@@ -345,8 +345,8 @@ public sealed class IrCSharpDifferentialOracleTests
     {
         return AppDomain.CurrentDomain.GetAssemblies()
             .Count(static assembly =>
-                assembly.GetName().Name?.StartsWith(
+                assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (assembly.GetName().Name?.StartsWith(
                     "SharpProofOracle_",
-                    StringComparison.Ordinal) == true);
+                    StringComparison.Ordinal) == true));
     }
 }

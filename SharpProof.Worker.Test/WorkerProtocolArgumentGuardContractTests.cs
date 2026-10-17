@@ -154,6 +154,7 @@ public sealed class WorkerProtocolArgumentGuardContractTests
 
     private static void AssertOutOfRange(Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         var error = Assert.Throws<ArgumentOutOfRangeException>(action);
         Assert.That(error!.ParamName, Is.EqualTo(ParameterName));
     }

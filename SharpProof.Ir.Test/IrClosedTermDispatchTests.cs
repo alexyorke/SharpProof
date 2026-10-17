@@ -70,6 +70,11 @@ public sealed class IrClosedTermDispatchTests
 
     private static string TypeName(IrFactory factory, IrTypeId type)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         return "\"" + factory.GetString(factory.GetTypeInfo(type).Name) + "\"#t" + type.Value;
     }
 }

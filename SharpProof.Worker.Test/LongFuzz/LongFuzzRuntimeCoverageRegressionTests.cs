@@ -32,6 +32,7 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
     public async Task SourceStringLengthSamplesPreserveValidClaimsAndObserveInvalidClaims(
         int length, bool reversed, string operation, int boundary)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         foreach (var valid in ClaimValidity)
         {
             var comparison = reversed ? $"{boundary} {operation} s.Length" : $"s.Length {operation} {boundary}";
@@ -265,6 +266,8 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
     [TestCase(3000183, ContractClaimProgramGenerator.EnforcePure, typeof(DivideByZeroException))]
     public void OracleFindsCompiledClrWitnesses(int seed, string expectedMode, Type expectedException)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedException);
+        System.ArgumentNullException.ThrowIfNull(expectedMode);
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(seed == 3000036 ? "Thrower((y + 5))" : "case 1: case 2: State++;"));
@@ -313,6 +316,8 @@ public sealed class LongFuzzRuntimeCoverageRegressionTests
     [TestCase(3001792, ContractClaimProgramGenerator.EnforcePure, "Contract.Requires((s != null && s.Length == 6));")]
     public void OracleFindsAdditionalCompiledClrWitnesses(int seed, string expectedMode, string sourceMarker)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedMode);
+        System.ArgumentNullException.ThrowIfNull(sourceMarker);
         var (source, mode, _) = new ContractClaimProgramGenerator(new Random(seed)).Program();
         Assert.That(mode, Is.EqualTo(expectedMode));
         Assert.That(source, Does.Contain(sourceMarker));

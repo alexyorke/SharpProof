@@ -7,6 +7,18 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReportingTests
 {
+    [Test]
+    public void DefaultAdditionalFilesCaptureAsAnEmptyCollection()
+    {
+        var compilation = TestCompilation.Create("DefaultAdditionalFiles",
+            ("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var captured = CompilerCompilationCapture.Capture(compilation,
+            Directory.GetCurrentDirectory(), "net8.0", default,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(captured.AdditionalFiles, Is.Empty);
+        Assert.That(captured.SyntaxTrees, Has.Length.EqualTo(1));
+    }
+
     private static readonly string[][] CapturedPathCases = [
         ["Subject.cs", "./Subject.cs"],
         ["Subject.cs", "Subject.cs", "Subject.cs#1"],
@@ -22,11 +34,14 @@ public sealed class CompilerReportingTests
     [TestCase(4)]
     public void CapturedDocumentsHaveUniqueFinalIdentities(int caseIndex)
     {
+        if (caseIndex < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(caseIndex)); }
+
         var paths = CapturedPathCases[caseIndex];
         var compilation = TestCompilation.Create("DocumentIdentityTests", paths.Select((path, index) =>
-            (path, "public static class Subject" + index + " { public static int Root() => " + index + "; }")).ToArray());
+            path is null ? throw new System.ArgumentNullException(nameof(path)) : ((path, "public static class Subject" + index + " { public static int Root() => " + index + "; }"))).ToArray());
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(snapshots.Select(static snapshot => snapshot.Path).Distinct(StringComparer.Ordinal).Count(),
+        Assert.That(snapshots.Select(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path)).Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(paths.Length));
         var trees = compilation.SyntaxTrees.ToArray();
         for (var ordinal = 0; ordinal < trees.Length; ordinal++)
@@ -36,7 +51,7 @@ public sealed class CompilerReportingTests
             Assert.That(snapshots[ordinal].TextLength, Is.EqualTo(independentlyCaptured.TextLength));
             var originalPath = string.IsNullOrEmpty(paths[ordinal])
                 ? $"<compiler-generated:{ordinal}>" : CompilerCaptureIdentity.NormalizePath(paths[ordinal]);
-            if (!snapshots.Take(ordinal).Any(snapshot => snapshot.Path == originalPath))
+            if (!snapshots.Take(ordinal).Any(snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path == originalPath)))
             { Assert.That(snapshots[ordinal].Path, Is.EqualTo(originalPath)); }
         }
     }
@@ -57,6 +72,7 @@ public sealed class CompilerReportingTests
     [TestCase("message")]
     public void DiagnosticOrderingPreservesDistinctSourceCoordinates(string coordinate)
     {
+        System.ArgumentNullException.ThrowIfNull(coordinate);
         var first = new CompilerDiagnosticArtifact { Location = Location(), Code = "SP0027", Message = "same" };
         var second = new CompilerDiagnosticArtifact { Location = Location(), Code = "SP0027", Message = "same" };
         switch (coordinate)
@@ -138,6 +154,7 @@ public sealed class CompilerReportingTests
     [TestCase("first-line")]
     public void MalformedReportingMapsDoNotInventCoordinates(string malformed)
     {
+        System.ArgumentNullException.ThrowIfNull(malformed);
         var tree = Tree("physical.cs");
         var entry = tree.LineMap[0];
         switch (malformed)
@@ -230,6 +247,7 @@ public sealed class CompilerReportingTests
 
     private static CompilerSyntaxTreeSnapshot Tree(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return new CompilerSyntaxTreeSnapshot
         {
             Path = path,

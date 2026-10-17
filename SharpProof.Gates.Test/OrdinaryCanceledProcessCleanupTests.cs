@@ -82,6 +82,7 @@ public sealed class OrdinaryCanceledProcessCleanupTests
 
     private static async Task<string> CreateBlockingExecutableAsync(string directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         var executable = Path.Combine(directory, "blocking-git.sh");
         await File.WriteAllTextAsync(executable,
             "#!/bin/sh\nprintf '%s\\n' \"$$\" > child.pid\nwhile :; do sleep 1; done\n",

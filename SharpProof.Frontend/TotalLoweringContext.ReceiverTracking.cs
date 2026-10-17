@@ -11,9 +11,10 @@ public sealed partial class TotalLoweringContext
     // implementation, cycles, ref escapes and captured mutable storage abstain.
     internal void TrackArrayReceivers(ControlFlowGraph graph)
     {
-        var operations = graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
-            .SelectMany(operation => operation.DescendantsAndSelf()).ToArray();
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })))
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).ToArray();
         var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
         var captures = new Dictionary<CaptureId, List<IOperation>>();
         var excluded = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
@@ -71,12 +72,14 @@ public sealed partial class TotalLoweringContext
 
         void Exclude(IOperation operation)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (Symbol(operation) is { } symbol)
             { excluded.Add(symbol); }
         }
 
         IArrayTypeSymbol? ResolveDefinitions(List<IOperation> values, int depth)
         {
+            values = RepositoryParameterGuard.NotNull(values, nameof(values));
             IArrayTypeSymbol? result = null;
             foreach (var value in values)
             {
@@ -90,6 +93,7 @@ public sealed partial class TotalLoweringContext
 
         IArrayTypeSymbol? Resolve(IOperation operation, int depth)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return null; }
             if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion &&
@@ -113,6 +117,7 @@ public sealed partial class TotalLoweringContext
 
     internal IArrayTypeSymbol? ConcreteArray(IOperation operation, int depth = 0)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (depth > 64)
         { return null; }
         if (operation.Type is IArrayTypeSymbol { IsSZArray: true } array && CSharpOperationSemantics.IsScalar(array.ElementType))
@@ -137,20 +142,23 @@ public sealed partial class TotalLoweringContext
 
     internal void SpecializeArrayParameter(IParameterSymbol parameter, IArrayTypeSymbol array)
     {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        array = RepositoryParameterGuard.NotNull(array, nameof(array));
         _arrayReceivers[parameter] = array;
         if (((INamedTypeSymbol)parameter.Type).TypeArguments[0] is ITypeParameterSymbol element)
         {
             _receiverElements[element] = array.ElementType;
             _types.TypeSpecializer = type => type != null && _receiverElements.TryGetValue(type, out var concrete) ? concrete : type;
         }
-        Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
+        Parameters = [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
             ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(array)),
                 Factory.CreateVariable("current:" + parameter.Ordinal, Type(array)),
-                Factory.CreateVariable("old:" + parameter.Ordinal, Type(array))) : binding)];
+                Factory.CreateVariable("old:" + parameter.Ordinal, Type(array))) : binding))];
     }
 
     internal IOperation? ArrayCollectionReceiver(IPropertyReferenceOperation property)
     {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (CSharpOperationSemantics.ArrayCollectionReceiver(property) is { } direct)
         { return direct; }
         return CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property) && property.Instance is { } receiver &&
@@ -161,6 +169,8 @@ public sealed partial class TotalLoweringContext
 
     internal IrTerm BridgeValue(IrTerm value, IrTypeId type)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         // Transport admits sequence-to-object and reference-to-reference
         // identities. Keep both steps when an opaque interface stores an array.
         if (Factory.GetTypeInfo(value.Type).Kind == IrTypeKind.Sequence &&
@@ -178,6 +188,7 @@ public sealed partial class TotalLoweringContext
 
     private static ISymbol? Symbol(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             ILocalReferenceOperation local => local.Local,

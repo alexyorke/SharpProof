@@ -25,8 +25,8 @@ public sealed class AnalyzerCoreCalleeNameCoverageTests
                 : "public static class Fixture { public static int Target() => 1; }",
             [], additionalReferences: referenced ? [reference] : [])
             .WithAssemblyName("AnalyzerCoreCalleeNameCaller");
-        Assert.That(origin.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        Assert.That(caller.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(origin.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(caller.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var location = Location.None;
         if (referenced)
         {

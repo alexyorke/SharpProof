@@ -46,15 +46,15 @@ public sealed class IrInstructionProjectionTests
         var sequence = factory.Variable(old);
         var owner = factory.Cast(factory.ObjectType, factory.SequenceAccess(sequence, factory.Integer(0)));
         var memo = new Dictionary<IrId, IrTerm>();
-        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable == old,
-            guard => guard, () => true, memo, out var selector, default), Is.True);
+        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old),
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out var selector, default), Is.True);
         Assert.That(selector, Is.SameAs(factory.Boolean(true)));
         var unsupported = factory.PureOpaque(factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "UnknownOwner", factory.ObjectType, true), null);
         Assert.That(IrSnapshotReads.TrySelector(factory, unsupported, _ => false,
-            guard => guard, () => true, memo, out _, default), Is.False);
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out _, default), Is.False);
         Assert.That(IrSnapshotReads.TrySelector(factory, factory.Null(factory.ObjectType), _ => true,
-            guard => guard, () => true, memo, out selector, default), Is.True);
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out selector, default), Is.True);
         Assert.That(selector, Is.SameAs(factory.Boolean(false)));
     }
 }

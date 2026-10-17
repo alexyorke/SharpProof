@@ -14,6 +14,8 @@ public sealed class WorkerVcDefaultFieldControlTests
     [TestCase("public int Value; public virtual void Mutate() { Value = 7; }", "var cell = new Cell(); cell.Mutate(); return cell.Value;", false)]
     public async Task DefaultFieldsPreserveOtherHeapBehavior(string members, string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public class Cell { " + members +
             " } public static class Subject { public static int Target() { " +
             "Contract.Ensures(Contract.Result<int>() == 0); " + body + " } }", cacheEnabled: false);

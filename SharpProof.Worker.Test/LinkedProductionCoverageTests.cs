@@ -34,6 +34,8 @@ public sealed class LinkedProductionCoverageTests
     [TestCase("foreign-range", "ProductionB:eng/RoslynSymbolFacts.cs:20")]
     public async Task RejectsEvidenceBelongingOnlyToAnotherProductionModule(string scenario, string identity)
     {
+        System.ArgumentNullException.ThrowIfNull(identity);
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var result = await RunAsync(scenario);
         Assert.That(result.RootElement.GetProperty("error").GetString(),
             Does.Contain("authenticated"), scenario);
@@ -42,6 +44,7 @@ public sealed class LinkedProductionCoverageTests
 
     private static async Task<JsonDocument> RunAsync(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         const string script = """
             $ErrorActionPreference = 'Stop'
             Set-StrictMode -Version Latest

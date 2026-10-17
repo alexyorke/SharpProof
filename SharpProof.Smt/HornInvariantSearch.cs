@@ -32,7 +32,7 @@ public static class HornInvariantSearch
     private sealed class Search(Context context, IrFactory factory, Z3ExpressionOwner owner, BvEncoder encoder,
         IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
-        private readonly SmtQueryResourceMeter _meter = new(rlimit, cancellationToken);
+        private readonly SmtQueryResourceMeter _meter = (states is null ? throw new System.ArgumentNullException(nameof(states)) : (encoder is null ? throw new System.ArgumentNullException(nameof(encoder)) : (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : new(rlimit, cancellationToken))))));
         private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
@@ -44,12 +44,13 @@ public static class HornInvariantSearch
 
         internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
         {
+            clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
             var proposals = new Dictionary<IrMemberId, IrTerm>();
             _error = context.MkFuncDecl("error", [], context.BoolSort);
             var rules = new List<BoolExpr>();
             foreach (var clause in clauses)
             {
-                var body = clause.Assumptions.Select(assumption => Atom(encoder.EncodeBoolean(assumption.Predicate, _meter))).ToList();
+                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToList();
                 foreach (var (guards, head) in Heads(encoder.EncodeBoolean(clause.Goal.Predicate, _meter)))
                 { rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
             }
@@ -84,7 +85,7 @@ public static class HornInvariantSearch
                 if (state.Length != domain.Length)
                 { throw new ArgumentException("An invariant state must match its relation's arity."); }
                 var arguments = state.Select((term, ordinal) =>
-                    Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal]))).ToArray();
+                    ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToArray();
                 for (var ordinal = 0; ordinal < state.Length; ordinal++)
                 { _names[arguments[ordinal].FuncDecl.Name.ToString()] = state[ordinal]; }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
@@ -100,7 +101,7 @@ public static class HornInvariantSearch
         {
             var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
             CollectIntegerConstants(rule, constants);
-            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToArray();
             var congruence = new List<BoolExpr>();
             // A bitvector unknown keeps its signed range.
             foreach (var name in applied)
@@ -122,7 +123,7 @@ public static class HornInvariantSearch
                     if (function != other || arguments.Length != otherArguments.Length)
                     { continue; }
                     congruence.Add(Own(context.MkImplies(
-                        Own(context.MkAnd([.. arguments.Select((argument, ordinal) => Own(context.MkEq(argument, otherArguments[ordinal])))])),
+                        Own(context.MkAnd([.. arguments.Select((argument, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkEq(argument, otherArguments[ordinal]))))))])),
                         Own(context.MkEq(constants[applied[left]], constants[applied[right]])))));
                 }
             }
@@ -162,7 +163,7 @@ public static class HornInvariantSearch
                 var arguments = expression.Args.Select(Integer).ToArray();
                 if (!_relations.TryGetValue(name, out var relation))
                 {
-                    relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
+                    relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
                     _relations.Add(name, relation);
                 }
                 return Own(context.MkApp(relation, arguments));
@@ -185,7 +186,7 @@ public static class HornInvariantSearch
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
                 var function = expression.FuncDecl.Name.ToString();
-                var key = function + "(" + string.Join(",", operands.Select(operand => operand.Id.ToString(CultureInfo.InvariantCulture))) + ")";
+                var key = function + "(" + string.Join(",", operands.Select(operand => operand is null ? throw new System.ArgumentNullException(nameof(operand)) : (operand.Id.ToString(CultureInfo.InvariantCulture)))) + ")";
                 if (!_applications.TryGetValue(key, out var application))
                 {
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
@@ -233,6 +234,7 @@ public static class HornInvariantSearch
         {
             // Integer memoizes the completed conversion before any later use.
             // This method therefore allocates once for each unknown expression.
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             var name = "unknown" + _unknownCount.ToString(CultureInfo.InvariantCulture);
             Expr fresh = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
             _unknownCount++;
@@ -241,18 +243,21 @@ public static class HornInvariantSearch
 
         private T Own<T>(T expression) where T : Expr
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return owner.Own(expression);
         }
 
         private bool IsRelation(Expr expression)
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             return expression.IsApp && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED &&
-                encoder.Relations!.Values.Any(relation => relation.Name.ToString() == expression.FuncDecl.Name.ToString());
+                encoder.Relations!.Values.Any(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (relation.Name.ToString() == expression.FuncDecl.Name.ToString()));
         }
 
         private bool ContainsRelation(Expr expression)
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return IsRelation(expression) || expression.IsApp && expression.Args.Any(ContainsRelation);
         }
@@ -271,10 +276,11 @@ public static class HornInvariantSearch
 
         private void Applications(Expr expression, List<Expr> applications)
         {
+            applications = RepositoryParameterGuard.NotNull(applications, nameof(applications));
             _meter.Consume();
             if (IsRelation(expression))
             {
-                if (!applications.Any(application => application.Equals(expression)))
+                if (!applications.Any(application => application is null ? throw new System.ArgumentNullException(nameof(application)) : (application.Equals(expression))))
                 { applications.Add(expression); }
                 return;
             }
@@ -293,11 +299,11 @@ public static class HornInvariantSearch
             if (IsRelation(goal))
             { return [([], goal)]; }
             if (goal.IsAnd)
-            { return [.. goal.Args.SelectMany(argument => Heads((BoolExpr)argument))]; }
+            { return [.. goal.Args.SelectMany(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Heads((BoolExpr)argument)))]; }
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
-                var guards = goal.Args.Where(argument => !ContainsRelation(argument))
-                    .Select(argument => Own(context.MkNot((BoolExpr)argument))).ToArray();
+                var guards = goal.Args.Where(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (!ContainsRelation(argument)))
+                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToArray();
                 return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToArray(), head.Head))];
             }
             throw new UnsupportedIrEncodingException();
@@ -308,6 +314,7 @@ public static class HornInvariantSearch
         // Quantification is added only after this traversal.
         private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
         {
+            constants = RepositoryParameterGuard.NotNull(constants, nameof(constants));
             _meter.Consume();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
@@ -322,6 +329,7 @@ public static class HornInvariantSearch
         // The IR meaning of a cover over boolean and bitvector state.
         private IrTerm? Translate(Expr expression)
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             var arguments = expression.IsApp ? expression.Args : [];
             var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);

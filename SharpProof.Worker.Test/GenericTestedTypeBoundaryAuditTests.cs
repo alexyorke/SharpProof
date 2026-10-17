@@ -51,6 +51,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
 
     private static async Task<BoundaryObservation> ObserveBoundary(string boundary)
     {
+        System.ArgumentNullException.ThrowIfNull(boundary);
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var evidenceDirectory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "generic-type-values-audit",
@@ -93,8 +94,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
                 TargetNoInlining = (targetFlags & MethodImplAttributes.NoInlining) != 0,
                 ControlNoInlining = (controlFlags & MethodImplAttributes.NoInlining) != 0,
                 TargetNoOptimization = (targetFlags & MethodImplAttributes.NoOptimization) != 0,
-                HasBox = instructions.Any(instruction => instruction.OpCode == "box"),
-                HasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst"),
+                HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
+                HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
                 IlHex = Convert.ToHexString(il),
                 Instructions = instructions,
                 Cases = cases,
@@ -135,17 +136,17 @@ public sealed class GenericTestedTypeBoundaryAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => new
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            }).ToArray(),
+            })).ToArray(),
             Cases = cases,
             NativeExpectation = preserveProof ? "Proven preservation control" : "Exploratory nullable outcome; no fixed outcome",
             SubjectBytes = "Exploratory actual counts, with no zero or positive allocation prerequisite",
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven.",
-            ObservedPositiveAllocation = cases.Any(observed => observed.Target.AllocatedBytes > 0)
+            ObservedPositiveAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0))
         });
         Assert.That(response.Errors, Is.Empty);
         Assert.That(project.Request.Cache.Enabled, Is.False);
@@ -155,6 +156,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
 
     private static CaseObservation[] ObserveCases(string boundary, MethodInfo target, MethodInfo control)
     {
+        System.ArgumentNullException.ThrowIfNull(control);
+        System.ArgumentNullException.ThrowIfNull(target);
         return boundary switch
         {
             "fixed-int" =>
@@ -189,9 +192,12 @@ public sealed class GenericTestedTypeBoundaryAuditTests
         };
     }
 
-    private static CaseObservation Observe<TValue, TTest>(string name, MethodInfo generic, MethodInfo control, TValue value,
+    private static CaseObservation Observe<TValue, TTest>(string name, MethodInfo generic, MethodInfo control, TValue value /* SPINT001: all values valid - runtime type probes intentionally accept all values, including null */,
         bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(control);
+        System.ArgumentNullException.ThrowIfNull(generic);
+        System.ArgumentNullException.ThrowIfNull(name);
         var target = generic.MakeGenericMethod(typeof(TValue), typeof(TTest)).CreateDelegate<Func<TValue, int, bool>>();
         var controlTarget = control.MakeGenericMethod(typeof(TValue)).CreateDelegate<Func<TValue, int, bool>>();
         return new(name, typeof(TValue).ToString(), typeof(TTest).ToString(),
@@ -199,8 +205,9 @@ public sealed class GenericTestedTypeBoundaryAuditTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Measurement Measure<TValue>(Func<TValue, int, bool> target, TValue value, bool expected)
+    private static Measurement Measure<TValue>(Func<TValue, int, bool> target, TValue value /* SPINT001: all values valid - runtime type probes intentionally accept all values, including null */, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         var actual = target(value, InputGuard);
         for (var index = 0; index < WarmupCount; index++)
         {
@@ -221,6 +228,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
 
     private static void AssertMeasurement(string name, Measurement measured)
     {
+        System.ArgumentNullException.ThrowIfNull(measured);
+        System.ArgumentNullException.ThrowIfNull(name);
         Assert.That(measured.Actual, Is.EqualTo(measured.Expected), name);
         Assert.That(measured.TrueResults, Is.EqualTo(measured.Expected ? MeasurementCount : 0), name);
         Assert.That(measured.AllocatedBytes, Is.GreaterThanOrEqualTo(0), name);
@@ -333,10 +342,11 @@ public sealed class GenericTestedTypeBoundaryAuditTests
 
     private static IlInstruction[] ReadIl(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field.FieldType == typeof(OpCode))
-            .Select(field => (OpCode)field.GetValue(null)!)
-            .ToDictionary(opcode => unchecked((ushort)opcode.Value));
+            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = new List<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
@@ -364,14 +374,32 @@ public sealed class GenericTestedTypeBoundaryAuditTests
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
-    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason);
+    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
+    {
+        public string Boundary { get; init; } = Boundary ?? throw new System.ArgumentNullException(nameof(Boundary));
+        public CaseObservation[] Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+    }
 
-    private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control);
+    private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public string ValueType { get; init; } = ValueType ?? throw new System.ArgumentNullException(nameof(ValueType));
+        public string TestedType { get; init; } = TestedType ?? throw new System.ArgumentNullException(nameof(TestedType));
+        public Measurement Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
+        public Measurement Control { get; init; } = Control ?? throw new System.ArgumentNullException(nameof(Control));
+    }
 
     private sealed record Measurement(bool Expected, bool Actual, int TrueResults, long AllocatedBytes, double BytesPerCall);
 
-    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex);
+    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string OperandHex { get; init; } = OperandHex ?? throw new System.ArgumentNullException(nameof(OperandHex));
+    }
 }

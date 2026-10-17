@@ -47,6 +47,7 @@ public sealed class CompilerCaptureFreshnessControlTests
     [TestCase("RunAnalyzersDuringBuild")]
     public async Task FreshBuildRequiresExecutedCollector(string disabledProperty)
     {
+        System.ArgumentNullException.ThrowIfNull(disabledProperty);
         using var consumer = new Consumer(PureSource);
         var build = await consumer.BuildAsync((disabledProperty, "false"));
         Assert.That(build.Code, Is.Not.Zero, build.Output);
@@ -93,6 +94,7 @@ public sealed class CompilerCaptureFreshnessControlTests
     [TestCase("RunAnalyzersDuringBuild")]
     public async Task ReenabledCollectorRecoversAfterRejectedChangedBuild(string disabledProperty)
     {
+        System.ArgumentNullException.ThrowIfNull(disabledProperty);
         using var consumer = new Consumer(PureSource);
         var first = await consumer.BuildAsync();
         Assert.That(first.Code, Is.Zero, first.Output);
@@ -138,6 +140,8 @@ public sealed class CompilerCaptureFreshnessControlTests
     [TestCase("SharpProofCompilerManifestFile", "compiler-capture.request.completed")]
     public async Task PublicationCannotOverwriteCaptureSidecars(string property, string fileName)
     {
+        System.ArgumentNullException.ThrowIfNull(fileName);
+        System.ArgumentNullException.ThrowIfNull(property);
         using var consumer = new Consumer(PureSource);
         var first = await consumer.BuildAsync();
         Assert.That(first.Code, Is.Zero, first.Output);
@@ -210,6 +214,7 @@ public sealed class CompilerCaptureFreshnessControlTests
 
         internal Consumer(string source)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             _project = (IDisposable)_type.GetMethod("Create", Members)!.Invoke(null, [source, false])!;
         }
 
@@ -222,11 +227,13 @@ public sealed class CompilerCaptureFreshnessControlTests
 
         private string PathProperty(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return (string)_type.GetProperty(name, Members)!.GetValue(_project)!;
         }
 
         internal async Task<(int Code, string Output)> BuildAsync(params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             (string Name, string Value)[] configured = [("SharpProofRunAnalyzersForPackageTests", "true"), .. properties];
             var task = (Task)_type.GetMethod("BuildAsync", Members)!.Invoke(_project, [true, configured])!;
             await task;

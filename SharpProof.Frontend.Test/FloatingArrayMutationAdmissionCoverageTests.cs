@@ -9,6 +9,7 @@ public sealed class FloatingArrayMutationAdmissionCoverageTests
     [TestCase(" += 1f")]
     public void ActualFloatingArrayMutationKeepsIntegerMutationClosure(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         using var subject = TypedProgramSubject.Create("bool Target(float[] values) { values[0]" + mutation +
             "; return values[0] == 2f; }");
         float[] values = [1f];

@@ -155,6 +155,8 @@ public sealed class CallableReplayBoundaryTests
         ImmutableArray<IrVarId> resultVariables = default,
         IrTerm? postcondition = null)
     {
+
+        System.ArgumentNullException.ThrowIfNull(factory);
         return new CallableReplayContext(program, isTrivial,
             parameterBindings ?? ImmutableDictionary<IrVarId, IrVarId>.Empty,
             preStateBindings ?? ImmutableDictionary<IrVarId, IrVarId?>.Empty,
@@ -168,6 +170,10 @@ public sealed class CallableReplayBoundaryTests
         IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments,
         CallableReplayContext context, params IrVarId[] variables)
     {
+        System.ArgumentNullException.ThrowIfNull(variables, nameof(variables));
+        System.ArgumentNullException.ThrowIfNull(assignments);
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(factory);
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
         return await new ProofKernel(new ModelBackend(new BackendModel(assignments)))
@@ -176,6 +182,7 @@ public sealed class CallableReplayBoundaryTests
 
     private static void AssertReplayFailed(ProofOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(outcome);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
@@ -183,11 +190,13 @@ public sealed class CallableReplayBoundaryTests
 
     private sealed class ModelBackend(BackendModel model) : ISmtBackend
     {
+        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(BackendCheckResult.Satisfiable(model));
+            return Task.FromResult(BackendCheckResult.Satisfiable(_guarded_model));
         }
     }
 }

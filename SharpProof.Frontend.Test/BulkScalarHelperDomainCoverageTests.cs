@@ -14,10 +14,10 @@ public sealed class BulkScalarHelperDomainCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(bool flag, int first, int second) => flag ? first : second;");
         var operation = (IConditionalOperation)Expression(subject);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => lowerer.LowerClause(child)).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
         Assert.That(children, Has.Length.EqualTo(3));
-        Assert.That(children.All(child => child.Classification.IsExact), Is.True);
-        Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child.Value)]), FrontendAbstention.UnsupportedOperationKind);
+        Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
+        Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UnsupportedOperationKind);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.True);
         foreach (var flag in new[] { true, false })
@@ -25,7 +25,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
             object[] inputs = [flag, 17, 23];
             var expected = flag ? 17 : 23;
             Assert.That(subject.Invoke(inputs), Is.EqualTo(expected));
-            var environment = subject.Context.Parameters.ToDictionary(binding => binding.Current, binding => subject.Value(binding.Current, inputs[binding.Parameter.Ordinal]));
+            var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.SafeCondition, environment).Value!.Boolean, Is.True);
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
             Replay(subject, inputs, expected);
@@ -42,10 +42,10 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var operation = (IBinaryOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.OperatorMethod, Is.Not.Null);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => lowerer.LowerClause(child)).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
         Assert.That(children, Has.Length.EqualTo(2));
-        Assert.That(children.All(child => child.Classification.IsExact), Is.True);
-        Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child.Value)]), FrontendAbstention.UserDefinedOperator);
+        Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
+        Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UserDefinedOperator);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.False);
         Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UserDefinedOperator));
@@ -95,7 +95,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var rule = CSharpOperationSemantics.Bitwise(supported.Factory, binary.Operator, binary.Left, binary.Right);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = supported.Context.Parameters.ToDictionary(binding => binding.Current, binding => supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3));
+        var environment = supported.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3)));
         Assert.That(new IrInterpreter(supported.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(3)));
         Replay(supported, [7, 3], 3);
     }
@@ -111,7 +111,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding.Entry, _ => subject.Factory.CreateStringValue("word"));
+        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), _ => subject.Factory.CreateStringValue("word"));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -123,13 +123,15 @@ public sealed class BulkScalarHelperDomainCoverageTests
 
     private static Microsoft.CodeAnalysis.IOperation Expression(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         return subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
     }
 
     private static void Closed(IrFactory factory, TotalScalarRule rule, FrontendAbstention reason)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(reason));
         Assert.That(rule.Throws, Is.Empty);
@@ -138,6 +140,8 @@ public sealed class BulkScalarHelperDomainCoverageTests
 
     private static void Replay(TypedProgramSubject subject, object[] inputs, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(subject);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

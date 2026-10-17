@@ -35,7 +35,7 @@ public sealed class ContractEditingRecoveryTests
             [tree], TestMetadataReferences.WithSharpProof,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         var model = compilation.GetSemanticModel(tree);
         var root = tree.GetRoot();
@@ -57,7 +57,7 @@ public sealed class ContractEditingRecoveryTests
             Is.EqualTo(declared ? TypeKind.Class : TypeKind.Error));
         Assert.That(defaultOperation.Type.ContainingType!.Name, Is.EqualTo("Container"));
         var callerSyntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax.Expression.ToString() == "Target.Read<int>");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Target.Read<int>"));
         var callerOperation = (IInvocationOperation)model.GetOperation(callerSyntax)!;
         var target = callerOperation.TargetMethod;
         Assert.That(target.TypeArguments.Single().SpecialType, Is.EqualTo(SpecialType.System_Int32));

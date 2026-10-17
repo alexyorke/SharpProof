@@ -18,7 +18,7 @@ public sealed class GenericRootShadowTypeTestCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "generic-root.cs");
         var compilation = CSharpCompilation.Create("ActualGenericRoot", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("ActualGenericRoot", isCollectible: true);
@@ -42,7 +42,7 @@ public sealed class GenericRootShadowTypeTestCoverageTests
             Assert.That(shadow.IsShadowCallSkeleton, Is.True);
             Assert.That(shadow.IsExact, Is.False);
             Assert.That(shadow.PreservedSourceCalls, Is.Empty);
-            var instructions = shadow.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+            var instructions = shadow.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
             Assert.That(instructions.OfType<IrCallInstruction>(), Is.Empty);
             Assert.That(instructions.OfType<IrAllocationInstruction>(), Is.Empty);
             var havoc = instructions.OfType<IrHavocInstruction>().Single();

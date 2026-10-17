@@ -43,9 +43,9 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         // Same source/text paths; supported Conditional contract calls are
         // absent only from this bounded CLR control image, not native artifact.
-        var runtimeTrees = compilation.SyntaxTrees.Select(tree => CSharpSyntaxTree.ParseText(tree.GetText(),
+        var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
             ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
-                ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol != Contract.ConditionalSymbol)), tree.FilePath));
+                ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
         var runtimeCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(runtimeTrees);
         TestCompilation.AssertNoErrors(runtimeCompilation);
         using var runtimeImage = new MemoryStream();
@@ -135,7 +135,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             // Manually constructed IR/Smt API lemmas use compiler-decoded
             // bindings. They are not compiler-produced contract clauses.
             var assumptions = domain.AddRange(constraints.Select(predicate =>
-                new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))));
+                predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))));
             var query = new VerificationQuery(factory, assumptions,
                 Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
             var before = session.ConsumedResourceCount;
@@ -147,7 +147,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             if (outcome is ProvenOutcome proven)
             {
                 Assert.That(proven.Core, Is.Not.Empty);
-                Assert.That(proven.Core.All(core => assumptions.Any(assumption => assumption.Justification == core)), Is.True);
+                Assert.That(proven.Core.All(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification == core)))), Is.True);
             }
             else
             {
@@ -160,7 +160,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 q,
                 outcome = outcome.GetType().Name,
                 reason = outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : "None",
-                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core.Operation.Value).ToArray() : [],
+                core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToArray() : [],
                 delta,
                 consumed = session.ConsumedResourceCount
             }));

@@ -104,7 +104,7 @@ public sealed class RoslynSymbolFactsCompilerSymbolTests
                     optimizationLevel: OptimizationLevel.Release)),
             _ => throw new ArgumentOutOfRangeException(nameof(language)),
         };
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(typeof(RoslynSymbolFacts).Assembly.GetName().Name, Is.EqualTo("SharpProof.Frontend"));
 
         var box = RequiredType(compilation, "Box`1");
@@ -175,6 +175,8 @@ public sealed class RoslynSymbolFactsCompilerSymbolTests
 
     private static INamedTypeSymbol RequiredType(Compilation compilation, string metadataName)
     {
+        System.ArgumentNullException.ThrowIfNull(metadataName);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var type = compilation.GetTypeByMetadataName(metadataName);
         Assert.That(type, Is.Not.Null, metadataName);
         return type!;

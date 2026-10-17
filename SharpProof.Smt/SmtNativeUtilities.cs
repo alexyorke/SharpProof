@@ -38,10 +38,7 @@ internal static class SmtNativeUtilities
 
     internal static uint? ReadResourceCount(Solver solver)
     {
-        if (solver is null)
-        {
-            throw new ArgumentNullException(nameof(solver));
-        }
+        solver = RepositoryParameterGuard.NotNull(solver, nameof(solver));
 
         // Statistics is a caller-owned Z3 object holding a native reference, the
         // same as a model. A solver session outlives hundreds of
@@ -69,17 +66,11 @@ internal static class SmtNativeUtilities
         Symbol name,
         uint value)
     {
-        if (name is null)
-        {
-            throw new ArgumentNullException(nameof(name));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
 
         using (name)
         {
-            if (parameters is null)
-            {
-                throw new ArgumentNullException(nameof(parameters));
-            }
+            parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
 
             parameters.Add(name, value);
         }
@@ -94,6 +85,7 @@ internal static class SmtNativeUtilities
 
     internal static NativeIntegerNumeral? ReadBitVectorNumeral(BitVecNum number)
     {
+        number = RepositoryParameterGuard.NotNull(number, nameof(number));
         using var sort = number.Sort;
         return sort is BitVecSort bitVector && bitVector.Size is 8 or 16 or 32 or 64
             ? new NativeIntegerNumeral(number, (int)bitVector.Size, 0) : null;
@@ -110,6 +102,8 @@ internal static class SmtNativeUtilities
     internal static IrIntegerTerm? DecodeIntegerLiteral(
         IrFactory factory, Expr expression, out Z3_decl_kind kind)
     {
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         kind = expression.FuncDecl.DeclKind;
         NativeIntegerNumeral? numeral = null;
         switch (kind)
@@ -138,10 +132,8 @@ internal static class SmtNativeUtilities
 
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
     {
-        if (factory is null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
 
         return expression is not BoolExpr ? null : expression.BoolValue switch
         {
@@ -156,6 +148,8 @@ internal static class SmtNativeUtilities
     internal static IrTerm? ReconstructHornApplication(
         IrFactory factory, Expr expression, IrTerm?[] operands)
     {
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (operands.Any(operand => operand == null))
         { return null; }
         var terms = operands.Select(operand => operand!).ToArray();
@@ -200,6 +194,7 @@ internal static class SmtNativeUtilities
 
     internal static IrTerm? Fold(IrFactory factory, IrBinaryOperator @operator, IrTerm[] terms)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (terms.Length == 0)
         { return null; }
         var result = terms[0];
@@ -215,6 +210,9 @@ internal static class SmtNativeUtilities
     // it from their operands' type.
     private static IrTerm Compare(IrFactory factory, IrBinaryOperator @operator, IrTerm left, IrTerm right, bool? signed)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         (left, right) = Unify(factory, left, right);
         if (signed is { } kind && factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer } info && info.Signed != kind)
         {
@@ -226,6 +224,10 @@ internal static class SmtNativeUtilities
 
     private static IrTerm Conditional(IrFactory factory, IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
     {
+        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        whenFalse = RepositoryParameterGuard.NotNull(whenFalse, nameof(whenFalse));
+        whenTrue = RepositoryParameterGuard.NotNull(whenTrue, nameof(whenTrue));
         var (left, right) = Unify(factory, whenTrue, whenFalse);
         return factory.Conditional(condition, left, right);
     }
@@ -233,15 +235,21 @@ internal static class SmtNativeUtilities
     // A literal takes the type of the term it meets.
     private static (IrTerm Left, IrTerm Right) Unify(IrFactory factory, IrTerm left, IrTerm right)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left is IrIntegerTerm && right is not IrIntegerTerm ? (Like(factory, left, right.Type), right) : (left, Like(factory, right, left.Type));
     }
 
     private static IrTerm Like(IrFactory factory, IrTerm term, IrTypeId type)
-    { return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
+    { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); term = RepositoryParameterGuard.NotNull(term, nameof(term)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
 
     internal static void ApplyArrayObservations(IrFactory factory, IrTypeId elementType,
         IrValue[] elements, Dictionary<int, IrValue> observed)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(elementType.IsDefault, nameof(elementType));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
         foreach (var entry in observed)
         {
             if (entry.Key < 0 || entry.Key >= elements.Length)

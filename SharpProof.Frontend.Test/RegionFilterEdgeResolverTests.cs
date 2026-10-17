@@ -38,8 +38,8 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.Single(branch =>
-            Inside(branch.Source.EnclosingRegion, subject.Filter) &&
-            branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling);
+            branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (Inside(branch.Source.EnclosingRegion, subject.Filter) &&
+            branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling));
         Assert.That(edge.Destination, Is.Null);
         Assert.That(subject.Resolver.Resolve(edge), Is.EqualTo(subject.Rejected));
     }
@@ -49,8 +49,8 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
-            Inside(branch.Source.EnclosingRegion, subject.Filter) &&
-            branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Catch));
+            branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (Inside(branch.Source.EnclosingRegion, subject.Filter) &&
+            branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Catch)));
         Assert.That(edge.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Regular));
         Assert.That(edge.FinallyRegions, Is.Empty);
         Assert.That(subject.Resolver.Resolve(edge), Is.EqualTo(subject.Accepted));
@@ -61,8 +61,8 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
-            Inside(branch.Source.EnclosingRegion, subject.Filter) &&
-            branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Filter));
+            branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (Inside(branch.Source.EnclosingRegion, subject.Filter) &&
+            branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Filter)));
         Assert.That(edge.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Regular));
         Assert.That(edge.FinallyRegions, Is.Empty);
         Assert.That(subject.Resolver.Resolve(edge), Is.EqualTo(subject.Blocks[edge.Destination!]));
@@ -92,7 +92,7 @@ public sealed class RegionFilterEdgeResolverTests
     public void CompilerReturnEdgeRefusesControlFlow()
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
-        var edge = subject.Edges.Single(branch => branch.Semantics == ControlFlowBranchSemantics.Return);
+        var edge = subject.Edges.Single(branch => branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (branch.Semantics == ControlFlowBranchSemantics.Return));
         Assert.That(edge.Destination, Is.Not.Null);
         AssertIncomplete(subject, edge);
     }
@@ -101,7 +101,7 @@ public sealed class RegionFilterEdgeResolverTests
     public void CompilerThrowEdgeRefusesControlFlow()
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
-        var edge = subject.Edges.Single(branch => branch.Semantics == ControlFlowBranchSemantics.Throw);
+        var edge = subject.Edges.Single(branch => branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (branch.Semantics == ControlFlowBranchSemantics.Throw));
         Assert.That(edge.Destination, Is.Null);
         AssertIncomplete(subject, edge);
     }
@@ -111,9 +111,9 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
-            branch.Semantics == ControlFlowBranchSemantics.Regular && !branch.FinallyRegions.IsEmpty);
+            branch is null ? throw new System.ArgumentNullException(nameof(branch)) : (branch.Semantics == ControlFlowBranchSemantics.Regular && !branch.FinallyRegions.IsEmpty));
         Assert.That(edge.Destination, Is.Not.Null);
-        Assert.That(edge.FinallyRegions.All(region => region.Kind == ControlFlowRegionKind.Finally), Is.True);
+        Assert.That(edge.FinallyRegions.All(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Finally)), Is.True);
         AssertIncomplete(subject, edge);
     }
 
@@ -128,6 +128,7 @@ public sealed class RegionFilterEdgeResolverTests
 
     private static void AssertIncomplete(Subject subject, ControlFlowBranch? edge)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var exception = Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(
             new Action(() => subject.Resolver.Resolve(edge)))!;
         Assert.That(exception.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
@@ -139,24 +140,24 @@ public sealed class RegionFilterEdgeResolverTests
             path: "filter-edge-resolver.cs", cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("FilterEdgeResolver", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics(TestContext.CurrentContext.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(TestContext.CurrentContext.CancellationToken).Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var syntax = tree.GetRoot(TestContext.CurrentContext.CancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = compilation.GetSemanticModel(tree);
         var target = model.GetDeclaredSymbol(syntax, TestContext.CurrentContext.CancellationToken)!;
         var graph = ControlFlowGraph.Create(syntax, model, TestContext.CurrentContext.CancellationToken)!;
-        var filter = Regions(graph.Root).Single(region => region.Kind == ControlFlowRegionKind.Filter);
-        var caught = filter.EnclosingRegion!.NestedRegions.Single(region => region.Kind == ControlFlowRegionKind.Catch);
+        var filter = Regions(graph.Root).Single(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Filter));
+        var caught = filter.EnclosingRegion!.NestedRegions.Single(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Catch));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         var lowerer = new RoslynTotalProgramLowerer(context, cancellationToken);
         var builder = new IrProgramBuilder(factory);
-        var blocks = graph.Blocks.ToDictionary(block => block, block => builder.CreateBlock("cfg:" + block.Ordinal));
+        var blocks = graph.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock("cfg:" + block.Ordinal)));
         var accepted = builder.CreateBlock("accepted");
         var rejected = builder.CreateBlock("rejected");
         var resolver = new RoslynTotalProgramLowerer.RegionFilterEdgeResolver(lowerer, filter, caught, accepted, rejected, blocks);
@@ -165,6 +166,7 @@ public sealed class RegionFilterEdgeResolverTests
 
     private static IEnumerable<ControlFlowRegion> Regions(ControlFlowRegion root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         yield return root;
         foreach (var child in root.NestedRegions)
         {
@@ -175,6 +177,7 @@ public sealed class RegionFilterEdgeResolverTests
 
     private static bool Inside(ControlFlowRegion candidate, ControlFlowRegion expected)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         for (var region = candidate; region != null; region = region.EnclosingRegion)
         {
             if (region == expected)
@@ -187,8 +190,16 @@ public sealed class RegionFilterEdgeResolverTests
         Dictionary<BasicBlock, IrBlockId> Blocks, IrBlockId Accepted, IrBlockId Rejected,
         RoslynTotalProgramLowerer.RegionFilterEdgeResolver Resolver)
     {
+        public ControlFlowGraph Graph { get; init; } = Graph ?? throw new System.ArgumentNullException(nameof(Graph));
+        public ControlFlowRegion Filter { get; init; } = Filter ?? throw new System.ArgumentNullException(nameof(Filter));
+        public ControlFlowRegion Catch { get; init; } = Catch ?? throw new System.ArgumentNullException(nameof(Catch));
+        public Dictionary<BasicBlock, IrBlockId> Blocks { get; init; } = Blocks ?? throw new System.ArgumentNullException(nameof(Blocks));
+        public IrBlockId Accepted { get; init; } = Accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Accepted)) : Accepted;
+        public IrBlockId Rejected { get; init; } = Rejected.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Rejected)) : Rejected;
+        public RoslynTotalProgramLowerer.RegionFilterEdgeResolver Resolver { get; init; } = Resolver.Equals(default(RoslynTotalProgramLowerer.RegionFilterEdgeResolver)) ? throw new System.ArgumentException("Value must be initialized.", nameof(Resolver)) : Resolver;
+
         internal IEnumerable<ControlFlowBranch> Edges => Graph.Blocks
-            .SelectMany(block => new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
+            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
             .OfType<ControlFlowBranch>();
     }
 }

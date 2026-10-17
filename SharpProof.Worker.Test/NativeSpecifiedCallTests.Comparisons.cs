@@ -3,7 +3,6 @@ using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
-
 public sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("int")]
@@ -12,14 +11,23 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("ulong")]
     public async Task IntegerCompareToProvesResultAndEffectClaims(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         await CheckComparisonContract(type, "return left.CompareTo(right);", WorkerClaimOutcome.Proven);
-        var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static int Target(" +
-            type + " left, " + type + " right) { return left.CompareTo(right); }");
+        var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static int Target(" + type + " left, " + type + " right) { return left.CompareTo(right); }");
         var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        foreach (var result in new[] { exceptions, allocations, purity })
-        { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
+        foreach (var result in new[]
+        {
+            exceptions,
+            allocations,
+            purity
+        }
+
+        )
+        {
+            Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        }
     }
 
     [TestCase("int")]
@@ -28,9 +36,8 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("ulong")]
     public async Task DefaultIntegerComparerProvesResultWithoutErasingGetterEffects(string type)
     {
-        await CheckComparisonContract(type,
-            "return System.Collections.Generic.Comparer<" + type + ">.Default.Compare(y: right, x: left);",
-            WorkerClaimOutcome.Proven);
+        System.ArgumentNullException.ThrowIfNull(type);
+        await CheckComparisonContract(type, "return System.Collections.Generic.Comparer<" + type + ">.Default.Compare(y: right, x: left);", WorkerClaimOutcome.Proven);
     }
 
     [Test]
@@ -43,9 +50,7 @@ public sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task CustomComparerDoesNotGainDefaultComparerSemantics()
     {
-        await CheckComparisonContract("int",
-            "return System.Collections.Generic.Comparer<int>.Create((x, y) => 42).Compare(left, right);",
-            WorkerClaimOutcome.Unknown);
+        await CheckComparisonContract("int", "return System.Collections.Generic.Comparer<int>.Create((x, y) => 42).Compare(left, right);", WorkerClaimOutcome.Unknown);
     }
 
     [Test]
@@ -57,8 +62,7 @@ public sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task DefaultGetterStillHasConservativeAllocationAndExceptionOutcomes()
     {
-        var preparation = Prepare("[DoesNotThrow, ZeroAllocations] public static int Target(int left, int right) { " +
-            "return System.Collections.Generic.Comparer<int>.Default.Compare(left, right); }");
+        var preparation = Prepare("[DoesNotThrow, ZeroAllocations] public static int Target(int left, int right) { " + "return System.Collections.Generic.Comparer<int>.Default.Compare(left, right); }");
         var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(exceptions.Outcome, Is.Not.TypeOf<ProvenOutcome>());
@@ -72,27 +76,27 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("System.Collections.Generic.ICollection<int>")]
     public async Task CountDoesNotProveStrictPositivityOrAnInterfaceInvariant(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var comparison = type == "System.Collections.Generic.ICollection<int>" ? ">= 0" : "> 0";
-        using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static int Target(" +
-            type + " value) { Contract.Requires(value != null); Contract.Ensures(Contract.Result<int>() " + comparison + "); return value.Count; } }");
+        using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static int Target(" + type + " value) { Contract.Requires(value != null); Contract.Ensures(Contract.Result<int>() " + comparison + "); return value.Count; } }");
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
+        Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     private static async Task CheckComparisonContract(string type, string body, WorkerClaimOutcome outcome, string? expected = null)
     {
-        using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static int Target(" +
-            type + " left, " + type + " right) { Contract.Ensures(Contract.Result<int>() == (" +
-            (expected ?? "left < right ? -1 : left > right ? 1 : 0") + ")); " + body + " } }");
+        global::System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(type);
+        using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static int Target(" + type + " left, " + type + " right) { Contract.Ensures(Contract.Result<int>() == (" + (expected ?? "left < right ? -1 : left > right ? 1 : 0") + ")); " + body + " } }");
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
+        Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome), response.ClaimResults.Single().ToString());
     }
 }

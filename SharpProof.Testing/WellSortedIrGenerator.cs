@@ -6,7 +6,11 @@ namespace SharpProof.Testing;
 public sealed record GeneratedIrCase(
     IrTerm Term,
     IReadOnlyDictionary<IrVarId, IrValue> Variables,
-    GeneratedIrCategory Category = GeneratedIrCategory.Arithmetic);
+    GeneratedIrCategory Category = GeneratedIrCategory.Arithmetic)
+{
+    public IrTerm Term { get; init; } = Term ?? throw new System.ArgumentNullException(nameof(Term));
+    public IReadOnlyDictionary<IrVarId, IrValue> Variables { get; init; } = Variables ?? throw new System.ArgumentNullException(nameof(Variables));
+}
 
 public enum GeneratedIrCategory
 {
@@ -107,6 +111,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         IrTerm term,
         GeneratedIrCategory category)
     {
+        System.ArgumentNullException.ThrowIfNull(term);
         var referenced = CollectVariables(term);
         var textChoice = _random.Next(4);
         var sequenceIsNull = _random.Next(4) == 0;
@@ -166,6 +171,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private static HashSet<IrVarId> CollectVariables(IrTerm root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         var variables = new HashSet<IrVarId>();
         var visited = new HashSet<IrId>();
         var pending = new Stack<IrTerm>();

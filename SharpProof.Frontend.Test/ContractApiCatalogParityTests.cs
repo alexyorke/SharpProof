@@ -17,28 +17,28 @@ public sealed class ContractApiCatalogParityTests
             BindingFlags.DeclaredOnly);
         var attributes = typeof(Contract).Assembly.GetExportedTypes()
             .Where(static type =>
-                !type.IsAbstract &&
-                typeof(Attribute).IsAssignableFrom(type))
-            .Select(static type => type.FullName)
+                type is null ? throw new System.ArgumentNullException(nameof(type)) : (!type.IsAbstract &&
+                typeof(Attribute).IsAssignableFrom(type)))
+            .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.FullName))
             .OrderBy(static name => name, StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                methods.Select(static method => method.Name)
-                    .OrderBy(static name => name, StringComparer.Ordinal),
+                methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name))
+                    .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal),
                 Is.EqualTo(ContractApiMetadata.ContractMethodCandidateNames
-                    .OrderBy(static name => name, StringComparer.Ordinal)));
+                    .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal)));
             Assert.That(
                 attributes,
                 Is.EqualTo(ContractApiMetadata.AttributeMetadataNames
-                    .OrderBy(static name => name, StringComparer.Ordinal)));
+                    .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal)));
         }
 
         foreach (var descriptor in ContractApiMetadata.Methods)
         {
             var method = methods.Single(candidate =>
-                candidate.Name == descriptor.Name);
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == descriptor.Name));
             AssertMethodShape(method, descriptor);
             Assert.That(
                 ContractApiClauseProjection.GetClauseRole(method.Name),
@@ -108,6 +108,10 @@ public sealed class ContractApiCatalogParityTests
         MethodInfo method,
         ContractApiMethodDescriptor descriptor)
     {
+        if (descriptor.Name is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(descriptor)); }
+
+        System.ArgumentNullException.ThrowIfNull(method);
         var parameters = method.GetParameters();
         switch (descriptor.Shape)
         {
@@ -120,7 +124,7 @@ public sealed class ContractApiCatalogParityTests
                     Assert.That(method.IsGenericMethodDefinition, Is.False);
                     Assert.That(
                         method.GetCustomAttributes<ConditionalAttribute>()
-                            .Select(static attribute => attribute.ConditionString),
+                            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ConditionString)),
                         Is.EqualTo([Contract.ConditionalSymbol]));
                 }
                 break;
@@ -141,6 +145,8 @@ public sealed class ContractApiCatalogParityTests
         ParameterInfo[] parameters,
         int parameterCount)
     {
+        System.ArgumentNullException.ThrowIfNull(parameters, nameof(parameters));
+        System.ArgumentNullException.ThrowIfNull(method);
         var generic = method.GetGenericArguments();
         using (Assert.EnterMultipleScope())
         {

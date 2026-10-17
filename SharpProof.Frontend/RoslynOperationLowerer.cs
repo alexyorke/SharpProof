@@ -22,6 +22,7 @@ public sealed class RoslynOperationLowerer
         Func<IMethodSymbol, bool>? isKnownPure = null)
         : this(factory, isKnownPure, allowCompilerConstants: false)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
 
     private RoslynOperationLowerer(
@@ -40,6 +41,7 @@ public sealed class RoslynOperationLowerer
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure = null)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return new RoslynOperationLowerer(
             factory,
             isKnownPure,
@@ -60,6 +62,7 @@ public sealed class RoslynOperationLowerer
 
     public FrontendLoweringResult Lower(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var lowered = LowerWithoutBindings(operation);
         return new FrontendLoweringResult(
             lowered.Term, lowered.Classification, CreateVariableBindings());
@@ -68,6 +71,7 @@ public sealed class RoslynOperationLowerer
     internal (IrTerm Term, FrontendSubsetClassification Classification)
         LowerTerm(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var lowered = LowerWithoutBindings(operation);
         return (lowered.Term, lowered.Classification);
     }
@@ -98,14 +102,14 @@ public sealed class RoslynOperationLowerer
             .Select(static pair => new FrontendVariableBinding(pair.Key, pair.Value))
             .Concat(_instances.Select(static pair =>
                 new FrontendVariableBinding(pair.Key, pair.Value)))
-            .OrderBy(static binding => binding.Variable.Value)];
+            .OrderBy(static binding => ((binding.Variable.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : (binding.Variable.Value)))];
     }
 
     internal ImmutableArray<IrVarId> CreateVariableIds()
     {
         return [.. _variables.Values
             .Concat(_instances.Values)
-            .OrderBy(static variable => variable.Value)];
+            .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 
     internal ImmutableArray<IrVarId> CreateCaptureBindings()
@@ -141,6 +145,7 @@ public sealed class RoslynOperationLowerer
         ISymbol symbol,
         ITypeSymbol? type)
     {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         if (!_variables.TryGetValue(symbol, out var variable))
         {
             variable = _factory.CreateVariable(
@@ -152,7 +157,7 @@ public sealed class RoslynOperationLowerer
     }
 
     internal IrVariableTerm GetCapture(
-        CaptureId id,
+        CaptureId id /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */,
         ITypeSymbol? type)
     {
         if (!_captures.TryGetValue(id, out var variable))
@@ -170,6 +175,7 @@ public sealed class RoslynOperationLowerer
     internal IrVarId? GetReferencedVariable(
         IOperation operation, bool unwrapConversions = true)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (unwrapConversions)
         {
             while (operation is IConversionOperation conversion)
@@ -195,6 +201,8 @@ public sealed class RoslynOperationLowerer
         IOperation right,
         out IOperation value)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         value = IsNullConstant(right)
             ? left
             : IsNullConstant(left) ? right : null!;
@@ -204,6 +212,7 @@ public sealed class RoslynOperationLowerer
     private static (IOperation Any, IOperation ReferenceOnly)
         UnwrapComparisonOperand(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var any = operation;
         var referenceOnly = operation;
         var canUnwrapReference = true;
@@ -229,6 +238,7 @@ public sealed class RoslynOperationLowerer
 
     private static bool IsNullConstant(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation.ConstantValue is { HasValue: true, Value: null };
     }
 
@@ -236,6 +246,7 @@ public sealed class RoslynOperationLowerer
         IInstanceReferenceOperation operation,
         ITypeSymbol? specializedType)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var type = operation.Type!;
 
         if (!_instances.TryGetValue(type, out var variable))
@@ -253,6 +264,7 @@ public sealed class RoslynOperationLowerer
         ISymbol? symbol = null, IOperation? receiver = null,
         IEnumerable<IOperation>? arguments = null)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var depthLimited = abstention == FrontendAbstention.ExpressionDepthLimit;
         var loweredReceiver = depthLimited || receiver == null
             ? null
@@ -260,9 +272,10 @@ public sealed class RoslynOperationLowerer
         IrTerm[] loweredArguments = depthLimited
             ? []
             : (arguments ?? operation.ChildOperations)
-                .Where(child => !ReferenceEquals(child, receiver))
+                .Where(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!ReferenceEquals(child, receiver)))
                 .Select((child, index) =>
                 {
+                    child = RepositoryParameterGuard.NotNull(child, nameof(child));
                     var argument = child as IArgumentOperation;
                     return (
                         Ordinal: argument?.Parameter?.Ordinal ?? int.MaxValue,
@@ -288,7 +301,7 @@ public sealed class RoslynOperationLowerer
             CompilerIdentityBridge.CreateSymbolDisplay(symbol) +
             ":result=" +
             CompilerIdentityBridge.CreateTypeDisplay(operation.Type);
-        var parameterTypes = argumentTerms.Select(static value => value.Type).ToArray();
+        var parameterTypes = argumentTerms.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type)).ToArray();
         var member = _factory.GetOrCreateMember(
             identity, declaringType, displayName, resultType,
             receiverTerm == null, parameterTypes);
@@ -349,7 +362,7 @@ public sealed class RoslynOperationLowerer
     private sealed class LoweringVisitor(RoslynOperationLowerer owner)
         : OperationVisitor<LoweringContext, LoweredExpression>
     {
-        private readonly RoslynOperationLowerer _owner = owner;
+        private readonly RoslynOperationLowerer _owner = (owner ?? throw new System.ArgumentNullException(nameof(owner)));
         private int _depth;
 
         public override LoweredExpression Visit(
@@ -395,6 +408,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression DefaultVisit(
             IOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             var abstention = operation.Type?.TypeKind == TypeKind.Error
                 ? FrontendAbstention.ErrorOperation
                 : GetUnsupportedValueAbstention(operation);
@@ -404,6 +418,7 @@ public sealed class RoslynOperationLowerer
         private static FrontendAbstention GetUnsupportedValueAbstention(
             IOperation operation)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return operation.ConstantValue.HasValue &&
                 operation.Type is
                 {
@@ -417,12 +432,14 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitInvalid(
             IInvalidOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, FrontendAbstention.InvalidOperation);
         }
 
         public override LoweredExpression VisitLiteral(
             ILiteralOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.LowerConstant(operation);
         }
 
@@ -456,6 +473,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitParameterReference(
             IParameterReferenceOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return LowerSupportedReference(
                 operation,
                 type => _owner.GetVariable(operation.Parameter, type));
@@ -464,6 +482,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCapture(
             IFlowCaptureOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             _owner.GetCapture(operation.Id, operation.Value.Type);
             return _owner.LowerCore(operation.Value);
         }
@@ -471,6 +490,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return LowerSupportedReference(
                 operation,
                 type => _owner.GetCapture(operation.Id, type));
@@ -479,6 +499,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitInstanceReference(
             IInstanceReferenceOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return LowerSupportedReference(
                 operation,
                 type => _owner.GetInstance(operation, type));
@@ -487,6 +508,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitDefaultValue(
             IDefaultValueOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             var type = _owner.TypeSpecializer(operation.Type);
             var specialType = type?.SpecialType ?? SpecialType.None;
             if (specialType == SpecialType.System_Boolean)
@@ -735,6 +757,7 @@ public sealed class RoslynOperationLowerer
 
         private bool ChangesReferenceEqualityToString(IOperation operand)
         {
+            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
             return operand.Type is ITypeParameterSymbol &&
                 _owner.TypeSpecializer(operand.Type)?.SpecialType ==
                     SpecialType.System_String;
@@ -861,6 +884,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitIsNull(
             IIsNullOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
             {
@@ -897,7 +921,7 @@ public sealed class RoslynOperationLowerer
             }
             return _owner.Opaque(operation, FrontendAbstention.UnsupportedMemberAccess,
                 operation.Property, operation.Instance,
-                operation.Arguments.Select(static value => value.Value));
+                operation.Arguments.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Value)));
         }
 
         public override LoweredExpression VisitArrayElementReference(
@@ -929,6 +953,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitInvocation(
             IInvocationOperation operation, LoweringContext argument)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, FrontendAbstention.UnsupportedInvocationShape,
                 operation.TargetMethod, operation.Instance,
                 operation.Arguments);
@@ -939,6 +964,7 @@ public sealed class RoslynOperationLowerer
             IOperation left,
             IOperation right)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (!TryGetNullComparisonValue(left, right, out var compared))
             {
                 return null;
@@ -967,9 +993,10 @@ public sealed class RoslynOperationLowerer
         private static FrontendAbstention FirstAbstention(
             params LoweredExpression[] expressions)
         {
+            expressions = RepositoryParameterGuard.NotNull(expressions, nameof(expressions));
             return expressions
                 .First(static expression =>
-                    expression.Classification.Abstention != FrontendAbstention.None)
+                    expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (expression.Classification.Abstention != FrontendAbstention.None))
                 .Classification.Abstention;
         }
 
@@ -977,6 +1004,8 @@ public sealed class RoslynOperationLowerer
             IOperation operation,
             Func<ITypeSymbol?, IrTerm> exact)
         {
+            exact = RepositoryParameterGuard.NotNull(exact, nameof(exact));
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             var specializedType = _owner.TypeSpecializer(operation.Type);
             return _owner.IsSupportedValueDomain(specializedType)
                 ? LoweredExpression.Exact(exact(specializedType))
@@ -989,6 +1018,8 @@ public sealed class RoslynOperationLowerer
             FrontendAbstention abstention,
             ISymbol? symbol = null)
         {
+            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, abstention, symbol, arguments: [operand]);
         }
 
@@ -996,6 +1027,7 @@ public sealed class RoslynOperationLowerer
             IConditionalOperation operation,
             FrontendAbstention abstention)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, abstention,
                 arguments: [operation.Condition, operation.WhenTrue, operation.WhenFalse!]);
         }
@@ -1004,6 +1036,7 @@ public sealed class RoslynOperationLowerer
             IArrayElementReferenceOperation operation,
             FrontendAbstention abstention)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, abstention, receiver: operation.ArrayReference,
                 arguments: operation.Indices);
         }
@@ -1012,6 +1045,7 @@ public sealed class RoslynOperationLowerer
             IBinaryOperation operation, FrontendAbstention abstention,
             IMethodSymbol? symbol = null)
         {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return _owner.Opaque(operation, abstention, symbol,
                 arguments: [operation.LeftOperand, operation.RightOperand]);
         }
@@ -1021,9 +1055,9 @@ public sealed class RoslynOperationLowerer
 
     private sealed class LoweredExpression(
         IrTerm term,
-        FrontendSubsetClassification classification)
+        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
     {
-        internal IrTerm Term { get; } = term;
+        internal IrTerm Term { get; } = (term ?? throw new System.ArgumentNullException(nameof(term)));
         internal FrontendSubsetClassification Classification
         {
             get;
@@ -1032,6 +1066,7 @@ public sealed class RoslynOperationLowerer
 
         internal static LoweredExpression Exact(IrTerm term)
         {
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return new(term, FrontendSubsetClassification.Exact);
         }
     }

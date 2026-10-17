@@ -151,17 +151,17 @@ public sealed class ContainerContractTests
 
             var mutations = new Action<JsonObject>[]
             {
-                contract => contract["schemaVersion"] = "1",
-                contract => contract["schemaVersion"] = 1,
-                contract => contract["schemaVersion"] = JsonNode.Parse("2147483648"),
-                contract => contract["z3LibraryBytes"] = "invalid",
-                contract => contract["z3LibraryBytes"] = JsonNode.Parse("9223372036854775808"),
-                contract => contract["z3LibraryBytes"] =
-                    contract["z3LibraryBytes"]!.GetValue<long>() + 1,
-                contract => contract["z3LibrarySha256"] = new string('0', 64),
-                contract => contract["platform"] = " ",
-                contract => contract["platform"] = "linux/arm64"
-                ,contract => contract.Remove("dotnetTestRuntimeVersion")
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = "1"; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = 1; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = JsonNode.Parse("2147483648"); },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = "invalid"; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = JsonNode.Parse("9223372036854775808"); },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] =
+                    contract["z3LibraryBytes"]!.GetValue<long>() + 1; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibrarySha256"] = new string('0', 64); },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["platform"] = " "; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["platform"] = "linux/arm64"; }
+                ,contract => { System.ArgumentNullException.ThrowIfNull(contract); contract.Remove("dotnetTestRuntimeVersion"); }
             };
             foreach (var mutate in mutations)
             {
@@ -262,6 +262,7 @@ public sealed class ContainerContractTests
 
     private static void AssertInvalidContractPayload(string payload)
     {
+        System.ArgumentNullException.ThrowIfNull(payload);
         var originalContainer = Environment.GetEnvironmentVariable(
             "SHARPPROOF_CONTAINER");
         var originalContract = Environment.GetEnvironmentVariable(

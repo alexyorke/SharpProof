@@ -32,6 +32,8 @@ internal sealed class SmtQueryResourceMeter(
 
     internal void ConsumeNative(long consumed)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(consumed < 0, nameof(consumed));
+
         _consumed = checked(_consumed + consumed);
         // Native work has already completed, even if cancellation arrived
         // before we could publish its charge.
@@ -59,15 +61,10 @@ internal static class SmtNativeCheck
 {
     internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
     {
-        if (assumptions is null)
-        {
-            throw new ArgumentNullException(nameof(assumptions));
-        }
+        solver = RepositoryParameterGuard.NotNull(solver, nameof(solver));
+        assumptions = RepositoryParameterGuard.NotNull(assumptions, nameof(assumptions));
 
-        if (meter is null)
-        {
-            throw new ArgumentNullException(nameof(meter));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
 
         meter.PollCancellation();
         var before = SmtNativeUtilities.ReadResourceCount(solver);

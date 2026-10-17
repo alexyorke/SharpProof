@@ -35,7 +35,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
             "System.InvalidOperationException"
         };
         var actualExceptionNames = claim.Evidence.Constraint.AllowedExceptionTypes
-            .Select(value => value[(value.LastIndexOf("::", StringComparison.Ordinal) + 2)..])
+            .Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value[(value.LastIndexOf("::", StringComparison.Ordinal) + 2)..]))
             .ToArray();
 
         using (Assert.EnterMultipleScope())
@@ -49,7 +49,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
                 Is.EqualTo(expectedExceptions));
             Assert.That(
                 result.Manifest.Claims.Count(static entry =>
-                    entry.EffectContractKind == WorkerEffectContractKind.AllowedExceptions),
+                    entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.EffectContractKind == WorkerEffectContractKind.AllowedExceptions)),
                 Is.EqualTo(1));
         }
     }
@@ -91,7 +91,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
 
         Assert.That(callables, Has.Length.EqualTo(6));
         Assert.That(
-            callables.Select(static callable => callable.CallableId).Distinct(
+            callables.Select(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).Distinct(
                 StringComparer.Ordinal).Count(),
             Is.EqualTo(callables.Length));
     }

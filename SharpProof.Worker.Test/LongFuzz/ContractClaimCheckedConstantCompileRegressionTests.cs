@@ -21,9 +21,9 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
         }
 
         var errors = Compile(source).GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         Assert.That(errors, Is.Empty,
-            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}\n{source}");
+            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}\n{source}");
     }
 
     [Test]
@@ -49,10 +49,11 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
 
     private static MethodInfo LoadTarget(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(" | ", emit.Diagnostics));
@@ -62,6 +63,7 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
 
     private static CSharpCompilation Compile(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: []),
             "/project/Subject.cs", Encoding.UTF8);

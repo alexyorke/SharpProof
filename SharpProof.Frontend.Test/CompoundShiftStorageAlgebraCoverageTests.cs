@@ -84,6 +84,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     [TestCase("sbyte Target(sbyte value, int count) { checked { value <<= count; } return value; }", (sbyte)17, false, 34)]
     public void ActualCheckedStorageMatchesNativeValueOrOverflow(string source, sbyte input, bool overflow, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         object[] inputs = [input, 1];
         var native = subject.Invoke(inputs);

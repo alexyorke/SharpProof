@@ -4,6 +4,7 @@ internal static partial class CSharpOperationSemantics
 {
     internal static bool IsArrayCollectionDeclaration(IPropertySymbol property)
     {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (property.IsStatic || property.ReturnsByRef || property.ReturnsByRefReadonly ||
             property.ContainingType.TypeKind != TypeKind.Interface || property.ContainingType.TypeArguments.Length != 1 ||
             property.GetMethod is not { } getter || !IsFrameworkCollectionMember(getter))
@@ -25,6 +26,7 @@ internal static partial class CSharpOperationSemantics
     // a scalar SZ array has one known implementation and cannot be covariant.
     internal static IOperation? ArrayCollectionReceiver(IPropertyReferenceOperation property)
     {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (!IsArrayCollectionDeclaration(property.Property))
         { return null; }
         var receiver = property.Instance;
@@ -45,6 +47,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule ArrayCollectionGuard(IrFactory factory, IrTerm receiver, IrTerm index)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        index = RepositoryParameterGuard.NotNull(index, nameof(index));
         var guard = ElementGuard(factory, receiver, index, null);
         // Array's IList<T> implementation throws ArgumentOutOfRangeException.
         // Until native IR has that exact kind, retain an unknown bounds fault;

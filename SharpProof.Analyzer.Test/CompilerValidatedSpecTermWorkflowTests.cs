@@ -14,7 +14,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
     [TestCase(int.MinValue + 1, true)]
     public void DefaultAbsNormalCompletionPreservesTheOverflowBoundary(int value, bool expected)
     {
-        var template = ApiSpecTable.Default.Templates.Single(item => item.Target.WitnessIdentifier == "bcl.math.abs.int32");
+        var template = ApiSpecTable.Default.Templates.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Target.WitnessIdentifier == "bcl.math.abs.int32"));
         Assert.That(template.Target.DocumentationCommentId, Is.EqualTo("M:System.Math.Abs(System.Int32)"));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var integer = factory.GetOrCreateIntegerType(32, true);
@@ -81,10 +81,10 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
     public void ValidatedStringParameterRemainsOutsideTheScalarConverterTypes()
     {
         var template = ApiSpecTable.Default.Templates.Single(item =>
-            item.Target.DocumentationCommentId == "M:System.String.IsNullOrEmpty(System.String)");
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Target.DocumentationCommentId == "M:System.String.IsNullOrEmpty(System.String)"));
         var compilation = AnalyzerTestHost.CreateCompilation(
             "internal class Subject { bool Run(string value) => System.String.IsNullOrEmpty(value); }", []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol!;
@@ -104,15 +104,16 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
 
     private static SpecTermDeclaration ValidateMaxPostcondition(SpecTermDeclaration condition, bool wide = false)
     {
-        var template = ApiSpecTable.Default.Templates.Single(item => item.Target.WitnessIdentifier == "bcl.math.max.int32-int32");
+        System.ArgumentNullException.ThrowIfNull(condition);
+        var template = ApiSpecTable.Default.Templates.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Target.WitnessIdentifier == "bcl.math.max.int32-int32"));
         var arguments = wide ? "1L, 2L" : "1, 2";
         var compilation = AnalyzerTestHost.CreateCompilation($"internal class Subject {{ object Run() => System.Math.Max({arguments}); }}", []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol!;
-        Assert.That(method.Parameters.All(parameter => parameter.Type.SpecialType ==
-            (wide ? SpecialType.System_Int64 : SpecialType.System_Int32)), Is.True);
+        Assert.That(method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType ==
+            (wide ? SpecialType.System_Int64 : SpecialType.System_Int32))), Is.True);
         var target = template.Target with
         {
             DocumentationCommentId = method.GetDocumentationCommentId()!,
@@ -126,6 +127,8 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
 
     private static void AssertBoolean(IrFactory factory, IrTerm term, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(term);
         var result = new IrInterpreter(factory).Evaluate(term);
         using (Assert.EnterMultipleScope())
         {

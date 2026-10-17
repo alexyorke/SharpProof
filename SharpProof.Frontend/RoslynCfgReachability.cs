@@ -47,10 +47,10 @@ internal static class RoslynCfgReachability
             }
 
             foreach (var handler in owner.NestedRegions.Where(candidate =>
-                         candidate.Kind is ControlFlowRegionKind.Filter or
+                         candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind is ControlFlowRegionKind.Filter or
                              ControlFlowRegionKind.Catch or
                              ControlFlowRegionKind.FilterAndHandler or
-                             ControlFlowRegionKind.Finally))
+                             ControlFlowRegionKind.Finally)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (yielded.Add(handler.FirstBlockOrdinal))

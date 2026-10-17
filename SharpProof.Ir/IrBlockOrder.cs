@@ -15,15 +15,9 @@ internal static class IrBlockOrder
         Func<int, bool> spend,
         out IrAcyclicOrderFailure failure)
     {
-        if (program is null)
-        {
-            throw new ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
 
-        if (spend is null)
-        {
-            throw new ArgumentNullException(nameof(spend));
-        }
+        spend = RepositoryParameterGuard.NotNull(spend, nameof(spend));
 
         var blockCapacity = program.Blocks.Length;
         var states = new byte[blockCapacity];
@@ -77,26 +71,36 @@ internal static class IrBlockOrder
 
         public void Visit(IrBranchInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
             state.Push((instruction.WhenFalse, false));
             state.Push((instruction.WhenTrue, false));
         }
 
         public void Visit(IrGotoInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
             state.Push((instruction.Target, false));
         }
 
         public void Visit(IrThrowInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
             state.Push((instruction.Target, false));
         }
 
         public void Visit(IrReturnInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
         }
 
         public void Visit(IrExceptionalExitInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
         }
     }
 }

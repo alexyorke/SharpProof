@@ -25,7 +25,7 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
                 internal static int Root() => 1;
             }
             """, [], filePath: "custom-event.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
@@ -43,7 +43,7 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
             Assert.That(eventSource.Span, Is.EqualTo(eventDeclaration.Span));
             Assert.That(eventSymbol.ContainingType.StaticConstructors, Is.Empty);
             Assert.That(eventDeclaration.AccessorList!.Accessors, Has.Count.EqualTo(2));
-            Assert.That(eventDeclaration.AccessorList.Accessors.All(accessor => accessor.Body is { Statements.Count: 0 }), Is.True);
+            Assert.That(eventDeclaration.AccessorList.Accessors.All(accessor => accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body is { Statements.Count: 0 })), Is.True);
             Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
             Assert.That(method.IsStatic, Is.True);
             Assert.That(declaration.Span.Length, Is.GreaterThan(0));
@@ -104,7 +104,7 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
                 }
             }
             """, [], filePath: "event.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
@@ -122,13 +122,13 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
         }
 
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(item => item.Identifier.ValueText == "Subscribe");
+            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Identifier.ValueText == "Subscribe"));
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         var artifact = await CaptureAsync(compilation);
         Assert.That(artifact.ReachableSource, Is.Not.Null);
         var reachable = artifact.ReachableSource!;
         var callable = artifact.Manifest.Callables.Single();
-        var body = reachable.Bodies.Single(item => item.MethodIdentity == callable.CallableId);
+        var body = reachable.Bodies.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.MethodIdentity == callable.CallableId));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
@@ -144,7 +144,8 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
 
     private static async Task<CompilerManifestArtifact> CaptureAsync(CSharpCompilation compilation)
     {
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofEventCapture-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try

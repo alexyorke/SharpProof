@@ -38,8 +38,8 @@ public sealed class OrdinaryWideLocalAllocationWorkflowTests
                 Assert.That(method.IsStatic, Is.True);
                 Assert.That(body.InitLocals, Is.True);
                 Assert.That(body.LocalVariables, Has.Count.EqualTo(expectedPeLocals));
-                Assert.That(body.LocalVariables.Select(static local => local.LocalType), Is.All.EqualTo(typeof(int)));
-                Assert.That(body.LocalVariables.Any(static local => local.LocalIndex >= 256), Is.EqualTo(expectedWideLocal));
+                Assert.That(body.LocalVariables.Select(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalType)), Is.All.EqualTo(typeof(int)));
+                Assert.That(body.LocalVariables.Any(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalIndex >= 256)), Is.EqualTo(expectedWideLocal));
                 Assert.That(body.GetILAsByteArray(), Is.Not.Null.And.Not.Empty);
                 Assert.That(body.GetILAsByteArray()!.Length, Is.LessThan(65536));
                 Assert.That(method.Invoke(null, arguments), Is.EqualTo(runtimeSeed * declaredLocals));

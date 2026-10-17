@@ -19,6 +19,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
     [TestCase("lambda")]
     public void CSharpOriginalBodiesRetainTheirCompilation(string shape)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var members = shape switch
         {
             "local" => "int Target(int value) { static int Local(int item) => item + 7; return Local(value); }",
@@ -75,7 +76,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
         var compilation = VisualBasicCompilation.Create("GraphModelVisualBasic", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
         var graph = ControlFlowGraph.Create(syntax, model)!;
@@ -114,18 +115,23 @@ public sealed class CompilerGraphSemanticModelInvariantTests
 
     private static IFlowAnonymousFunctionOperation FlowLambda(ControlFlowGraph graph)
     {
-        return graph.Blocks.SelectMany(block => block.Operations)
-            .SelectMany(operation => operation.DescendantsAndSelf()).OfType<IFlowAnonymousFunctionOperation>().Single();
+        System.ArgumentNullException.ThrowIfNull(graph);
+        return graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IFlowAnonymousFunctionOperation>().Single();
     }
 
     private static void AssertOriginalCompilation(ControlFlowGraph graph, Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(graph);
         Assert.That(graph.OriginalOperation.SemanticModel, Is.Not.Null);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
     }
 
     private static void AssertExactPreparedReplay(ControlFlowGraph graph, IMethodSymbol target, int input, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
+        System.ArgumentNullException.ThrowIfNull(graph);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

@@ -21,13 +21,13 @@ public sealed class ContractClaimGeneratorCompileRegressionTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(d => d.ToString()))}\n{source}");
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.ToString())))}\n{source}");
         Assert.That(source, Does.Contain("if (y == State) _ = (s == null ? -1 : s.Length);"));
         Assert.That(source, Does.Contain("if (a != null) return (v3 % State);"));
         var finallyClauses = tree.GetRoot().DescendantNodes().OfType<FinallyClauseSyntax>().ToArray();
         Assert.That(finallyClauses, Is.Not.Empty);
-        Assert.That(finallyClauses.SelectMany(clause => clause.Block.DescendantNodes().OfType<ReturnStatementSyntax>()),
+        Assert.That(finallyClauses.SelectMany(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Block.DescendantNodes().OfType<ReturnStatementSyntax>())),
             Is.Empty);
     }
 }

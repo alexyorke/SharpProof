@@ -22,12 +22,12 @@ public sealed class OrdinaryCollectionInitializerCensusWorkflowTests
             public static class Caller {
                 public static int Root() =>
             """ + expression + "; }");
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
-        var calls = inventory.Owners.Single(owner => owner.Method.Name == "Root").Calls;
+        var calls = inventory.Owners.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.Name == "Root")).Calls;
         Assert.That(calls, Has.Length.EqualTo(initializer ? 2 : 1));
         if (initializer)
         {
@@ -39,7 +39,7 @@ public sealed class OrdinaryCollectionInitializerCensusWorkflowTests
         var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         Assert.That(coverage.Expected, Is.EqualTo(1));
-        Assert.That(coverage.Failures.Count(failure => failure.StartsWith("DuplicateSourceObligation:", StringComparison.Ordinal)),
+        Assert.That(coverage.Failures.Count(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.StartsWith("DuplicateSourceObligation:", StringComparison.Ordinal))),
             Is.EqualTo(initializer ? 1 : 0));
     }
 }

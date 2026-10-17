@@ -22,6 +22,7 @@ public sealed class Pr275SourceCallApiCoverageTests
 
     private static bool PrepareCallee(TotalLoweringContext context)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
         return new ContractBinder(Compilation, context.Factory).BindTotalRequires(context).IsSuccess;
     }
 
@@ -65,6 +66,8 @@ public sealed class Pr275SourceCallApiCoverageTests
     [TestCase("empty params", "argument")]
     public void SourceSessionReportsMissingOperationOrMethod(string api, string expectedParameter)
     {
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(expectedParameter);
         var session = CreateSession();
         var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
@@ -101,6 +104,7 @@ public sealed class Pr275SourceCallApiCoverageTests
     [TestCase("arguments")]
     public void SourceFramePreparationRequiresItsContextMethodAndArgumentArray(string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(missing);
         var method = Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Callee")
             .OfType<IMethodSymbol>().Single();
         var caller = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
@@ -119,6 +123,7 @@ public sealed class Pr275SourceCallApiCoverageTests
     [TestCase("model")]
     public void SourceGraphCreationRequiresItsRoslynInputs(string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(missing);
         var method = Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Callee")
             .OfType<IMethodSymbol>().Single();
         var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();

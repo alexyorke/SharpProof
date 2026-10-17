@@ -59,9 +59,10 @@ public static class CompilationModelProvider
         Compilation root,
         SyntaxTree tree)
     {
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var index = OwnershipCache.GetValue(
             root,
-            static compilation => TreeOwnershipIndex.Create(compilation));
+            static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (TreeOwnershipIndex.Create(compilation)));
         if (index.IsAmbiguous(tree))
         {
             throw new ArgumentException(
@@ -82,11 +83,13 @@ public static class CompilationModelProvider
         private TreeOwnershipIndex(
             Dictionary<SyntaxTree, Compilation?> owners)
         {
+            owners = RepositoryParameterGuard.NotNull(owners, nameof(owners));
             _owners = owners;
         }
 
         internal static TreeOwnershipIndex Create(Compilation root)
         {
+            root = RepositoryParameterGuard.NotNull(root, nameof(root));
             var owners = new Dictionary<SyntaxTree, Compilation?>(
                 ReferenceComparer<SyntaxTree>.Instance);
             var pending = new Stack<Compilation>();
@@ -126,6 +129,7 @@ public static class CompilationModelProvider
 
         internal bool IsAmbiguous(SyntaxTree tree)
         {
+            tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
             return _owners.TryGetValue(tree, out var owner) &&
                 owner == null;
         }

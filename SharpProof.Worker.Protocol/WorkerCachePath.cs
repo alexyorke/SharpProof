@@ -6,8 +6,7 @@ internal static class WorkerCachePath
         string? configuredDirectory,
         string projectDirectory)
     {
-        if (projectDirectory is null)
-        { throw new ArgumentNullException(nameof(projectDirectory)); }
+        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
 
         return Path.GetFullPath(
             string.IsNullOrWhiteSpace(configuredDirectory)

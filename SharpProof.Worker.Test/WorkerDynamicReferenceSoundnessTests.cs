@@ -12,6 +12,8 @@ public sealed class WorkerDynamicReferenceSoundnessTests
     [TestCase("sealed class", "int[]")]
     public async Task NonemptyBuiltinInputCannotAliasAnUnrelatedClass(string declaration, string valueType)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
+        System.ArgumentNullException.ThrowIfNull(valueType);
         var members = "public " + declaration + " Cell { } public static class Subject { public static bool Target(Cell cell, " +
             valueType + " value) { ";
         const string body = "return (object)value != (object)cell;";
@@ -28,6 +30,8 @@ public sealed class WorkerDynamicReferenceSoundnessTests
 
     private static void AssertRuntimeResult(string source, string valueType)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(valueType);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("DynamicReferenceSoundnessRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

@@ -117,7 +117,7 @@ public sealed class FinalCompilationCollectorTests
         var originalCapture = CompilerCompilationCapture.CaptureReferences(
             compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default,
-            TestContext.CurrentContext.CancellationToken).Single(snapshot => snapshot.Modules[0].Path == NormalizePath(path));
+            TestContext.CurrentContext.CancellationToken).Single(snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Modules[0].Path == NormalizePath(path)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(originalCapture.Modules, Has.Length.EqualTo(1));
@@ -164,9 +164,9 @@ public sealed class FinalCompilationCollectorTests
         var total = artifact.Callables.Single().Total;
         if (total != null)
         {
-            var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block.Instructions)
-                .GroupBy(instruction => instruction.Kind).OrderBy(group => group.Key).Take(8)
-                .Select(group => FormattableString.Invariant($"{group.Key}:{group.Count()}")));
+            var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                .GroupBy(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)).OrderBy(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key)).Take(8)
+                .Select(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (FormattableString.Invariant($"{group.Key}:{group.Count()}"))));
             await TestContext.Out.WriteLineAsync(FormattableString.Invariant(
                 $"Receiver artifact: mutate={mutate}, abstraction={total.IsBodyAbstraction}, receiver={total.HasReceiver}, parameters={total.Parameters.Length}, clauses={total.Clauses.Length}, terms={total.Graph.Terms.Length}, instructions={instructionKinds}"));
         }
@@ -202,12 +202,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).WithAssemblyName("MetadataEffectLocationDependency");
         Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, image);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataEffectLocationControl", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
                 .Invoke(null, [7]), Is.EqualTo(7));
         });
@@ -223,13 +224,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var method = compilation.GetTypeByMetadataName("Dependency")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
-        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single()
             .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
@@ -237,8 +238,8 @@ public sealed class FinalCompilationCollectorTests
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-effect-location"),
             captureRawArtifact: true);
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
-            claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
-        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Effect);
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
         var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
         using (Assert.EnterMultipleScope())
         {
@@ -276,12 +277,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).WithAssemblyName("MetadataRejectedCompanionLocationDependency");
         Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, image);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
                 .Invoke(null, [7]), Is.EqualTo(7));
         });
@@ -309,13 +311,13 @@ public sealed class FinalCompilationCollectorTests
         var compilation = CreateCompilation(companionSource)
             .AddReferences(MetadataReference.CreateFromFile(dependencyPath));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var method = compilation.GetTypeByMetadataName("Dependency")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
-        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
         Assert.That(binding.IsSuccess, Is.EqualTo(matchingSignature));
         Assert.That(binding.Failure, Is.EqualTo(matchingSignature
@@ -333,7 +335,7 @@ public sealed class FinalCompilationCollectorTests
                 .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
             var artifact = await EmitArtifact(compilation, path, captureRawArtifact: true);
             foreach (var claim in artifact.Manifest.Claims.Where(static claim =>
-                         claim.Evidence is WorkerClaimEvidence.ReturnAttribute or WorkerClaimEvidence.Attribute))
+                         claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence is WorkerClaimEvidence.ReturnAttribute or WorkerClaimEvidence.Attribute)))
             {
                 Assert.That(claim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
                 Assert.That(claim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
@@ -350,7 +352,7 @@ public sealed class FinalCompilationCollectorTests
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken), Is.Null);
-            foreach (var location in discovery.Manifest.Claims.Select(static claim => claim.Location)
+            foreach (var location in discovery.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location))
                          .Append(target.Entry.Location))
             {
                 Assert.That(location.Path, Is.Empty);
@@ -378,12 +380,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).WithAssemblyName("MetadataBodylessEffectLocationDependency");
         Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, image);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectLocationControl", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
                 .Invoke(null, [7]), Is.EqualTo(7));
         });
@@ -397,13 +400,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var method = compilation.GetTypeByMetadataName("Dependency")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
-        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var companion = compilation.GetTypeByMetadataName("DependencyContracts")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(companion.IsExtern, Is.True);
@@ -420,8 +423,8 @@ public sealed class FinalCompilationCollectorTests
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-location"),
             captureRawArtifact: true);
         var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
-            claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
-        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Effect);
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
         var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
         using (Assert.EnterMultipleScope())
         {
@@ -458,12 +461,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).WithAssemblyName("MetadataBodylessEffectOnlyLocationDependency");
         Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(dependency);
         var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
         await File.WriteAllBytesAsync(dependencyPath, image);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
                 .Invoke(null, [7]), Is.EqualTo(7));
         });
@@ -477,13 +481,13 @@ public sealed class FinalCompilationCollectorTests
             }
             """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var method = compilation.GetTypeByMetadataName("Dependency")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.GetReturnTypeAttributes(), Is.Empty);
-        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var companion = compilation.GetTypeByMetadataName("DependencyContracts")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(companion.IsExtern, Is.True);
@@ -499,7 +503,7 @@ public sealed class FinalCompilationCollectorTests
         var callableId = SemanticClaimIdentity.CreateCallableId(method);
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-only-location"),
             captureRawArtifact: true);
-        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Effect);
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
         var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
         using (Assert.EnterMultipleScope())
         {
@@ -549,17 +553,18 @@ public sealed class FinalCompilationCollectorTests
             }
             """, (CSharpParseOptions)compilation.SyntaxTrees.Single().Options, implementationPath));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var definition = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Root").OfType<IMethodSymbol>().Single();
         var implementation = definition.PartialImplementationPart;
         Assert.That(implementation, Is.Not.Null);
         Assert.That(implementation!.GetReturnTypeAttributes().Select(static attribute =>
-            attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath),
+            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath)),
             Is.EqualTo(new[] { definitionPath, implementationPath }));
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
                 .Invoke(null, [7]), Is.EqualTo(7));
         });
@@ -570,9 +575,9 @@ public sealed class FinalCompilationCollectorTests
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Evidence),
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence)),
                 Is.All.EqualTo(WorkerClaimEvidence.ReturnAttribute));
-            Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Location.Path),
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)),
                 Is.EqualTo(new[] { definitionPath, implementationPath }.Order(StringComparer.Ordinal)));
             Assert.That(prepared.FailureReason, Is.EqualTo(matchingPathOrder
                 ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
@@ -617,13 +622,13 @@ public sealed class FinalCompilationCollectorTests
         var method = compilation.GetTypeByMetadataName("Dependency")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
-        Assert.That(method.Locations.Any(location => location.IsInSource), Is.False);
+        Assert.That(method.Locations.Any(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single()
             .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
         var callableId = SemanticClaimIdentity.CreateCallableId(method);
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"), captureRawArtifact: true);
-        var attributeClaim = artifact.Manifest.Claims.Single(claim => claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
+        var attributeClaim = artifact.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
@@ -655,8 +660,8 @@ public sealed class FinalCompilationCollectorTests
         {
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(2));
-            Assert.That(artifact.Callables.All(callable => callable.Total == null), Is.True);
-            Assert.That(artifact.Callables.All(callable => callable.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
+            Assert.That(artifact.Callables.All(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total == null)), Is.True);
+            Assert.That(artifact.Callables.All(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.FailureReason == WorkerClaimReason.UnsupportedCallable)), Is.True);
             Assert.That(artifact.ReachableSource, Is.Not.Null);
             Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
         }
@@ -712,6 +717,7 @@ public sealed class FinalCompilationCollectorTests
         string filePath,
         char surrogate)
     {
+        System.ArgumentNullException.ThrowIfNull(filePath);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("ill-formed-text");
         var compilation = CreateCompilation();
@@ -815,6 +821,7 @@ public sealed class FinalCompilationCollectorTests
     public async Task IllFormedCompilerStringTermsBecomeUnsupportedExpression(
         string escape)
     {
+        System.ArgumentNullException.ThrowIfNull(escape);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("ill-formed-string-term-" + escape);
         var compilation = CreateCompilation(
@@ -843,7 +850,7 @@ public sealed class FinalCompilationCollectorTests
     [TestCase("class", "public sealed class Subject(int value) { }")]
     [TestCase("record", "public sealed record Subject(int value);")]
     public async Task PrimaryConstructorSelectionIsInventoriedExactlyOnce(
-        string _,
+        string? /* SPINT001: all values valid - this unused test-case label accepts null */ _,
         string declaration)
     {
         ArgumentNullException.ThrowIfNull(declaration);
@@ -1078,8 +1085,8 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 new[] { generalError, specificError, providerError },
                 Has.All.Matches<CompilerManifestArtifact>(artifact =>
-                    artifact.CompilerDiagnostics.Any(diagnostic =>
-                        diagnostic.Code == "compiler.CS0168")));
+                    artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (artifact.CompilerDiagnostics.Any(diagnostic =>
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS0168")))));
             Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
             Assert.That(new[] { generalError, specificError, providerError }.Select(Digest),
                 Has.All.EqualTo(Digest(generalError)));
@@ -1129,6 +1136,8 @@ public sealed class FinalCompilationCollectorTests
         string source,
         string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var workspace = new CollectorWorkspace();
         var seed = CreateCompilation();
         var tree = CSharpSyntaxTree.ParseText(
@@ -1139,10 +1148,11 @@ public sealed class FinalCompilationCollectorTests
         var compilation = seed.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
         var expected = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error &&
-                diagnostic.Location.IsInSource)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.Location.IsInSource))
             .Select(static diagnostic =>
             {
+                System.ArgumentNullException.ThrowIfNull(diagnostic);
                 var mapped = diagnostic.Location.GetMappedLineSpan();
                 return new
                 {
@@ -1163,7 +1173,7 @@ public sealed class FinalCompilationCollectorTests
             workspace.SealPath("diagnostic-location"),
             allowCompilationErrors: true);
         var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
-            new
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (new
             {
                 diagnostic.Code,
                 diagnostic.Message,
@@ -1172,7 +1182,7 @@ public sealed class FinalCompilationCollectorTests
                 diagnostic.Location.Path,
                 diagnostic.Location.Line,
                 diagnostic.Location.Column
-            }).ToArray();
+            })).ToArray();
 
         Assert.That(actual, Is.EquivalentTo(expected));
     }
@@ -1198,10 +1208,10 @@ public sealed class FinalCompilationCollectorTests
         using var workspace = new CollectorWorkspace();
         var compilation = CreateCompilation("internal static class Subject { }");
         compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
-        var expected = compilation.GetDiagnostics().Single(static item => item.Id == "CS5001");
+        var expected = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS5001"));
         Assert.That(expected.Location.IsInSource, Is.False);
         var artifact = await EmitArtifact(compilation, workspace.SealPath("missing-main"), allowCompilationErrors: true);
-        var diagnostic = artifact.CompilerDiagnostics.Single(static item => item.Code == "compiler.CS5001");
+        var diagnostic = artifact.CompilerDiagnostics.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code == "compiler.CS5001"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(diagnostic.IsSource, Is.False);
@@ -1219,6 +1229,7 @@ public sealed class FinalCompilationCollectorTests
     [TestCase("not-a-number")]
     public async Task InvalidExpressionDepthFailsArtifactEmission(string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         using var workspace = new CollectorWorkspace();
 
         var diagnostics = await AnalyzeCollectorAsync(
@@ -1237,6 +1248,7 @@ public sealed class FinalCompilationCollectorTests
     public async Task BlankSpecificationPackSegmentFailsArtifactEmission(
         string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("blank-specification-pack");
         var options = Options(path);
@@ -1403,31 +1415,31 @@ public sealed class FinalCompilationCollectorTests
             workspace.SealPath("linked-modules"));
         var captured = CompilerCompilationCapture.CaptureReferences(subject.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single(item =>
-            item.Modules[0].Path.EndsWith(
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules[0].Path.EndsWith(
                 "/Linked.dll",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                captured.Modules.Select(static module => module.Name),
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
                 Is.EqualTo(["Linked.dll", "A.netmodule", "B.netmodule"]));
             Assert.That(
-                captured.Modules.Select(static module => module.Path),
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
                     .Select(NormalizePath)));
             Assert.That(
-                captured.Modules.Select(static module => module.Mvid),
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Mvid)),
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
                     .Select(ReadMvid)));
             Assert.That(
-                captured.Modules.Select(static module => module.Sha256),
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Sha256)),
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
                     .Select(ReadSha256)));
             Assert.That(
-                captured.Modules.Select(static module => module.SizeBytes),
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
-                    .Select(static path => new FileInfo(path).Length)));
+                    .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new FileInfo(path).Length))));
         }
     }
 
@@ -1504,8 +1516,8 @@ public sealed class FinalCompilationCollectorTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                captured.SelectMany(static item => item.Modules)
-                    .Select(static module => module.SizeBytes),
+                captured.SelectMany(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules))
+                    .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
                 Is.EqualTo(new[]
                 {
                     firstImage.LongLength,
@@ -1592,6 +1604,7 @@ public sealed class FinalCompilationCollectorTests
     public void LinkedNetmoduleMustBeANonemptySiblingFileName(
         string moduleName)
     {
+        System.ArgumentNullException.ThrowIfNull(moduleName);
         using var workspace = new CollectorWorkspace();
         var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
 
@@ -1608,6 +1621,7 @@ public sealed class FinalCompilationCollectorTests
     public void LinkedNetmoduleAllowsOrdinaryLinuxFileNameCharacters(
         string moduleName)
     {
+        System.ArgumentNullException.ThrowIfNull(moduleName);
         using var workspace = new CollectorWorkspace();
         var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
 
@@ -1691,6 +1705,9 @@ public sealed class FinalCompilationCollectorTests
         string features,
         bool shouldEmit)
     {
+        System.ArgumentNullException.ThrowIfNull(buildProfile);
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(rawProfile);
         using var workspace = new CollectorWorkspace();
         var path = workspace.SealPath("profile-alias-order");
         var options = Options(
@@ -1706,6 +1723,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static string Digest(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
     private static async Task<CompilerManifestArtifact> EmitArtifact(
@@ -1714,6 +1732,8 @@ public sealed class FinalCompilationCollectorTests
         bool allowCompilationErrors = false,
         bool captureRawArtifact = false)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(path);
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
@@ -1740,9 +1760,12 @@ public sealed class FinalCompilationCollectorTests
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
-        ImmutableArray<AdditionalText> additionalFiles = default,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
         bool allowCompilationErrors = false)
     {
+
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(values);
         return AnalyzerTestHost.AnalyzeAsync(
             compilation,
             values,
@@ -1755,6 +1778,8 @@ public sealed class FinalCompilationCollectorTests
         CSharpCompilation compilation,
         AnalyzerConfigOptionsProvider optionsProvider)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(optionsProvider);
         return AnalyzerTestHost.AnalyzeAsync(
             compilation,
             optionsProvider,
@@ -1764,6 +1789,7 @@ public sealed class FinalCompilationCollectorTests
     private static CSharpCompilation CreateCompilation(
         string source = "internal static class Fixture { const int Value = 1; }")
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return AnalyzerTestHost.CreateCompilation(source, []);
     }
 
@@ -1772,6 +1798,8 @@ public sealed class FinalCompilationCollectorTests
         string assemblyName,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         return AnalyzerTestHost.EmitImage(compilation
             .WithAssemblyName(assemblyName)
@@ -1781,11 +1809,13 @@ public sealed class FinalCompilationCollectorTests
 
     private static string NormalizePath(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return Path.GetFullPath(path).Replace('\\', '/');
     }
 
     private static string ReadMvid(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         using var stream = File.OpenRead(path);
         using var reader = new PEReader(stream);
         var metadata = reader.GetMetadataReader();
@@ -1795,6 +1825,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static string ReadSha256(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         using var stream = File.OpenRead(path);
         using var hash = SHA256.Create();
         return SharpProof.Ir.HashEncoding.ToLowerHex(hash.ComputeHash(stream));
@@ -1805,6 +1836,9 @@ public sealed class FinalCompilationCollectorTests
         string original,
         string replacement)
     {
+        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        System.ArgumentNullException.ThrowIfNull(original);
+        System.ArgumentNullException.ThrowIfNull(replacement);
         var originalBytes = Encoding.ASCII.GetBytes(original);
         var replacementBytes = Encoding.ASCII.GetBytes(replacement);
         Assert.That(replacementBytes, Has.Length.EqualTo(originalBytes.Length));
@@ -1827,6 +1861,11 @@ public sealed class FinalCompilationCollectorTests
         string assumptionPolicy = "allow",
         string maximumExpressionDepth = "64")
     {
+        System.ArgumentNullException.ThrowIfNull(assumptionPolicy);
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(maximumExpressionDepth);
+        System.ArgumentNullException.ThrowIfNull(profile);
+        System.ArgumentNullException.ThrowIfNull(verifyPolicy);
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase)
         {
@@ -1851,10 +1890,10 @@ public sealed class FinalCompilationCollectorTests
         string content) : AdditionalText, ICompilerAdditionalTextSnapshot
     {
         private readonly SourceText _text = SourceText.From(
-            content,
+            (content ?? throw new System.ArgumentNullException(nameof(content))),
             Encoding.UTF8);
 
-        public override string Path { get; } = path;
+        public override string Path { get; } = (path ?? throw new System.ArgumentNullException(nameof(path)));
 
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
 
@@ -1873,7 +1912,7 @@ public sealed class FinalCompilationCollectorTests
     {
         private int _readCount;
 
-        public override string Path { get; } = path;
+        public override string Path { get; } = (later is null ? throw new System.ArgumentNullException(nameof(later)) : (first is null ? throw new System.ArgumentNullException(nameof(first)) : (path ?? throw new System.ArgumentNullException(nameof(path)))));
 
         public override SourceText GetText(
             CancellationToken cancellationToken)
@@ -1891,19 +1930,21 @@ public sealed class FinalCompilationCollectorTests
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            new DictionaryAnalyzerConfigOptions(globalValues);
+            new DictionaryAnalyzerConfigOptions((globalValues ?? throw new System.ArgumentNullException(nameof(globalValues))));
         private readonly AnalyzerConfigOptions _tree =
-            new DictionaryAnalyzerConfigOptions(treeValues);
+            new DictionaryAnalyzerConfigOptions((treeValues ?? throw new System.ArgumentNullException(nameof(treeValues))));
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return _tree;
         }
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return _tree;
         }
     }
@@ -1913,17 +1954,19 @@ public sealed class FinalCompilationCollectorTests
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            new DictionaryAnalyzerConfigOptions(globalValues);
+            new DictionaryAnalyzerConfigOptions((globalValues ?? throw new System.ArgumentNullException(nameof(globalValues))));
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             throw new InvalidOperationException("tree options unavailable");
         }
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             throw new InvalidOperationException("additional options unavailable");
         }
     }
@@ -1933,10 +1976,12 @@ public sealed class FinalCompilationCollectorTests
         ReportDiagnostic reportDiagnostic)
         : SyntaxTreeOptionsProvider
     {
+        private string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
         public override GeneratedKind IsGenerated(
             SyntaxTree tree,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return GeneratedKind.Unknown;
         }
 
@@ -1946,10 +1991,12 @@ public sealed class FinalCompilationCollectorTests
             CancellationToken cancellationToken,
             out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(requestedDiagnosticId);
+            System.ArgumentNullException.ThrowIfNull(tree);
             severity = reportDiagnostic;
             return string.Equals(
                 requestedDiagnosticId,
-                diagnosticId,
+                _guarded_diagnosticId,
                 StringComparison.Ordinal);
         }
 
@@ -1958,6 +2005,7 @@ public sealed class FinalCompilationCollectorTests
             CancellationToken cancellationToken,
             out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(requestedDiagnosticId);
             severity = ReportDiagnostic.Default;
             return false;
         }
@@ -1982,6 +2030,7 @@ public sealed class FinalCompilationCollectorTests
         }
         internal string SealPath(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return System.IO.Path.Combine(Path, name + ".seal");
         }
 

@@ -30,6 +30,7 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("var text = value.ToString();")]
     public async Task UnspecifiedOrDispatchedCallsMayUseAnyCapability(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[AllowedCapabilities(SharpProofCapability.None)] public static void Target(object value) { " +
             "Contract.Requires(value != null); " + body + " }");
         var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -41,6 +42,8 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("SharpProofCapability.Synchronization", typeof(ProvenOutcome))]
     public async Task LocksUseSynchronization(string allowed, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var preparation = Prepare("[AllowedCapabilities(" + allowed + ")] public static void Target() { lock (new object()) { } }");
         var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
@@ -48,9 +51,10 @@ public sealed partial class NativeSpecifiedCallTests
 
     private static CompilerCallablePreparation Prepare(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

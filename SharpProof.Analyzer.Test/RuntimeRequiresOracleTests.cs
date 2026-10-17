@@ -63,6 +63,7 @@ public sealed class RuntimeRequiresOracleTests
             image,
             assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             var fixture = assembly.GetType(
                     "RuntimeRequiresFixture",
                     throwOnError: true)!;
@@ -72,17 +73,17 @@ public sealed class RuntimeRequiresOracleTests
                 throw new InvalidOperationException(
                     "Runtime Range method is missing.");
             var runtimeRefutationLines = cases
-                .Where(item => !(bool)range.Invoke(
+                .Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!(bool)range.Invoke(
                     null,
-                    [item.Value, item.Minimum, item.Maximum])!)
-                .Select(static item => item.CallLine)
+                    [item.Value, item.Minimum, item.Maximum])!))
+                .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallLine))
                 .Order()
                 .ToArray();
             var diagnosticLines = diagnostics
-                .Where(static diagnostic => diagnostic.Id == "SP0027")
+                .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0027"))
                 .Select(static diagnostic =>
-                    diagnostic.Location.GetLineSpan()
-                        .StartLinePosition.Line)
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.GetLineSpan()
+                        .StartLinePosition.Line))
                 .Order()
                 .ToArray();
 

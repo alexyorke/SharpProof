@@ -23,10 +23,22 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class CompositionalLongFuzzTests
 {
     private const string Harness = "compositional";
-    private sealed record Operation(string Name, string Expression, int Anchor);
-    private sealed record Scope(string Name, string Template, string ClaimMode);
+    private sealed record Operation(string Name, string Expression, int Anchor)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public string Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
+    }
+    private sealed record Scope(string Name, string Template, string ClaimMode)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public string Template { get; init; } = Template ?? throw new System.ArgumentNullException(nameof(Template));
+        public string ClaimMode { get; init; } = ClaimMode ?? throw new System.ArgumentNullException(nameof(ClaimMode));
+    }
     private sealed record Observation(int Input, int? Value, string? Exception, int State, int Writes);
-    private sealed record ClrResult(Observation[] Runs, string? Error);
+    private sealed record ClrResult(Observation[] Runs, string? Error)
+    {
+        public Observation[] Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+    }
 
     private static readonly Operation[] s_operations =
     [
@@ -74,7 +86,7 @@ public sealed class CompositionalLongFuzzTests
             var generatedSource = "// Compositional LongFuzz seed " + seed;
             try
             {
-                await RunCase(session, seed, operation, scope, pair, recover, source => generatedSource = source);
+                await RunCase(session, seed, operation, scope, pair, recover, source => { System.ArgumentNullException.ThrowIfNull(source); generatedSource = source; });
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -128,6 +140,9 @@ public sealed class CompositionalLongFuzzTests
 
     private static Operation CheckedAdd(int cycle)
     {
+        if (cycle < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
+
         var delta = new[] { 1, 2, -1, -2 }[cycle % 4];
         return new("checked-add", "checked(y + " + Literal(delta) + ")",
             delta < 0 ? int.MinValue : int.MaxValue);
@@ -135,6 +150,9 @@ public sealed class CompositionalLongFuzzTests
 
     private static Operation ShiftDivide(int cycle)
     {
+        if (cycle < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
+
         var mask = new[] { 3, 7 }[cycle % 2];
         var shift = new[] { 1, 31, 32, 33 }[cycle % 4];
         return new("shift-divide", "8 / (y & " + mask + ") + (y << " + shift + ")", 0);
@@ -142,6 +160,9 @@ public sealed class CompositionalLongFuzzTests
 
     private static Operation ArrayIndex(int cycle)
     {
+        if (cycle < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
+
         var longArray = cycle % 2 == 0;
         var elements = longArray ? "y, -2, 3, 5" : "y, 2, 3";
         var mask = longArray ? 7 : 3;
@@ -151,6 +172,9 @@ public sealed class CompositionalLongFuzzTests
 
     private static Operation SwitchPattern(int cycle)
     {
+        if (cycle < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
+
         var shift = new[] { 1, 2, 31, 32 }[cycle % 4];
         return new("switch-pattern", "y switch { < 0 => checked(y * 2), 0 => 0, _ => y << " +
             shift + " }", 2);
@@ -158,6 +182,9 @@ public sealed class CompositionalLongFuzzTests
 
     private static Operation CheckedByte(int cycle)
     {
+        if (cycle < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
+
         var delta = cycle % 3;
         return new("checked-byte", "checked((byte)(y + " + delta + "))", 256);
     }
@@ -165,6 +192,9 @@ public sealed class CompositionalLongFuzzTests
     private static async Task RunCase(LongFuzzSession session, int seed, Operation operation, Scope scope,
         string pair, bool recover, Action<string> rememberSource)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
+        System.ArgumentNullException.ThrowIfNull(rememberSource);
+        System.ArgumentNullException.ThrowIfNull(scope);
         var plainBody = scope.Template.Replace("@@", operation.Expression, StringComparison.Ordinal);
         var body = recover ? "try { " + plainBody + " } catch (Exception) { Mark(5); return 5; }" : plainBody;
         var inputs = new[] { operation.Anchor }.Concat(s_inputs).Distinct().ToArray();
@@ -211,11 +241,11 @@ public sealed class CompositionalLongFuzzTests
         }
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, pair,
-                "", "", Format(witness), string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())), source));
+                "", "", Format(witness), string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))), source));
             return;
         }
         session.Count("claim-compiled:" + pair);
@@ -229,11 +259,11 @@ public sealed class CompositionalLongFuzzTests
         {
             session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, pair,
                 "", "", Format(witness), string.Join(" | ", response.Errors.Select(error =>
-                    error.Code + ":" + error.Message)), source));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))), source));
             return;
         }
-        var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(item =>
-            item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, pair,
@@ -269,6 +299,11 @@ public sealed class CompositionalLongFuzzTests
     private static bool CheckRecovery(LongFuzzSession session, int seed, string pair, string plainBody,
         int[] inputs, Observation[] recovered, string recoveredSource)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(pair);
+        System.ArgumentNullException.ThrowIfNull(plainBody);
+        System.ArgumentNullException.ThrowIfNull(recoveredSource);
+        System.ArgumentNullException.ThrowIfNull(session);
         var plain = RunClr(Source("", plainBody), inputs);
         if (plain.Error is not null)
         {
@@ -323,6 +358,7 @@ public sealed class CompositionalLongFuzzTests
 
     private static string Claim(Scope scope, Operation operation, Observation anchor)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         if (scope.ClaimMode == "EnforcePure" ||
             (scope.ClaimMode == "AutoOrPurity" && anchor.Exception is null))
         {
@@ -340,21 +376,25 @@ public sealed class CompositionalLongFuzzTests
 
     private static Observation? Witness(string claim, Operation operation, Observation atAnchor, Observation[] runs)
     {
+        System.ArgumentNullException.ThrowIfNull(runs, nameof(runs));
+        System.ArgumentNullException.ThrowIfNull(atAnchor);
+        System.ArgumentNullException.ThrowIfNull(operation);
         if (claim == "[DoesNotThrow]")
         {
-            return runs.FirstOrDefault(run => run.Exception is not null);
+            return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Exception is not null));
         }
         if (claim == "[EnforcePure]")
         {
-            return runs.FirstOrDefault(run => run.Writes != 0 || run.State != 0);
+            return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Writes != 0 || run.State != 0));
         }
         var expected = operation.Name == "shift-divide" ? unchecked(atAnchor.Value!.Value + 1) :
             atAnchor.Value!.Value;
-        return runs.FirstOrDefault(run => run.Input == operation.Anchor && run.Exception is null && run.Value != expected);
+        return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Input == operation.Anchor && run.Exception is null && run.Value != expected));
     }
 
     private static string ClaimName(string claim)
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
         return claim == "[DoesNotThrow]" ? "DoesNotThrow" :
             claim == "[EnforcePure]" ? "EnforcePure" : "Ensures";
     }
@@ -371,6 +411,8 @@ public sealed class CompositionalLongFuzzTests
 
     private static string Source(string claim, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(claim);
         var attribute = claim.StartsWith('[') ? claim : "";
         var inline = attribute.Length == 0 ? claim : "";
         return "using System; using SharpProof.Attributes; public static class C { " +
@@ -384,6 +426,7 @@ public sealed class CompositionalLongFuzzTests
 
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
@@ -395,11 +438,13 @@ public sealed class CompositionalLongFuzzTests
 
     private static ClrResult RunClr(string source, int[] inputs)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
         if (errors.Length != 0)
         {
-            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error.ToString())));
+            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
         }
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);

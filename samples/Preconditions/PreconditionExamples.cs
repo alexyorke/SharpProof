@@ -10,11 +10,21 @@ public static class PreconditionExamples {
 
     public static int KnownGoodCall() => Positive(1);
 
-    public static string RequiredText([NotNull] string value) => value;
+    public static string RequiredText([NotNull] string value) {
+        System.ArgumentNullException.ThrowIfNull(value);
+        return value;
+    }
 
-    public static int RequiredPositive([Positive] int value) => value;
+    public static int RequiredPositive([Positive] int value) {
+        System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+        return value;
+    }
 
-    public static int RequiredRange([InRange(0, 10)] int value) => value;
+    public static int RequiredRange([InRange(0, 10)] int value) {
+        System.ArgumentOutOfRangeException.ThrowIfNegative(value);
+        System.ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 10);
+        return value;
+    }
 
     public static int ClosedContractCalls() =>
         RequiredText("known").Length +

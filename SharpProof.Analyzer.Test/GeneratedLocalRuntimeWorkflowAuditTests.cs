@@ -15,6 +15,7 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
     [TestCase("strict", true)]
     public async Task SelectedLocalRuntimeMutationRequiresDiagnostic(string profile, bool generated)
     {
+        System.ArgumentNullException.ThrowIfNull(profile);
         const string source = """
             using SharpProof.Attributes;
             public static class Subject {
@@ -29,7 +30,7 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002"],
             filePath: generated ? "Subject.g.cs" : "Subject.cs");
         var compilerErrors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         Assert.That(compilerErrors, Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -42,6 +43,7 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         var image = AnalyzerTestHost.EmitImage(compilation);
         RuntimeAssemblyTestHost.WithRuntimeAssembly("GeneratedLocalRuntimeWorkflowAudit", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             var type = assembly.GetType("Subject", throwOnError: true)!;
             var state = type.GetField("State", BindingFlags.Public | BindingFlags.Static)!;
             Assert.That(state.GetValue(null), Is.EqualTo(0));

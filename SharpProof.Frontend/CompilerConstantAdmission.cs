@@ -5,8 +5,7 @@ internal static class CompilerConstantAdmission
     internal static bool IsCatalogIntegerBoundary(
         IFieldReferenceOperation operation)
     {
-        if (operation is null)
-        { throw new ArgumentNullException(nameof(operation)); }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
 
         var field = operation.Field;
         if (!field.IsConst || !field.IsStatic ||
@@ -30,8 +29,7 @@ internal static class CompilerConstantAdmission
 
     internal static bool IsLiteralIntegerNegation(IUnaryOperation operation)
     {
-        if (operation is null)
-        { throw new ArgumentNullException(nameof(operation)); }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
 
         return operation.OperatorKind == UnaryOperatorKind.Minus &&
             operation.Operand is ILiteralOperation &&

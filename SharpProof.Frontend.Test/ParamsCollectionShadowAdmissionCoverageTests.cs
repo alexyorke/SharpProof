@@ -23,7 +23,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp13), "params-collection.cs");
         var compilation = CSharpCompilation.Create("ParamsCollectionShadowSubject", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -36,8 +36,8 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [null]), Is.EqualTo(17));
             var model = compilation.GetSemanticModel(tree);
             var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-            var targetSyntax = methods.Single(m => m.Identifier.ValueText == "Target");
-            var helperSyntax = methods.Single(m => m.Identifier.ValueText == "Helper");
+            var targetSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Target"));
+            var helperSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Helper"));
             var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
             Assert.That(invocation.Instance, Is.Null);
             Assert.That(invocation.Arguments, Has.Length.EqualTo(1));
@@ -57,6 +57,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             var policyCalls = 0;
             bool PreserveActualHelper(IMethodSymbol method)
             {
+                System.ArgumentNullException.ThrowIfNull(method);
                 policyCalls++;
                 return SymbolEqualityComparer.Default.Equals(method, invocation.TargetMethod.OriginalDefinition);
             }
@@ -78,7 +79,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(direct.IsExact, Is.True);
             Assert.That(direct.ConstructionLimitExceeded, Is.False);
             var replay = new IrProgramInterpreter(factory).Execute(direct.Program,
-                helperContext.Parameters.ToDictionary(p => p.Entry, p => factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type)));
+                helperContext.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type))));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17)));

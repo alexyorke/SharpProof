@@ -78,7 +78,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
             """);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var target = preparations.Single(preparation => preparation.Total is { CallPreconditions.Length: 2 });
+        var target = preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Total is { CallPreconditions.Length: 2 }));
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         using (Assert.EnterMultipleScope())
         {

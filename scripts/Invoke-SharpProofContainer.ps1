@@ -81,24 +81,6 @@ else {
     @()
 }
 
-# Build the repository-only analyzer once before any project builds. The
-# solution can build projects in parallel, so individual projects must not
-# race to write its bin/obj directories.
-if ($Command -notin @('contract', 'restore', 'dependency-audit') -and
-    -not $NoBuild -and -not $Fast) {
-    $defensiveAnalyzerProject = Join-Path $repositoryRoot `
-        'eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
-    Invoke-SharpProofRequiredDotnet @(
-        'restore', $defensiveAnalyzerProject, '--locked-mode')
-    # Some top-level commands build a Release project after entering with the
-    # default Debug configuration (for example, security).
-    foreach ($analyzerConfiguration in @('Debug', 'Release')) {
-        Invoke-SharpProofRequiredDotnet @(
-            'build', $defensiveAnalyzerProject, '--configuration', $analyzerConfiguration,
-            '--no-restore', '-p:RunAnalyzersDuringBuild=false')
-    }
-}
-
 function New-TestInvocationArguments([hashtable]$Additional = @{}) {
     $arguments = @{ Configuration = $Configuration }
     foreach ($entry in $Additional.GetEnumerator()) {
@@ -582,7 +564,7 @@ switch ($Command) {
         if (Test-Path -LiteralPath $mergedAuthorityPath) {
             throw 'coverage-gate requires a coverage root without merged authority evidence.'
         }
-        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura.xml' -File)) {
+        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura*.xml' -File | Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })) {
             $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
             if ($relativeReport -cnotmatch '^(semantic|package)/') {
                 throw 'coverage-gate found a report outside the two authenticated shards.'
@@ -604,8 +586,9 @@ switch ($Command) {
             $shardReports = @(Get-ChildItem `
                     -LiteralPath $shardRoot `
                     -Recurse `
-                    -Filter '*.cobertura.xml' `
-                    -File)
+                    -Filter '*.cobertura*.xml' `
+                    -File |
+                    Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })
             if ($shardReports.Count -eq 0) {
                 throw "Coverage shard '$shardName' produced no Cobertura reports."
             }

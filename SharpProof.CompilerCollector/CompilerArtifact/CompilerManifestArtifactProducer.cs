@@ -9,6 +9,14 @@ internal static class CompilerManifestArtifactProducer
         ImmutableArray<AdditionalText> additionalFiles = default,
         ImmutableArray<string> specificationPacks = default)
     {
+
+
+        if (additionalFiles.IsDefault)
+        {
+            additionalFiles = [];
+        }
+        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
+        targetFramework = RepositoryParameterGuard.NotNull(targetFramework, nameof(targetFramework));
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         discovery = ArgumentNullGuard.NotNull(discovery, nameof(discovery));
         var specificationPackAuthority =
@@ -22,17 +30,18 @@ internal static class CompilerManifestArtifactProducer
         snapshot.SpecificationPackCatalogSha256 =
             specificationPackAuthority.SpecificationPackCatalogSha256;
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
-            .Where(static item => item.Severity == DiagnosticSeverity.Error &&
-                !item.IsSuppressed)
-            .Select(item => CreateDiagnostic(item, snapshot));
+            .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error &&
+                !item.IsSuppressed))
+            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (CreateDiagnostic(item, snapshot)));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
-        var targets = discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal);
+        var targets = discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
         CompilerCallableArtifact[] callables;
         if (diagnosticArtifacts.Length != 0)
         {
             callables = [.. targets.Select(item =>
             {
+                item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var artifact = new CompilerCallableArtifact
                 {
                     CallableId = item.Entry.CallableId,
@@ -51,6 +60,7 @@ internal static class CompilerManifestArtifactProducer
                 // display-name purposes (opaque versus call), and IrFactory
                 // intentionally hash-conses those requests by structural
                 // identity rather than display name.
+                item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var lowerer = new CompilerCallableLowerer(
                     compilation,
                     new IrFactory(),
@@ -86,6 +96,8 @@ internal static class CompilerManifestArtifactProducer
         this CompilerCallableArtifact artifact,
         ManifestCallableTarget target)
     {
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var claims = target.EffectClaims;
         var evidence = new CompilerEffectClaimArtifact[claims.Length];
         for (var index = 0; index < claims.Length; index++)
@@ -101,6 +113,8 @@ internal static class CompilerManifestArtifactProducer
         Diagnostic diagnostic,
         CompilerCompilationSnapshot compilation)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
         var result = new CompilerDiagnosticArtifact

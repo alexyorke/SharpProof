@@ -55,7 +55,7 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         var context = CreateContext("InvocationMaterializationDirectValid", "ContractFrames", "Evaluate");
         var candidates = RecognizedCandidates(context.Body, context.Api);
 
-        Assert.That(context.PublicContracts.Clauses.Select(clause => clause.Kind),
+        Assert.That(context.PublicContracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(candidates.Select(candidate => candidate.Kind)));
         Assert.That(candidates.Length, Is.EqualTo(3));
         var result = ContractInvocationMaterialization.Bind(
@@ -66,25 +66,25 @@ public sealed class ContractInvocationMaterializationBoundaryTests
             requiresOnly: false);
 
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(result.Clauses.Select(clause => clause.Kind),
+        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(FullKinds));
-        Assert.That(result.Clauses.Select(clause => clause.Evidence),
+        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence)),
             Is.All.EqualTo(BoundContractEvidence.CompilerBoundInvocation));
         Assert.That(
-            result.Clauses.Select(clause => clause.DiagnosticText),
+            result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)),
             Is.EqualTo(candidates.Select(candidate =>
-                candidate.Invocation.Arguments[0].Value.Syntax.ToString())));
+                ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Arguments[0].Value.Syntax.ToString())))));
         Assert.That(
-            result.Clauses.Select(clause => clause.SourceSyntax!.Span),
-            Is.EqualTo(candidates.Select(candidate => candidate.Invocation.Syntax.Span)));
+            result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceSyntax!.Span)),
+            Is.EqualTo(candidates.Select(candidate => ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Syntax.Span)))));
         Assert.That(
-            result.Clauses.Select(clause => clause.SourceSyntax!.SyntaxTree),
+            result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceSyntax!.SyntaxTree)),
             Is.All.SameAs(context.Tree));
         Assert.That(
-            result.Clauses.Select(clause => DescribeOperation(context.Factory, clause)),
+            result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (DescribeOperation(context.Factory, clause))),
             Is.EqualTo(candidates.Select(candidate =>
-                "contract@" + candidate.Invocation.Syntax.SpanStart.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture))));
+                ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : ("contract@" + candidate.Invocation.Syntax.SpanStart.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture))))));
 
         var parameter = context.ExpressionBinder.VariableBindings.Single(binding =>
             SymbolEqualityComparer.Default.Equals(binding.Symbol, context.Method.Parameters[0])).Variable;
@@ -134,7 +134,7 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         Assert.That(context.PublicContracts.Clauses, Is.Empty);
         var invocation = context.Body.DescendantsAndSelf()
             .OfType<IInvocationOperation>()
-            .Single(candidate => candidate.TargetMethod.Name == invocationMethodName);
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.TargetMethod.Name == invocationMethodName));
         Assert.That(context.Api.Clauses.GetClauseKind(invocation.TargetMethod), Is.Null);
 
         // These are ordinary calls supplied directly to the materializer as raw
@@ -156,6 +156,8 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         IOperation body,
         ContractApiSymbols api)
     {
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(body);
         var candidates = ImmutableArray.CreateBuilder<ContractInvocationCandidate>();
         foreach (var invocation in body.DescendantsAndSelf().OfType<IInvocationOperation>())
         {
@@ -166,11 +168,13 @@ public sealed class ContractInvocationMaterializationBoundaryTests
             }
         }
 
-        return [.. candidates.OrderBy(candidate => candidate.Invocation.Syntax.SpanStart)];
+        return [.. candidates.OrderBy(candidate => ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Syntax.SpanStart)))];
     }
 
     private static string DescribeOperation(IrFactory factory, BoundContractClause clause)
     {
+        System.ArgumentNullException.ThrowIfNull(clause);
+        System.ArgumentNullException.ThrowIfNull(factory);
         var description = factory.GetOperationInfo(clause.SourceOperation).Description;
         Assert.That(description.HasValue, Is.True);
         return factory.GetString(description!.Value);
@@ -181,6 +185,9 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var compilation = TestCompilation.Create(assemblyName, SourceText);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -189,8 +196,8 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         var tree = compilation.SyntaxTrees.Single();
         var semanticModel = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == methodName &&
-                ((IMethodSymbol)semanticModel.GetDeclaredSymbol(method)!).ContainingType.Name == typeName);
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == methodName &&
+                ((IMethodSymbol)semanticModel.GetDeclaredSymbol(method)!).ContainingType.Name == typeName));
         var source = (IMethodSymbol)semanticModel.GetDeclaredSymbol(syntax)!;
         Assert.That(
             SymbolEqualityComparer.Default.Equals(source.ContainingAssembly, compilation.Assembly),
@@ -228,5 +235,14 @@ public sealed class ContractInvocationMaterializationBoundaryTests
         ContractApiSymbols Api,
         IrFactory Factory,
         ContractExpressionBinder ExpressionBinder,
-        BoundMethodContracts PublicContracts);
+        BoundMethodContracts PublicContracts)
+    {
+        public SyntaxTree Tree { get; init; } = Tree ?? throw new System.ArgumentNullException(nameof(Tree));
+        public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public IOperation Body { get; init; } = Body ?? throw new System.ArgumentNullException(nameof(Body));
+        public ContractApiSymbols Api { get; init; } = Api ?? throw new System.ArgumentNullException(nameof(Api));
+        public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
+        public ContractExpressionBinder ExpressionBinder { get; init; } = ExpressionBinder ?? throw new System.ArgumentNullException(nameof(ExpressionBinder));
+        public BoundMethodContracts PublicContracts { get; init; } = PublicContracts ?? throw new System.ArgumentNullException(nameof(PublicContracts));
+    }
 }

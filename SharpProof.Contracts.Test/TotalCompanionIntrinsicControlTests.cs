@@ -14,6 +14,7 @@ public sealed class TotalCompanionIntrinsicControlTests
     [TestCase("void Nested() { _ = Contract.Result<int>(); }")]
     public void RequiresOnlyPreservesCompanionPreconditions(string statement)
     {
+        System.ArgumentNullException.ThrowIfNull(statement);
         var compilation = TestCompilation.Create("TotalCompanionControls", $$"""
             using SharpProof.Attributes;
             public static class Target {

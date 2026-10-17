@@ -16,14 +16,17 @@ public sealed class Pr275ControlFlowCaptureCoverageTests
     [TestCase("int[]", "int[] left, int[] right", "left ?? right")]
     public void RealControlFlowCapturesReuseTheirVariableForEachReference(string returnType, string parameters, string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         var tree = CSharpSyntaxTree.ParseText($"class Subject {{ static {returnType} Target({parameters}) => {expression}; }}");
         var compilation = CSharpCompilation.Create("Pr275Captures", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var graph = ControlFlowGraph.Create(method, compilation.GetSemanticModel(tree))!;
-        var operations = graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? [] : [block.BranchValue]))
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? [] : [block.BranchValue])))
             .SelectMany(DescendantsAndSelf).ToArray();
         var captures = operations.OfType<IFlowCaptureOperation>().ToArray();
         var references = operations.OfType<IFlowCaptureReferenceOperation>().ToArray();
@@ -51,7 +54,7 @@ public sealed class Pr275ControlFlowCaptureCoverageTests
             Assert.That(result.Term, Is.TypeOf<IrBinaryTerm>());
             Assert.That(((IrBinaryTerm)result.Term).Operator, Is.EqualTo(IrBinaryOperator.Equal));
         }
-        Assert.That(lowerer.CreateCaptureBindings(), Has.Length.EqualTo(captures.Select(capture => capture.Id).Distinct().Count()));
+        Assert.That(lowerer.CreateCaptureBindings(), Has.Length.EqualTo(captures.Select(capture => capture is null ? throw new System.ArgumentNullException(nameof(capture)) : (capture.Id)).Distinct().Count()));
     }
 
     [Test]
@@ -60,9 +63,9 @@ public sealed class Pr275ControlFlowCaptureCoverageTests
         var tree = CSharpSyntaxTree.ParseText("class Subject { static long Target(int input) { int local = input; return (long)local; } }");
         var compilation = CSharpCompilation.Create("Pr275References", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var parameter = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Single(node => node.Identifier.Text == "input");
+        var parameter = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.Text == "input"));
         var conversion = tree.GetRoot().DescendantNodes().OfType<CastExpressionSyntax>().Single();
         var parameterOperation = model.GetOperation(parameter)!;
         var conversionOperation = model.GetOperation(conversion)!;
@@ -82,6 +85,7 @@ public sealed class Pr275ControlFlowCaptureCoverageTests
 
     private static IEnumerable<IOperation> DescendantsAndSelf(IOperation operation)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         yield return operation;
         foreach (var child in operation.ChildOperations)
         {

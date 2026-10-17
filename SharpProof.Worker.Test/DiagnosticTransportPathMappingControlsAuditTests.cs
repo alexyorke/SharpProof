@@ -30,6 +30,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
     [TestCase("unix-absolute-literal-map", TestName = "AbsoluteUnixMappedBackslashTargetsExistingLiteralFile")]
     public async Task CompilerAndPublishedLocationsFollowPathContract(string caseName)
     {
+        System.ArgumentNullException.ThrowIfNull(caseName);
         var input = Input(caseName);
         var source = Header + (input.MappedPath is null
             ? string.Empty
@@ -70,9 +71,10 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True,
-            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item.ToString())));
+            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ToString()))));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("DiagnosticTransportPathMappingAudit", image, assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             var target = assembly.GetType("Subject")!.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
             Assert.That(target(-1), Is.EqualTo(-1));
         });
@@ -247,6 +249,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
 
     private static string EvidenceDirectory(string caseName)
     {
+        System.ArgumentNullException.ThrowIfNull(caseName);
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var directory = Path.Combine(repositoryRoot!, "artifacts", "correctness",
@@ -284,5 +287,12 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
     }
 
     private sealed record MappingInput(string ProjectDirectory, string SourcePath, string? MappedPath,
-        string ExpectedPath, string ExpectedUri, string ExpectedRootUri, bool NativeMappedTarget);
+        string ExpectedPath, string ExpectedUri, string ExpectedRootUri, bool NativeMappedTarget)
+    {
+        public string ProjectDirectory { get; init; } = ProjectDirectory ?? throw new System.ArgumentNullException(nameof(ProjectDirectory));
+        public string SourcePath { get; init; } = SourcePath ?? throw new System.ArgumentNullException(nameof(SourcePath));
+        public string ExpectedPath { get; init; } = ExpectedPath ?? throw new System.ArgumentNullException(nameof(ExpectedPath));
+        public string ExpectedUri { get; init; } = ExpectedUri ?? throw new System.ArgumentNullException(nameof(ExpectedUri));
+        public string ExpectedRootUri { get; init; } = ExpectedRootUri ?? throw new System.ArgumentNullException(nameof(ExpectedRootUri));
+    }
 }

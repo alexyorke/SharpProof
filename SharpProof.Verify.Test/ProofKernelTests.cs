@@ -160,7 +160,7 @@ public sealed class ProofKernelTests
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
         Assert.That(
             outcomes.Cast<UnknownOutcome>()
-                .Select(static outcome => outcome.Reason),
+                .Select(static outcome => outcome is null ? throw new System.ArgumentNullException(nameof(outcome)) : (outcome.Reason)),
             Has.All.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
 
@@ -437,12 +437,13 @@ public sealed class ProofKernelTests
 
     private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
     {
-        private readonly BackendCheckResult _result = result;
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
         }
@@ -456,6 +457,7 @@ public sealed class ProofKernelTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             if (_throwSynchronously)
             {
@@ -473,6 +475,7 @@ public sealed class ProofKernelTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromException<BackendCheckResult>(
                 new AggregateException(
@@ -487,10 +490,10 @@ public sealed class ProofKernelTests
         Goal goal,
         VerificationQuery query)
     {
-        internal IrFactory Factory { get; } = factory;
-        internal IrVarId Variable { get; } = variable;
-        internal OperationId Operation { get; } = operation;
-        internal Goal Goal { get; } = goal;
-        internal VerificationQuery Query { get; } = query;
+        internal IrFactory Factory { get; } = (factory ?? throw new System.ArgumentNullException(nameof(factory)));
+        internal IrVarId Variable { get; } = (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : variable);
+        internal OperationId Operation { get; } = (operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : operation);
+        internal Goal Goal { get; } = (goal ?? throw new System.ArgumentNullException(nameof(goal)));
+        internal VerificationQuery Query { get; } = (query ?? throw new System.ArgumentNullException(nameof(query)));
     }
 }

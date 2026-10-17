@@ -25,23 +25,23 @@ public sealed class NativeCallerCancellationAdmissionTests
         var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(session, target, budgets,
             () => session.ConsumedResourceCount, budgets.MethodWallTimeMilliseconds, boundary, caller.Token);
         Assert.That(result.Callable.CallableId, Is.EqualTo(target.Entry.CallableId));
-        Assert.That(result.Claims.Select(claim => claim.ClaimId), Is.EqualTo(target.Entry.ClaimIds));
-        Assert.That(result.Callable.Assumptions.Select(assumption => assumption.Id),
-            Is.EqualTo(target.Entry.Assumptions.Select(assumption => assumption.Id)));
+        Assert.That(result.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)), Is.EqualTo(target.Entry.ClaimIds));
+        Assert.That(result.Callable.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)),
+            Is.EqualTo(target.Entry.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))));
         if (canceled)
         {
             Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
-            Assert.That(result.Claims.All(claim => claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+            Assert.That(result.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled)), Is.True);
             Assert.That(session.ConsumedResourceCount, Is.Zero);
         }
         else
         {
             Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.None));
-            Assert.That(result.Claims.Count(claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
-            Assert.That(result.Claims.Count(claim => claim.Outcome == WorkerClaimOutcome.Refuted), Is.EqualTo(1));
-            Assert.That(result.Claims.All(claim => claim.Reason == WorkerClaimReason.None), Is.True);
+            Assert.That(result.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
+            Assert.That(result.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)), Is.EqualTo(1));
+            Assert.That(result.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason == WorkerClaimReason.None)), Is.True);
             Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
         }
     }
@@ -76,7 +76,7 @@ public sealed class NativeCallerCancellationAdmissionTests
             Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
             Assert.That(result.Claims.All(claim =>
-                claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled)), Is.True);
         }
     }
 
@@ -95,6 +95,7 @@ public sealed class NativeCallerCancellationAdmissionTests
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             _started.TrySetResult();
             await Task.WhenAny(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken), _release.Task)
                 .ConfigureAwait(false);

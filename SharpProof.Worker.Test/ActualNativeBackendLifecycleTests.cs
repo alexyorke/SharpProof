@@ -60,8 +60,8 @@ public sealed class ActualNativeBackendLifecycleTests
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
-            Assert.That(response.Manifest.Claims.Select(claim => claim.ClaimId),
-                Is.EqualTo(response.ClaimResults.Select(claim => claim.ClaimId)));
+            Assert.That(response.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
+                Is.EqualTo(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Disabled));
             Assert.That(response.Summary.CacheHit, Is.False);
             var callable = response.CallableResults.Single();

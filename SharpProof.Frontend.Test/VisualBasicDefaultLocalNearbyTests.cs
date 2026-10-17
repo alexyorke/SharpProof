@@ -23,11 +23,14 @@ public sealed class VisualBasicDefaultLocalNearbyTests
     [TestCase("function-result-assignment", "Integer", "Target = 17", 17)]
     public void OrdinaryDefaultStorageAndAssignmentsMatchTheCompiledProgram(string name, string returnType, string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         var source = "Public Class Subject\nPublic Shared Function Target() As " + returnType + "\n" + body + "\nEnd Function\nEnd Class";
         var tree = VisualBasicSyntaxTree.ParseText(source, path: name + ".vb");
         var compilation = VisualBasicCompilation.Create("DefaultLocal_" + name, [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty, name);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty, name);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True, name);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext(name, isCollectible: true);
@@ -60,7 +63,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "static-local.vb");
         var compilation = VisualBasicCompilation.Create("StaticLocalSubject", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("StaticLocalSubject", isCollectible: true);
@@ -86,6 +89,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
     [TestCase("int Target() { int value; if (true) value = 9; else value = 7; return value; }", 9)]
     public void CSharpDefiniteAssignmentControlsKeepTheirExistingSemantics(string source, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         Assert.That(subject.Invoke([]), Is.EqualTo(expected));
         var lowered = subject.Lower();

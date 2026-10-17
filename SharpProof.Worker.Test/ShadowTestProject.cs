@@ -21,9 +21,11 @@ internal sealed class ShadowTestProject : IDisposable
     internal ShadowTestProject(string source, bool cacheEnabled = false)
         : this(CompilerTotalCallableArtifactTests.CreateArtifact(source), cacheEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(source, nameof(source));
     }
     internal ShadowTestProject(CompilerManifestArtifact artifact, bool cacheEnabled = false)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         try
         {
             artifact.Compilation.ProjectDirectory = _directory.FullName;

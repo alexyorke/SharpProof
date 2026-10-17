@@ -4,10 +4,11 @@ namespace SharpProof.Contracts;
 internal static class ContractSpecializationPolicy
 {
     internal static bool TrySpecialize<TState, TResult>(
-        TState state,
+        TState state /* SPINT001: all values valid - opaque caller state is forwarded unchanged and permits every value */,
         Func<TState, TResult> specialize,
         out TResult result)
     {
+        specialize = RepositoryParameterGuard.NotNull(specialize, nameof(specialize));
         try
         {
             result = specialize(state);

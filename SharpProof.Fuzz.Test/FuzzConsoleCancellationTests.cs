@@ -23,6 +23,7 @@ public sealed class FuzzConsoleCancellationTests
         var observedSignal = 0;
         ConsoleCancelEventHandler protectHost = (_, eventArgs) =>
         {
+            System.ArgumentNullException.ThrowIfNull(eventArgs);
             eventArgs.Cancel = true;
             Interlocked.Exchange(ref observedSignal, 1);
         };

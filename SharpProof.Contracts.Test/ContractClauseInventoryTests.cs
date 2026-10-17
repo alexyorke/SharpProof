@@ -63,22 +63,22 @@ public sealed class ContractClauseInventoryTests
         Assert.That(inventory.ContractApiAvailable, Is.True);
         Assert.That(inventory.HasPlacementErrors, Is.True);
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.Kind),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(InventoryKinds));
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.Placement),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement)),
             Is.EqualTo(InventoryPlacements));
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.SourceOrdinal),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceOrdinal)),
             Is.EqualTo(Enumerable.Range(0, 6)));
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.Ordinal),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Ordinal)),
             Is.EqualTo(InventoryOrdinals));
         Assert.That(
             inventory.Clauses.All(static clause =>
-                clause.Location.IsInSource &&
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Location.IsInSource &&
                 clause.Invocation.TargetMethod.Name ==
-                clause.Kind.ToString()),
+                clause.Kind.ToString())),
             Is.True);
     }
 
@@ -100,7 +100,7 @@ public sealed class ContractClauseInventoryTests
         var inventory = CreateInventory(source, "Target", "Analyze");
 
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.Placement),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement)),
             Is.EqualTo(MisplacedPlacements));
     }
 
@@ -121,7 +121,7 @@ public sealed class ContractClauseInventoryTests
         var inventory = CreateInventory(source, "Target", "Analyze");
 
         Assert.That(
-            inventory.Clauses.Select(static clause => clause.Placement),
+            inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement)),
             Is.EqualTo([
                 ContractClausePlacement.ValidPrologue,
                 ContractClausePlacement.Late
@@ -195,7 +195,7 @@ public sealed class ContractClauseInventoryTests
             ContractClausePlacement.Late
         ];
 
-        Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+        Assert.That(inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement)),
             Is.EqualTo(expected));
     }
 
@@ -222,8 +222,8 @@ public sealed class ContractClauseInventoryTests
         var body = model.GetOperation(tree.GetRoot());
         Assert.That(body, Is.Not.Null);
         Assert.That(entry.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax() is CompilationUnitSyntax unit &&
-            unit.SyntaxTree == tree && unit.Span == body!.Syntax.Span), Is.True);
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax() is CompilationUnitSyntax unit &&
+            unit.SyntaxTree == tree && unit.Span == body!.Syntax.Span)), Is.True);
         var builder = new ContractClauseInventoryBuilder(compilation);
         var inventory = builder.Create(entry, body);
         var other = compilation.GetTypeByMetadataName("Other")!
@@ -241,11 +241,11 @@ public sealed class ContractClauseInventoryTests
             Assert.That(inventory.ContractApiAvailable, Is.True);
             Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
             Assert.That(inventory.ImplementationBody, Is.SameAs(body));
-            Assert.That(inventory.Clauses.Select(static clause => clause.Kind),
+            Assert.That(inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
                 Is.EqualTo(TopLevelInventoryKinds));
-            Assert.That(inventory.Clauses.Select(static clause => clause.Ordinal),
+            Assert.That(inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Ordinal)),
                 Is.EqualTo(Enumerable.Range(0, 2)));
-            Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+            Assert.That(inventory.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement)),
                 Is.EqualTo(expected));
             Assert.That(body!.SemanticModel!.Compilation, Is.SameAs(compilation));
             Assert.That(other.ContainingAssembly, Is.SameAs(compilation.Assembly));
@@ -409,6 +409,7 @@ public sealed class ContractClauseInventoryTests
     [TestCase("ref readonly")]
     public void RefExpressionBodyResolvesMethodBodyOperation(string returnKind)
     {
+        System.ArgumentNullException.ThrowIfNull(returnKind);
         var inventory = CreateInventory(
             $$"""
             public static class Target {
@@ -526,6 +527,8 @@ public sealed class ContractClauseInventoryTests
         string methodName,
         bool includeSharpProofReference = true)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(
             source,
             includeSharpProofReference);
@@ -542,6 +545,7 @@ public sealed class ContractClauseInventoryTests
         bool includeSharpProofReference,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return TestCompilation.Create(
             "ClauseInventory",
             source,

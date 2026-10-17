@@ -5,6 +5,7 @@ internal static partial class CSharpOperationSemantics
     // Smaller integer implementations can return subtraction, not -1/0/1.
     internal static bool IsIntegerCompareTo(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsStatic && method.Name == "CompareTo" && method.DeclaringSyntaxReferences.IsEmpty &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 && method.Parameters.Length == 1 &&
             method.Parameters[0].RefKind == RefKind.None &&
@@ -15,16 +16,18 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsIntegerComparerDeclaration(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsStatic && method.Name == "Compare" && method.Parameters.Length == 2 &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 &&
             method.ContainingType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
             IsFrameworkCollectionMember(method) &&
-            method.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
-                SymbolEqualityComparer.Default.Equals(parameter.Type, method.ContainingType.TypeArguments[0]));
+            method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
+                SymbolEqualityComparer.Default.Equals(parameter.Type, method.ContainingType.TypeArguments[0])));
     }
 
     internal static bool IsDefaultIntegerComparison(IInvocationOperation invocation)
     {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         return IsIntegerComparerDeclaration(invocation.TargetMethod) &&
             invocation.TargetMethod.ContainingType.TypeArguments[0].SpecialType is
                 SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32 or SpecialType.System_UInt64 &&
@@ -39,6 +42,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsNonnegativeCollectionCount(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsStatic && !method.IsVirtual && method.Parameters.IsEmpty &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 && IsFrameworkCollectionMember(method) &&
             method.OriginalDefinition.AssociatedSymbol?.GetDocumentationCommentId() is
@@ -48,6 +52,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsFrameworkCollectionMember(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (!method.DeclaringSyntaxReferences.IsEmpty)
         { return false; }
         var identity = method.ContainingAssembly.Identity;
@@ -60,6 +65,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static IrTerm IntegerComparison(IrFactory factory, IrTerm left, IrTerm right)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return factory.Conditional(factory.Binary(IrBinaryOperator.LessThan, left, right), factory.Integer(-1),
             factory.Conditional(factory.Binary(IrBinaryOperator.GreaterThan, left, right), factory.Integer(1), factory.Integer(0)));
     }

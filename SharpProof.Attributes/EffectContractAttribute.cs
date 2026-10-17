@@ -11,6 +11,20 @@ public sealed class EffectContractAttribute : Attribute
     /// <param name="effects">The declared effect flags.</param>
     public EffectContractAttribute(SharpProofEffect effects)
     {
+        const SharpProofEffect known = SharpProofEffect.ReadsReceiverState |
+            SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsCapturedState |
+            SharpProofEffect.ReadsStaticState | SharpProofEffect.ReadsAmbientState |
+            SharpProofEffect.WritesReceiverState | SharpProofEffect.WritesArgumentState |
+            SharpProofEffect.WritesCapturedState | SharpProofEffect.WritesStaticState |
+            SharpProofEffect.WritesAmbientState | SharpProofEffect.Allocates |
+            SharpProofEffect.Throws | SharpProofEffect.Synchronizes |
+            SharpProofEffect.UsesNondeterminism | SharpProofEffect.UsesNativeCode |
+            SharpProofEffect.UsesReflection;
+        if ((effects & ~known) != SharpProofEffect.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(effects));
+        }
+
         Effects = effects;
     }
 

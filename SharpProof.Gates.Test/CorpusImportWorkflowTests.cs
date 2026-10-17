@@ -122,8 +122,8 @@ public sealed class CorpusImportWorkflowTests
         {
             var document = new OpenSourceCorpusDocument(2,
                 [pinnedSource with { Commit = commit }], files,
-                selected.Select((candidate, index) => candidate.ToMethod(
-                    $"OSS{index + 1:D4}", CorpusVerdict.Proven, CorpusSupport.Supported)).ToImmutableArray());
+                selected.Select((candidate, index) => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ToMethod(
+                    $"OSS{index + 1:D4}", CorpusVerdict.Proven, CorpusSupport.Supported))).ToImmutableArray());
             await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(document, JsonOptions));
         }
         else if (review == "empty-manifest")
@@ -173,9 +173,9 @@ public sealed class CorpusImportWorkflowTests
             {
                 Assert.That(plan!.Document.Methods, Has.Length.EqualTo(200));
                 Assert.That(plan.Document.Files, Has.Length.EqualTo(25));
-                Assert.That(plan.Document.Methods.Select(static method => method.Support),
+                Assert.That(plan.Document.Methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support)),
                     Is.All.EqualTo(CorpusSupport.Supported));
-                Assert.That(plan.Document.Methods.Select(static method => method.ExpectedVerdict),
+                Assert.That(plan.Document.Methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.ExpectedVerdict)),
                     Is.All.EqualTo(CorpusVerdict.Proven));
                 Assert.That(plan.Document.Sources.Single().Commit, Is.EqualTo(commit));
                 Assert.That(plan.Updates, Has.Length.EqualTo(2));
@@ -196,6 +196,8 @@ public sealed class CorpusImportWorkflowTests
 
     private static Task<string> GitAsync(string path, params string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(path);
         return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, TestContext.CurrentContext.CancellationToken);
     }
 }

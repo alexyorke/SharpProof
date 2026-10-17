@@ -35,6 +35,7 @@ public sealed class SourceClauseReplayBoundaryProducerTests
 
     private static (GuardedExpression Total, FrontendLoweringResult Legacy) InspectActualSource(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var tree = CSharpSyntaxTree.ParseText(
             "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n",
             new CSharpParseOptions(LanguageVersion.CSharp12));
@@ -47,7 +48,7 @@ public sealed class SourceClauseReplayBoundaryProducerTests
         var emission = compilation.Emit(image, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate.Identifier.ValueText == "Target");
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == "Target"));
         var model = compilation.GetSemanticModel(tree);
         var symbol = model.GetDeclaredSymbol(method);
         Assert.That(symbol, Is.Not.Null);

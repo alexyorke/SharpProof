@@ -16,12 +16,12 @@ public sealed class VoidPropertyAccessorAdmissionTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "void-property.cs");
         var compilation = CSharpCompilation.Create("VoidProperty", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)).ToArray();
         Assert.That(errors, Does.Contain("CS0547"));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var declaration = tree.GetRoot().DescendantNodes().OfType<AccessorDeclarationSyntax>()
-            .Single(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            .Single(accessor => accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.IsKind(SyntaxKind.GetAccessorDeclaration)));
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var property = (IPropertySymbol)target.AssociatedSymbol!;

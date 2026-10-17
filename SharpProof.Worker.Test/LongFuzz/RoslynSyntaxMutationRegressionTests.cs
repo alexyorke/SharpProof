@@ -62,8 +62,8 @@ public sealed class RoslynSyntaxMutationRegressionTests
             TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.SpecificationPackIds, Is.Empty);
         var targets = artifact.Manifest.Claims.Where(claim =>
-            claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
-            claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
+            claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
         Assert.That(targets, Has.Length.EqualTo(1), source);
 
         using var project = new ShadowTestProject(artifact);
@@ -71,7 +71,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty, source);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True, source);
-        var results = response.ClaimResults.Where(result => result.ClaimId == targets[0].ClaimId).ToArray();
+        var results = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targets[0].ClaimId)).ToArray();
         Assert.That(results, Has.Length.EqualTo(1), source);
         var result = results[0];
         return (source, variant, anchor, falseClaim, result.Outcome, result.Reason);
@@ -90,6 +90,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
 
     private static string MutateReturn(int anchor, int claimed, string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var seed = "using System; using SharpProof.Attributes; public static class Subject { " +
             "public static int Target(int x) { Contract.Requires(x == " + anchor + "); " +
             "Contract.Ensures(Contract.Result<int>() == " + claimed + "); " +
@@ -104,6 +105,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
 
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols),
@@ -117,14 +119,17 @@ public sealed class RoslynSyntaxMutationRegressionTests
 
     private static void AssertNoErrors(CSharpCompilation compilation, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(source);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         Assert.That(errors, Is.Empty,
-            string.Join(" | ", errors.Select(error => error.ToString())) + "\n" + source);
+            string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))) + "\n" + source);
     }
 
     private static int RunClr(CSharpCompilation compilation, int anchor)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join(" | ", emission.Diagnostics));

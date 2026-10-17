@@ -61,7 +61,7 @@ function Save-SharpProofCoverageCohort {
                 }
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
-                Where-Object { [string]$_.href -like '*.cobertura.xml' })
+                Where-Object { [string]$_.href -match '\.cobertura(?:\[\d+\])?\.xml$' })
             if ($attachments.Count -eq 0) { throw "Coverage task '$name' has no collector attachment." }
             foreach ($attachment in $attachments) {
                 $report = Join-Path $receipt.DirectoryName ([string]$attachment.href)
@@ -90,14 +90,14 @@ function Save-SharpProofCoverageShardManifest {
 
     $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -like '*.cobertura.xml' } |
+            $_.Name -like '*.trx' -or $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
         Sort-Object FullName | ForEach-Object {
             [ordered]@{
                 path = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
             }
         })
-    if (@($files | Where-Object { $_.path -like '*.cobertura.xml' }).Count -eq 0 -or
+    if (@($files | Where-Object { $_.path -match '\.cobertura(?:\[\d+\])?\.xml$' }).Count -eq 0 -or
         @($files | Where-Object { $_.path -like '*/coverage-cohort.json' }).Count -ne 1) {
         throw "Coverage shard '$Phase' has no complete cohort evidence."
     }
@@ -118,12 +118,12 @@ function Assert-SharpProofCoverageShardManifest {
     }
     $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -like '*.cobertura.xml' } |
+            $_.Name -like '*.trx' -or $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
         ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object)
     $recorded = @($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object)
     if ($actual.Count -eq 0 -or ($actual -join "`n") -cne ($recorded -join "`n") -or
         @($recorded | Select-Object -Unique).Count -ne $recorded.Count -or
-        @($recorded | Where-Object { $_ -like '*.cobertura.xml' }).Count -eq 0 -or
+        @($recorded | Where-Object { $_ -match '\.cobertura(?:\[\d+\])?\.xml$' }).Count -eq 0 -or
         @($recorded | Where-Object { $_ -like '*/coverage-cohort.json' }).Count -ne 1 -or
         @($recorded | Where-Object { $_ -eq 'coverage-authority.json' }).Count -ne 1 -or
         ($Phase -eq 'semantic' -and $recorded -cnotcontains 'coverage-cohort.json')) {

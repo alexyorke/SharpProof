@@ -15,9 +15,9 @@ public sealed class SourceFinallyNoTransferApiCoverageTests
             "void Target() { try { for (;;) { } } finally { throw new System.Exception(); } }");
         Assert.That(subject.Graph.Blocks.Last().Kind, Is.EqualTo(BasicBlockKind.Exit));
         Assert.That(subject.Graph.Blocks.Last().IsReachable, Is.False);
-        Assert.That(subject.Graph.Blocks.Any(static block => block.IsReachable &&
+        Assert.That(subject.Graph.Blocks.Any(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
             block.ConditionKind == ControlFlowConditionKind.None &&
-            ReferenceEquals(block.FallThroughSuccessor?.Destination, block)), Is.True);
+            ReferenceEquals(block.FallThroughSuccessor?.Destination, block))), Is.True);
         var pending = new Stack<ControlFlowRegion>();
         pending.Push(subject.Graph.Root);
         var hasFinally = false;

@@ -12,6 +12,7 @@ public sealed class CorpusDeclarationWorkflowTests
     [TestCase("public static class C { public static int Value() => 1; public static int Other() => 2; }", 1, 2)]
     public void SourceLineSelectionRejectsMissingAndAmbiguousDeclarations(string source, int line, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var document = SourceDocument(source);
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var selected = document.Methods.Single() with { StartLine = line, EndLine = line };
@@ -62,9 +63,10 @@ public sealed class CorpusDeclarationWorkflowTests
 
     private static OpenSourceCorpusDocument SourceDocument(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Value");
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Value"));
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);

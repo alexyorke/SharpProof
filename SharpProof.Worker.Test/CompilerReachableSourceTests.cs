@@ -15,6 +15,7 @@ public sealed class CompilerReachableSourceTests
     [TestCase("int[] Root(int n) => new int[n];", false)]
     public void ApprovedScalarApiModelsRetainOnlyTheirDeclaredEffectBoundary(string method, bool cacheAllocation)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { [ZeroAllocations] public static " + method + " }");
         var body = artifact.ReachableSource!.Bodies.Single();
@@ -44,7 +45,7 @@ public sealed class CompilerReachableSourceTests
                 static int Count(params int[] values) => values.Length;
             }
             """);
-        var body = artifact.ReachableSource!.Bodies.Single(body => body.IsCallSkeleton);
+        var body = artifact.ReachableSource!.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton));
         Assert.That(body.SourceCalls, Has.Length.EqualTo(1));
         var decoded = PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Instructions.OfType<IrAllocationInstruction>(), Is.Empty);
@@ -62,7 +63,7 @@ public sealed class CompilerReachableSourceTests
             }
             namespace System { static class Math { public static int Abs(int x) => 7; } }
             """);
-        var root = artifact.ReachableSource!.Bodies.Single(body => body.IsCallSkeleton);
+        var root = artifact.ReachableSource!.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton));
         Assert.That(root.SourceCalls, Has.Length.EqualTo(1));
         Assert.That(PortableIrGraphCodec.Decode(root.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Instructions.OfType<IrThrowInstruction>(), Is.Empty);
         CompilerManifestArtifactJson.DeserializePrepared(
@@ -87,16 +88,16 @@ public sealed class CompilerReachableSourceTests
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Roots, Has.Length.EqualTo(2));
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
-        var shared = graph.Bodies.Single(body => body.MethodIdentity.Contains("Shared", StringComparison.Ordinal));
+        var shared = graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Shared", StringComparison.Ordinal)));
         Assert.That(shared.Graph, Is.Not.Null);
         Assert.That(PortableIrGraphCodec.Decode(shared.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Program, Is.Not.Null);
-        Assert.That(graph.Bodies.Where(body => body.BodyId != shared.BodyId).All(body =>
-            body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
-            body.SourceCalls.Single().CalleeBodyId == shared.BodyId), Is.True);
+        Assert.That(graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId != shared.BodyId)).All(body =>
+            body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
+            body.SourceCalls.Single().CalleeBodyId == shared.BodyId)), Is.True);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(roundTrip.ReachableSource!.Bodies.Select(body => body.BodyId),
-            Is.EqualTo(graph.Bodies.Select(body => body.BodyId)));
+        Assert.That(roundTrip.ReachableSource!.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId)),
+            Is.EqualTo(graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId))));
     }
 
     [Test]
@@ -112,8 +113,8 @@ public sealed class CompilerReachableSourceTests
         var graph = artifact.ReachableSource!;
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(2));
-        Assert.That(graph.Bodies.All(body => body.Graph != null && body.IsCallSkeleton && body.SourceCalls.Length == 1 && body.Callees.Length == 1 &&
-            body.Callees[0] != body.BodyId), Is.True);
+        Assert.That(graph.Bodies.All(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && body.IsCallSkeleton && body.SourceCalls.Length == 1 && body.Callees.Length == 1 &&
+            body.Callees[0] != body.BodyId)), Is.True);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
@@ -165,8 +166,8 @@ public sealed class CompilerReachableSourceTests
         var graph = artifact.ReachableSource!;
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
-        Assert.That(graph.Bodies.Single(body => body.MethodIdentity.Contains("Local", StringComparison.Ordinal)).Callees,
-            Is.EqualTo(new[] { graph.Bodies.Single(body => body.MethodIdentity.Contains("Helper", StringComparison.Ordinal)).BodyId }));
+        Assert.That(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Local", StringComparison.Ordinal))).Callees,
+            Is.EqualTo(new[] { graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Helper", StringComparison.Ordinal))).BodyId }));
     }
 
     [TestCase("public static int Root() => P; static int P => 1;")]
@@ -189,6 +190,7 @@ public sealed class CompilerReachableSourceTests
     [TestCase("public static Value Root(Value value) => value[1..^1]; public class Value { public int Length => 3; public Value Slice(int start,int length) => this; }")]
     public void UncollectedImplicitSourceCallsStayIncomplete(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
             using SharpProof.Attributes;
             static class Subject { [ZeroAllocations] {{members}} }
@@ -258,6 +260,7 @@ public sealed class CompilerReachableSourceTests
     [TestCase("public static string Root() => nameof(P); static int P => 1;")]
     public void OperationsWithoutHiddenCallsKeepSourceCollectionComplete(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
             using SharpProof.Attributes;
             static class Subject { [ZeroAllocations] {{members}} }
@@ -271,6 +274,7 @@ public sealed class CompilerReachableSourceTests
         "class Value { public override int GetHashCode() => Helper(); } static int Helper() => 1;")]
     public void UnknownDispatchCannotReportCompleteSourceCollection(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact($$"""
             using SharpProof.Attributes;
             static class Subject { [ZeroAllocations] {{members}} }
@@ -291,13 +295,14 @@ public sealed class CompilerReachableSourceTests
     [TestCase("unreachable")]
     public void MalformedReachableGraphIsRejected(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SharedSource);
         var graph = artifact.ReachableSource!;
-        var leaf = graph.Bodies.Single(body => body.Graph != null && !body.IsCallSkeleton);
+        var leaf = graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton));
         switch (mutation)
         {
             case "missing":
-                graph.Bodies = graph.Bodies.Where(body => body != leaf).ToArray();
+                graph.Bodies = graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body != leaf)).ToArray();
                 break;
             case "duplicate":
                 graph.Bodies = [.. graph.Bodies, leaf];
@@ -319,7 +324,7 @@ public sealed class CompilerReachableSourceTests
                 leaf.Graph!.Semantics = IrExecutionSemantics.Legacy;
                 break;
             case "location":
-                leaf.Graph!.Operations.First(operation => operation.SourceSpan != null).SourceSpan!.Document = "wrong.cs";
+                leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!.Document = "wrong.cs";
                 break;
             case "document":
                 graph.Documents[0].MaximumBodyEnd = 0;
@@ -344,11 +349,12 @@ public sealed class CompilerReachableSourceTests
     [TestCase("marker")]
     public void MalformedSourceCallMappingIsRejected(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var source = mutation == "duplicate" ? SharedSource.Replace("=> Shared(x);", "=> Shared(x) + Shared(x);", StringComparison.Ordinal) : SharedSource;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var graph = artifact.ReachableSource!;
-        var caller = graph.Bodies.First(body => body.IsCallSkeleton);
-        var callee = graph.Bodies.Single(body => body.BodyId == caller.SourceCalls[0].CalleeBodyId);
+        var caller = graph.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton));
+        var callee = graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId == caller.SourceCalls[0].CalleeBodyId));
         switch (mutation)
         {
             case "missing":

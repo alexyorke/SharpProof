@@ -49,6 +49,9 @@ public sealed class TypedReferenceProgramLoweringTests
     [TestCaseSource(nameof(ReferenceCases))]
     public void CompiledReferenceBodyMatchesNullLengthAndIdentityObservations(string members, object[] arguments, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke(arguments);
         if (expected is Type exceptionType)
@@ -62,9 +65,9 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding.Entry,
-            binding => Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
-                arguments[binding.Parameter.Ordinal], aliases));
+        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
+                arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         if (expected is Type)
         {
@@ -106,6 +109,7 @@ public sealed class TypedReferenceProgramLoweringTests
     [TestCase("int[]", true)]
     public void CompiledReferenceReturnsMatchOriginalSourceFrames(string type, bool isNull)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         object? input = isNull ? null : type == "string" ? new string('a', 3)
             : type == "int[]" ? new[] { 1, 2, 3 } : new object();
         using var subject = TypedProgramSubject.Create($$"""
@@ -183,14 +187,17 @@ public sealed class TypedReferenceProgramLoweringTests
 
     [TestCaseSource(nameof(ArrayReadCases))]
     public void GuardedArrayReadsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { AssertArrayExecution(members, arguments, expected, false); }
+    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, false); }
 
     [TestCaseSource(nameof(ArrayMutationCases))]
     public void GuardedArrayMutationsMatchCompiledExecution(string members, object[] arguments, object expected)
-    { AssertArrayExecution(members, arguments, expected, true); }
+    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(expected, nameof(expected)); System.ArgumentNullException.ThrowIfNull(members, nameof(members)); AssertArrayExecution(members, arguments, expected, true); }
 
     private static void AssertArrayExecution(string members, object[] arguments, object expected, bool opaqueCalls)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke(arguments);
         Assert.That(expected is Type exceptionType ? actual?.GetType() == exceptionType : Equals(actual, expected), Is.True,
@@ -198,8 +205,8 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: opaqueCalls);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding.Entry,
-            binding => Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases));
+        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (expected is Type fault)
@@ -222,6 +229,7 @@ public sealed class TypedReferenceProgramLoweringTests
     [TestCase("ulong", true)]
     public void NativeWidthIndexConversionsRemainClosed(string type, bool isNull)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = TypedProgramSubject.Create($"int Target(int[] x, {type} index) => x[index];");
         object index = type == "long" ? (object)4294967296L : ulong.MaxValue;
         var actual = subject.Invoke([isNull ? null! : new int[1], index]);
@@ -237,6 +245,9 @@ public sealed class TypedReferenceProgramLoweringTests
 
     private static TestCaseData Case(string members, object[] arguments, object expected, string? label = null)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
         return new TestCaseData(members, arguments, expected).SetName("Reference observations: " + members + " #" +
             (expected is Type type ? type.Name : expected.ToString()) + (label == null ? "" : " " + label));
     }
@@ -244,6 +255,12 @@ public sealed class TypedReferenceProgramLoweringTests
     private static IrValue Value(IrFactory factory, IrTypeId type, object? input,
         Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        System.ArgumentNullException.ThrowIfNull(aliases);
+        System.ArgumentNullException.ThrowIfNull(factory);
         if (input == null)
         { return factory.CreateNullValue(type); }
         var info = factory.GetTypeInfo(type);
@@ -268,7 +285,7 @@ public sealed class TypedReferenceProgramLoweringTests
         {
             IrTypeKind.String when input is string text => factory.CreateStringValue(new string('\0', text.Length)),
             IrTypeKind.Sequence when input is Array array => factory.CreateSequenceValue(type,
-                array.Cast<object>().Select(element => Value(factory, info.ElementType!.Value, element, aliases))),
+                array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases)))),
             IrTypeKind.Reference => factory.CreateReferenceValue(type, input),
             _ => throw new ArgumentException("The runtime value does not match the reference oracle type.", nameof(input))
         };

@@ -14,6 +14,8 @@ public sealed class Pr275StringPrinterCoverageTests
     public void StringLiteralDiagnosticsPreserveContentsInTheirCanonicalRepresentation(
         string contents, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(contents);
+        System.ArgumentNullException.ThrowIfNull(expected);
         var factory = new IrFactory();
         var term = factory.String(contents);
 

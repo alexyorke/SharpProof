@@ -35,6 +35,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
 
     internal static void FillExactly(Stream stream, byte[] destination, CancellationToken cancellationToken)
     {
+        destination = RepositoryParameterGuard.NotNull(destination, nameof(destination));
+        stream = RepositoryParameterGuard.NotNull(stream, nameof(stream));
         var read = 0;
         while (read != destination.Length)
         {
@@ -48,6 +50,10 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
 
     private static bool NoInitialization(PEReader pe, MetadataReader reader, TypeDefinitionHandle type)
     {
+        RepositoryParameterGuard.RequireInitialized(type.IsNil, nameof(type), "Value must be initialized.");
+
+        pe = RepositoryParameterGuard.NotNull(pe, nameof(pe));
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         var remaining = 128;
         for (var current = type; !current.IsNil; current = reader.GetTypeDefinition(current).GetDeclaringType())
         {
@@ -78,8 +84,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         { return null; }
         _capturedReferences ??= CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
-        var authority = _capturedReferences.SelectMany(item => item.Modules).FirstOrDefault(module =>
-            module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path));
+        var authority = _capturedReferences.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).FirstOrDefault(module =>
+            module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path)));
         if (authority == null || authority.SizeBytes <= 0 || authority.SizeBytes > CompilerReferenceLimits.MaximumModuleBytes)
         { return null; }
         if (!_images.TryGetValue(path, out var bytes))
@@ -144,10 +150,12 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
 
     private static bool SameSignature(IMethodSymbol expected, IMethodSymbol actual)
     {
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        expected = RepositoryParameterGuard.NotNull(expected, nameof(expected));
         return CompilerScalarIlDecoder.Candidate(actual) && expected.MetadataToken == actual.MetadataToken &&
             expected.MetadataName == actual.MetadataName && SameType(expected.ReturnType, actual.ReturnType) &&
             expected.Parameters.Length == actual.Parameters.Length &&
-            expected.Parameters.Select((parameter, ordinal) => SameType(parameter.Type, actual.Parameters[ordinal].Type)).All(same => same);
+            expected.Parameters.Select((parameter, ordinal) => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (SameType(parameter.Type, actual.Parameters[ordinal].Type))).All(same => same);
     }
 
     // The all-members metadata compilation has distinct Roslyn symbol instances.
@@ -155,6 +163,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     // arrays; compare their bound assembly identities as well as the intrinsic.
     private static bool SameType(ITypeSymbol expected, ITypeSymbol actual)
     {
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        expected = RepositoryParameterGuard.NotNull(expected, nameof(expected));
         return expected.SpecialType == actual.SpecialType && expected.SpecialType != SpecialType.None &&
             expected.ContainingAssembly.Identity.Equals(actual.ContainingAssembly.Identity);
     }
@@ -174,9 +184,9 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             var attributeIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeClass);
             var constructorIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeConstructor);
             var kind = clause.Validation.Kind.ToString();
-            var matches = evidence.Where(row => row.ParameterOrdinal == clause.ParameterOrdinal &&
+            var matches = evidence.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParameterOrdinal == clause.ParameterOrdinal &&
                 row.AttributeIdentity == attributeIdentity && row.ConstructorIdentity == constructorIdentity &&
-                row.Kind == kind && row.Minimum == clause.Validation.Minimum && row.Maximum == clause.Validation.Maximum)
+                row.Kind == kind && row.Minimum == clause.Validation.Minimum && row.Maximum == clause.Validation.Maximum))
                 .Take(2).ToArray();
             if (matches.Length != 1 || !consumed.Add(matches[0].AttributeToken))
             { return false; }
@@ -189,6 +199,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     internal static bool TryReadAssemblyIdentity(MetadataReader reader, AssemblyReferenceHandle handle,
         AssemblyIdentity expected, out AssemblyIdentity identity)
     {
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         identity = null!;
         var assembly = reader.GetAssemblyReference(handle);
         const AssemblyFlags contentTypeMask = (AssemblyFlags)0x0e00;
@@ -216,27 +227,31 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
 }
 
 // Lexical parser data; this record supplies no metadata owner or body authority.
-internal readonly record struct CompilerIlToken(int Offset, string RawCode, long Operand, int TargetByteOffset);
+internal readonly record struct CompilerIlToken(int Offset, string RawCode, long Operand, int TargetByteOffset)
+{
+    public string RawCode { get; init; } = RawCode ?? throw new System.ArgumentNullException(nameof(RawCode));
+}
 
 // Decodes scalar IL representation; provider admission remains unchanged.
 internal static class CompilerScalarIlDecoder
 {
     private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode)).Select(field => (OpCode)field.GetValue(null)!)
-        .ToDictionary(opcode => opcode.Value);
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode))).Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
     internal static bool Candidate(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method is
         {
             MethodKind: MethodKind.Ordinary, IsStatic: true, IsAsync: false, IsExtern: false, IsVirtual: false,
             Arity: 0, ReturnsByRef: false, ReturnsByRefReadonly: false, ReducedFrom: null
         } &&
             !method.IsVararg && !method.HasUnsupportedMetadata && !method.ContainingType.IsGenericType && method.Parameters.Length <= 128 &&
-            method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.IsParams && TotalIlStack.Supported(parameter.Type.SpecialType)) &&
+            method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None && !parameter.IsParams && TotalIlStack.Supported(parameter.Type.SpecialType))) &&
             (method.ReturnsVoid || TotalIlStack.Supported(method.ReturnType.SpecialType)) &&
             !CompilerMetadataResolution.IsReferenceAssembly(method.ContainingAssembly) &&
-            !method.GetAttributes().Any(attribute => attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
-                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
+            !method.GetAttributes().Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { MetadataName: "UnmanagedCallersOnlyAttribute" } type &&
+                CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices")));
     }
 
     internal static unsafe bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,
@@ -298,6 +313,7 @@ internal static class CompilerScalarIlDecoder
     internal static unsafe ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
         IAssemblySymbol assembly, string module, CancellationToken cancellationToken)
     {
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         var decoded = ImmutableArray.CreateBuilder<TotalIlInstruction>();
         var reader = body.GetILReader();
         var code = new ReadOnlySpan<byte>(reader.StartPointer, reader.Length);
@@ -347,7 +363,8 @@ internal static class CompilerScalarIlDecoder
     internal static ImmutableArray<TotalIlInstruction> NormalizeTargets(
         ImmutableArray<TotalIlInstruction>.Builder decoded)
     {
-        var offsets = decoded.Select((instruction, index) => (instruction.Offset, index)).ToDictionary(item => item.Offset, item => item.index);
+        decoded = RepositoryParameterGuard.NotNull(decoded, nameof(decoded));
+        var offsets = decoded.Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Offset, index))).ToDictionary(item => item.Offset, item => item.index);
         for (var index = 0; index < decoded.Count; index++)
         {
             var instruction = decoded[index];
@@ -362,14 +379,20 @@ internal static class CompilerScalarIlDecoder
 
     internal static IMethodSymbol? ResolveMethod(MetadataReader reader, IAssemblySymbol assembly, MethodDefinitionHandle handle, string module)
     {
+        RepositoryParameterGuard.RequireInitialized(handle.IsNil, nameof(handle), "Value must be initialized.");
+
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
+        module = RepositoryParameterGuard.NotNull(module, nameof(module));
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         var definition = reader.GetMethodDefinition(handle);
         var type = assembly.GetTypeByMetadataName(TypeName(reader, definition.GetDeclaringType()));
         return type?.GetMembers(reader.GetString(definition.Name)).OfType<IMethodSymbol>()
-            .SingleOrDefault(method => method.MetadataToken == MetadataTokens.GetToken(handle) && method.ContainingModule.Name == module);
+            .SingleOrDefault(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MetadataToken == MetadataTokens.GetToken(handle) && method.ContainingModule.Name == module));
     }
 
     internal static string TypeName(MetadataReader reader, TypeDefinitionHandle handle)
     {
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         var definition = reader.GetTypeDefinition(handle);
         var name = reader.GetString(definition.Name);
         var parent = definition.GetDeclaringType();

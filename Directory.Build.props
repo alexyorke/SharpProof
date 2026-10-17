@@ -19,7 +19,7 @@
     <!-- Run every built-in .NET analyzer rule, including rules disabled by default. -->
     <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060;NU1901;NU1902;NU1903;NU1904;SPINT002;SPINT003;SPINT004;SPINT005</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060;NU1901;NU1902;NU1903;NU1904;SPINT001;SPINT002;SPINT003;SPINT004;SPINT005</WarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <SharpProofTestProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', 'Test$'))">true</SharpProofTestProject>
   </PropertyGroup>
@@ -63,6 +63,42 @@
     -->
     <Compile Include="$(MSBuildThisFileDirectory)SharpProof.Ir\IrIdentifierAliases.cs"
              Link="IrIdentifierAliases.cs" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ConsoleLoggingAnalyzer' OR
+                        '$(MSBuildProjectName)' == 'DefensiveCodingAnalyzer' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Analyzer' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Core' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.CompilerCollector' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.CompilerProbe.TestAsset' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Contracts' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Dataflow' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Effects' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Frontend' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Gates' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Host' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Ir' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Smt' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Specs' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Testing' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Verify' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">
+    <SharpProofHasParameterGuard>true</SharpProofHasParameterGuard>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_PARAMETER_GUARD_$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '_').ToUpperInvariant())</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SharpProofHasParameterGuard)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng/ParameterGuard.cs" Link="InternalParameterGuard.cs" />
+    <Using Include="SharpProof.Internal.$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '')).ParameterGuard" Alias="RepositoryParameterGuard" />
+  </ItemGroup>
+
+
+  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'SharpProof.ArchitectureTest' AND '$(MSBuildProjectName)' != 'SharpProof.Attributes.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ParameterGuardContractTests.cs" Link="ParameterGuardContractTests.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">

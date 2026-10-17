@@ -36,6 +36,8 @@ public sealed class OperationThrowClassificationCoverageTests
     public void BuiltInClassificationPreservesArithmeticAndConversionFaults(
         string parameters, string expression, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var operation = GetExpression(parameters, expression);
         Assert.That(CSharpOperationSemantics.BuiltInOperationMayThrow(operation),
             Is.EqualTo(expected), operation.Kind.ToString());
@@ -49,6 +51,8 @@ public sealed class OperationThrowClassificationCoverageTests
     public void ReferenceAndUnboxingCastsPreserveRuntimeFaults(
         string parameters, string expression, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var operation = GetExpression(parameters, expression);
         Assert.That(CSharpOperationSemantics.OperationMayThrow(operation),
             Is.EqualTo(expected));
@@ -84,6 +88,8 @@ public sealed class OperationThrowClassificationCoverageTests
     [TestCase("double x", "++x")]
     public void UncheckedPredefinedIncrementHasNoArithmeticFault(string parameters, string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var operation = GetExpression(parameters, expression);
         Assert.That(CSharpOperationSemantics.BuiltInOperationMayThrow(operation), Is.False);
         Assert.That(CSharpOperationSemantics.OperationMayThrow(operation), Is.False);
@@ -92,16 +98,19 @@ public sealed class OperationThrowClassificationCoverageTests
     private static IOperation GetExpression(
         string parameters, string expression, string declarations = "")
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var tree = CSharpSyntaxTree.ParseText(
             declarations + " public static class Subject { public static object Target(" +
             parameters + ") => " + expression + "; }");
         var compilation = CSharpCompilation.Create(
             "ThrowClassification", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error),
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)),
             Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target").ExpressionBody!.Expression;
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target")).ExpressionBody!.Expression;
         return FrontendTestHelpers.TryGetExpressionOperation(
             compilation.GetSemanticModel(tree), syntax)!;
     }

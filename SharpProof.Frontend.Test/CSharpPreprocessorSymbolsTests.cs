@@ -81,6 +81,8 @@ public sealed class CSharpPreprocessorSymbolsTests
         string source,
         params string[] symbols)
     {
+        System.ArgumentNullException.ThrowIfNull(symbols, nameof(symbols));
+        System.ArgumentNullException.ThrowIfNull(source);
         return CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(

@@ -6,6 +6,7 @@ internal static class NativeIntegerRange
 {
     internal static bool FitsRuntimeType(Type type, System.Numerics.BigInteger numeric)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         return type == typeof(sbyte) ? numeric >= sbyte.MinValue && numeric <= sbyte.MaxValue :
             type == typeof(byte) ? numeric >= byte.MinValue && numeric <= byte.MaxValue :
             type == typeof(short) ? numeric >= short.MinValue && numeric <= short.MaxValue :

@@ -12,6 +12,7 @@ public sealed class CrossFrameExceptionTypeTests
     [TestCase("catch (System.ArgumentException) when ((State = 1) == 1) { State = 2; }")]
     public async Task ExactCalleeExceptionCannotExecuteSubtypeEffects(string handler)
     {
+        System.ArgumentNullException.ThrowIfNull(handler);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "[EnforcePure] public static void Target() { try { Helper(); } " + handler +
             " catch (System.Exception) { } } static void Helper() { throw new System.Exception(); } }";
@@ -59,13 +60,15 @@ public sealed class CrossFrameExceptionTypeTests
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
     private static void AssertRuntimeState(string source, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("CrossFrameTypeRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

@@ -95,22 +95,23 @@ public sealed partial class NativeSpecifiedCallTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var target = (await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken)).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(syntax => syntax.Identifier.ValueText == "Target");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Target"));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(target)!);
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
             ControlFlowGraph.Create(target, model)!, context,
             frame =>
             {
+                System.ArgumentNullException.ThrowIfNull(frame);
                 var binding = new SharpProof.Contracts.ContractBinder(compilation, factory).BindTotalRequires(frame,
                     cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
                 return binding.IsSuccess;
             }, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true, pinElementReads: true);
         Assert.That(lowered.IsExact, Is.True);
-        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>()
-            .All(call => factory.GetOperationInfo(call.Operation).Description is { } description &&
-                factory.GetString(description).Contains(":bounds", StringComparison.Ordinal)), Is.True,
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>()
+            .All(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (factory.GetOperationInfo(call.Operation).Description is { } description &&
+                factory.GetString(description).Contains(":bounds", StringComparison.Ordinal))), Is.True,
             "The generic Swap body must inline; its collection calls cannot fall back to opaque dispatch.");
         using var emitted = new MemoryStream();
         var emission = compilation.Emit(emitted, cancellationToken: TestContext.CurrentContext.CancellationToken);

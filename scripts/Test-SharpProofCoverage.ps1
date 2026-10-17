@@ -199,9 +199,10 @@ $reports = @(
     Get-ChildItem `
         -LiteralPath $resolvedCoverageRoot `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File |
         Where-Object {
+            $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' -and
             [IO.Path]::GetRelativePath(
                 $resolvedCoverageRoot,
                 $_.FullName).Replace('\', '/') -cnotmatch '(^|/)In(/|$)'

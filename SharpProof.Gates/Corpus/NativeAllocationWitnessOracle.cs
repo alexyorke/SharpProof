@@ -13,7 +13,11 @@ using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Gates.Corpus;
 
-internal sealed record AllocationOracleObservation(string RuntimeOracle, string IlOracle, int RuntimeChecks, long? AllocatedBytes);
+internal sealed record AllocationOracleObservation(string RuntimeOracle, string IlOracle, int RuntimeChecks, long? AllocatedBytes)
+{
+    public string RuntimeOracle { get; init; } = RuntimeOracle ?? throw new System.ArgumentNullException(nameof(RuntimeOracle));
+    public string IlOracle { get; init; } = IlOracle ?? throw new System.ArgumentNullException(nameof(IlOracle));
+}
 
 // All argument materialization, delegate construction and warmup occur outside
 // the measured calls. The source image does not derive from the candidate IR.
@@ -31,7 +35,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         cancellationToken.ThrowIfCancellationRequested();
         if (!evidence.HasFeasibleEntryWitness)
         { return Gap("NoFeasibleEntryWitness"); }
-        if (!method.IsStatic || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+        if (!method.IsStatic || method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
             preparation.Parameters.Length != method.Parameters.Length)
         { return Gap("UnsupportedInvocationShape"); }
         var inputs = evidence.EntryModel;
@@ -118,6 +122,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
 
     private static bool TryBind(IMethodSymbol symbol, Type definition, Type choice, out MethodInfo? callable)
     {
+        System.ArgumentNullException.ThrowIfNull(choice);
+        System.ArgumentNullException.ThrowIfNull(definition);
+        System.ArgumentNullException.ThrowIfNull(symbol);
         callable = null;
         try
         {
@@ -131,7 +138,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
                     ? candidate.MakeGenericMethod(Enumerable.Repeat(choice, symbol.Arity).ToArray()) : candidate;
                 var parameters = closed.GetParameters();
                 if (parameters.Length == symbol.Parameters.Length && parameters.Select((parameter, ordinal) =>
-                        Matches(symbol.Parameters[ordinal].Type, parameter.ParameterType, choice)).All(match => match))
+                        parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (Matches(symbol.Parameters[ordinal].Type, parameter.ParameterType, choice))).All(match => match))
                 {
                     if (callable != null)
                     { throw new InvalidDataException("A source allocation witness has an ambiguous emitted method."); }
@@ -145,10 +152,11 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
     }
 
     private static bool Matches(ITypeSymbol symbol, Type runtime, Type choice)
-    { return CompilerClrTypeMatcher.Matches(symbol, runtime, choice); }
+    { System.ArgumentNullException.ThrowIfNull(choice, nameof(choice)); System.ArgumentNullException.ThrowIfNull(runtime, nameof(runtime)); System.ArgumentNullException.ThrowIfNull(symbol, nameof(symbol)); return CompilerClrTypeMatcher.Matches(symbol, runtime, choice); }
 
     private static bool TryValue(Type type, IrValue value, Dictionary<object, object> aliases, out object? result)
     {
+        System.ArgumentNullException.ThrowIfNull(aliases);
         result = null;
         if (value.Kind == IrValueKind.Null)
         { return !type.IsValueType; }
@@ -170,6 +178,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
 
     private static Action<object?[]> CreateInvocation(MethodInfo callable)
     {
+        System.ArgumentNullException.ThrowIfNull(callable);
         var wrapper = new DynamicMethod("allocation-witness", typeof(void), [typeof(object[])], callable.Module, skipVisibility: true);
         var il = wrapper.GetILGenerator();
         var parameters = callable.GetParameters();
@@ -188,16 +197,16 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
     }
 
     private static void Invoke(Action<object?[]> run, object?[] values)
-    { try { run(values); } catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException) { } }
+    { System.ArgumentNullException.ThrowIfNull(run, nameof(run)); System.ArgumentNullException.ThrowIfNull(values, nameof(values)); try { run(values); } catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException) { } }
 
     private static string MetadataName(INamedTypeSymbol type)
-    { return CompilerClrTypeMatcher.MetadataName(type); }
+    { System.ArgumentNullException.ThrowIfNull(type, nameof(type)); return CompilerClrTypeMatcher.MetadataName(type); }
 
     private static AllocationOracleObservation Gap(string reason)
-    { return new(reason, "NotRun", 0, null); }
+    { System.ArgumentNullException.ThrowIfNull(reason, nameof(reason)); return new(reason, "NotRun", 0, null); }
 
     private static bool HasReachableAllocationOpcode(MethodInfo method)
-    { return AllocationIlOracle.HasPotentialAllocation(method); }
+    { System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return AllocationIlOracle.HasPotentialAllocation(method); }
 
     public void Dispose()
     {

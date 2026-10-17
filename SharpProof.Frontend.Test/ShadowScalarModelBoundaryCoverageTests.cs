@@ -11,6 +11,7 @@ public sealed class ShadowScalarModelBoundaryCoverageTests
     [TestCase("string")]
     public void RegisteredArrayEmptyModelIsEvaluatedWithoutExecutableShadowAdmission(string elementType)
     {
+        System.ArgumentNullException.ThrowIfNull(elementType);
         using var subject = TypedProgramSubject.Create("int Target() => System.Array.Empty<" + elementType + ">().Length;");
         Assert.That(subject.Invoke([]), Is.EqualTo(0));
         var resolutions = 0;
@@ -29,6 +30,7 @@ public sealed class ShadowScalarModelBoundaryCoverageTests
 
         TotalScalarCallModel? ResolveArrayEmpty(IMethodSymbol method)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             Assert.That(method.IsStatic, Is.True);
             Assert.That(method.ContainingType.SpecialType, Is.EqualTo(SpecialType.System_Array));
             Assert.That(method.Name, Is.EqualTo("Empty"));

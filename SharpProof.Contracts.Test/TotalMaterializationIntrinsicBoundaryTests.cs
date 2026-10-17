@@ -29,8 +29,8 @@ public sealed class TotalMaterializationIntrinsicBoundaryTests
         var publicResult = new ContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
         Assert.That(publicResult.Failure, Is.EqualTo(expected));
         Assert.That(publicResult.Clauses, Is.Empty);
-        var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence.IsValid)
-            .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation)).ToImmutableArray();
+        var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
+            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))).ToImmutableArray();
         var moduleResult = TotalContractInvocationMaterialization.Bind(new TotalLoweringContext(factory, target),
             api, intrinsics, resolution, candidates, requiresOnly: false);
         Assert.That(moduleResult.Failure, Is.EqualTo(expected));
@@ -51,14 +51,14 @@ public sealed class TotalMaterializationIntrinsicBoundaryTests
         var violation = intrinsics.Validate(resolution.Source, resolution.Inventory.ImplementationBody).Single();
         Assert.That(violation.EnclosingClauseKind, Is.EqualTo(BoundContractKind.Ensures));
         Assert.That(violation.Failure, Is.EqualTo(ContractBindingFailure.InvalidIntrinsicSignature));
-        var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence.IsValid)
-            .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation)).ToImmutableArray();
+        var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
+            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))).ToImmutableArray();
         var moduleResult = TotalContractInvocationMaterialization.Bind(context, api, intrinsics, resolution, candidates, requiresOnly: true);
         var publicResult = new ContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(moduleResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(moduleResult.Clauses.Select(clause => clause.Kind), Is.EqualTo(new[] { BoundContractKind.Requires }));
-        Assert.That(publicResult.Clauses.Select(clause => clause.Kind), Is.EqualTo(new[] { BoundContractKind.Requires }));
+        Assert.That(moduleResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(new[] { BoundContractKind.Requires }));
+        Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(new[] { BoundContractKind.Requires }));
         var entry = context.Parameters.Single().Entry;
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { false, true })
@@ -72,6 +72,8 @@ public sealed class TotalMaterializationIntrinsicBoundaryTests
 
     private static IMethodSymbol Method(CSharpCompilation compilation, string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(methodName);
         return compilation.GetTypeByMetadataName("IntrinsicSource")!.GetMembers(methodName).OfType<IMethodSymbol>().Single();
     }
 

@@ -53,6 +53,7 @@ public static class ContainerNativeLibrary
         Assembly assembly,
         DllImportSearchPath? searchPath)
     {
+        System.ArgumentNullException.ThrowIfNull(assembly);
         _ = assembly;
         _ = searchPath;
         if (!string.Equals(

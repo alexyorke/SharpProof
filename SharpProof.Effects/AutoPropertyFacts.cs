@@ -8,10 +8,7 @@ internal static class AutoPropertyFacts
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        if (method is null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
 
         return method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet &&
             method.AssociatedSymbol is IPropertySymbol property &&
@@ -22,36 +19,30 @@ internal static class AutoPropertyFacts
         IPropertySymbol property,
         CancellationToken cancellationToken)
     {
-        if (property is null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
 
         return property.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
             {
                 ExpressionBody: null,
                 AccessorList.Accessors: var accessors
             } &&
             accessors.Count != 0 &&
             accessors.All(static accessor =>
-                accessor.Body == null && accessor.ExpressionBody == null));
+                accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body == null && accessor.ExpressionBody == null))));
     }
 
     internal static bool TryGetBackingField(
         IPropertySymbol property,
         out IFieldSymbol field)
     {
-        if (property is null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
 
         field = property.ContainingType.GetMembers()
             .OfType<IFieldSymbol>()
             .FirstOrDefault(candidate =>
-                candidate.AssociatedSymbol is IPropertySymbol associated &&
-                AreSameProperty(associated, property))!;
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.AssociatedSymbol is IPropertySymbol associated &&
+                AreSameProperty(associated, property)))!;
         return field != null;
     }
 
@@ -59,6 +50,8 @@ internal static class AutoPropertyFacts
         IPropertySymbol left,
         IPropertySymbol right)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SymbolEqualityComparer.Default.Equals(left, right) ||
             SymbolEqualityComparer.Default.Equals(
                 left.OriginalDefinition,

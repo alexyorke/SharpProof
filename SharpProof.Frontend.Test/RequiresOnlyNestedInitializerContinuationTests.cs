@@ -35,7 +35,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
         compilation = compilation.ReplaceSyntaxTree(originalTree,
             CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -44,7 +44,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var ensuresSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
         var ensures = (IInvocationOperation)model.GetOperation(ensuresSyntax)!;
         Assert.That(ensures.TargetMethod.IsConditional, Is.True);
         Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Does.Not.Contain("SHARPPROOF_CONTRACTS"));
@@ -52,17 +52,17 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
         Assert.That(ensuresSyntax.Span.Contains(conditionals[0].BranchValue!.Syntax.Span), Is.True);
-        Assert.That(graph.Blocks.Any(block => block.FallThroughSuccessor?.Semantics is
-            ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow), Is.False);
-        Assert.That(Regions(graph.Root).All(region => region.Kind is
-            ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime), Is.True);
-        var additions = graph.Blocks.SelectMany(block => block.Operations.Select(operation =>
-            (Block: block, Operation: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))
+        Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics is
+            ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow)), Is.False);
+        Assert.That(Regions(graph.Root).All(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind is
+            ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)), Is.True);
+        var additions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Select(operation =>
+            operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((Block: block, Operation: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))))
             .Where(pair => pair.Operation is IInvocationOperation { TargetMethod.Name: "Add" }).ToArray();
         Assert.That(additions, Has.Length.EqualTo(initializers ? 2 : 0));
         var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
@@ -139,6 +139,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
 
     private static IEnumerable<BasicBlock> Reachable(BasicBlock first)
     {
+        System.ArgumentNullException.ThrowIfNull(first);
         var visited = new HashSet<BasicBlock>();
         var pending = new Stack<BasicBlock>();
         pending.Push(first);
@@ -156,6 +157,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
 
     private static IEnumerable<ControlFlowRegion> Regions(ControlFlowRegion region)
     {
+        System.ArgumentNullException.ThrowIfNull(region);
         yield return region;
         foreach (var child in region.NestedRegions)
         {

@@ -7,7 +7,6 @@ using SharpProof.Frontend.Host;
 using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;
-
 [TestFixture]
 public sealed class ArrayReceiverModelOwnershipTests
 {
@@ -15,16 +14,16 @@ public sealed class ArrayReceiverModelOwnershipTests
     [TestCase(true)]
     public void ArraySpecializationRequiresAnUnambiguousSourceModel(bool shared)
     {
-        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) => Helper(values); " +
-            "public static int Helper(System.Collections.Generic.IList<int> values) => values.Count; }");
-        var compilation = CSharpCompilation.Create("ArrayReceiverOwner", [tree], TestMetadataReferences.Platform,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) => Helper(values); " + "public static int Helper(System.Collections.Generic.IList<int> values) => values.Count; }");
+        var compilation = CSharpCompilation.Create("ArrayReceiverOwner", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         if (shared)
-        { compilation = compilation.AddReferences(compilation.WithAssemblyName("ArrayReceiverDependency").ToMetadataReference()); }
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        {
+            compilation = compilation.AddReferences(compilation.WithAssemblyName("ArrayReceiverDependency").ToMetadataReference());
+        }
+
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = CompilationModelProvider.GetRootSemanticModel(compilation, tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var target = model.GetDeclaredSymbol(syntax)!;
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -49,14 +48,12 @@ public sealed class ArrayReceiverModelOwnershipTests
     [TestCase("int Read() => values.Count; return Read();")]
     public void CapturedParameterReadersKeepOpaqueInterfaceBindings(string body)
     {
-        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) => Helper(values); " +
-            "public static int Helper(System.Collections.Generic.IList<int> values) { " + body + " } }");
-        var compilation = CSharpCompilation.Create("CapturedReceiver", [tree], TestMetadataReferences.Platform,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        global::System.ArgumentNullException.ThrowIfNull(body);
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) => Helper(values); " + "public static int Helper(System.Collections.Generic.IList<int> values) { " + body + " } }");
+        var compilation = CSharpCompilation.Create("CapturedReceiver", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);

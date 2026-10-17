@@ -27,7 +27,7 @@ public sealed class IteratorRequiresSessionApiCoverageTests
             MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location));
         var compilation = CSharpCompilation.Create("IteratorRequiresSessionApi", [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -44,7 +44,7 @@ public sealed class IteratorRequiresSessionApiCoverageTests
         }
         var model = compilation.GetSemanticModel(tree);
         var target = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Target");
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var callSyntax = target.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(callSyntax)!;
         var helper = (MethodDeclarationSyntax)invocation.TargetMethod.DeclaringSyntaxReferences.Single().GetSyntax();
@@ -57,14 +57,15 @@ public sealed class IteratorRequiresSessionApiCoverageTests
         var prepared = 0;
         bool PrepareCallee(TotalLoweringContext candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             Assert.That(candidate.Factory, Is.SameAs(factory));
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, invocation.TargetMethod), Is.True);
             var binding = new ContractBinder(compilation, factory).BindTotalRequires(candidate);
             Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
             Assert.That(binding.Clauses, Has.Length.EqualTo(requires ? 1 : 0));
-            Assert.That(binding.Clauses.All(static value => value.Kind == BoundContractKind.Requires), Is.True);
-            candidate.SourceCallPreconditions = [.. binding.Clauses.Where(static value => value.Kind == BoundContractKind.Requires)
-                .Select(static value => new TotalSourcePrecondition(value.Value, value.SafeCondition, value.SourceOperation))];
+            Assert.That(binding.Clauses.All(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind == BoundContractKind.Requires)), Is.True);
+            candidate.SourceCallPreconditions = [.. binding.Clauses.Where(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind == BoundContractKind.Requires))
+                .Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new TotalSourcePrecondition(value.Value, value.SafeCondition, value.SourceOperation)))];
             prepared++;
             return binding.IsSuccess;
         }

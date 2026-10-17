@@ -16,14 +16,14 @@ public sealed class AnalyzerCorePartialDefaultCallbackCoverageTests
             "static partial void Missing(" + parameter + "); " +
             "[EnforcePure] public static int Selected() { Missing(1); return 1; } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002"]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.Session, Is.Not.Null);
         var actual = factory.Session!.Compilation;
         var root = await actual.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
-        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Missing");
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Missing"));
         var model = actual.GetSemanticModel(declaration.SyntaxTree);
         var missing = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         Assert.That(SymbolEqualityComparer.Default.Equals(missing.ContainingAssembly, actual.Assembly), Is.True);

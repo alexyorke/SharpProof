@@ -166,6 +166,7 @@ public sealed class DeclarationCoverageAccountingTests
     public async Task RequiresValidSyntaxInEveryQualifiedParseContext(
         string scenario, bool qualified, bool declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         // Explicit classification output after ownership/checksum qualification.
         // Invoke the production aggregation, including its final invalid set
         // removal, so result ordering cannot qualify an invalid parse context.

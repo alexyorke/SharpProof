@@ -5,10 +5,8 @@ using SharpProof.Ir;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Effects.Test;
-
 public sealed partial class DotnetApiInventoryTests
 {
-
     [Test]
     public void InterfaceArrayAdmissionRejectsDerivedInterfacesAliasesAndReferenceCovariance()
     {
@@ -23,12 +21,9 @@ public sealed partial class DotnetApiInventoryTests
                 public static int F(int[] values) => (values as System.Collections.Generic.IList<int>)[0];
             }
             """);
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
-        var compilation = CSharpCompilation.Create("InterfaceArrayAdmission", [tree],
-            paths.Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("InterfaceArrayAdmission", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
@@ -46,45 +41,33 @@ public sealed partial class DotnetApiInventoryTests
                 public static int A(System.Collections.Generic.ICollection<int> values) => values.Count;
             }
             """);
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
-        var compilation = CSharpCompilation.Create("InterfaceArraySpoof", [tree],
-            paths.Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("InterfaceArraySpoof", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         Assert.That(CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property), Is.False);
         Assert.That(CSharpOperationSemantics.ArrayCollectionReceiver(property), Is.Null);
     }
 
-
     [Test]
     public void InterfaceArraySourceSkeletonRetainsBoundsEffectsWithoutOpaqueCalls()
     {
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int index) { int[] values = new int[1]; return " +
-            "((System.Collections.Generic.IList<int>)values)[index]; } }");
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
-        var compilation = CSharpCompilation.Create("InterfaceArraySkeleton", [tree],
-            paths.Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int index) { int[] values = new int[1]; return " + "((System.Collections.Generic.IList<int>)values)[index]; } }");
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("InterfaceArraySkeleton", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context,
-            static _ => true, TestContext.CurrentContext.CancellationToken);
+        var lowered = new RoslynProgramLowerer(factory).LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.Classification.IsExact, Is.True);
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrCallInstruction>(), Is.Empty);
-        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc =>
-            factory.GetOperationInfo(havoc.Operation).Description is { } description &&
-            factory.GetString(description).EndsWith(":interface-array:bounds", StringComparison.Ordinal)), Is.True);
-        Assert.That(instructions.OfType<IrWriteInstruction>().Any(write => write.Region == IrWriteRegion.Static), Is.True);
+        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new global::System.ArgumentNullException(nameof(havoc)) : (factory.GetOperationInfo(havoc.Operation).Description is { } description && factory.GetString(description).EndsWith(":interface-array:bounds", StringComparison.Ordinal))), Is.True);
+        Assert.That(instructions.OfType<IrWriteInstruction>().Any(write => write is null ? throw new global::System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Static)), Is.True);
     }
-
 
     [TestCase("receiver")]
     [TestCase("index")]
@@ -93,6 +76,7 @@ public sealed partial class DotnetApiInventoryTests
     [TestCase("comparison-receiver")]
     public void UnmodeledOperandsRemainIncompleteThroughInterfaceAndComparisonIntrinsics(string kind)
     {
+        global::System.ArgumentNullException.ThrowIfNull(kind);
         var body = kind switch
         {
             "receiver" => "return ((System.Collections.Generic.IList<int>)UnknownValues())[0];",
@@ -101,17 +85,12 @@ public sealed partial class DotnetApiInventoryTests
             "comparison-receiver" => "return UnknownIndex().CompareTo(0);",
             _ => "return (0).CompareTo(UnknownIndex());"
         };
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { " +
-            "public static int Check(int[] values) { " + body + " } " +
-            "private static int[] UnknownValues() => new int[1]; private static int UnknownIndex() => 0; }");
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
-        var compilation = CSharpCompilation.Create("IncompleteIntrinsicOperands", [tree],
-            paths.Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { " + "public static int Check(int[] values) { " + body + " } " + "private static int[] UnknownValues() => new int[1]; private static int UnknownIndex() => 0; }");
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("IncompleteIntrinsicOperands", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Check");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Check"));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         // No callee preparation or opaque-call admission: each source helper
@@ -125,7 +104,6 @@ public sealed partial class DotnetApiInventoryTests
             Assert.That(clause.Classification.IsExact, Is.False);
         }
     }
-
 
     [TestCase("System.Collections.Generic.IList<int> list = values; return list.Count;", true)]
     [TestCase("System.Collections.Generic.IList<int> list = values; list = choose ? values : unknown; return list.Count;", false)]
@@ -141,34 +119,37 @@ public sealed partial class DotnetApiInventoryTests
     [TestCase("System.Collections.Generic.IList<long> list = (System.Collections.Generic.IList<long>)(System.Collections.Generic.IList<int>)values; return list.Count;", false)]
     public void ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(string body, bool expected)
     {
+        global::System.ArgumentNullException.ThrowIfNull(body);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, System.Collections.Generic.IList<int> unknown, bool choose) { " + body + " } }");
-        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
-        var compilation = CSharpCompilation.Create("ReceiverProvenance", [tree],
-            paths.Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("ReceiverProvenance", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
         context.TrackArrayReceivers(graph);
-        var property = graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
-            .SelectMany(operation => operation.DescendantsAndSelf())
-            .OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
+        var property = graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
         Assert.That(context.ConcreteArray(property.Instance!) != null, Is.EqualTo(expected));
     }
 
     [Test]
     public void ReceiverProvenanceBoundsDeepInterfaceConversions()
     {
-        ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(
-            "return (" + string.Concat(Enumerable.Repeat("(System.Collections.Generic.IList<int>)", 70)) + "values).Count;", false);
+        ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes("return (" + string.Concat(Enumerable.Repeat("(System.Collections.Generic.IList<int>)", 70)) + "values).Count;", false);
     }
+
     private static bool CheckInterfaceArrayIntrinsic(CSharpCompilation references, string api, bool wrongClaim)
     {
-        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? new[] { "count", "inherited-count", "aliased-count" } : ["read", "write", "aliased-read", "aliased-write"];
+        global::System.ArgumentNullException.ThrowIfNull(api);
+        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? new[]
+        {
+            "count",
+            "inherited-count",
+            "aliased-count"
+        }
+
+        : ["read", "write", "aliased-read", "aliased-write"];
         foreach (var action in actions)
         {
             var body = action switch
@@ -183,18 +164,43 @@ public sealed partial class DotnetApiInventoryTests
             };
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, int index, int replacement) { " + body + " } }");
             var compilation = references.AddSyntaxTrees(tree);
-            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
-            { return false; }
+            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
+            {
+                return false;
+            }
+
             var model = compilation.GetSemanticModel(tree);
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
             if (!lowered.IsExact)
-            { return false; }
-            foreach (var values in new int[]?[] { null, [], [17], [int.MinValue, 0, int.MaxValue] })
             {
-                foreach (var index in new[] { int.MinValue, -1, 0, 1, (values?.Length ?? 1) - 1, values?.Length ?? 0, int.MaxValue })
+                return false;
+            }
+
+            foreach (var values in new int[]?[]
+            {
+                null,
+                [],
+                [17],
+                [int.MinValue, 0, int.MaxValue]
+            }
+
+            )
+            {
+                foreach (var index in new[]
+                {
+                    int.MinValue,
+                    -1,
+                    0,
+                    1,
+                    (values?.Length ?? 1) - 1,
+                    values?.Length ?? 0,
+                    int.MaxValue
+                }
+
+                )
                 {
                     const int replacement = -37;
                     var runtime = values?.ToArray();
@@ -222,32 +228,39 @@ public sealed partial class DotnetApiInventoryTests
                         }
                     }
                     catch (Exception exception) when (exception is NullReferenceException or ArgumentOutOfRangeException)
-                    { fault = exception; }
+                    {
+                        fault = exception;
+                    }
+
                     var parameters = context.Parameters;
                     var arrayType = factory.GetVariableInfo(parameters[0].Entry).Type;
-                    var arrayValue = values == null ? factory.CreateNullValue(arrayType) :
-                        factory.CreateSequenceValue(arrayType, values.Select(value => factory.CreateIntegerValue(value)));
-                    var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>
-                    {
-                        [parameters[0].Entry] = arrayValue,
-                        [parameters[1].Entry] = factory.CreateIntegerValue(index),
-                        [parameters[2].Entry] = factory.CreateIntegerValue(replacement)
-                    }, 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                    var arrayValue = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType, values.Select(value => factory.CreateIntegerValue(value)));
+                    var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue> { [parameters[0].Entry] = arrayValue, [parameters[1].Entry] = factory.CreateIntegerValue(index), [parameters[2].Entry] = factory.CreateIntegerValue(replacement) }, 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                     if (replay.ConsumedApproximation && fault is not ArgumentOutOfRangeException)
-                    { return false; }
+                    {
+                        return false;
+                    }
+
                     if (fault != null)
                     {
                         if (values != null && !runtime!.SequenceEqual(values))
-                        { return false; }
-                        if (replay.Status != IrProgramExecutionStatus.Exception ||
-                            replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.Unknown))
-                        { return false; }
+                        {
+                            return false;
+                        }
+
+                        if (replay.Status != IrProgramExecutionStatus.Exception || replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.Unknown))
+                        {
+                            return false;
+                        }
                     }
                     else if (replay.Status != IrProgramExecutionStatus.Returned || replay.ReturnValue?.Integer != expected + (wrongClaim ? 1L : 0L))
-                    { return false; }
+                    {
+                        return false;
+                    }
                 }
             }
         }
+
         return true;
     }
 }

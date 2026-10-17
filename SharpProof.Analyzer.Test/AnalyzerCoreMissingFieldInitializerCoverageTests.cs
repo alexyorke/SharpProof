@@ -19,8 +19,8 @@ public sealed class AnalyzerCoreMissingFieldInitializerCoverageTests
             "public static int Value = " + value + "; } " +
             "public static class SelectedFixture { [EnforcePure] public static int Target() => 1; }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002", "SP0047"]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.Id), missingValue ? Is.EqualTo(MissingValueCompilerErrors) : Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), missingValue ? Is.EqualTo(MissingValueCompilerErrors) : Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory), allowCompilationErrors: missingValue);
         Assert.That(diagnostics, Is.Empty);
@@ -52,7 +52,7 @@ public sealed class AnalyzerCoreMissingFieldInitializerCoverageTests
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Lowering.IsExact, Is.True);
-        Assert.That(body.Program.Blocks.Sum(block => block.Instructions.Length), Is.LessThanOrEqualTo(4096));
+        Assert.That(body.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.LessThanOrEqualTo(4096));
         Assert.That(factory.GetNamedOutcome("Target"), Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }
 }

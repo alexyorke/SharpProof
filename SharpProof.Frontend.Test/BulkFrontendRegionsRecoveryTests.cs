@@ -16,22 +16,24 @@ public sealed class BulkFrontendRegionsRecoveryTests
     public void CompilerRecoveryTerminalOutsideCatchIsRejected(string body, string diagnosticId,
         ControlFlowBranchSemantics semantics)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(diagnosticId);
         var source = FrontendTestHelpers.WrapSubjectMembers(
             "public static int Target(int x) { try { " + body + " } finally { x++; } }");
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12), "region-recovery.cs");
         var compilation = CSharpCompilation.Create("RegionRecovery", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(diagnostic => diagnostic.Id), Does.Contain(diagnosticId));
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Does.Contain(diagnosticId));
         using var stream = new MemoryStream();
         Assert.That(compilation.Emit(stream).Success, Is.False);
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration.Identifier.ValueText == "Target");
+            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var graph = ControlFlowGraph.Create(method, model)!;
-        var terminal = graph.Blocks.Single(block => block.IsReachable &&
-            (block.FallThroughSuccessor?.Semantics == semantics || block.ConditionalSuccessor?.Semantics == semantics));
+        var terminal = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
+            (block.FallThroughSuccessor?.Semantics == semantics || block.ConditionalSuccessor?.Semantics == semantics)));
         for (var region = terminal.EnclosingRegion; region != null; region = region.EnclosingRegion)
         {
             Assert.That(region.Kind, Is.Not.EqualTo(ControlFlowRegionKind.Catch));

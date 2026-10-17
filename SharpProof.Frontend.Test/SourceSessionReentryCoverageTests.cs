@@ -15,6 +15,7 @@ public sealed class SourceSessionReentryCoverageTests
         Assert.That(subject.Invoke([17]), Is.EqualTo(18));
         bool PrepareCallee(TotalLoweringContext candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, subject.Context.Target), Is.True);
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
             Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));

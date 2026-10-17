@@ -25,7 +25,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation(Source, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -61,9 +61,9 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         var observed = string.Join("\n", diagnostics.Select(diagnostic =>
-            $"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture)));
-        Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:" +
+            diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+        Assert.That(diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(ExpectedDiagnosticIds),
             $"Same-compilation emit succeeded; CLR construction threw InvalidOperationException: {runtimeFailure}\n" +
             $"intrinsic={operation.Kind};ownerKind={owner?.Kind};owner={owner};" +
@@ -90,7 +90,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         AnalyzerTestHost.AssertIds(diagnostics);
     }
@@ -106,7 +106,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),

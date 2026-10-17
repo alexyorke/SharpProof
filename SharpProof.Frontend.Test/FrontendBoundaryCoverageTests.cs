@@ -42,7 +42,7 @@ public sealed class FrontendBoundaryCoverageTests
         var first = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
         var second = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.Select(type => type.ToDisplayString()), Does.Contain("N.Outer.Inner"));
+        Assert.That(first.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())), Does.Contain("N.Outer.Inner"));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>((Action)(() =>
@@ -72,7 +72,7 @@ public sealed class FrontendBoundaryCoverageTests
         var compilation = CSharpCompilation.Create("GenericDepthBoundary", [tree],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var field = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().Single();
         var type = compilation.GetSemanticModel(tree).GetTypeInfo(field.Declaration.Type).Type!;
         Assert.That(CompilerIdentityBridge.IsClosedReferenceType(type, TestContext.CurrentContext.CancellationToken), Is.EqualTo(expected));

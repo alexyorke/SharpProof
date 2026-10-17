@@ -69,6 +69,8 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         string path,
         string json)
     {
+        System.ArgumentNullException.ThrowIfNull(json);
+        System.ArgumentNullException.ThrowIfNull(path);
         var bytes = Encoding.UTF8.GetBytes(json);
         await File.WriteAllBytesAsync(path, bytes);
         return new WorkerVerifyRequest

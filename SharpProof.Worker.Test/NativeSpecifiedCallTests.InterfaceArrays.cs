@@ -182,19 +182,27 @@ public sealed partial class NativeSpecifiedCallTests
 
     private static async Task CheckInterfaceArrayContract(string parameters, string body, WorkerClaimOutcome expected, string result = "int", string members = "")
     {
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static " +
             result + " Target(" + parameters + ") { " + body + " } " + members + " }");
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
+        Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().Reason.ToString());
     }
 
     private static async Task CheckInterfaceArrayEffects(string attributes, string parameters, string body,
         bool? noThrow, bool? noAllocation, bool? pure, string result = "int")
     {
+        System.ArgumentNullException.ThrowIfNull(attributes);
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(result);
         var preparation = Prepare(attributes + " public static " + result + " Target(" + parameters + ") { " + body + " }");
         if (noThrow.HasValue)
         {

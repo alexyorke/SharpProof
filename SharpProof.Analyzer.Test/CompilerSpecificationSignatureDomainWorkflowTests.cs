@@ -36,7 +36,7 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
             "public static class SignatureProbe { public static " + declaration + "; }", [])
             .WithAssemblyName("SignatureDomain_" + scenario);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         Assert.That(image, Is.Not.Empty);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("SignatureProbe")!
@@ -50,8 +50,8 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
             Assert.That(result, Is.EqualTo(expected));
             Assert.That(runtimeMethod.ReturnType, Is.EqualTo(expected.GetType()));
             Assert.That(method.Parameters, Has.Length.EqualTo(arguments.Length));
-            Assert.That(runtimeMethod.GetParameters().Select(parameter => parameter.ParameterType),
-                Is.EqualTo(arguments.Select(argument => argument.GetType())));
+            Assert.That(runtimeMethod.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType)),
+                Is.EqualTo(arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.GetType()))));
         }
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var mapped = CompilerSpecificationScalarDomain.TryMapSignature(factory, method,
@@ -62,7 +62,7 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
             Assert.That(parameters, Has.Length.EqualTo(method.Parameters.Length));
             Assert.That(resultType, Is.EqualTo(CompilerSpecificationScalarDomain.MapType(factory, method.ReturnType)));
             Assert.That(parameters, Is.EqualTo(method.Parameters.Select(parameter =>
-                CompilerSpecificationScalarDomain.MapType(factory, parameter.Type))));
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerSpecificationScalarDomain.MapType(factory, parameter.Type)))));
             Assert.That(integerType.IsDefault, Is.EqualTo(!admitted));
         }
         if (admitted)

@@ -33,6 +33,8 @@ public sealed class Pr275CompilerApiCoverageTests
     [TestCase("initialization", "type")]
     public void TotalSourceLoweringRequiresItsInputs(string api, string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(missing);
         var target = new ClaimManifestBuilder(Compilation).Build().Targets.Values.Single();
         var trees = CompilerCompilationCapture.CaptureTrees(Compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);

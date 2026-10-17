@@ -47,6 +47,7 @@ public sealed class Wave8ProtocolEffectWitnessContractMatrixTests
         WorkerEffectContractKind contract, WorkerEffectSet effects, WorkerEffectCapabilitySet capabilities,
         bool expectedValid, string boundary)
     {
+        System.ArgumentNullException.ThrowIfNull(boundary);
         var request = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference { Path = "compiler.manifest.json", Sha256 = WorkerProtocolVersions.EmptySha256 },
@@ -123,6 +124,7 @@ public sealed class Wave8ProtocolEffectWitnessContractMatrixTests
     private static WorkerVerifyResponse CreateResponse(WorkerVerifyRequest request, WorkerEffectContractKind contract,
         WorkerEffectSet effects, WorkerEffectCapabilitySet capabilities)
     {
+        System.ArgumentNullException.ThrowIfNull(request);
         var location = new WorkerSourceLocation { Path = "Subject.cs", Start = 1, Length = 1, Line = 1, Column = 1 };
         var manifest = new WorkerClaimManifest
         {

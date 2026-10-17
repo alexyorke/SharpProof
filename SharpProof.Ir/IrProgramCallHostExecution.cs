@@ -8,6 +8,7 @@ internal static class IrProgramCallHostExecution
         Func<IrTerm, IrEvaluationResult> evaluate,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost)
     {
+        evaluate = RepositoryParameterGuard.NotNull(evaluate, nameof(evaluate));
         IrValue? receiverValue = null;
         if (call.Receiver is { } receiver)
         {

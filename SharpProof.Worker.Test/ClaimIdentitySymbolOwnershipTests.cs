@@ -76,6 +76,8 @@ public sealed class ClaimIdentitySymbolOwnershipTests
     [TestCase("VisualBasic", "constructed-original", true, 0)]
     public void TypeParameterOwnerDepthUsesSemanticDefinitions(string language, string relation, bool expected, int expectedDepth)
     {
+        System.ArgumentNullException.ThrowIfNull(relation);
+        System.ArgumentNullException.ThrowIfNull(language);
         var compilation = CreateCompilation(language, language == "CSharp" ? CSharpTypes : VisualBasicTypes);
         var outer = TypeOwner(compilation.GetTypeByMetadataName("Outer`1")!);
         var middle = TypeOwner(compilation.GetTypeByMetadataName("Outer`1+Middle`1")!);
@@ -117,12 +119,13 @@ public sealed class ClaimIdentitySymbolOwnershipTests
     [TestCase("sibling", false, 3)]
     public void LocalMethodOwnerDepthPreservesPartialAndGenericNormalization(string relation, bool expected, int expectedDepth)
     {
+        System.ArgumentNullException.ThrowIfNull(relation);
         var compilation = CreateCompilation("CSharp", CSharpMethods);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>()
-            .ToDictionary(syntax => syntax.Identifier.ValueText,
-                syntax => MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!));
+            .ToDictionary(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText),
+                syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!)));
         var source = locals["Leaf"];
         var parent = locals["Parent"];
         var definition = MethodOwner(compilation.GetTypeByMetadataName("HostContainer")!.GetMembers("Host")
@@ -157,6 +160,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
     [TestCase("unrelated")]
     public void VisualBasicOrdinaryMethodsHaveNoMethodAncestor(string relation)
     {
+        System.ArgumentNullException.ThrowIfNull(relation);
         var compilation = CreateCompilation("VisualBasic", VisualBasicMethods);
         var type = compilation.GetTypeByMetadataName("HostContainer")!;
         var source = MethodOwner(type.GetMembers("Host").OfType<IMethodSymbol>().Single());
@@ -168,6 +172,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
 
     private static INamedTypeSymbol TypeOwner(INamedTypeSymbol type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var parameter = type.TypeParameters.Single();
         Assert.That(parameter.TypeParameterKind, Is.EqualTo(TypeParameterKind.Type));
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, type), Is.True);
@@ -176,6 +181,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
 
     private static IMethodSymbol MethodOwner(IMethodSymbol method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var parameter = method.TypeParameters.Single();
         Assert.That(parameter.TypeParameterKind, Is.EqualTo(TypeParameterKind.Method));
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method), Is.True);
@@ -184,13 +190,15 @@ public sealed class ClaimIdentitySymbolOwnershipTests
 
     private static Compilation CreateCompilation(string language, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(language);
         Compilation compilation = language == "CSharp"
             ? CSharpCompilation.Create("ClaimIdentityOwnership", [CSharpSyntaxTree.ParseText(source,
                 new CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp12))], TestMetadataReferences.Platform,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release))
             : VisualBasicCompilation.Create("ClaimIdentityOwnership", [VisualBasicSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

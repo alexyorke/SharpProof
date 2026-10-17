@@ -8,6 +8,18 @@ public sealed class AllowedCapabilitiesAttribute : Attribute
     /// <param name="capabilities">The allowed capability flags.</param>
     public AllowedCapabilitiesAttribute(SharpProofCapability capabilities)
     {
+        const SharpProofCapability known = SharpProofCapability.IO |
+            SharpProofCapability.FileRead | SharpProofCapability.FileWrite |
+            SharpProofCapability.Network | SharpProofCapability.Console |
+            SharpProofCapability.Process | SharpProofCapability.Environment |
+            SharpProofCapability.Registry | SharpProofCapability.Clock |
+            SharpProofCapability.Randomness | SharpProofCapability.Reflection |
+            SharpProofCapability.Synchronization | SharpProofCapability.NativeInterop;
+        if ((capabilities & ~known) != SharpProofCapability.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(capabilities));
+        }
+
         Capabilities = capabilities;
     }
 

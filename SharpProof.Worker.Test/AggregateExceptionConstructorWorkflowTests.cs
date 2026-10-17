@@ -14,6 +14,7 @@ public sealed class AggregateExceptionConstructorWorkflowTests
     [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.ArgumentNullException(\"inner\"); }", WorkerClaimOutcome.Refuted)]
     public async Task WorkerPublishesOnlySupportedConstructorExceptionEvidence(string declaration, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " + declaration + " }");
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
