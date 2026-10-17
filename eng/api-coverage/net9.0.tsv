@@ -32579,13 +32579,13 @@ System.Runtime	P:System.Collections.ArrayList.SyncRoot	Property	unmodeled	-
 System.Runtime	P:System.Collections.DictionaryEntry.Key	Property	unmodeled	-
 System.Runtime	P:System.Collections.DictionaryEntry.Value	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IAsyncEnumerator`1.Current	Property	unmodeled	-
-System.Runtime	P:System.Collections.Generic.ICollection`1.Count	Property	unmodeled	-
+System.Runtime	P:System.Collections.Generic.ICollection`1.Count	Property	partially-modeled	intrinsic=scalar-array-backed-interface
 System.Runtime	P:System.Collections.Generic.ICollection`1.IsReadOnly	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IDictionary`2.Item(`0)	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IDictionary`2.Keys	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IDictionary`2.Values	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IEnumerator`1.Current	Property	unmodeled	-
-System.Runtime	P:System.Collections.Generic.IList`1.Item(System.Int32)	Property	unmodeled	-
+System.Runtime	P:System.Collections.Generic.IList`1.Item(System.Int32)	Property	partially-modeled	intrinsic=scalar-array-backed-interface
 System.Runtime	P:System.Collections.Generic.IReadOnlyCollection`1.Count	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IReadOnlyDictionary`2.Item(`0)	Property	unmodeled	-
 System.Runtime	P:System.Collections.Generic.IReadOnlyDictionary`2.Keys	Property	unmodeled	-

@@ -46,7 +46,7 @@ internal static class TotalBodyLowering
         { return lowering; }
         // A body whose only element writes are stores reads elements where it
         // reads them; one that may write elements otherwise approximates them.
-        var unmodeled = UnmodeledElementWrites(lowering.Program);
+        var unmodeled = UnmodeledElementWrites(context.Factory, lowering.Program);
         return LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
             initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: unmodeled, pinElementReads: !unmodeled, cancellationToken);
     }
@@ -223,13 +223,15 @@ internal static class TotalBodyLowering
                 IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter });
     }
 
-    // A call or an unmodeled element or field write may write any array or
-    // object.
-    internal static bool UnmodeledElementWrites(IrProgram program)
+    // An opaque writer or an unmodeled element/field write may mutate arrays.
+    // Trusted calls without Writes retain their other effects without erasing
+    // array contents. Unspecified calls still carry All, including Writes.
+    internal static bool UnmodeledElementWrites(IrFactory factory, IrProgram program)
     {
         return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-            instruction is IrCallInstruction { Receiver: null, Target: null } or
-                IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter, IsStore: false });
+            instruction is IrCallInstruction { Receiver: null, Target: null } call &&
+                (IrOpaqueCallSite.Effects(factory, call.Operation) & IrOpaqueCallEffects.Writes) != 0 ||
+            instruction is IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter, IsStore: false });
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)

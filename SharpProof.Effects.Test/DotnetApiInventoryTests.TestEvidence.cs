@@ -32,6 +32,15 @@ public sealed partial class DotnetApiInventoryTests
                     "empty, singleton and 65 entries; native lowering exercised by NativeSpecifiedCallTests.CountGettersProveNonnegativeResults",
                     () => CheckCountInvariant(row.Id, false), () => CheckCountInvariant(row.Id, true));
             }
+            if (row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    row.Id.Contains("IList", StringComparison.Ordinal)
+                        ? "compiled CFG/heap versus runtime get/set; null/empty/singleton/extreme elements; negative, first/last, Count and extreme indexes"
+                        : "compiled CFG/heap versus runtime Count via ICollection and IList; null, empty, singleton and populated arrays",
+                    () => CheckInterfaceArrayIntrinsic(compilation, row.Id, false),
+                    () => CheckInterfaceArrayIntrinsic(compilation, row.Id, true));
+            }
             var instance = row.Id switch
             {
                 "M:System.String.Equals(System.String,System.String)" => false,

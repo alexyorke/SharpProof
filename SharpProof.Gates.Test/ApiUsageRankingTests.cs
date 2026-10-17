@@ -164,9 +164,14 @@ public sealed class ApiUsageRankingTests
                     IIncrementOrDecrementOperation => "read-write",
                     _ => "read"
                 };
-                // Property inventory evidence resolves the getter. Never credit
-                // a setter with support gained by adding a getter declaration.
-                if (access != "read")
+                if (operation is IPropertyReferenceOperation property && CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property))
+                {
+                    status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null ? "unmodeled-dispatch" :
+                        access == "read-write" ? "unmodeled-access" : "partially-modeled";
+                }
+                // Catalog property evidence resolves only the getter. The
+                // guarded array intrinsic above explicitly models simple stores.
+                else if (access != "read")
                 { status = "unmodeled-setter"; }
             }
             var line = syntax.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
@@ -239,6 +244,39 @@ public sealed class ApiUsageRankingTests
         Assert.That(sites.Count(site => site.Access == "call" && site.Status == "partially-modeled"), Is.EqualTo(1));
         Assert.That(sites.Count(site => site.Status == "unmodeled-dispatch"), Is.EqualTo(2));
     }
+
+    [Test]
+    public void UsageScanSeparatesGuardedInterfaceReadsStoresAndUnknownDispatch()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class UsageProbe {
+                public static void Target(int[] values, System.Collections.Generic.IList<int> list,
+                    System.Collections.Generic.ICollection<int> collection) {
+                    _ = ((System.Collections.Generic.ICollection<int>)values).Count;
+                    _ = ((System.Collections.Generic.IList<int>)values)[0];
+                    ((System.Collections.Generic.IList<int>)values)[0] = 7;
+                    ((System.Collections.Generic.IList<int>)values)[0] += 1;
+                    _ = collection.Count;
+                    _ = list[0];
+                    list[0] = 7;
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var count = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")!.GetMembers("Count").OfType<IPropertySymbol>().Single();
+        var item = compilation.GetTypeByMetadataName("System.Collections.Generic.IList`1")!.GetMembers().OfType<IPropertySymbol>().Single(property => property.IsIndexer);
+        var inventory = new[] { count, item }.ToDictionary(property => property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId(),
+            _ => "partially-modeled", StringComparer.Ordinal);
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites, Has.Count.EqualTo(7));
+        Assert.That(sites.Count(site => site.Status == "partially-modeled"), Is.EqualTo(3));
+        Assert.That(sites.Count(site => site.Status == "partially-modeled" && site.Access == "write"), Is.EqualTo(1));
+        Assert.That(sites.Count(site => site.Status == "unmodeled-dispatch"), Is.EqualTo(3));
+        Assert.That(sites.Count(site => site.Status == "unmodeled-access"), Is.EqualTo(1));
+    }
+
     private static void RequireCompilation(CSharpCompilation compilation)
     {
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

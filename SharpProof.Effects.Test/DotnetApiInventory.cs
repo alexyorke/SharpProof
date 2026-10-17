@@ -88,6 +88,8 @@ internal static class DotnetApiInventory
         if (symbol is IPropertySymbol { GetMethod: { } countGetter } &&
             CSharpOperationSemantics.IsNonnegativeCollectionCount(countGetter))
         { evidence.Add("intrinsic=concrete-count-nonnegative"); }
+        if (symbol is IPropertySymbol interfaceProperty && CSharpOperationSemantics.IsArrayCollectionDeclaration(interfaceProperty))
+        { evidence.Add("intrinsic=scalar-array-backed-interface"); }
         if (symbol is IMethodSymbol method)
         {
             if (CSharpOperationSemantics.IsIntegerCompareTo(method))

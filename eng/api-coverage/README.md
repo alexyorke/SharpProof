@@ -177,13 +177,56 @@ regression tests. The usage report splits rows by contextual support status:
 `unmodeled-dispatch` means the API declaration has a guarded intrinsic but this
 call does not meet its guards. Generic comparer calls in the original corpus
 therefore remain visible as gaps; this batch does not claim all 26 are covered.
+### Array-backed IList and ICollection
+
+The frontend models `ICollection<T>.Count` and `IList<T>.Item` when the receiver is
+a visible direct cast from a single-dimensional scalar array to the matching
+framework interface. Count is the array length; index reads return its elements;
+simple index stores update the same array storage and retain mutation effects.
+The model also works for inherited Count access through `IList<T>` and for
+getter expressions in contract clauses.
+
+For example, with non-null and valid-index preconditions, this call has the same
+result as `values[index]` and proves no-throw/no-allocation claims:
+
+```csharp
+return ((IList<int>)values)[index]; // values is int[]
+```
+
+Receiver, index, and setter value evaluation retain C# ordering. Native tests cover
+scalar reads/stores, saved reads across aliasing stores, receiver reassignment by
+the setter value, value evaluation before a null receiver fault, and an opaque
+callback invalidating content knowledge. Compiled CFG/heap execution is checked
+against runtime Count/get/set behavior on null, empty, singleton, and extreme
+element values and negative, valid, Count, and extreme indexes. Deliberately wrong
+result claims must fail.
+
+This is guarded implementation support. Arbitrary interface parameters, local
+interface aliases without tracked provenance, custom derived interfaces, reference
+array covariance, `as` casts, and compound index assignments remain outside this
+slice. If CFG captures hide the array conversion, verification stays conservative.
+Invalid-index branches retain possible exception allocation, framework cache writes,
+and ambient resource/capability effects. Valid-index preconditions exclude those
+branches. Known non-writing calls preserve array contents; unspecified or writing
+calls still invalidate that knowledge.
+Array's interface indexer throws `ArgumentOutOfRangeException`, whereas direct
+array indexing throws `IndexOutOfRangeException`. Native IR currently retains an
+Unknown bounds fault for the interface case; exact exception-type claims on those
+paths remain Unknown.
+
+The usage report applies this guard to each interface call, including writes.
+A supported simple store is partial evidence; an arbitrary receiver is
+`unmodeled-dispatch`; a compound assignment is `unmodeled-access`. The 109 original
+IList index/collection Count sites do not gain blanket support from the new two API
+rows. Closing those requires concrete receiver provenance or modeled implementations
+across calls, beyond this initial array-backed slice.
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |
 | --- | ---: | --- |
-| `IList<T>.Item` | 56 reads, 13 writes | Closed dispatch evidence or modeled implementation; bounds and element-store semantics |
+| `IList<T>.Item` | 56 reads, 13 writes | Scalar array-backed casts implemented; track other concrete receivers and interface aliases |
 | `Dictionary<TKey,TValue>.Item` | 40 reads, 1 write | Key/value state plus arbitrary comparer callback effects and exceptions |
-| `ICollection<T>.Count` | 40 reads | Resolve concrete implementation; an interface getter may run arbitrary user code |
+| `ICollection<T>.Count` | 40 reads | Scalar array-backed casts implemented; resolve other concrete implementations |
 | `Array.Length` | 32 reads | Existing contextual array lowering; the absence of a blanket catalog row is not absence of all support |
 | `Comparer<T>.Compare` | 26 calls | Resolve comparer implementation and its callback behavior |
 | `Dictionary.Add / ContainsKey` | 22 calls each | Comparer callbacks, dictionary state, allocation, and exception conditions |

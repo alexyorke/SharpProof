@@ -72,6 +72,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && operation is IPropertyReferenceOperation interfaceProperty &&
+            ArrayCollectionClause(interfaceProperty, state, depth) is { } arrayProperty)
+        { return arrayProperty; }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -379,6 +382,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IInvocationOperation opaqueInvocation &&
             OpaqueCall(operation, opaqueInvocation.TargetMethod, opaqueInvocation.Instance, opaqueInvocation.Arguments, block, depth) is { } invoked)
         { return invoked; }
+        if (depth < 256 && operation is IPropertyReferenceOperation arrayRead &&
+            ArrayCollectionBody(arrayRead, operation, null, block, depth) is { } arrayReadValue)
+        { return arrayReadValue; }
+        if (depth < 256 && operation is ISimpleAssignmentOperation
+            { IsRef: false, Target: IPropertyReferenceOperation arrayTarget } arrayStore &&
+            ArrayCollectionBody(arrayTarget, operation, arrayStore.Value, block, depth) is { } arrayStored)
+        { return arrayStored; }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }

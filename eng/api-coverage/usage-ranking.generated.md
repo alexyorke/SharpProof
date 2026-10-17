@@ -6,9 +6,9 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 
 | API | Access | Sites | Caller units | Samples | OSS | Synthetic | Status |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | 20 | 0 | 56 | 0 | unmodeled |
+| P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | 20 | 0 | 56 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | 23 | 0 | 40 | 0 | unmodeled |
-| P:System.Collections.Generic.ICollection`1.Count | read | 40 | 24 | 0 | 40 | 0 | unmodeled |
+| P:System.Collections.Generic.ICollection`1.Count | read | 40 | 24 | 0 | 40 | 0 | unmodeled-dispatch |
 | P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | unmodeled |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | call | 26 | 21 | 0 | 26 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | 11 | 0 | 22 | 0 | unmodeled |
@@ -21,7 +21,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | 5 | 0 | 16 | 0 | partially-modeled |
 | M:System.Collections.Generic.List`1.Add(`0) | call | 13 | 9 | 0 | 13 | 0 | partially-modeled |
 | P:System.Collections.Generic.Comparer`1.Default | read | 13 | 13 | 0 | 13 | 0 | unmodeled |
-| P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | 11 | 0 | 13 | 0 | unmodeled-setter |
+| P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | 11 | 0 | 13 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 12 | 10 | 0 | 12 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | unmodeled |
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | unmodeled |
