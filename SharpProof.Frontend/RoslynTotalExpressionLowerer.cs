@@ -11,7 +11,7 @@ internal readonly struct TotalBodyValue(IrTerm value, IrBlockId continuation,
 
 // Pure clauses compose safety; body evaluation emits the same local faults as
 // ordered edges, materializing operands before later source effects.
-internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
+internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     IrProgramBuilder? builder = null, IrBlockId /* SPINT001: all values valid - default means no exceptional exit in pure lowering */ exceptionalExit = default)
 {
     private readonly TotalLoweringContext _context = ArgumentNullGuard.NotNull(context, nameof(context));
@@ -74,6 +74,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && operation is IPropertyReferenceOperation interfaceProperty &&
+            ArrayCollectionClause(interfaceProperty, state, depth) is { } arrayProperty)
+        { return arrayProperty; }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -88,7 +91,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             case IParenthesizedOperation parenthesized:
                 return LowerClause(parenthesized.Operand, state, depth + 1);
             case IInvocationOperation invocation:
-                return Intrinsic?.Invoke(invocation, state) ?? StringEqualsClause(invocation, state, depth) ??
+                return Intrinsic?.Invoke(invocation, state) ?? IntegerComparisonClause(invocation, state, depth) ?? StringEqualsClause(invocation, state, depth) ??
                     Failed(operation, FrontendAbstention.UnsupportedInvocationShape);
             case IConditionalOperation { WhenFalse: { } whenFalse } conditional:
                 {
@@ -372,12 +375,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
+        if (depth < 256 && operation is IInvocationOperation comparison &&
+            IntegerComparisonBody(comparison, block, depth) is { } compared)
+        { return compared; }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }
         if (depth < 256 && operation is IInvocationOperation opaqueInvocation &&
             OpaqueCall(operation, opaqueInvocation.TargetMethod, opaqueInvocation.Instance, opaqueInvocation.Arguments, block, depth) is { } invoked)
         { return invoked; }
+        if (depth < 256 && operation is IPropertyReferenceOperation arrayRead &&
+            ArrayCollectionBody(arrayRead, operation, null, block, depth) is { } arrayReadValue)
+        { return arrayReadValue; }
+        if (depth < 256 && operation is ISimpleAssignmentOperation
+            { IsRef: false, Target: IPropertyReferenceOperation arrayTarget } arrayStore &&
+            ArrayCollectionBody(arrayTarget, operation, arrayStore.Value, block, depth) is { } arrayStored)
+        { return arrayStored; }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }
@@ -537,10 +550,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             case ISimpleAssignmentOperation { IsRef: false } assignment when TryStorage(assignment.Target, out var target) ||
                 _context.CapturedStorage(assignment.Target) is { } captured && (target = captured) == captured:
                 {
-                    var right = LowerBodyValue(assignment.Value, block, depth + 1);
+                    var right = _context.ConcreteArray(assignment.Target) != null
+                        ? LowerReceiverValue(assignment.Value, block, depth + 1)
+                        : LowerBodyValue(assignment.Value, block, depth + 1);
                     if (right.Classification.IsExact)
                     {
-                        var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, right.Value);
+                        var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, _context.BridgeValue(right.Value, _factory.GetVariableInfo(target).Type));
                         _builder.Write(right.Continuation, mutation.Operation, IrWriteRegion.Local);
                     }
                     return right;
@@ -873,6 +888,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
             result = _factory.Variable(target);
         }
+        // A fresh havoc masked to the nonnegative Int32 domain represents every
+        // possible concrete Count without adding an unowned proof assumption.
+        // It has no relation to other reads or collection contents.
+        if (CSharpOperationSemantics.IsNonnegativeCollectionCount(method))
+        { result = _factory.Binary(IrBinaryOperator.BitwiseAnd, result, _factory.Integer(int.MaxValue)); }
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
     }
 
