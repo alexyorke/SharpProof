@@ -4,6 +4,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Verifier" Version="SHARPPROOF_PACKAGE_VERSION" />
+    <PackageReference Include="SharpProof" Version="SHARPPROOF_PACKAGE_VERSION" />
   </ItemGroup>
 </Project>

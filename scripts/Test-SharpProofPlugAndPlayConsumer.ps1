@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PackageSource,
-    [ValidateSet('SharpProof', 'SharpProof.Verifier')][string]$PackageId = 'SharpProof.Verifier',
+    [ValidateSet('SharpProof', 'SharpProof.Verifier')][string]$PackageId = 'SharpProof',
     [Parameter(Mandatory = $true)][ValidateSet('linux', 'windows', 'macos')][string]$OsFamily,
     [Parameter(Mandatory = $true)][ValidateSet('x64', 'arm64')][string]$Architecture,
     [ValidateRange(30, 600)][int]$CommandTimeoutSeconds = 180

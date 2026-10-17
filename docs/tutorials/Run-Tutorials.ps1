@@ -91,7 +91,6 @@ try {
         $consumer = Join-Path $scratch $id
         [void][IO.Directory]::CreateDirectory($consumer)
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "code/$id.cs") -Destination (Join-Path $consumer 'Example.cs')
-        $verifierReference = if ($case.Native) { "<PackageReference Include=`"SharpProof.Verifier`" Version=`"$version`" PrivateAssets=`"all`" />" } else { '' }
         $verify = if ($case.Native) { 'true' } else { 'false' }
         [IO.File]::WriteAllText((Join-Path $consumer 'Example.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -102,9 +101,7 @@ try {
     <SharpProofAssumptionPolicy>warn</SharpProofAssumptionPolicy>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Attributes" Version="$version" />
-    <PackageReference Include="SharpProof" Version="$version" PrivateAssets="all" />
-    $verifierReference
+    <PackageReference Include="SharpProof" Version="$version" />
   </ItemGroup>
 </Project>
 "@, $utf8)

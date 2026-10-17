@@ -539,6 +539,9 @@
           "eng/container/dev-command.sh",
           "eng/container/dev-init.sh",
           "eng/container/Prepare-NativePayload.ps1",
+          "eng/container/windows-native/build.sh",
+          "eng/container/windows-native/inspect-pe.py",
+          "eng/container/windows-native/verify-output.py",
           "eng/container/New-ContainerContract.ps1",
           "compose.yaml",
           "scripts/Invoke-SharpProofContainer.ps1",
@@ -576,6 +579,8 @@
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofSamples.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
+          "scripts/Test-SharpProofThirdPartyInventory.ps1",
+          "scripts/Test-SharpProofThirdPartyInventoryRegression.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
           "scripts/package-projects.json"
         ]

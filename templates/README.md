@@ -1,6 +1,6 @@
 # Project templates
 
-`sp-verified` is the standard setup: a class library with one `SharpProof.Verifier` reference, no SharpProof properties, and a simple normal-return proof. The package enables strict verification automatically and supplies its API/analyzer dependencies transitively. The reference permits application contract dependencies to propagate. `sp-portable` is an explicit advanced alternative for compiler diagnostics without the native worker. Both target net8.0; this does not change the compiler-host or worker runtime requirements. Use a [qualified host](../docs/preview-support.md).
+`sp-verified` is the standard setup: a class library with one `SharpProof` reference, no SharpProof properties, and a simple normal-return proof. The package enables strict verification automatically and supplies its API/analyzer dependencies transitively. The reference permits application contract dependencies to propagate. `sp-portable` is an explicit advanced alternative for compiler diagnostics without the native worker. Both target net8.0; this does not change the compiler-host or worker runtime requirements. Use a [qualified host](../docs/preview-support.md).
 
 The installer reads [SharpProof.Release.props](../SharpProof.Release.props), stages templates in a unique temporary directory, and adds the exact package version as their default. Source templates deliberately have no independent release-version default. Neither installation nor generation obtains packages or promises public feed availability.
 

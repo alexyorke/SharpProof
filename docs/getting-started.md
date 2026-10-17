@@ -1,6 +1,6 @@
 # Getting started
 
-Add **SharpProof.Verifier** to an SDK-style C# project and build. The package brings the contract API and portable analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required.
+Run `dotnet add package SharpProof` in an SDK-style C# project using your configured feed, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
 
 Full verification requires .NET SDK 10.0.100+ with the .NET 10 runtime and a host/filesystem in the [support matrix](preview-support.md). Application target frameworks are separate from the compiler/worker host. Repository build/test/pack commands always run in the canonical Linux amd64 container.
 
@@ -11,7 +11,7 @@ Full verification requires .NET SDK 10.0.100+ with the .NET 10 runtime and a hos
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
 </ItemGroup>
 ```
 
@@ -50,7 +50,7 @@ docker compose build tooling
 pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
 ```
 
-The host wrapper supplies read-only external Git metadata mounts for worktrees. Packed artifacts are exported under `artifacts/container-packages`. Configure your consumer's NuGet sources to include that local feed using a path visible inside its build environment. The standard Verifier reference restores the exact-version three-package dependency graph automatically. [SharpProof.Release.props](../SharpProof.Release.props) owns the package version.
+The host wrapper supplies read-only external Git metadata mounts for worktrees. Packed artifacts are exported under `artifacts/container-packages`. Configure your consumer's NuGet sources to include that local feed using a path visible inside its build environment. The standard SharpProof reference restores the exact-version `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes` dependency graph automatically. [SharpProof.Release.props](../SharpProof.Release.props) owns the package version.
 
 `pack` requires clean exact-commit source. For development validation with uncommitted changes, use `docker compose run --rm tooling samples -Configuration Release`; its harness builds an isolated feed and validates actual consumer diagnostics and proof records.
 
@@ -62,16 +62,19 @@ Default evidence is published under `obj/<Configuration>/<TargetFramework>/Sharp
 
 ## Portable-only alternative
 
-For older compiler hosts or deliberate analysis without native proofs, reference `SharpProof.Attributes` and `SharpProof` privately as appropriate:
+For deliberate analysis without native proofs, opt out explicitly on the same single package:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Attributes" Version="1.0.0-preview.1" />
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" PrivateAssets="all" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
 </ItemGroup>
+<PropertyGroup>
+  <SharpProofProfile>advisory</SharpProofProfile>
+  <SharpProofVerify>false</SharpProofVerify>
+</PropertyGroup>
 ```
 
-The portable package retains advisory analysis with verification disabled by default and requires SDK 9.0.300+/Roslyn 4.14+. It does not supply native proofs. The [portable template](../templates/README.md) and [diagnostic tutorial](tutorials/02-diagnostics.md) demonstrate this advanced alternative, including the SP0027 precondition warning. Editor design-time feedback also remains portable; normal builds run the verifier when the standard package is installed.
+This explicit portable-only configuration requires SDK 9.0.300+/Roslyn 4.14+ and does not run native proofs. The default configuration still requires SDK 10.0.100+ and runs full verification. `SharpProofProfile=off` disables analysis as well. The [portable template](../templates/README.md) and [diagnostic tutorial](tutorials/02-diagnostics.md) demonstrate the advisory alternative, including the SP0027 precondition warning. Editor design-time feedback remains portable; normal builds run the verifier by default.
 
 ## Next steps
 

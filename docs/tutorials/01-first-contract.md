@@ -4,9 +4,9 @@ A useful first contract documents an input requirement and lets the analyzer che
 
 ## Set up a consumer
 
-Active analysis requires .NET SDK 9.0.300 or newer. The canonical container supplies the pinned SDK; the sample application can still target net8.0. SDK version and target framework are separate choices.
+Use .NET SDK 10.0.100 or newer for this series. The canonical container supplies the pinned SDK; the sample application can still target net8.0. SDK version and target framework are separate choices. The standard installation is one `SharpProof` reference with automatic strict verification; this first lesson deliberately opts into portable-only feedback to distinguish compiler diagnostics from proofs.
 
-For a new class library, use this complete project file. For an existing SDK-style project, merge its references and SharpProof properties with your current settings:
+For a new class library, use this complete project file. The explicit advisory/verification-disabled settings are this lesson's teaching choice, not required installation steps. For an existing SDK-style project, merge the single reference and these deliberate overrides with your current settings:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -18,8 +18,7 @@ For a new class library, use this complete project file. For an existing SDK-sty
     <SharpProofVerify>false</SharpProofVerify>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Attributes" Version="1.0.0-preview.1" />
-    <PackageReference Include="SharpProof" Version="1.0.0-preview.1" PrivateAssets="all" />
+    <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
   </ItemGroup>
 </Project>
 ```

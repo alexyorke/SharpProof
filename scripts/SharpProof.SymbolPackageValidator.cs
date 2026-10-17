@@ -12,6 +12,58 @@ internal static class SharpProofSymbolPackageValidator
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
+    public static void ValidateFacade(
+        string packagePath, string packageVersion, string repositoryCommit)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packagePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryCommit);
+        if (repositoryCommit.Length != 40 ||
+            repositoryCommit.Any(static value =>
+                !Uri.IsHexDigit(value) || value is >= 'A' and <= 'F'))
+        {
+            throw new InvalidDataException(
+                "The expected repository commit is not a 40-character hash.");
+        }
+        using var facade = ZipFile.OpenRead(packagePath);
+        RejectDuplicateEntries(facade, packagePath);
+        ValidateArchiveIdentity(facade, packagePath, "SharpProof", packageVersion,
+            repositoryCommit, isSymbols: false);
+        if (facade.Entries.Any(static entry =>
+                entry.FullName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
+                entry.FullName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                entry.FullName.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidDataException(
+                "The metadata-only SharpProof facade must not contain executable payloads or PDBs.");
+        }
+        var nuspec = facade.Entries.Single(static entry =>
+            entry.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+        using var stream = nuspec.Open();
+        using var document = System.Xml.XmlReader.Create(stream,
+            new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit });
+        var dependencyCount = 0;
+        while (document.Read())
+        {
+            if (document.NodeType != System.Xml.XmlNodeType.Element || document.LocalName != "dependency")
+            {
+                continue;
+            }
+            dependencyCount++;
+            if (!string.Equals(document.GetAttribute("id"), "SharpProof.Verifier", StringComparison.Ordinal) ||
+                !string.Equals(document.GetAttribute("version"), "[" + packageVersion + "]", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The SharpProof facade must depend on the exact matching SharpProof.Verifier version.");
+            }
+        }
+        if (dependencyCount != 1)
+        {
+            throw new InvalidDataException(
+                "The SharpProof facade must contain exactly one Verifier dependency.");
+        }
+    }
+
     public static void Validate(
         string packagePath,
         string symbolPackagePath,

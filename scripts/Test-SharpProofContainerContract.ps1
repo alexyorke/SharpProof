@@ -173,6 +173,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+        'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
@@ -186,10 +187,37 @@ function Assert-DockerfileAuthority {
     }
 
 
+    $windowsNativeLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS windows-native'
+    $windowsNativeText = $windowsNativeLines -join "`n"
+    foreach ($required in @(
+            'COPY eng/container/windows-native/ /opt/sharpproof-windows-cross/',
+            'COPY eng/container/toolchain.json /opt/sharpproof-windows-cross/toolchain.json',
+            '/bin/bash /opt/sharpproof-windows-cross/build.sh',
+            'python3 /opt/sharpproof-windows-cross/verify-output.py',
+            '/opt/sharpproof-windows-cross/toolchain.json /output /payload')) {
+        if (-not $windowsNativeText.Contains($required, [StringComparison]::Ordinal)) {
+            throw "Dockerfile windows-native stage is missing '$required'."
+        }
+    }
+    foreach ($url in @(
+            [string]$ToolchainCatalog.z3.windowsCrossBuild.sourceUrl,
+            [string]$ToolchainCatalog.z3.windowsCrossBuild.compilerUrl)) {
+        if (-not $windowsNativeText.Contains($url, [StringComparison]::Ordinal)) {
+            throw "Dockerfile windows-native stage does not use the catalog input '$url'."
+        }
+    }
+
     $toolchainLines = Get-DockerfileStageLines `
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
+    Assert-SingleMatchingLine `
+        $toolchainLines `
+        '^COPY --from=windows-native ' `
+        'COPY --from=windows-native /payload/ /opt/sharpproof/windows-native/' `
+        'verified Windows native payload copy'
     foreach ($required in @(
             'ARG USER_UID=1000',
             'ARG USER_GID=1000',
@@ -395,9 +423,9 @@ if ($null -eq $z3Package) {
 }
 Assert-Exact $z3Package.Version $catalog.z3.version 'Microsoft.Z3 version'
 Assert-Exact `
-    $packageProjects.projects[-1] `
-    'SharpProof.Verifier/SharpProof.Verifier.csproj' `
-    'Verifier package project'
+    ($packageProjects.projects -join '|') `
+    'SharpProof.Attributes/SharpProof.Attributes.csproj|SharpProof.Verifier/SharpProof.Verifier.csproj|SharpProof.Package/SharpProof.Package.csproj' `
+    'Package projects in dependency order'
 Assert-Exact `
     $catalog.support.verifierPackageId `
     'SharpProof.Verifier' `
@@ -449,24 +477,27 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $managedSha256 `
         $catalog.z3.managedAssemblySha256 `
         'Installed managed Z3 SHA-256 digest'
-    $windowsNative = Join-Path `
-        ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
-        "z3/$($catalog.z3.version)/win-x64/libz3.dll"
-    $windowsInformation = Get-Item -LiteralPath $windowsNative
-    Assert-Exact $windowsInformation.Length $catalog.z3.windows.libraryBytes 'Installed Windows Z3 size'
-    $windowsSha256 = (Get-FileHash -LiteralPath $windowsNative -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-Exact $windowsSha256 $catalog.z3.windows.librarySha256 'Installed Windows Z3 SHA-256 digest'
-    $windowsManaged = Join-Path (Split-Path -Parent $windowsNative) 'Microsoft.Z3.dll'
-    $windowsManagedInformation = Get-Item -LiteralPath $windowsManaged
-    Assert-Exact `
-        $windowsManagedInformation.Length `
-        $catalog.z3.windows.managedAssemblyBytes `
-        'Installed Windows managed Z3 size'
-    $windowsManagedSha256 = (Get-FileHash -LiteralPath $windowsManaged -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-Exact `
-        $windowsManagedSha256 `
-        $catalog.z3.windows.managedAssemblySha256 `
-        'Installed Windows managed Z3 SHA-256 digest'
+    foreach ($architecture in @('x64', 'arm64')) {
+        $windowsCatalog = if ($architecture -ceq 'x64') { $catalog.z3.windows } else { $catalog.z3.windowsArm64 }
+        $windowsNative = Join-Path `
+            ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
+            "z3/$($catalog.z3.version)/win-$architecture/libz3.dll"
+        $windowsInformation = Get-Item -LiteralPath $windowsNative
+        Assert-Exact $windowsInformation.Length $windowsCatalog.libraryBytes "Installed Windows $architecture Z3 size"
+        $windowsSha256 = (Get-FileHash -LiteralPath $windowsNative -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-Exact $windowsSha256 $windowsCatalog.librarySha256 "Installed Windows $architecture Z3 SHA-256 digest"
+        $windowsManaged = Join-Path (Split-Path -Parent $windowsNative) 'Microsoft.Z3.dll'
+        $windowsManagedInformation = Get-Item -LiteralPath $windowsManaged
+        Assert-Exact `
+            $windowsManagedInformation.Length `
+            $catalog.z3.managedAssemblyBytes `
+            "Installed Windows $architecture managed Z3 size"
+        $windowsManagedSha256 = (Get-FileHash -LiteralPath $windowsManaged -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-Exact `
+            $windowsManagedSha256 `
+            $catalog.z3.managedAssemblySha256 `
+            "Installed Windows $architecture managed Z3 SHA-256 digest"
+    }
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {

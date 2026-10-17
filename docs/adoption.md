@@ -1,6 +1,6 @@
 # Adopt SharpProof in an existing repository
 
-Start with one small SDK-style library on a [qualified host](preview-support.md). Keep the existing target framework and warning policy. Add one `SharpProof.Verifier` package reference as in [getting started](getting-started.md#first-use-in-three-steps); no SharpProof properties or separate package references are needed. Strict verification is the default. Keep the standard reference without `PrivateAssets="all"` so the transitive application contract dependency propagates.
+Start with one small SDK-style library on a [qualified host](preview-support.md). Keep the existing target framework and warning policy. Add one `SharpProof` package reference as in [getting started](getting-started.md#first-use-in-three-steps); no SharpProof properties or separate package references are needed. Strict verification is the default. Keep the standard reference without `PrivateAssets="all"` so the transitive application contract dependency propagates.
 
 ## Review the first project's results
 

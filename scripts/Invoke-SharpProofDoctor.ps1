@@ -107,17 +107,17 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
             $processArchitecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
             $runtimeIdentifier = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
             if (($IsLinux -and ($architecture -notin @('X64', 'Arm64') -or $runtimeIdentifier -notin @('linux-x64', 'linux-arm64'))) -or
-                ($IsWindows -and $architecture -ne 'X64') -or
+                ($IsWindows -and ($architecture -notin @('X64', 'Arm64') -or $runtimeIdentifier -notin @('win-x64', 'win-arm64'))) -or
                 ($IsMacOS -and $architecture -notin @('X64', 'Arm64')) -or
                 $architecture -cne $processArchitecture -or
                 (-not ($IsLinux -or $IsWindows -or $IsMacOS))) {
-                Add-Check 'platform' 'error' 'This full-verifier host is outside the qualified platform boundary.' 'Use matching host/process architectures on glibc Linux x64/arm64, Windows x64, or macOS x64/arm64; consult preview-support.md.'
+                Add-Check 'platform' 'error' 'This full-verifier host is outside the qualified platform boundary.' 'Use matching host/process architectures on glibc Linux x64/arm64, Windows x64/arm64, or macOS x64/arm64; consult preview-support.md.'
             }
             else { Add-Check 'platform' 'ok' 'OS and architecture match a documented verifier platform; proof execution is still required to qualify this installation.' }
             $worker = $configuration.SharpProofWorkerPath
             if ($worker -and -not [IO.Path]::IsPathRooted($worker)) { $worker = Join-Path $configuration.MSBuildProjectDirectory $worker }
             if (-not $worker -or -not (Test-Path -LiteralPath $worker -PathType Leaf)) {
-                Add-Check 'worker' 'error' 'Configured worker payload is unavailable.' 'Restore SharpProof.Verifier for this host and inspect SharpProofWorkerPath.'
+                Add-Check 'worker' 'error' 'Configured worker payload is unavailable.' 'Restore SharpProof for this host and inspect SharpProofWorkerPath.'
             }
             else {
                 Add-Check 'worker' 'ok' 'Configured worker payload exists.'

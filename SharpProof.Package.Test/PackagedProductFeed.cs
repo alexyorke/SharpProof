@@ -20,7 +20,7 @@ public sealed class PackagedProductFeedLifecycle
 internal sealed class PackagedProductFeed : IDisposable
 {
     internal const string AttributesPackageId = "SharpProof.Attributes";
-    internal const string PortablePackageId = "SharpProof";
+    internal const string MainPackageId = "SharpProof";
     internal const string VerifierPackageId =
         "SharpProof.Verifier";
     internal const string PackageSourceEnvironmentVariable =
@@ -28,7 +28,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static readonly string[] s_expectedPackageIds = [
         AttributesPackageId,
-        PortablePackageId,
+        MainPackageId,
         VerifierPackageId
     ];
     private static readonly Lazy<Task<PackagedProductFeed>> s_shared =
@@ -178,8 +178,8 @@ internal sealed class PackagedProductFeed : IDisposable
         System.ArgumentNullException.ThrowIfNull(source);
         var packages = ReadPackages(source, ".nupkg");
         var symbolPackages = ReadPackages(source, ".snupkg");
-        ValidatePackages(packages, "package");
-        ValidatePackages(symbolPackages, "symbol package");
+        ValidatePackages(packages, "package", s_expectedPackageIds);
+        ValidatePackages(symbolPackages, "symbol package", [AttributesPackageId, VerifierPackageId]);
         if (!string.Equals(
                 packages[0].Version,
                 symbolPackages[0].Version,
@@ -221,16 +221,18 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static void ValidatePackages(
         PackagedPackage[] packages,
-        string kind)
+        string kind,
+        string[] expectedIds)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedIds);
         System.ArgumentNullException.ThrowIfNull(kind);
         if (!packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id))
-                .SequenceEqual(s_expectedPackageIds, StringComparer.Ordinal))
+                .SequenceEqual(expectedIds, StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
                 "The package source must contain exactly one " + kind +
                 " for " +
-                string.Join(", ", s_expectedPackageIds) + ". Found: " +
+                string.Join(", ", expectedIds) + ". Found: " +
                 string.Join(
                     ", ",
                     packages.Select(static package =>
@@ -284,9 +286,9 @@ internal sealed class PackagedProductFeed : IDisposable
             .ToArray();
         var expectedProjects = new[] {
             "SharpProof.Attributes/SharpProof.Attributes.csproj",
-            "SharpProof.Package/SharpProof.Package.csproj",
             "SharpProof.Verifier/" +
-                "SharpProof.Verifier.csproj"
+                "SharpProof.Verifier.csproj",
+            "SharpProof.Package/SharpProof.Package.csproj"
         };
         if (!projects.SequenceEqual(
                 expectedProjects,
