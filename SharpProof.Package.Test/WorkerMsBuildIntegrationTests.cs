@@ -3863,7 +3863,8 @@ public sealed class WorkerMsBuildIntegrationTests
                           BeforeTargets="CoreCompile"
                           Condition="'$(SharpProofRunAnalyzersForPackageTests)' != 'true'">
                     <ItemGroup>
-                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath)" />
+                      <!-- This fixture isolates worker targets; IDE enrollment is tested with the packed product. -->
+                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath);$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" />
                     </ItemGroup>
                   </Target>
                 </Project>

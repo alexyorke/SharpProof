@@ -1566,19 +1566,23 @@ public sealed class BuildTaskTests
                 Is.True,
                 string.Join(Environment.NewLine, result.Diagnostics));
         }
+        // Platform metadata references come from this test host's runtime. The
+        // generated executable must select that same framework, including in coverage shards.
+        var runtimeVersion = Environment.Version;
         File.WriteAllText(
             Path.ChangeExtension(assemblyPath, ".runtimeconfig.json"),
-            """
+            JsonSerializer.Serialize(new
             {
-              "runtimeOptions": {
-                "tfm": "net9.0",
-                "framework": {
-                  "name": "Microsoft.NETCore.App",
-                  "version": "9.0.0"
+                runtimeOptions = new
+                {
+                    tfm = FormattableString.Invariant($"net{runtimeVersion.Major}.{runtimeVersion.Minor}"),
+                    framework = new
+                    {
+                        name = "Microsoft.NETCore.App",
+                        version = FormattableString.Invariant($"{runtimeVersion.Major}.{runtimeVersion.Minor}.0")
+                    }
                 }
-              }
-            }
-            """);
+            }));
         return assemblyPath;
     }
 
