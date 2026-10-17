@@ -37,6 +37,10 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.Analyzer.dll"
     ];
 
+    private static readonly string[] ExpectedCodeFixEntryFileNames = [
+        "SharpProof.CodeFixes.dll"
+    ];
+
     private static readonly string[] ExpectedGeneratorEntryFileNames = [
         "SharpProof.ContractForGenerator.dll"
     ];
@@ -85,6 +89,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
@@ -111,26 +116,21 @@ public sealed class PackageLayoutSmokeTests
     ];
 
     private static readonly string[] ExpectedToolEntries = [
-        "tools/net9/Microsoft.Z3.dll",
-        "tools/net9/SharpProof.BuildTasks.deps.json",
-        "tools/net9/SharpProof.BuildTasks.dll",
-        "tools/net9/SharpProof.CompilerArtifact.dll",
-        "tools/net9/SharpProof.Dataflow.dll",
-        "tools/net9/SharpProof.Host.dll",
-        "tools/net9/SharpProof.Ir.dll",
-        "tools/net9/SharpProof.Logging.dll",
-        "tools/net9/SharpProof.Smt.dll",
-        "tools/net9/SharpProof.Specs.dll",
-        "tools/net9/SharpProof.Verify.dll",
-        "tools/net9/SharpProof.Worker.deps.json",
-        "tools/net9/SharpProof.Worker.dll",
-        "tools/net9/SharpProof.Worker.Protocol.dll",
-        "tools/net9/SharpProof.Worker.runtimeconfig.json",
-        "tools/net9/System.Collections.Immutable.dll",
-        "tools/net9/System.IO.Pipelines.dll",
-        "tools/net9/System.Text.Encodings.Web.dll",
-        "tools/net9/System.Text.Json.dll",
-        "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
+        "tools/net10/Microsoft.Z3.dll",
+        "tools/net10/SharpProof.BuildTasks.deps.json",
+        "tools/net10/SharpProof.BuildTasks.dll",
+        "tools/net10/SharpProof.CompilerArtifact.dll",
+        "tools/net10/SharpProof.Dataflow.dll",
+        "tools/net10/SharpProof.Host.dll",
+        "tools/net10/SharpProof.Ir.dll",
+        "tools/net10/SharpProof.Logging.dll",
+        "tools/net10/SharpProof.Smt.dll",
+        "tools/net10/SharpProof.Specs.dll",
+        "tools/net10/SharpProof.Verify.dll",
+        "tools/net10/SharpProof.Worker.deps.json",
+        "tools/net10/SharpProof.Worker.dll",
+        "tools/net10/SharpProof.Worker.Protocol.dll",
+        "tools/net10/SharpProof.Worker.runtimeconfig.json"
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
@@ -154,11 +154,13 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
-    public async Task VerifierPackageIncludesDeclaredWindowsManagedRuntimeTargets()
+    public async Task VerifierUsesFrameworkLibrariesWithoutRedundantWindowsManagedRuntimeTargets()
     {
         var feed = await PackagedProductFeed.GetAsync();
-        using var archive = ZipFile.OpenRead(feed.GetPackage(PackagedProductFeed.VerifierPackageId).Path);
-        using var dependencies = JsonDocument.Parse(ReadArchiveText(archive, "tools/net9/SharpProof.Worker.deps.json"));
+        using var archive = await ZipFile.OpenReadAsync(
+            feed.GetPackage(PackagedProductFeed.VerifierPackageId).Path,
+            TestContext.CurrentContext.CancellationToken);
+        using var dependencies = JsonDocument.Parse(ReadArchiveText(archive, "tools/net10/SharpProof.Worker.deps.json"));
         var windowsAssets = dependencies.RootElement.GetProperty("targets").EnumerateObject()
             .SelectMany(static target => target.Value.EnumerateObject())
             .Where(static library => library.Value.TryGetProperty("runtimeTargets", out _))
@@ -166,10 +168,11 @@ public sealed class PackageLayoutSmokeTests
             .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
                 asset.Value.GetProperty("rid").GetString() is "win" or "win-x64")
             .Select(static asset => asset.Name).ToArray();
-        Assert.That(windowsAssets, Is.Not.Empty);
+        Assert.That(windowsAssets, Is.Empty,
+            "The .NET 10 worker uses framework libraries rather than redundant Windows runtime copies.");
         foreach (var asset in windowsAssets)
         {
-            Assert.That(archive.GetEntry("tools/net9/" + asset), Is.Not.Null,
+            Assert.That(archive.GetEntry("tools/net10/" + asset), Is.Not.Null,
                 "The portable worker deps manifest selects this managed asset on Windows: " + asset);
         }
     }
@@ -254,9 +257,10 @@ public sealed class PackageLayoutSmokeTests
         var feed = await PackagedProductFeed.GetAsync();
         using var directory = new TempDirectory(
             "sharpproof-analyzer-discovery-");
-        ZipFile.ExtractToDirectory(
+        await ZipFile.ExtractToDirectoryAsync(
             feed.GetPackagePath(PackagedProductFeed.PortablePackageId),
-            directory.FullName);
+            directory.FullName,
+            TestContext.CurrentContext.CancellationToken);
         var analyzerDirectory = Path.Combine(
             directory.FullName,
             "tools",
@@ -632,7 +636,8 @@ public sealed class PackageLayoutSmokeTests
                 ("SharpProofVerify", "true"),
                 ("DesignTimeBuild", "true")),
             includePortable: true,
-            includeCollector: false);
+            includeCollector: false,
+            includeCodeFix: true);
         AssertPackagedAnalyzerItems(
             await EvaluatePackagedAnalyzerItemsAsync(
                 workspace,
@@ -656,7 +661,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
+                "requires .NET SDK 10.0.100 or newer and Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -1185,6 +1190,27 @@ public sealed class PackageLayoutSmokeTests
         JsonAssert.Equal(physicalLocation, "region.startLine", 73);
     }
 
+    [TestCase("9.0.300")]
+    [TestCase("9.0.316")]
+    public async Task VerifierPackageRejectsSdkThatOnlySupportsPortableAnalysis(string sdkVersion)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteConsumer(feed.Version, PackagedProductFeed.VerifierPackageId);
+        var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var verification = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild", workspace.ConsumerProject,
+            "-t:SharpProofRejectUnsupportedWorkerHost",
+            "-p:_SharpProofVerifyActive=true",
+            "-p:NETCoreSdkVersion=" + sdkVersion,
+            "--nologo");
+        Assert.That(verification.ExitCode, Is.Not.Zero, verification.Output);
+        Assert.That(verification.Output,
+            Does.Contain("requires .NET SDK 10.0.100 or newer")
+                .And.Contain("Portable analyzer profiles remain available"));
+    }
+
     [Test]
     public async Task VerifierPackageRejectsANonX64BuildProcess()
     {
@@ -1214,7 +1240,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain(
-                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
+                "requires .NET SDK 10.0.100 or newer and Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -2149,7 +2175,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             entries,
             Has.None.StartsWith("lib/")
-                .And.None.StartsWith("tools/net9/"));
+                .And.None.StartsWith("tools/net10/"));
     }
 
     private static void VerifyVerifierLayout(string packagePath)
@@ -2160,7 +2186,7 @@ public sealed class PackageLayoutSmokeTests
             .ToArray();
         var toolEntries = entries
             .Where(entry => entry.StartsWith(
-                "tools/net9/",
+                "tools/net10/",
                 StringComparison.Ordinal))
             .ToArray();
         Assert.That(
@@ -2169,16 +2195,16 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             toolEntries,
             Does.Not.Contain(
-                "tools/net9/Microsoft.CodeAnalysis.AnalyzerUtilities.dll"));
+                "tools/net10/Microsoft.CodeAnalysis.AnalyzerUtilities.dll"));
         Assert.That(
             toolEntries.Where(static entry =>
                 entry.StartsWith(
-                    "tools/net9/Microsoft.CodeAnalysis",
+                    "tools/net10/Microsoft.CodeAnalysis",
                     StringComparison.Ordinal) ||
                 entry is
-                    "tools/net9/SharpProof.Attributes.dll" or
-                    "tools/net9/SharpProof.Contracts.dll" or
-                    "tools/net9/SharpProof.Frontend.dll"),
+                    "tools/net10/SharpProof.Attributes.dll" or
+                    "tools/net10/SharpProof.Contracts.dll" or
+                    "tools/net10/SharpProof.Frontend.dll"),
             Is.Empty);
         Assert.That(
             entries,
@@ -2199,7 +2225,7 @@ public sealed class PackageLayoutSmokeTests
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
         foreach (var dependencies in new[] {
-                     "tools/net9/SharpProof.Worker.deps.json"
+                     "tools/net10/SharpProof.Worker.deps.json"
                  })
         {
             Assert.That(
@@ -2241,7 +2267,7 @@ public sealed class PackageLayoutSmokeTests
             windows.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
             archive,
-            "tools/net9/Microsoft.Z3.dll",
+            "tools/net10/Microsoft.Z3.dll",
             z3.GetProperty("managedAssemblyBytes").GetInt64(),
             z3.GetProperty("managedAssemblySha256").GetString()!);
         foreach (var architecture in new[] { "arm64", "x64" })
@@ -2415,8 +2441,12 @@ public sealed class PackageLayoutSmokeTests
     private static void AssertPackagedAnalyzerItems(
         PackagedAnalyzerItem[] items,
         bool includePortable,
-        bool includeCollector)
+        bool includeCollector,
+        bool includeCodeFix = false)
     {
+        Assert.That(
+            items.Where(static item => item.Role == "CodeFix").Select(static item => item.FileName),
+            includeCodeFix ? Is.EquivalentTo(ExpectedCodeFixEntryFileNames) : Is.Empty);
         Assert.That(
             items.Select(static item => item.FileName),
             Is.Unique);
@@ -2455,6 +2485,7 @@ public sealed class PackageLayoutSmokeTests
             Has.All.Matches<string>(role =>
                 role is
                     "EntryPoint" or
+                    "CodeFix" or
                     "Generator" or
                     "Dependency" or
                     "Collector" or

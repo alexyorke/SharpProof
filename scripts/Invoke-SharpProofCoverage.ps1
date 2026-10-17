@@ -250,8 +250,8 @@ $fuzzConsoleClock = [Diagnostics.Stopwatch]::StartNew()
 try {
     $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
         -SourceDirectory (Join-Path $repositoryRoot (
-            'SharpProof.Fuzz.Test/bin/Release/net9.0')) `
-        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net9.0')
+            'SharpProof.Fuzz.Test/bin/Release/net10.0')) `
+        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net10.0')
     [Environment]::SetEnvironmentVariable(
         'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
     & $dotnetWrapper `

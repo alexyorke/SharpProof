@@ -2,11 +2,26 @@
 
 This document defines the current verifier's qualified host/filesystem boundary. Language limits are described separately in [coverage and limits](coverage-and-limits.md).
 
+## Compatibility matrix
+
+| Workflow | Qualified environment | Boundary/evidence |
+| --- | --- | --- |
+| Attributes API | netstandard2.0-compatible application targets | Application target is separate from compiler SDK |
+| Portable analyzer consumers | Linux x64, Windows x64, macOS ARM64/x64; SDK 9.0.300+ / Roslyn 4.14+ | Exact packed consumer matrix in [package CI](../.github/workflows/package-consumers.yml); no native solver |
+| Full verification | Canonical Linux amd64 container | Pinned .NET 10 SDK/runtime, payload, Docker resource isolation |
+| Full verification | Native Windows x64, fixed local NTFS; SDK 10.0.100+ | .NET 10 runtime; real package worker CI; restrictions and resource caveats below |
+| Full verification | Native macOS ARM64/x64; SDK 10.0.100+ | .NET 10 runtime; architecture-matched packaged solver; native package consumer CI |
+| Repository build/test/pack/acceptance | Canonical Linux amd64 container only | Includes repository PowerShell commands |
+| IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
+| Native Linux verifier, Windows/Linux ARM64 verifier, full-framework MSBuild verifier | Unqualified | A successful portable build does not extend qualification |
+
+The consumer matrix is maintained in [package CI](../.github/workflows/package-consumers.yml). Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
+
 ## Supported
 
 - Docker Engine or Docker Desktop with Compose v2, running the pinned Linux amd64 container.
 - Core MSBuild and `dotnet build` inside that canonical container.
-- Native Windows x64 Core MSBuild and `dotnet build` with SDK 9.0.300 or later, consuming the packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier-plan.md).
+- Native Windows x64 Core MSBuild and `dotnet build` with SDK 10.0.100 or later, consuming the packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier-plan.md).
 - Native Core MSBuild and `dotnet build` on macOS ARM64 or x64, using the architecture-matched pinned Z3 payload in the verifier package.
 - Packaged portable analyzer and bounded out-of-process verifier, cache, and optional SARIF.
 - Local publication paths, including spaces, percent characters, Unicode, and long paths.

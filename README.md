@@ -10,11 +10,13 @@ SharpProof checks C# contracts and effects. Its portable analyzer reports usage 
 | --- | --- |
 | `SharpProof.Attributes` | Application contract API and IntelliSense XML; targets netstandard2.0 |
 | `SharpProof` | Portable analyzer, companion validation hook, compiler collector, and build configuration |
-| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64 and macOS Z3 payloads |
+| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64, Windows x64, and macOS Z3 payloads |
 
-Reference Attributes from application code. Keep analyzer and verifier references private. Full verification runs in the [canonical container](docs/container-development.md) or natively on macOS ARM64/x64; the portable analyzer does not load native Z3.
+Reference Attributes from application code. Keep analyzer and verifier references private. Full verification runs in the [canonical container](docs/container-development.md), on native Windows x64, or on macOS ARM64/x64 within the [qualified support matrix](docs/preview-support.md). Repository development commands run in the container. The portable analyzer does not load native Z3.
 
 Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This is a compiler-host requirement, separate from the application's target framework. The canonical image supplies the pinned SDK.
+
+Full verification additionally requires .NET SDK 10.0.100 or newer and its .NET 10 runtime. The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
 
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
@@ -36,7 +38,7 @@ public static class Calculator
 
 Contract clauses belong in a contiguous method prologue. They express static conditions and are normally removed by the C# compiler. Do not define `SHARPPROOF_CONTRACTS`: SharpProof has no runtime contract-checking mode.
 
-See [getting started](docs/getting-started.md) for package references, profiles, and verifier policy, and [public API](docs/public-api.md) for the full contract surface.
+Start with the [portable first success](docs/getting-started.md#first-use-in-three-steps), then [your first proof](docs/getting-started.md#your-first-proof). [Project templates](templates/README.md) generate either setup using this checkout's package version. Follow [incremental adoption](docs/adoption.md) for an existing repository and [upgrades](docs/upgrading.md) when changing versions. See [public API](docs/public-api.md) for the full contract surface.
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 

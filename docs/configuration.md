@@ -15,7 +15,7 @@ The implementation authority is [the consumer contract](../SharpProof.Package/bu
 | `SharpProofAssumptionPolicy` | `error` for strict; `allow` otherwise | `allow`, `warn`, `error`; governs declared user assumptions and trusted boundaries |
 | `SharpProofSpecificationPacks` | Unset | Semicolon-delimited embedded pack IDs; currently `dotnet.scalar` |
 
-`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, Core MSBuild, and the canonical Linux amd64 container. Design-time builds do not run the worker.
+`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, Core MSBuild, and a host/filesystem in the [qualified support matrix](preview-support.md): the canonical Linux amd64 container, native Windows x64, or native macOS ARM64/x64. Design-time builds do not run the worker.
 
 Feature selection does not mean that every method receives every possible proof. Effect annotations select effect obligations; postconditions and return contracts select normal-return obligations. A precondition describes an entry/call obligation and does not by itself assert a return relationship. Selected unsupported callables remain accountable through incomplete coverage and typed Unknown results. See [coverage and limits](coverage-and-limits.md) and [public API](public-api.md).
 

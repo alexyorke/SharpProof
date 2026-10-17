@@ -6,7 +6,7 @@ internal static class ProductBuildOutputs
     {
         return AssemblyPath(
             project,
-            "net9.0",
+            "net10.0",
             project + ".dll");
     }
 

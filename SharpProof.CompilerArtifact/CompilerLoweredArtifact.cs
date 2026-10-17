@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.CompilerArtifact;
+
 // The callable payload is the admission reason, the compiler's effect claims
 // and the Total programs; the worker verifies only those programs.
 internal static class CompilerLoweredArtifact

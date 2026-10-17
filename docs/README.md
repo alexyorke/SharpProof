@@ -9,6 +9,12 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | Guide | Contents |
 | --- | --- |
 | [Getting started](getting-started.md) | Package references, first contract, profiles, and verifier policies |
+| [Project templates](../templates/README.md) | Portable/verified class libraries with version-authoritative local installation |
+| [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
+| [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
+| [Support](support.md) | Minimal reproductions, private reporting and redaction |
+| [Consumer performance](consumer-performance.md) | Comparable build measurements, quality evidence and explicit budgets |
+| [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
 | [Configuration](configuration.md) | Consumer MSBuild properties, selection, IDE behavior, budgets, cache, and report paths |
 | [Verification evidence](verification-results.md) | Find reports, join claims to selection, interpret proofs, replay, assumptions, vacuity, and cache records |

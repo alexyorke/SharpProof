@@ -838,10 +838,10 @@ try {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
                 -SourceDirectory (Join-Path $repositoryRoot (
                     'SharpProof.Package.Test/bin/' + $Configuration +
-                    '/net9.0')) `
+                    '/net10.0')) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
-                        $shard.Name + '/' + $Configuration + '/net9.0'))
+                        $shard.Name + '/' + $Configuration + '/net10.0'))
         }
         $directVstest = -not $coverageEnabled -and
             -not $nextIsExclusive

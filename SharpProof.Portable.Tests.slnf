@@ -4,6 +4,7 @@
     "projects": [
       "SharpProof.Analyzer.Test\\SharpProof.Analyzer.Test.csproj",
       "SharpProof.Attributes.Test\\SharpProof.Attributes.Test.csproj",
+      "SharpProof.CodeFixes.Test\\SharpProof.CodeFixes.Test.csproj",
       "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj",
       "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj",
       "SharpProof.Dataflow.Test\\SharpProof.Dataflow.Test.csproj",

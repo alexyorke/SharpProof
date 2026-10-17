@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <!-- Restore this test project as its project-reference closure, without
          evaluating unrelated projects in the solution. -->
     <RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>

@@ -19,6 +19,15 @@ docker compose run --rm tooling pr
 
 `pack`, `nightly`, and `fuzz-nightly` require clean exact-commit source. Commands that need source comparison also require usable Git metadata. Ignored `nupkgs` release inputs are copied explicitly; do not assume arbitrary ignored host files enter a finite task.
 
+For Git worktrees with metadata outside the checkout, invoke the host wrapper instead of direct Compose:
+
+```text
+pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target samples/Preconditions/Preconditions.csproj -Format Json
+```
+
+The wrapper validates Git paths and supplies read-only metadata mounts. Doctor evaluates trusted project configuration and existing restore assets without restoring or building. It reports missing prerequisites and direct package references; it does not certify native loading or run a proof. Ordinary clone commands above remain valid.
+
 ## Persistent development
 
 Open [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json) with a compatible Dev Container client. The `dev` service uses a container-owned Git workspace in a named volume, not the host source bind mount. Initialization uses `SHARPPROOF_ORIGIN_URL` and optional `SHARPPROOF_DEV_REF`.

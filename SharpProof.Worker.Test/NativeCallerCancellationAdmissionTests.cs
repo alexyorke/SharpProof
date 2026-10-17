@@ -61,25 +61,28 @@ public sealed class NativeCallerCancellationAdmissionTests
         {
             await backend.Started.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
             await caller.CancelAsync();
+            // Also unblocks the old implementation, whose query token did not follow caller cancellation.
+            backend.Release();
+            var result = await verification.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(backend.QueryTokenWasCanceled, Is.True);
+                Assert.That(boundary.IsCancellationRequested, Is.False);
+                Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
+                Assert.That(result.Claims.All(claim =>
+                    claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+            }
         }
         finally
         {
-            // Also unblocks the old implementation, whose query token did not follow caller cancellation.
+            // A startup or result deadline can throw before the normal join. Cancel and
+            // release the query, then join it before disposing the project and token sources.
+            await caller.CancelAsync();
             backend.Release();
-        }
-
-        var result = await verification.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.QueryTokenWasCanceled, Is.True);
-            Assert.That(boundary.IsCancellationRequested, Is.False);
-            Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
-            Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
-            Assert.That(result.Claims.All(claim =>
-                claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+            await verification;
         }
     }
-
     private sealed class WaitingBackend : ISmtBackend
     {
         private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);

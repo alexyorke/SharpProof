@@ -55,7 +55,7 @@ internal sealed class MacOsHostContract
         using var catalog = ReadToolchain();
         var managed = catalog.RootElement.GetProperty("z3");
         ValidatePayload(
-            Path.Combine(tools, "net9", "Microsoft.Z3.dll"),
+            Path.Combine(tools, "net10", "Microsoft.Z3.dll"),
             managed.GetProperty("managedAssemblyBytes").GetInt64(),
             managed.GetProperty("managedAssemblySha256").GetString()!,
             "managed");
@@ -94,7 +94,7 @@ internal sealed class MacOsHostContract
     {
         var assemblyDirectory = Path.GetDirectoryName(assemblyLocation) ??
             throw new InvalidDataException("The SharpProof host assembly has no package path.");
-        if (Path.GetFileName(assemblyDirectory) != "net9" ||
+        if (Path.GetFileName(assemblyDirectory) != "net10" ||
             Path.GetFileName(Path.GetDirectoryName(assemblyDirectory)) != "tools")
         {
             throw new InvalidDataException("The SharpProof macOS host assembly is outside its package runtime closure.");

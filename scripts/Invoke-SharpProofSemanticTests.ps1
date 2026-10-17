@@ -466,10 +466,10 @@ try {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
                 -SourceDirectory (Join-Path $repositoryRoot (
                     'SharpProof.Worker.Test/bin/' + $Configuration +
-                    '/net9.0')) `
+                    '/net10.0')) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
-                        $task.Name + '/' + $Configuration + '/net9.0'))
+                        $task.Name + '/' + $Configuration + '/net10.0'))
         }
         $directVstest = -not $coverageEnabled -and
             $task.Target.EndsWith(

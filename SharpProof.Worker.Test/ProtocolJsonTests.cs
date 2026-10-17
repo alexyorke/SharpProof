@@ -229,7 +229,7 @@ public sealed class ProtocolJsonTests
 
     [Test]
     [Platform("Linux")]
-    public void BoundedUtf8FileReaderRejectsFifoBeforeBlockingOpen()
+    public async Task BoundedUtf8FileReaderRejectsFifoBeforeBlockingOpen()
     {
         using var temporary = new TempDirectory(
             "protocol-json-fifo-",
@@ -249,37 +249,62 @@ public sealed class ProtocolJsonTests
             Assert.That(process.ExitCode, Is.Zero);
         }
 
-        var read = Task.Run(() => WorkerProtocolJson.ReadUtf8File(path));
-        var completed = Task.WhenAny(read, Task.Delay(500))
-            .GetAwaiter()
-            .GetResult();
-        if (!ReferenceEquals(completed, read))
+        var read = Task.Run(() =>
         {
-            using (var writer = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Write,
-                FileShare.ReadWrite))
+            try
             {
-                writer.WriteByte((byte)'{');
+                _ = WorkerProtocolJson.ReadUtf8File(path);
+                return false;
             }
-
-            var unblocked = Task.WhenAny(read, Task.Delay(5000))
-                .GetAwaiter()
-                .GetResult();
-            Assert.That(unblocked, Is.SameAs(read));
-            _ = read.Exception;
+            catch (InvalidDataException)
+            {
+                return true;
+            }
+        });
+        var completedBeforeTimeout = false;
+        try
+        {
+            try
+            {
+                await read.WaitAsync(TimeSpan.FromMilliseconds(500));
+                completedBeforeTimeout = true;
+            }
+            catch (TimeoutException)
+            {
+                // Cleanup below releases a regressed blocking FIFO read.
+            }
+        }
+        finally
+        {
+            try
+            {
+                if (!read.IsCompleted)
+                {
+                    using (var writer = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.ReadWrite,
+                        FileShare.ReadWrite))
+                    {
+                        writer.WriteByte((byte)'{');
+                    }
+                    await read.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+            }
+            finally
+            {
+                // Always join the operation before disposing the directory it reads.
+                await read;
+            }
         }
 
         Assert.That(
-            completed,
-            Is.SameAs(read),
+            completedBeforeTimeout,
+            Is.True,
             "Opening a FIFO must not wait for a writer.");
-        Assert.That(
-            (Action)(() => _ = read.GetAwaiter().GetResult()),
-            Throws.TypeOf<InvalidDataException>());
+        Assert.That(await read, Is.True,
+            "The FIFO must be rejected with InvalidDataException.");
     }
-
     [Test]
     public void RequestCarriesOnlyArtifactAndRuntimeControls()
     {

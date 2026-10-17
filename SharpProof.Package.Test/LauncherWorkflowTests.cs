@@ -162,7 +162,24 @@ public sealed class LauncherWorkflowTests
             "--publish-compiler-manifest", publishedManifest, "--publish-sarif", sarif];
         await File.WriteAllTextAsync(Path.Combine(directory.FullName, "result.json"), "stale result");
 
-        Assert.That(await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
+        using var output = new StringWriter();
+        var originalOutput = Console.Out;
+        try
+        {
+            Console.SetOut(output);
+            Assert.That(await Program.RunMain(arguments, verify: null, validatePreflight: null,
+                cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+        }
+        Assert.That(output.ToString(), Does.Contain("SharpProof results: run=Complete (None); selected callables=0, claims=0;"));
+        Assert.That(output.ToString(), Does.Contain("Proven=0, Refuted=0, Unknown=0; incomplete callables=0, vacuous claims=0;"));
+        Assert.That(output.ToString(), Does.Contain("SharpProof summary {"), "The structured summary remains available.");
+        Assert.That(output.ToString(), Does.Contain("SharpProof evidence: request=" + publishedRequest));
+        Assert.That(output.ToString(), Does.Contain("; result=" + publishedResult));
+        Assert.That(output.ToString(), Does.Contain("; SARIF=" + sarif));
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(publishedRequest))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult))!;
         var manifestBytes = await File.ReadAllBytesAsync(publishedManifest);

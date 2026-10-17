@@ -1,4 +1,5 @@
 namespace SharpProof.Ir;
+
 internal static class AtomicFile
 {
     private const int MaxPublicationAttempts = 8;

@@ -28,7 +28,7 @@ under `tools/net9` so native Windows can resolve the full JSON runtime closure.
 
 ## Execution boundary
 
-Full verification requires Core MSBuild in the canonical Linux amd64 container or on native macOS ARM64/x64. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary only for container verification. Worker query, method, project, and construction budgets remain separate.
+Full verification requires Core MSBuild and SDK 10.0.100+ with the .NET 10 runtime in the canonical Linux amd64 container or on qualified native Windows x64 or macOS ARM64/x64. See the [support matrix](preview-support.md) for filesystem and native runtime restrictions. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary only for container verification. Worker query, method, project, and construction budgets remain separate.
 
 The worker consumes the sealed compiler artifact, not a source reparse. Current protocol/schema ownership is listed in [release constants](release-constants.md). See [SMT lifecycle](smt-lifecycle.md) for evidence, replay, and cancellation.
 

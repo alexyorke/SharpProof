@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 namespace SharpProof.Ir;
+
 internal sealed class CanonicalHashWriter : IDisposable
 {
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);

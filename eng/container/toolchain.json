@@ -3,9 +3,9 @@
   "containerContractVersion": 2,
   "platform": "linux/amd64",
   "dotnet": {
-    "sdkVersion": "9.0.316",
-    "baseImage": "mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim",
-    "baseImageDigest": "sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a",
+    "sdkVersion": "10.0.402",
+    "baseImage": "mcr.microsoft.com/dotnet/sdk:10.0.402-noble",
+    "baseImageDigest": "sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc",
     "minimumSdkVersion": "9.0.300",
     "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim",
     "minimumSdkImageDigest": "sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8",

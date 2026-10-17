@@ -8,6 +8,14 @@ internal static class InvalidContractArgumentDiagnostics
             AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
                 violation.Failure,
                 violation.IsOld);
+        if (!violation.IsOld && violation.Failure == ContractBindingFailure.InvalidIntrinsicSignature)
+        {
+            return Diagnostic.Create(
+                GeneratedDiagnosticDescriptors.InvalidContractArgumentRule,
+                violation.Operation.Syntax.GetLocation(),
+                properties: ImmutableDictionary<string, string?>.Empty.Add("SharpProof.FixKind", "ResultReturnType"),
+                messageArgs: ["Contract.Result", argument, reason]);
+        }
         return Create(
             violation.IsOld ? "Contract.Old" : "Contract.Result",
             argument,

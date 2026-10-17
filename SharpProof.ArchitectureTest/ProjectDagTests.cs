@@ -16,6 +16,7 @@ public sealed class ProjectDagTests
             ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
             ["SharpProof.Attributes"] = [],
             ["SharpProof.BuildTasks"] = ["SharpProof.Host", "SharpProof.Worker.Protocol"],
+            ["SharpProof.CodeFixes"] = [],
             ["SharpProof.CompilerArtifact"] = ["SharpProof.Ir", "SharpProof.Worker.Protocol"],
             ["SharpProof.CompilerCollector"] = [
                 "SharpProof.Analyzer.Core",
@@ -76,6 +77,7 @@ public sealed class ProjectDagTests
     [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
+        "SharpProof.CodeFixes",
         "SharpProof.Attributes",
         "SharpProof.Contracts",
         "SharpProof.Effects",

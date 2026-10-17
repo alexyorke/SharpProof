@@ -8,6 +8,8 @@
   <Project Path="SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj" />
   <Project Path="SharpProof.Attributes/SharpProof.Attributes.csproj" />
   <Project Path="SharpProof.BuildTasks/SharpProof.BuildTasks.csproj" />
+  <Project Path="SharpProof.CodeFixes/SharpProof.CodeFixes.csproj" />
+  <Project Path="SharpProof.CodeFixes.Test/SharpProof.CodeFixes.Test.csproj" />
   <Project Path="SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj" />
   <Project Path="SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj" />
   <Project Path="SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj" />

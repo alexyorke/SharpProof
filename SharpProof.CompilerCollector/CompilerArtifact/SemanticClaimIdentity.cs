@@ -1,5 +1,6 @@
 // Semantic claim identities are sealed by the build-time collector.
 namespace SharpProof.CompilerArtifact;
+
 internal static partial class SemanticClaimIdentity
 {
     private const string ClaimDomain = "SharpProofClaim/v1";

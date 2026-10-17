@@ -3043,7 +3043,7 @@ public sealed class WorkerMsBuildIntegrationTests
             .Parent?.Name ?? throw new InvalidOperationException(
                 "The test build configuration was not found.");
         return Path.Combine(TestRepository.FindRoot(), "SharpProof.Worker",
-            "bin", configuration, "net9.0", "SharpProof.Worker.dll");
+            "bin", configuration, "net10.0", "SharpProof.Worker.dll");
     }
 
     private static void RequireContainerWorker()
@@ -3867,10 +3867,10 @@ public sealed class WorkerMsBuildIntegrationTests
             var collectorDirectory = EscapePath(repository, "SharpProof.CompilerCollector", "bin", testConfiguration, "netstandard2.0");
             var targets = EscapePath(repository, "SharpProof.Package", "buildTransitive", "SharpProof.targets");
             var verifierTargets = EscapePath(repository, "SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets");
-            var worker = EscapePath(repository, "SharpProof.Worker", "bin", testConfiguration, "net9.0", "SharpProof.Worker.dll");
+            var worker = EscapePath(repository, "SharpProof.Worker", "bin", testConfiguration, "net10.0", "SharpProof.Worker.dll");
             var launcher = worker;
             var protocol = EscapePath(repository, "SharpProof.Worker.Protocol", "bin", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll");
-            var buildTasks = EscapePath(repository, "SharpProof.BuildTasks", "bin", testConfiguration, "net9.0", "SharpProof.BuildTasks.dll");
+            var buildTasks = EscapePath(repository, "SharpProof.BuildTasks", "bin", testConfiguration, "net10.0", "SharpProof.BuildTasks.dll");
             return new ProjectTemplate(
                 repository,
                 nativeZ3Path,

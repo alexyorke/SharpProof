@@ -1,10 +1,50 @@
 # Getting started
 
-SharpProof offers portable analysis and optional full verification in the canonical Linux amd64 container or natively on macOS ARM64/x64. Read the [preview support boundary](preview-support.md) before enabling the verifier.
+SharpProof offers portable analysis and optional full verification in the canonical Linux amd64 container or natively on Windows x64 and macOS ARM64/x64. Read the [preview support boundary](preview-support.md) before enabling the verifier. Repository build/test/pack commands always run in the canonical container.
+
+## First use in three steps
+
+1. Obtain the packages using the next section. Public feed availability is not implied by this checkout. Point your consumer NuGet configuration at the resulting local feed.
+2. Create a class library with the two portable references shown below, or use the [portable template](../templates/README.md). Keep `SharpProofProfile=advisory` and `SharpProofVerify=false`; the native worker is unnecessary for this step.
+3. Build a deliberate precondition mistake. Save this complete compilation unit as `Calculator.cs`:
+
+```csharp
+using SharpProof.Attributes;
+public static class Calculator
+{
+    public static int Positive(int value)
+    {
+        Contract.Requires(value > 0);
+        return value;
+    }
+    public static int Example() => Positive(0);
+}
+```
+
+```xml
+<ItemGroup>
+  <PackageReference Include="SharpProof.Attributes" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" PrivateAssets="all" />
+</ItemGroup>
+<PropertyGroup>
+  <SharpProofProfile>advisory</SharpProofProfile>
+  <SharpProofVerify>false</SharpProofVerify>
+</PropertyGroup>
+```
+
+Run `dotnet build -c Release` in the consumer directory with a qualified compiler SDK. Expect warning **SP0027** about `Positive(0)` violating `value > 0`. Change the call to `Positive(1)` and rebuild; that warning should disappear. A clean portable build is useful feedback, not a proof. This exact diagnostic pattern also runs in the [executable tutorials](tutorials/02-diagnostics.md).
+
+## Your first proof
+
+Use the [verified template](../templates/README.md) or add the Verifier reference and strict properties below to a consumer on a qualified host. Use the `Counter.Next` contract below as the selected claim. Build in Release and inspect the worker's structured result: require a completed run, the expected selected claim, `Proven`, no incomplete callable coverage, and reviewed assumptions/vacuity. A successful build alone is insufficient. [Reading results](verification-results.md) explains these checks.
+
+For a fully automated repository demonstration, `docker compose run --rm tooling samples -Configuration Release` packs and exercises consumers in the canonical container. For an existing application, continue with [incremental adoption](adoption.md) before enabling strict policy broadly.
 
 ## Obtain this checkout's packages
 
-Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). The compiler SDK is separate from the application's target framework. Full verification additionally requires the canonical container or a supported macOS host with the verifier package's pinned native payload.
+Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). The compiler SDK is separate from the application's target framework. Full verification additionally requires a [qualified host/filesystem](preview-support.md) and the verifier package's architecture-matched pinned native payload.
+
+The verifier's build tasks and worker require SDK 10.0.100 or newer with the .NET 10 runtime. This does not require changing the application's compatible target framework. Portable-only consumers retain their separate SDK 9.0.300 minimum.
 
 From a clean, committed repository checkout:
 
@@ -12,6 +52,8 @@ From a clean, committed repository checkout:
 docker compose build tooling
 docker compose run --rm tooling pack -Configuration Release
 ```
+
+For a Git worktree whose metadata lives outside the mounted checkout, use `pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release`; the host wrapper resolves and mounts that metadata read-only. See [container development](container-development.md).
 
 Packed artifacts are exported under `artifacts/container-packages`. Configure the consumer's NuGet sources to include that local feed; package references alone do not configure a feed. Paths must identify the feed inside the consumer's build environment. The pinned package version comes from [SharpProof.Release.props](../SharpProof.Release.props); the current value is `1.0.0-preview.1`.
 
@@ -33,7 +75,7 @@ Add these items and properties to an SDK-style consumer project:
 </PropertyGroup>
 ```
 
-The verifier reference is needed only for full verification. Build that consumer inside the canonical container or on native macOS ARM64/x64. For a reproducible container package-backed example, run:
+The verifier reference is needed only for full verification. Build that consumer inside the canonical container or on qualified native Windows x64 or macOS ARM64/x64. For a reproducible container package-backed example, run:
 
 ```text
 docker compose run --rm tooling samples -Configuration Release

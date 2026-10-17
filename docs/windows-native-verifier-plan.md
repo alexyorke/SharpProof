@@ -1,7 +1,7 @@
 # Native Windows verifier
 
 The packaged verifier supports native Windows x64 with Core MSBuild and the
-.NET SDK 9.0.300 or later and the Microsoft Visual C++ v14 x64 runtime.
+.NET SDK 10.0.100 or later (including the .NET 10 runtime) and the Microsoft Visual C++ v14 x64 runtime.
 The canonical Linux amd64 container remains supported.
 Repository builds, tests, and packaging still use that container; native Windows
 projects consume its exact NuGet artifacts.
