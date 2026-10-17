@@ -1197,7 +1197,7 @@ public sealed class PackageLayoutSmokeTests
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteConsumer(feed.Version, PackagedProductFeed.VerifierPackageId);
-        var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
         var evaluation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "msbuild", workspace.ConsumerProject,
@@ -1212,6 +1212,7 @@ public sealed class PackageLayoutSmokeTests
             Is.EqualTo("true"),
             "The package props import must not reject the host before the SDK initializes its version.");
     }
+
     [TestCase("9.0.300")]
     [TestCase("9.0.316")]
     public async Task VerifierPackageRejectsSdkThatOnlySupportsPortableAnalysis(string sdkVersion)
