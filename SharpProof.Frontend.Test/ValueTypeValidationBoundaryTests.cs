@@ -10,6 +10,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ValueTypeValidationBoundaryTests
 {
+    private static readonly string[] CSharpError = ["CS0246"];
+    private static readonly string[] VisualBasicError = ["BC30002"];
     [Test]
     public void StructParameterConstantRejectsActualIntSpecialization()
     {
@@ -27,8 +29,8 @@ public sealed class ValueTypeValidationBoundaryTests
         Assert.That(SymbolEqualityComparer.Default.Equals(specialized, integer), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(constructed.Parameters.Single().Type, specialized), Is.True);
         var factory = new IrFactory();
-        var rejection = Assert.Throws<FrontendLoweringRejectionException>(() =>
-            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(factory), source, specialized));
+        var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
+            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(factory), source, specialized)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedType));
     }
 
@@ -48,11 +50,11 @@ public sealed class ValueTypeValidationBoundaryTests
     {
         var compilation = CompileCSharp("public class Subject { public Missing Value; }");
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
-            Is.EqualTo(new[] { "CS0246" }));
+            Is.EqualTo(CSharpError));
         var error = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Value").OfType<IFieldSymbol>().Single().Type;
         Assert.That(error.TypeKind, Is.EqualTo(TypeKind.Error));
-        var rejection = Assert.Throws<FrontendLoweringRejectionException>(() =>
-            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(new IrFactory()), error, error));
+        var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
+            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(new IrFactory()), error, error)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedType));
     }
 
@@ -63,8 +65,8 @@ public sealed class ValueTypeValidationBoundaryTests
         AssertNoErrors(compilation);
         var pointer = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Value").OfType<IFieldSymbol>().Single().Type;
         Assert.That(pointer.TypeKind, Is.EqualTo(TypeKind.Pointer));
-        var rejection = Assert.Throws<FrontendLoweringRejectionException>(() =>
-            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(new IrFactory()), pointer, pointer));
+        var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
+            RoslynValueTypeValidation.ResolveConstantType(new RoslynTypeMapper(new IrFactory()), pointer, pointer)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedType));
     }
 
@@ -73,13 +75,13 @@ public sealed class ValueTypeValidationBoundaryTests
     {
         var compilation = CompileVisualBasic("Module Subject\n Sub F()\n Dim broken As Missing\n End Sub\nEnd Module");
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
-            Is.EqualTo(new[] { "BC30002" }));
+            Is.EqualTo(VisualBasicError));
         var local = Local(compilation, "broken");
         Assert.That(local.Type.TypeKind, Is.EqualTo(TypeKind.Error));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("broken", factory.ObjectType);
-        var rejection = Assert.Throws<FrontendLoweringRejectionException>(() =>
-            RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable));
+        var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
+            RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedType));
     }
 
@@ -131,16 +133,22 @@ public sealed class ValueTypeValidationBoundaryTests
         End Module
         """;
 
-    private static CSharpCompilation CompileCSharp(string source) =>
-        CSharpCompilation.Create("ValueTypeBoundary", [CSharpSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
+    private static CSharpCompilation CompileCSharp(string source)
+    {
+        return CSharpCompilation.Create("ValueTypeBoundary", [CSharpSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+    }
 
-    private static VisualBasicCompilation CompileVisualBasic(string source) =>
-        VisualBasicCompilation.Create("StorageTypeBoundary", [VisualBasicSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
+    private static VisualBasicCompilation CompileVisualBasic(string source)
+    {
+        return VisualBasicCompilation.Create("StorageTypeBoundary", [VisualBasicSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
 
-    private static void AssertNoErrors(Compilation compilation) =>
+    private static void AssertNoErrors(Compilation compilation)
+    {
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+    }
 
     private static ILocalSymbol Local(VisualBasicCompilation compilation, string name)
     {
