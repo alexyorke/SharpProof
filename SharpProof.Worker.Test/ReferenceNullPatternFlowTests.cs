@@ -37,6 +37,7 @@ public sealed class ReferenceNullPatternFlowTests
     [TestCase("return s is \"x\" ? 0 : s!.Length;", WorkerClaimOutcome.Unknown, true)]
     public async Task RelatedReferencePatterns(string body, WorkerClaimOutcome expected, bool throwsForNull)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { " +
             "[DoesNotThrow] public static int Target(string? s) { " + body + " } }";
         if (throwsForNull)
@@ -59,6 +60,7 @@ public sealed class ReferenceNullPatternFlowTests
 
     private static int Execute(string source, string? input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("NullPatternOracle" + Guid.NewGuid().ToString("N"),
             [tree], TestMetadataReferences.WithSharpProof,

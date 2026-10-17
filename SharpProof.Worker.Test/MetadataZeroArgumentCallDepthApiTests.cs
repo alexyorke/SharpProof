@@ -21,13 +21,13 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
     public void DistinctEmittedMethodsRespectTheDefaultCallDepth(int methodCount, bool exact)
     {
         var names = Enumerable.Range(0, methodCount).Select(index => index == 0 ? "Target" : "Step" + index).ToArray();
-        var methods = names.Select((name, index) => "public static void " + name + "() { " +
-            (index + 1 == methodCount ? "" : names[index + 1] + "();") + " }");
+        var methods = names.Select((name, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (name is null ? throw new System.ArgumentNullException(nameof(name)) : ("public static void " + name + "() { " +
+            (index + 1 == methodCount ? "" : names[index + 1] + "();") + " }"))));
         var library = "public static class Library { " + string.Join(" ", methods) + " }";
         const string source = "public static class Subject { public static int Target() { Library.Target(); return 0; } }";
         using var subject = new MetadataTestSubject(library, source);
         var owner = subject.Compilation.GetTypeByMetadataName("Library")!;
-        var symbols = names.Select(name => owner.GetMembers(name).OfType<IMethodSymbol>().Single()).ToArray();
+        var symbols = names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (owner.GetMembers(name).OfType<IMethodSymbol>().Single())).ToArray();
         Assert.That(symbols, Has.Length.EqualTo(methodCount));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
@@ -46,7 +46,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
             Assert.That(body.Locals, Is.Empty);
             Assert.That(body.ModuleMvid, Is.Not.Empty);
             Assert.That(body.ImageSha256, Has.Length.EqualTo(64));
-            Assert.That(body.Instructions.Select(instruction => instruction.Code),
+            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)),
                 Is.EqualTo(index + 1 == methodCount ? LeafInstructions : CallingInstructions));
             if (index + 1 < methodCount)
             {

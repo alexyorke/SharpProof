@@ -45,6 +45,7 @@ public sealed class AllocationOracleContradictionControlTests
 
     private static OpenSourceCorpusDocument Document(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = method.GetLocation().GetLineSpan();
@@ -55,6 +56,7 @@ public sealed class AllocationOracleContradictionControlTests
 
     private static (long Bytes, string Il) Measure(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         image.Position = 0;

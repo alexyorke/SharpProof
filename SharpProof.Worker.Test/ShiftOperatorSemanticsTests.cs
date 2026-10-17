@@ -34,6 +34,7 @@ public sealed class ShiftOperatorSemanticsTests
     [TestCase("byte x = e; checked { x <<= 1; } return e <= 127;")]
     public async Task ClrShiftFactsAreProven(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (falses, claim) = await ObserveAndVerifyAsync(body);
         Assert.That(falses, Is.Zero, "The CLR must satisfy this shift fact.");
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -50,6 +51,7 @@ public sealed class ShiftOperatorSemanticsTests
     [TestCase("sbyte x = i; x >>>= 1; return x >= 0;")]
     public async Task FalseShiftFactsAreRefuted(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (falses, claim) = await ObserveAndVerifyAsync(body);
         Assert.That(falses, Is.Positive, "The CLR must falsify this shift fact.");
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
@@ -57,6 +59,7 @@ public sealed class ShiftOperatorSemanticsTests
 
     private static async Task<(int ClrFalses, WorkerClaimResult Claim)> ObserveAndVerifyAsync(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = """
             #undef SHARPPROOF_CONTRACTS
             using SharpProof.Attributes;

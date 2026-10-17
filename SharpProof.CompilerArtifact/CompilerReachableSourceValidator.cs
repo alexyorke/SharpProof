@@ -11,6 +11,14 @@ internal static class CompilerReachableSourceValidator
 
     internal static string TypeKey(IrFactory factory, IrTypeId type, int depth = 0)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         Require(depth <= PortableIrGraphCodec.MaximumGraphDepth);
         var info = factory.GetTypeInfo(type);
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1}:{2}:{3}:{4}",
@@ -47,7 +55,7 @@ internal static class CompilerReachableSourceValidator
                 !bodies.ContainsKey(body.BodyId) && body.Callees != null && body.Callees.Length <= 4096 &&
                 body.SourceCalls != null && body.SourceCalls.Length <= 4096 &&
                 body.ParameterTypes != null && body.ParameterTypes.Length <= 4096 &&
-                body.ParameterTypes.All(type => !string.IsNullOrWhiteSpace(type)));
+                body.ParameterTypes.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (!string.IsNullOrWhiteSpace(type))));
             bodies.Add(body.BodyId, body);
             if (body.Graph != null)
             {
@@ -68,15 +76,15 @@ internal static class CompilerReachableSourceValidator
             else
             { Require(!body.IsCallSkeleton && body.SourceCalls!.Length == 0); }
         }
-        Require(bodies.Values.Select(body => body.SourceTreeOrdinal).Distinct().Count() == documents.Count);
+        Require(bodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().Count() == documents.Count);
         foreach (var document in documents.Values)
         {
-            Require(document.MaximumBodyEnd == bodies.Values.Where(body => body.SourceTreeOrdinal == document.SourceTreeOrdinal)
-                .Max(body => body.Start + body.Length));
+            Require(document.MaximumBodyEnd == bodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == document.SourceTreeOrdinal))
+                .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length)));
         }
         foreach (var body in bodies.Values)
         {
-            Require(body.Callees.All(callee => callee != null && bodies.ContainsKey(callee)) &&
+            Require(body.Callees.All(callee => callee is null ? throw new System.ArgumentNullException(nameof(callee)) : (callee != null && bodies.ContainsKey(callee))) &&
                 body.Callees.Distinct(StringComparer.Ordinal).Count() == body.Callees.Length);
             if (artifact.CollectionComplete)
             { Require(body.CallsComplete); }
@@ -109,10 +117,10 @@ internal static class CompilerReachableSourceValidator
                     }
                 }
                 Require(new HashSet<string>(body.Callees, StringComparer.Ordinal).SetEquals(
-                    body.SourceCalls.Select(call => call.CalleeBodyId)));
+                    body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId))));
             }
         }
-        var callableIds = new HashSet<string>(manifest.Manifest.Callables.Select(callable => callable.CallableId), StringComparer.Ordinal);
+        var callableIds = new HashSet<string>(manifest.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)), StringComparer.Ordinal);
         var rootIds = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Stack<string>();
         foreach (var root in artifact.Roots!)
@@ -139,6 +147,14 @@ internal static class CompilerReachableSourceValidator
 
     private static bool IsVoidType(IrFactory factory, IrTypeId type)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Reference && info.Width == 0 && !info.Signed && info.ElementType == null &&
             factory.GetString(info.Name).EndsWith("::System.Void", StringComparison.Ordinal);

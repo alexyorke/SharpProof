@@ -17,6 +17,8 @@ public sealed class CorpusCallableWorkflowTests
         """, "Corpus case ordinary-cardinality has 2 public verified callables.")]
     public void CorpusCaseRequiresExactlyOneOrdinaryPublicCallable(string source, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(source);
         var item = new CorpusCase("ordinary-cardinality", "ordinary-cardinality",
             CorpusVariant.Baseline, "effects", CorpusVerdict.Proven, CorpusSupport.Supported, source);
 

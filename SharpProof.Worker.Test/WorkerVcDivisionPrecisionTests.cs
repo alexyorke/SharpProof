@@ -25,8 +25,9 @@ public sealed class WorkerVcDivisionPrecisionTests
     [TestCase("variable")]
     public async Task OwnedDivisionQueryAndActualWorkerRecordComparablePrecision(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var source = kind == "constant"
-            ? WorkerVcShadowSourceGateTests.Universe.Single(item => item.Name == "general-division-budget").Source
+            ? WorkerVcShadowSourceGateTests.Universe.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name == "general-division-budget")).Source
             : VariableSource;
         var trials = new List<DivisionTrial>();
         string[] structure = [];
@@ -46,7 +47,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             if (trial == 0)
             {
                 var printer = new IrPrinter(plan.Factory);
-                structure = [.. query.Assumptions.Select(assumption => printer.Print(assumption.Predicate)),
+                structure = [.. query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (printer.Print(assumption.Predicate))),
                     "goal: " + printer.Print(query.Goal.Predicate)];
             }
             var workerWatch = Stopwatch.StartNew();
@@ -71,6 +72,7 @@ public sealed class WorkerVcDivisionPrecisionTests
 
             async Task<DivisionQuery> Query(Func<CancellationToken, Task<PassiveCallableCheckResult>> check)
             {
+                System.ArgumentNullException.ThrowIfNull(check);
                 var startResources = solver.ConsumedResourceCount;
                 var watch = Stopwatch.StartNew();
                 var result = await check(boundary.Token);
@@ -116,19 +118,28 @@ public sealed class WorkerVcDivisionPrecisionTests
         Assert.That(response.Errors, Is.Empty);
         var posts = Postconditions(response);
         Assert.That(posts, Has.Length.EqualTo(2));
-        Assert.That(posts.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(posts.Select(result => result.Reason), Is.All.EqualTo(WorkerClaimReason.None));
+        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(WorkerClaimReason.None));
     }
 
     private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
     {
-        var ids = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
-            .Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToArray();
+        System.ArgumentNullException.ThrowIfNull(response);
+        var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
     }
 
-    private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds);
+    private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds)
+    {
+        public string Outcome { get; init; } = Outcome ?? throw new System.ArgumentNullException(nameof(Outcome));
+    }
     private sealed record DivisionTrial(DivisionQuery Entry, DivisionQuery Normal, DivisionQuery Ensures,
         long MethodResources, int Facts, int ModelVariables, double StandaloneMilliseconds, double WorkerMilliseconds,
-        double EndToEndMilliseconds, WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason);
+        double EndToEndMilliseconds, WorkerClaimOutcome NativeOutcome, WorkerClaimReason NativeReason)
+    {
+        public DivisionQuery Entry { get; init; } = Entry ?? throw new System.ArgumentNullException(nameof(Entry));
+        public DivisionQuery Normal { get; init; } = Normal ?? throw new System.ArgumentNullException(nameof(Normal));
+        public DivisionQuery Ensures { get; init; } = Ensures ?? throw new System.ArgumentNullException(nameof(Ensures));
+    }
 }

@@ -124,7 +124,7 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -230,21 +230,21 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 claim.CallableId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The selected synchronized auto getter cannot be Proven EnforcePure."
                 : "The NoInlining-only selected auto getter remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -288,15 +288,26 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, int GetterMetadataToken,
         int BackingFieldMetadataToken, int IlFieldToken, string BackingFieldName, bool BackingFieldReadOnly,
-        bool BackingFieldStatic, bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId);
+        bool BackingFieldStatic, bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+    {
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string BackingFieldName { get; init; } = BackingFieldName ?? throw new System.ArgumentNullException(nameof(BackingFieldName));
+        public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
+        public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
+        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+    }
 }

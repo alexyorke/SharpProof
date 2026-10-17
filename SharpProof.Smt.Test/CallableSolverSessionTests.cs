@@ -146,6 +146,7 @@ public sealed class CallableSolverSessionTests
             replayOptions: new IrProgramReplayOptions(_ => throw new InvalidOperationException("External input substitution is forbidden.")),
             callHost: (call, _, arguments) =>
             {
+                System.ArgumentNullException.ThrowIfNull(call);
                 Assert.That(call.Member, Is.EqualTo(member));
                 Assert.That(arguments.Single().IntegerBits, Is.EqualTo(ulong.MaxValue));
                 calls++;
@@ -203,14 +204,14 @@ public sealed class CallableSolverSessionTests
             new SmtQueryResourceMeter(100, CancellationToken.None));
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         Assert.That(result.UnsatCore.Single(), Is.EqualTo(2));
-        Assert.That(valid.All(label => label.IsDisposed), Is.True);
+        Assert.That(valid.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
         foreach (var inactive in new[] { "a-inactive", "g-previous" })
         {
             var malformed = new[] { new CoreLabel(inactive), new CoreLabel("a0") };
             result = CallableSolverSession.DecodeCore(malformed, active, "g-current",
                 new SmtQueryResourceMeter(100, CancellationToken.None));
             Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.MalformedResult));
-            Assert.That(malformed.All(label => label.IsDisposed), Is.True);
+            Assert.That(malformed.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
         }
     }
 
@@ -391,10 +392,10 @@ public sealed class CallableSolverSessionTests
         var expressions = ((List<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToArray();
         Assert.That(expressions, Is.Not.Empty);
         Assert.That(NativeObject(solver), Is.Not.EqualTo(IntPtr.Zero));
-        Assert.That(expressions.All(expression => NativeObject(expression) != IntPtr.Zero), Is.True);
+        Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) != IntPtr.Zero)), Is.True);
         session.Dispose();
         Assert.That(NativeObject(solver), Is.EqualTo(IntPtr.Zero));
-        Assert.That(expressions.All(expression => NativeObject(expression) == IntPtr.Zero), Is.True);
+        Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) == IntPtr.Zero)), Is.True);
         Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None)).FailureReason,
             Is.EqualTo(BackendFailureReason.Unavailable));
     }
@@ -425,35 +426,47 @@ public sealed class CallableSolverSessionTests
 
     private static IntPtr NativeObject(Z3Object value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         return (IntPtr)typeof(Z3Object).GetProperty("NativeObject", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.GetValue(value)!;
     }
 
     private static SmtNativeRunner GetRunner(CallableSolverSession session)
     {
+        System.ArgumentNullException.ThrowIfNull(session);
         return (SmtNativeRunner)typeof(CallableSolverSession).GetField("_runner", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
     }
 
     private static Assumption Assume(IrFactory factory, IrTerm predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         return new(factory, predicate, new LoweredJustification(factory.CreateOperation()));
     }
 
     private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return factory.Binary(IrBinaryOperator.Equal, left, right);
     }
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<Assumption> assumptions, IrTerm goal,
-        ImmutableArray<IrVarId> variables = default)
+        ImmutableArray<IrVarId> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ variables = default)
     {
+
+        System.ArgumentNullException.ThrowIfNull(assumptions);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(goal);
         return new(factory, assumptions,
             new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
     }
 
     private sealed class CoreLabel(string name) : IDisposable
     {
+        private string _guarded_name = name ?? throw new System.ArgumentNullException(nameof(name));
         internal bool IsDisposed { get; private set; }
-        public override string ToString() { return name; }
+        public override string ToString() { return _guarded_name; }
         public void Dispose() { IsDisposed = true; }
     }
 }

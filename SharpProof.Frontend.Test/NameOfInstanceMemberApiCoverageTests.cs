@@ -19,7 +19,7 @@ public sealed class NameOfInstanceMemberApiCoverageTests
         Assert.That(subject.Invoke([]), Is.True);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(s => s.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" });
+            .Single(s => s is null ? throw new System.ArgumentNullException(nameof(s)) : (s.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" }));
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax);
         Assert.That(operation, Is.InstanceOf<INameOfOperation>());
         var nameOf = (INameOfOperation)operation!;

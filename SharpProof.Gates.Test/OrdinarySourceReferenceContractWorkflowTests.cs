@@ -38,7 +38,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
             }
             """, "OrdinarySourceContractCaller", includeExternalEffectsFixture: false)
             .AddReferences(library.ToMetadataReference());
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("SourceHelper")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(SymbolEqualityComparer.Default.Equals(method, sourceMethod), Is.True);
         Assert.That(method.DeclaringSyntaxReferences, Has.Length.EqualTo(1));

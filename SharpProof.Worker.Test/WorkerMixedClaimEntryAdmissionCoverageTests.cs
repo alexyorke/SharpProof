@@ -46,9 +46,9 @@ public sealed partial class WorkerTests
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.Manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(decimalEntry
+            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(decimalEntry
                 ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven), WorkerProtocolJson.SerializeResponse(response));
-            Assert.That(response.ClaimResults.Select(result => result.Reason), Is.All.EqualTo(decimalEntry
+            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(decimalEntry
                 ? WorkerClaimReason.UnsupportedExpression : WorkerClaimReason.None));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }

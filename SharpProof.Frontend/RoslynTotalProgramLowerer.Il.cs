@@ -4,6 +4,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private TotalBodyValue? InlineMetadataCall(IInvocationOperation invocation, TotalIlBody body, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
         if (invocation.Instance != null || invocation.Arguments.Length != body.Method.Parameters.Length)
         { return null; }
         var arguments = new IrTerm[body.Method.Parameters.Length];
@@ -32,12 +36,28 @@ internal sealed partial class RoslynTotalProgramLowerer
         var filter = region == null ? null : EnclosingRegionFilter(region);
         var anchor = _context.Site(invocation);
         return ExpandIl(body, arguments, block, anchor,
-            (kind, site) => ContinueSourceException(region, filter, kind, site, static target => target), sourceBoundary: true);
+            (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ContinueSourceException(region, filter, kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target))), sourceBoundary: true);
     }
 
     private TotalBodyValue ExpandIl(TotalIlBody body, IrTerm[] arguments, IrBlockId caller, OperationId anchor,
         Func<IrExceptionKind, OperationId, IrBlockId> exceptionTarget, bool sourceBoundary = false)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (anchor.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(anchor));
+        }
+        if (caller.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(caller));
+        }
+        if (exceptionTarget is null)
+        {
+            throw new System.ArgumentNullException(nameof(exceptionTarget));
+        }
         if (_calls == null || !_calls.EnterIl(body.Method))
         { throw new RegionIncompleteException(); }
         try
@@ -70,7 +90,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 _builder.Assign(entry, anchor, parameter.PreState, factory.Variable(parameter.Entry));
             }
             var locals = body.Locals.Select(type => _context.Temporary(type == SpecialType.System_Object ? factory.ObjectType :
-                type == SpecialType.System_String ? factory.StringType : CSharpOperationSemantics.MapType(factory, type)!.Value)).ToArray();
+                type == SpecialType.System_String ? factory.StringType : (CSharpOperationSemantics.MapType(factory, type) ?? throw new RegionIncompleteException()))).ToArray();
             foreach (var local in locals)
             {
                 var type = factory.GetVariableInfo(local).Type;
@@ -85,7 +105,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (!_calls.Spend(shape.Length + 1))
                 { throw new RegionIncompleteException(); }
                 blocks[index] = _builder.CreateBlock("il:" + body.Instructions[index].Offset.ToString(CultureInfo.InvariantCulture));
-                storage[index] = [.. shape.Select(value => _context.Temporary(value.StorageType(factory)))];
+                storage[index] = [.. shape.Select(value => ((!value.IsValid) ? throw new System.ArgumentException("Value must be initialized.", nameof(value)) : (_context.Temporary(value.StorageType(factory)))))];
             }
             _builder.Goto(caller, anchor, entry);
             _builder.Goto(entry, anchor, blocks[0]);
@@ -99,12 +119,15 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ":" + instruction.Offset.ToString("X4", CultureInfo.InvariantCulture) + ":" + body.ImageSha256,
                     factory.GetOperationInfo(anchor).SourceSpan);
                 var block = blocks[index];
-                var stack = storage[index].Select((variable, slot) => shapes[index]!.Value[slot].IsNullReference
-                    ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable)).ToList();
+                var stack = storage[index].Select((variable, slot) => ((slot < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(slot)) : (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (shapes[index]!.Value[slot].IsNullReference
+                    ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable))))).ToList();
                 IrTerm Pop()
                 { var value = stack[stack.Count - 1]; stack.RemoveAt(stack.Count - 1); return value; }
                 IrBlockId Edge(int target)
                 {
+                    if (target < 0)
+                    { throw new System.ArgumentException("Value must be initialized.", nameof(target)); }
+
                     if (!_calls.Spend(stack.Count + 2))
                     { throw new RegionIncompleteException(); }
                     var edge = _builder.CreateBlock("il:edge");
@@ -118,6 +141,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
                 IrTerm Rule(TotalScalarRule rule)
                 {
+                    if (rule.Value is null)
+                    { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+
                     foreach (var fault in rule.Throws)
                     {
                         if (!_calls.Spend(4))
@@ -229,6 +255,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlLoad(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var info = factory.GetTypeInfo(value.Type);
         if (info.Kind is IrTypeKind.Reference or IrTypeKind.String)
         { return value; }
@@ -240,6 +274,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static IrTerm IlStore(IrFactory factory, IrTerm value, IrTypeId type)
     {
         // Stack validation admits only normalized 0/1 producers at Bool stores.
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         if (factory.GetTypeInfo(type).Kind is IrTypeKind.Reference or IrTypeKind.String)
         { return value is IrNullTerm ? factory.Null(type) : value; }
         return type == factory.BooleanType ? factory.Binary(IrBinaryOperator.NotEqual, value, factory.Integer(value.Type, 0)) : factory.Cast(type, value);
@@ -247,6 +285,18 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static TotalScalarRule IlConversion(IrFactory factory, string code, IrTerm value)
     {
+        if (code is null)
+        {
+            throw new System.ArgumentNullException(nameof(code));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var checkedConversion = code.StartsWith("Conv_ovf_", StringComparison.Ordinal);
         var suffix = code.Substring(checkedConversion ? 9 : 5);
         var unsignedSource = suffix.EndsWith("_un", StringComparison.Ordinal);
@@ -261,6 +311,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlComparison(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
+        if (code is null)
+        {
+            throw new System.ArgumentNullException(nameof(code));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         if (factory.GetTypeInfo(left.Type).Kind is IrTypeKind.Reference or IrTypeKind.String)
         {
             if (left is IrNullTerm)
@@ -286,6 +344,18 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
         // Normalized Bool values are 0 or 1, so the integer operators also cover bool &, | and ^.
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         if (code is "And" or "Or" or "Xor")
         {
             var bitwise = code == "And" ? IrBinaryOperator.BitwiseAnd : code == "Or" ? IrBinaryOperator.BitwiseOr : IrBinaryOperator.BitwiseXor;
@@ -310,8 +380,20 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RecordMetadataPreconditions(TotalLoweringContext frame, IrTerm[] arguments, IrBlockId block, OperationId site)
     {
-        var replacements = frame.Parameters.ToDictionary(parameter => parameter.Entry,
-            parameter => arguments[parameter.Parameter.Ordinal]);
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (frame is null)
+        {
+            throw new System.ArgumentNullException(nameof(frame));
+        }
+        var replacements = frame.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+            parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
         for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)
         {
             SpendRegion();

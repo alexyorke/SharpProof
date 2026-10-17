@@ -50,7 +50,7 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
             [tree], TestMetadataReferences.WithoutSharpProof.Add(reference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -84,7 +84,7 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
         var exceptions = new ConcurrentQueue<string>();
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
             new AnalyzerOptions([], new OptionsProvider()),
-            (exception, _, _) => exceptions.Enqueue(exception.ToString()),
+            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
             concurrentAnalysis: true, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: true));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
@@ -115,10 +115,12 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
         public override AnalyzerConfigOptions GlobalOptions => _options;
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return _options;
         }
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return _options;
         }
     }

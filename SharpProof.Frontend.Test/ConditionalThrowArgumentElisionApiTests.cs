@@ -31,10 +31,10 @@ public sealed class ConditionalThrowArgumentElisionApiTests
         Assert.That(CSharpPreprocessorSymbols.GetDefined(tree), Does.Not.Contain("ABSENT"));
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
-        var conditional = subject.Graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None);
+        var conditional = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None));
         Assert.That(conditional.BranchValue, Is.Not.Null);
         var thrown = subject.Graph.Blocks.Single(block =>
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw);
+            block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw));
         TestContext.WriteLine($"Throw SDK compiler={typeof(Compilation).Assembly.FullName}; CSharp={typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly.FullName}; kind={thrown.BranchValue?.Kind}; type={thrown.BranchValue?.Type?.ToDisplayString() ?? "<null>"}; implicit={thrown.BranchValue?.IsImplicit}");
         if (thrown.BranchValue is IConversionOperation convertedThrow)
         {

@@ -26,6 +26,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
     [TestCase("float")]
     public async Task NaNEqualityCannotProveFalsePostcondition(string valueType)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         object witness = valueType == "double" ? (object)double.NaN : float.NaN;
         var claim = await ObserveAndVerifyAsync(valueType, witness, expectedRuntime: false);
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven),
@@ -41,6 +42,8 @@ public sealed class FloatingPredicateSoundnessAuditTests
 
     private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string valueType, object witness, bool expectedRuntime)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
+        System.ArgumentNullException.ThrowIfNull(witness);
         var source = SourceTemplate.Replace("__VALUE_TYPE__", valueType, StringComparison.Ordinal);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
             throw new AssertionException("Canonical container repository root is missing.");

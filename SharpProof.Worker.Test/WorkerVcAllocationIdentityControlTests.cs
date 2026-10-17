@@ -13,6 +13,7 @@ public sealed class WorkerVcAllocationIdentityControlTests
     public async Task FreshnessPreservesAliasesAndOtherReferenceKinds(string body, bool contractResult,
         WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public static bool Target() { Contract.Ensures(Contract.Result<bool>() == " +
             (contractResult ? "true" : "false") + "); " + body + " } }", cacheEnabled: false);

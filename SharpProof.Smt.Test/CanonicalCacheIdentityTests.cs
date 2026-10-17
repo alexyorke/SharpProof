@@ -10,6 +10,7 @@ public sealed class CanonicalCacheIdentityTests
     [TestCase("empty-string")]
     public async Task DifferentCanonicalCachesHaveDifferentIdentities(string otherKind)
     {
+        System.ArgumentNullException.ThrowIfNull(otherKind);
         object runtimeFirst = Array.Empty<int>();
         object runtimeSecond = otherKind switch
         {

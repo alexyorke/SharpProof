@@ -288,9 +288,9 @@ public sealed class FrontendExpressionCoverageTests
         parents.Add(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, GeneratedCSharpExpression.Boolean(false)));
 
         var candidates = parents.SelectMany(parent =>
-            CSharpStructuralShrinker.GetCandidates(parent)
-                .Where(candidate => candidate.NodeCount < parent.NodeCount)
-                .Select(candidate => (Parent: parent, Candidate: candidate)))
+            parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (CSharpStructuralShrinker.GetCandidates(parent)
+                .Where(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.NodeCount < parent.NodeCount))
+                .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((Parent: parent, Candidate: candidate)))))
             .ToArray();
         Assert.That(candidates, Is.Not.Empty);
         Assert.That(candidates.Select(item => item.Parent.Kind).Distinct().Count(), Is.EqualTo(parents.Count));
@@ -308,6 +308,7 @@ public sealed class FrontendExpressionCoverageTests
 
     private static GeneratedCSharpCase Case(GeneratedCSharpExpression expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         return new(expression, Left: 8, Right: 2, Condition: true)
         {
             Text = "proof",
@@ -321,12 +322,15 @@ public sealed class FrontendExpressionCoverageTests
         string name)
         where TException : ArgumentException
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(name);
         Assert.That(Assert.Throws<TException>(action)!.ParamName, Is.EqualTo(name));
     }
 
     private static void AssertThrows<TException>(Action action)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         Assert.Throws<TException>(action);
     }
 }

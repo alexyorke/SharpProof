@@ -45,6 +45,9 @@ public sealed class CachedReferenceObjectViewControlTests
 
     private static Assumption Assume(IrFactory factory, IrTerm left, IrTerm right)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return new(factory, factory.Binary(IrBinaryOperator.Equal, left, right),
             new LoweredJustification(factory.CreateOperation()));
     }

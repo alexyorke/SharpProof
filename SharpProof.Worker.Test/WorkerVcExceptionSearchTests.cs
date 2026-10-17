@@ -117,6 +117,7 @@ public sealed class WorkerVcExceptionSearchTests
     [TestCase("nested-body-nonreturn")]
     public async Task NativeDecodedSearchAndUnwindPreserveProofReplayAndCache(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         using var project = new ShadowTestProject(Source(kind), cacheEnabled: true);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, kind);
@@ -139,12 +140,12 @@ public sealed class WorkerVcExceptionSearchTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             Assert.That(response.Errors, Is.Empty);
-            var ordinals = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
-                .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
-            Assert.That(posts.Select(result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
+                .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
             Assert.That(posts[1].Model, Is.Not.Empty);
-            Assert.That(posts[0].Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used),
+            Assert.That(posts[0].Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)),
                 Is.EqualTo(kind == "assume"));
         }
     }
@@ -155,6 +156,7 @@ public sealed class WorkerVcExceptionSearchTests
     [TestCase("replacement")]
     public void OptionalRegionEvidencePreservesLegacyGraphAndRows(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var compilation = TestCompilation.Create("RegionLegacyPreservation", ("Subject.cs", Source(kind)));
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
@@ -171,15 +173,16 @@ public sealed class WorkerVcExceptionSearchTests
     [TestCase("throw-target")]
     public void MalformedRegionArtifactRejectsInsteadOfDroppingTotal(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SearchSource);
         var total = artifact.Callables.Single().Total!;
         var graph = total.Graph;
         if (mutation == "naked-exit")
-        { graph.Entry = Array.FindIndex(graph.Blocks, block => block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit); }
+        { graph.Entry = Array.FindIndex(graph.Blocks, block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit)); }
         else if (mutation == "result-role")
         { total.Result = total.Parameters[0].Old; }
         else
-        { graph.Blocks.SelectMany(block => block.Instructions).First(instruction => instruction.Kind == IrInstructionKind.Throw).B = graph.Blocks.Length; }
+        { graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).B = graph.Blocks.Length; }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
     }
@@ -189,7 +192,7 @@ public sealed class WorkerVcExceptionSearchTests
     {
         var fixture = GoldenTest.Load("worker", "vc-shadow-regions");
         using var project = new ShadowTestProject(fixture.Source, cacheEnabled: true);
-        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal));
+        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal)));
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
@@ -200,9 +203,9 @@ public sealed class WorkerVcExceptionSearchTests
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
-            var claim = response.Manifest.Claims.Single(claim => claim.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal));
+            var claim = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal)));
             Assert.That(response.Errors, Is.Empty);
-            var result = response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId);
+            var result = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId));
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));

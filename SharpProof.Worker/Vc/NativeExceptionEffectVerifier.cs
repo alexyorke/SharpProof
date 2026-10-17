@@ -7,6 +7,8 @@ internal static class NativeExceptionEffectVerifier
     internal static async Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken = default)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(preparation);
         var checks = await VerifyClaimsAsync(preparation, budgets, cancellationToken).ConfigureAwait(false);
         return checks.Count == 1 ? checks.Values.Single() : Unknown(WorkerClaimReason.UnsupportedContract);
     }
@@ -17,15 +19,15 @@ internal static class NativeExceptionEffectVerifier
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var expected = preparation.EffectClaims.Where(claim => claim.ContractKind is
-            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions).ToArray();
+        var expected = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind is
+            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)).ToArray();
         var results = ImmutableDictionary.CreateBuilder<string, PassiveCallableCheckResult>(StringComparer.Ordinal);
         if (expected.Length == 0)
         { return results.ToImmutable(); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         if (candidate == null)
         { return All(Unknown(WorkerClaimReason.UnsupportedBody)); }
-        var constraints = (preparation.Total?.ExceptionConstraints ?? []).ToDictionary(constraint => constraint.ClaimId, StringComparer.Ordinal);
+        var constraints = (preparation.Total?.ExceptionConstraints ?? []).ToDictionary(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (constraint.ClaimId), StringComparer.Ordinal);
         foreach (var claim in expected)
         {
             if (!constraints.ContainsKey(claim.ClaimId))
@@ -53,14 +55,15 @@ internal static class NativeExceptionEffectVerifier
                 var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToHashSet(StringComparer.Ordinal);
                 var factory = candidate.Program.Factory;
                 results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, anyThrowViolates,
-                    site => ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
-                    site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false));
+                    site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),
+                    site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site)), cancellationToken).ConfigureAwait(false));
             }
         }
         return results.ToImmutable();
 
         ImmutableDictionary<string, PassiveCallableCheckResult> All(PassiveCallableCheckResult evidence)
         {
+            System.ArgumentNullException.ThrowIfNull(evidence);
             foreach (var claim in expected)
             {
                 if (!results.ContainsKey(claim.ClaimId))

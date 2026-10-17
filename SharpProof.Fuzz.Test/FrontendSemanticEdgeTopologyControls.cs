@@ -23,7 +23,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         ];
         var root = CompileActual(cases);
         Assert.That(root.DescendantNodes().OfType<ClassDeclarationSyntax>().Count(type =>
-            type.Identifier.ValueText == "SharpProofGeneratedFrontendEdges"), Is.EqualTo(2));
+            type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText == "SharpProofGeneratedFrontendEdges")), Is.EqualTo(2));
         var result = FrontendDifferentialOracle.CompareSemanticEdges(cases).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge type shape."));
@@ -42,12 +42,12 @@ public sealed class FrontendSemanticEdgeTopologyControls
         var methods = subject.Members.OfType<MethodDeclarationSyntax>().ToArray();
         Assert.That(methods.Length, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
-        Assert.That(methods.Select(method => method.Identifier.ValueText),
+        Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
             Is.EqualTo(OverloadedNames));
-        Assert.That(methods.Select(method => method.ParameterList.Parameters.Count), Is.EqualTo(OverloadedParameterCounts));
+        Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.ParameterList.Parameters.Count)), Is.EqualTo(OverloadedParameterCounts));
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases);
-        Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
-            string.Join(Environment.NewLine, results.Select(result => result.Detail)));
+        Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(FuzzOracleStatus.Agreement),
+            string.Join(Environment.NewLine, results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
     }
 
     [Test]
@@ -66,11 +66,15 @@ public sealed class FrontendSemanticEdgeTopologyControls
 
     private static FrontendSemanticEdgeCase Exact(string returnType, string expression, params object?[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         return new(returnType, "", expression, arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
     }
 
     private static CompilationUnitSyntax CompileActual(FrontendSemanticEdgeCase[] cases)
     {
+        System.ArgumentNullException.ThrowIfNull(cases, nameof(cases));
         var source = new StringBuilder();
         source.AppendLine("#nullable enable");
         source.AppendLine("public enum SharpProofGeneratedEdgeEnum { One = 1 }");

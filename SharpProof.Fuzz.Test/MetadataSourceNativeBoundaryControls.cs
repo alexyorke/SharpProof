@@ -45,7 +45,7 @@ public sealed class MetadataSourceNativeBoundaryControls
         var result = replay.Result;
         await TestContext.Out.WriteLineAsync("family=" + family + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +
-            "; details=" + string.Join(" | ", result.Failures.Select(failure => failure.Detail)));
+            "; details=" + string.Join(" | ", result.Failures.Select(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.Detail))));
         Assert.That(result.Cases, Is.EqualTo(1));
         if (family == "identity")
         {

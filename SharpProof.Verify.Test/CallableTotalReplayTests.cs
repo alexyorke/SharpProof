@@ -48,6 +48,7 @@ public sealed class CallableTotalReplayTests
     [TestCase("unbound-input", AbstentionReason.CounterexampleReplayFailed)]
     public async Task UnvalidatedNondeterminismCannotCreateARefutation(string scenario, AbstentionReason reason)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var outcome = await Replay(scenario);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(reason));
@@ -69,6 +70,7 @@ public sealed class CallableTotalReplayTests
     [TestCase("input-no-provider")]
     public async Task OnlyValuesActuallyReadByBodyOrContractNeedReplayEvidence(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var outcome = await Replay(scenario);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var value = ((RefutedOutcome)outcome).Model.Assignments.Single(pair =>
@@ -81,6 +83,7 @@ public sealed class CallableTotalReplayTests
     [TestCase("unresolved", AbstentionReason.CounterexampleReplayFailed)]
     public async Task TotalPostconditionRequiresAnExplicitSuccessfulGuard(string scenario, AbstentionReason reason)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new CallableReplayContext(null, true, ImmutableDictionary<IrVarId, IrVarId>.Empty,
             ImmutableDictionary<IrVarId, IrVarId?>.Empty, [], factory.Boolean(false),
@@ -156,6 +159,7 @@ public sealed class CallableTotalReplayTests
 
     private static async Task<ProofOutcome> Replay(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var parameter = factory.CreateVariable("canonical", factory.IntegerType);
         var bodyParameter = factory.CreateVariable("body", factory.IntegerType);
@@ -202,16 +206,20 @@ public sealed class CallableTotalReplayTests
 
     private static VerificationQuery Query(IrFactory factory, IrVarId[] variables)
     {
+        System.ArgumentNullException.ThrowIfNull(variables, nameof(variables));
+        System.ArgumentNullException.ThrowIfNull(factory);
         return new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
     }
 
     private sealed class StubBackend(BackendModel model) : ISmtBackend
     {
+        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(BackendCheckResult.Satisfiable(model));
+            return Task.FromResult(BackendCheckResult.Satisfiable(_guarded_model));
         }
     }
 }

@@ -48,9 +48,12 @@ public sealed class HornNumericStateTests
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<IrTerm> assumptions, IrTerm goal)
     {
+        System.ArgumentNullException.ThrowIfNull(assumptions);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(goal);
         return new(factory,
-            assumptions.Select(predicate => new Assumption(factory, predicate,
-                new LoweredJustification(factory.CreateOperation()))),
+            assumptions.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate,
+                new LoweredJustification(factory.CreateOperation())))),
             new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
     }
 }

@@ -9,6 +9,7 @@ public sealed class ContractAttributeNameGuardCoverageTests
     [TestCase("Example.UnknownAttribute")]
     public void UnknownAttributeNamesFailWithTheOriginalArgument(string metadataName)
     {
+        System.ArgumentNullException.ThrowIfNull(metadataName);
         using var subject = TypedProgramSubject.Create("int Target() => 17;");
         Assert.That(subject.Invoke([]), Is.EqualTo(17));
         var resolver = ContractApiIdentityResolver.ForCompilation(subject.Compilation);

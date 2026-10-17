@@ -22,6 +22,11 @@ public sealed partial class SpecInstantiationResult
         ImmutableArray<IrTerm> postconditions,
         IrTerm? normalCompletionCondition)
     {
+
+        if (postconditions.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(postconditions));
+        }
         return new(
             SpecInstantiationStatus.Succeeded,
             postconditions,
@@ -31,6 +36,10 @@ public sealed partial class SpecInstantiationResult
 
     internal static SpecInstantiationResult Failed(SpecInstantiationFailure failure)
     {
+        if (failure is null)
+        {
+            throw new System.ArgumentNullException(nameof(failure));
+        }
         return new(SpecInstantiationStatus.Failed, [], null, failure);
     }
 }
@@ -132,6 +141,13 @@ public static partial class ApiSpecInstantiator
     private static SpecInstantiationResult Failed(
         SpecInstantiationFailureKind kind, SpecVarId variable, string detail)
     {
+        if (variable.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(variable)); }
+
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return SpecInstantiationResult.Failed(new SpecInstantiationFailure(kind, variable, detail));
     }
 
@@ -141,25 +157,33 @@ public static partial class ApiSpecInstantiator
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
+        private IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> _guarded_validatedTerms = validatedTerms ?? throw new System.ArgumentNullException(nameof(validatedTerms));
+        private IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> _guarded_variables = variables ?? throw new System.ArgumentNullException(nameof(variables));
+        private IReadOnlyDictionary<SpecVarId, IrTerm> _guarded_substitutions = substitutions ?? throw new System.ArgumentNullException(nameof(substitutions));
+        private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         internal TermResult Term(SpecTermDeclaration term)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             try
             {
-                var declaration = validatedTerms[term].Declaration;
+                var declaration = _guarded_validatedTerms[term].Declaration;
                 // Validation admits exactly these nine kinds. The final
                 // case is Length; unknown public declarations never enter a node.
                 return declaration switch
                 {
                     SpecVariableDeclaration variable => Variable(variable),
-                    SpecBooleanDeclaration value => new(factory.Boolean(value.Value), null),
-                    SpecIntegerDeclaration value => new(factory.Integer(value.Value), null),
-                    SpecStringDeclaration value => new(factory.String(value.Value), null),
+                    SpecBooleanDeclaration value => new(_guarded_factory.Boolean(value.Value), null),
+                    SpecIntegerDeclaration value => new(_guarded_factory.Integer(value.Value), null),
+                    SpecStringDeclaration value => new(_guarded_factory.String(value.Value), null),
                     SpecNullDeclaration value => Null(value),
                     SpecUnaryDeclaration value => Unary(value),
                     SpecBinaryDeclaration value => Binary(value),
                     SpecConditionalDeclaration value => Conditional(value),
                     _ => Child(((SpecLengthDeclaration)declaration).Value,
-                        child => factory.Length(child))
+                        child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (_guarded_factory.Length(child)))
                 };
             }
             catch (ArgumentException exception)
@@ -171,8 +195,12 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Variable(SpecVariableDeclaration variable)
         {
-            return variables.TryGetValue((variable.Role, variable.Ordinal), out var information) &&
-            substitutions.TryGetValue(information.Id, out var replacement)
+            if (variable is null)
+            {
+                throw new System.ArgumentNullException(nameof(variable));
+            }
+            return _guarded_variables.TryGetValue((variable.Role, variable.Ordinal), out var information) &&
+            _guarded_substitutions.TryGetValue(information.Id, out var replacement)
                 ? new(replacement, null)
                 : Failure(SpecInstantiationFailureKind.MissingSubstitution, information?.Id,
                     "No IR term was supplied for a referenced spec variable.");
@@ -180,27 +208,39 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Null(SpecNullDeclaration value)
         {
+            if (value is null)
+            {
+                throw new System.ArgumentNullException(nameof(value));
+            }
             var type = value.Type switch
             {
-                IrTypeKind.String => factory.StringType,
-                IrTypeKind.Reference => factory.ObjectType,
+                IrTypeKind.String => _guarded_factory.StringType,
+                IrTypeKind.Reference => _guarded_factory.ObjectType,
                 _ => default
             };
             return type.IsDefault
                 ? Failure(SpecInstantiationFailureKind.UnsupportedValueType, null,
                     "A factory-independent sequence null needs a concrete sequence type substitution.")
-                : new(factory.Null(type), null);
+                : new(_guarded_factory.Null(type), null);
         }
 
         private TermResult Unary(SpecUnaryDeclaration unary)
         {
+            if (unary is null)
+            {
+                throw new System.ArgumentNullException(nameof(unary));
+            }
             return Child(
                 unary.Operand,
-                operand => factory.Unary(unary.Operator, operand));
+                operand => operand is null ? throw new System.ArgumentNullException(nameof(operand)) : (_guarded_factory.Unary(unary.Operator, operand)));
         }
 
         private TermResult Binary(SpecBinaryDeclaration binary)
         {
+            if (binary is null)
+            {
+                throw new System.ArgumentNullException(nameof(binary));
+            }
             var isEquality = binary.Operator is
                 IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
             var failure = ResolvePair(
@@ -223,25 +263,37 @@ public static partial class ApiSpecInstantiator
             }
 
             return new(
-                factory.Binary(binary.Operator, left.Term!, right.Term!),
+                _guarded_factory.Binary(binary.Operator, left.Term!, right.Term!),
                 null);
         }
 
         private TermResult Null(SpecNullDeclaration value, IrTerm peer)
         {
-            var peerType = factory.GetTypeInfo(peer.Type);
+            if (peer is null)
+            {
+                throw new System.ArgumentNullException(nameof(peer));
+            }
+            if (value is null)
+            {
+                throw new System.ArgumentNullException(nameof(value));
+            }
+            var peerType = _guarded_factory.GetTypeInfo(peer.Type);
             return peerType.Kind == value.Type &&
                    value.Type is
                        IrTypeKind.String or
                        IrTypeKind.Reference or
                        IrTypeKind.Sequence
-                ? new(factory.Null(peer.Type), null)
+                ? new(_guarded_factory.Null(peer.Type), null)
                 : Failure(SpecInstantiationFailureKind.TypeMismatch, null,
                     "The exact instantiated null operand type does not match its peer.");
         }
 
         private static bool IsNullOnly(SpecTermDeclaration declaration)
         {
+            if (declaration is null)
+            {
+                throw new System.ArgumentNullException(nameof(declaration));
+            }
             return declaration is SpecNullDeclaration ||
                    declaration is SpecConditionalDeclaration conditional &&
                    IsNullOnly(conditional.WhenTrue) &&
@@ -250,6 +302,10 @@ public static partial class ApiSpecInstantiator
 
         private TermResult NullOnly(SpecTermDeclaration declaration, IrTerm peer)
         {
+            if (peer is null)
+            {
+                throw new System.ArgumentNullException(nameof(peer));
+            }
             if (declaration is SpecNullDeclaration literal)
             {
                 return Null(literal, peer);
@@ -271,12 +327,16 @@ public static partial class ApiSpecInstantiator
             var whenFalse = NullOnly(conditional.WhenFalse, peer);
             return whenFalse.Failure != null
                 ? whenFalse
-                : new(factory.Conditional(
+                : new(_guarded_factory.Conditional(
                     condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
         }
 
         private TermResult Conditional(SpecConditionalDeclaration conditional)
         {
+            if (conditional is null)
+            {
+                throw new System.ArgumentNullException(nameof(conditional));
+            }
             var condition = Term(conditional.Condition);
             if (condition.Failure != null)
             {
@@ -291,7 +351,7 @@ public static partial class ApiSpecInstantiator
                 out var whenFalse);
             return failure is { } result
                 ? result
-                : new(factory.Conditional(
+                : new(_guarded_factory.Conditional(
                     condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
         }
 
@@ -302,6 +362,14 @@ public static partial class ApiSpecInstantiator
             out TermResult left,
             out TermResult right)
         {
+            if (leftDeclaration is null)
+            {
+                throw new System.ArgumentNullException(nameof(leftDeclaration));
+            }
+            if (rightDeclaration is null)
+            {
+                throw new System.ArgumentNullException(nameof(rightDeclaration));
+            }
             if (inferNulls &&
                 IsNullOnly(leftDeclaration) &&
                 !IsNullOnly(rightDeclaration))
@@ -341,6 +409,14 @@ public static partial class ApiSpecInstantiator
         private TermResult Child(
             SpecTermDeclaration source, Func<IrTerm, IrTerm> create)
         {
+            if (create is null)
+            {
+                throw new System.ArgumentNullException(nameof(create));
+            }
+            if (source is null)
+            {
+                throw new System.ArgumentNullException(nameof(source));
+            }
             var child = Term(source);
             return child.Failure == null
                 ? new(create(child.Term!), null)
@@ -350,6 +426,10 @@ public static partial class ApiSpecInstantiator
         private static TermResult Failure(
             SpecInstantiationFailureKind kind, SpecVarId? variable, string detail)
         {
+            if (detail is null)
+            {
+                throw new System.ArgumentNullException(nameof(detail));
+            }
             return new(null, new SpecInstantiationFailure(kind, variable, detail));
         }
     }

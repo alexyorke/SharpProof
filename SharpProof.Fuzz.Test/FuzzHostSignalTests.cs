@@ -34,7 +34,7 @@ public sealed class FuzzHostSignalTests : IDisposable
         var references = platformAssemblies.Split(Path.PathSeparator)
             .Append(typeof(FuzzRunner).Assembly.Location)
             .Distinct(StringComparer.Ordinal)
-            .Select(static path => MetadataReference.CreateFromFile(path));
+            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)));
         var compilation = CSharpCompilation.Create(
             "SharpProof.Fuzz.SignalHost",
             [CSharpSyntaxTree.ParseText(HostSource, new CSharpParseOptions(LanguageVersion.CSharp12))],

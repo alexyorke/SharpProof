@@ -72,6 +72,8 @@ public sealed class WorkerFactorResourceBoundaryTests
 
     private static async Task ObserveAsync(string label, string source, bool requireProof)
     {
+        System.ArgumentNullException.ThrowIfNull(label);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("FactorTheoremObservation", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
@@ -83,15 +85,15 @@ public sealed class WorkerFactorResourceBoundaryTests
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         var preparation = preparations.Single(static item =>
-            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block.Instructions).ToArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(static havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
+            .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(instructions.Single(instruction =>
-            instruction.Id == preparation.Total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
+            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == preparation.Total.CallPreconditions[0].Instruction)), Is.TypeOf<IrAssignInstruction>());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure),
@@ -150,6 +152,10 @@ public sealed class WorkerFactorResourceBoundaryTests
     private static void WriteObservation(string label, string stage, string source,
         PassiveCallableCheckResult result, long before, long after)
     {
+        System.ArgumentNullException.ThrowIfNull(label);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(stage);
         TestContext.Progress.WriteLine("FACTOR-OBSERVATION " + JsonSerializer.Serialize(new
         {
             label,
@@ -161,7 +167,7 @@ public sealed class WorkerFactorResourceBoundaryTests
             core = result.Core.ToArray(),
             model = result.EntryModel.OrderBy(pair => pair.Key.Value).Select(pair => new
             { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToArray(),
-            bodyAssumptions = result.BodyAssumptions.Select(item => item.Value).ToArray(),
+            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToArray(),
             callPreconditionWitness = result.CallPreconditionWitness?.Value,
             consumedBefore = before,
             consumedAfter = after,

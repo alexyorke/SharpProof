@@ -27,6 +27,31 @@ public sealed class CallableReplayContext(
         : this(program, isTrivial, parameterBindings, preStateBindings, resultVariables,
             postcondition, integerDomains, maximumSteps, registeredCalls, callHost)
     {
+
+        if (resultVariables.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(resultVariables));
+        }
+        if (integerDomains is null)
+        {
+            throw new System.ArgumentNullException(nameof(integerDomains));
+        }
+        if (parameterBindings is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameterBindings));
+        }
+        if (postcondition is null)
+        {
+            throw new System.ArgumentNullException(nameof(postcondition));
+        }
+        if (preStateBindings is null)
+        {
+            throw new System.ArgumentNullException(nameof(preStateBindings));
+        }
+        if (registeredCalls is null)
+        {
+            throw new System.ArgumentNullException(nameof(registeredCalls));
+        }
         PostconditionGuard = postconditionGuard;
         ReplayOptions = replayOptions;
     }
@@ -35,7 +60,7 @@ public sealed class CallableReplayContext(
     internal bool IsTrivial { get; } = isTrivial;
     internal ImmutableDictionary<IrVarId, IrVarId> ParameterBindings { get; } = ArgumentNullGuard.NotNull(parameterBindings, nameof(parameterBindings));
     internal ImmutableDictionary<IrVarId, IrVarId?> PreStateBindings { get; } = ArgumentNullGuard.NotNull(preStateBindings, nameof(preStateBindings));
-    internal ImmutableArray<IrVarId> ResultVariables { get; } = resultVariables;
+    internal ImmutableArray<IrVarId> ResultVariables { get; } = (resultVariables.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(resultVariables)) : resultVariables);
     internal IrTerm Postcondition { get; } = ArgumentNullGuard.NotNull(postcondition, nameof(postcondition));
     internal ImmutableDictionary<IrVarId, (BigInteger Minimum, BigInteger Maximum)> IntegerDomains { get; } = ArgumentNullGuard.NotNull(integerDomains, nameof(integerDomains));
     internal int MaximumSteps { get; } = maximumSteps;
@@ -49,5 +74,5 @@ public sealed class CallableReplayContext(
         : this(context.Program, context.IsTrivial, context.ParameterBindings, context.PreStateBindings,
             context.ResultVariables, context.Postcondition, context.IntegerDomains, context.MaximumSteps,
             context.RegisteredCalls, context.PostconditionGuard, context.ReplayOptions, context.CallHost)
-    { EntryConstraints = entryConstraints; }
+    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } if (entryConstraints.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(entryConstraints)); } EntryConstraints = entryConstraints; }
 }

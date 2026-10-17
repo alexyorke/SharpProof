@@ -7,6 +7,9 @@ internal static class ProcessRunner
         string fileName,
         IEnumerable<string> arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments);
+        System.ArgumentNullException.ThrowIfNull(fileName);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
@@ -28,6 +31,9 @@ internal static class ProcessRunner
         string fileName,
         params string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(fileName);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return RunCapturedAsync(
             CreateStartInfo(workingDirectory, fileName, arguments),
             CancellationToken.None);
@@ -84,4 +90,6 @@ internal readonly record struct ProcessRunnerResult(
     string Error)
 {
     internal string CombinedOutput => Output + Environment.NewLine + Error;
+    public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    public string Error { get; init; } = Error ?? throw new System.ArgumentNullException(nameof(Error));
 }

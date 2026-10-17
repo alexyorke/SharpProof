@@ -12,12 +12,28 @@ internal static class IrWriteSites
 
     internal static bool IsLoopCell(IrFactory factory, IrWriteInstruction write)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (write is null)
+        {
+            throw new System.ArgumentNullException(nameof(write));
+        }
         return factory.GetOperationInfo(write.Operation).Description is { } id &&
             factory.GetString(id).StartsWith(LoopCellPrefix, StringComparison.Ordinal);
     }
 
     internal static bool IsObservable(IrFactory factory, IrWriteInstruction write)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (write is null)
+        {
+            throw new System.ArgumentNullException(nameof(write));
+        }
         return write.Region != IrWriteRegion.Local &&
             !(factory.GetOperationInfo(write.Operation).Description is { } id &&
                 factory.GetString(id).StartsWith(FreshPrefix, StringComparison.Ordinal));

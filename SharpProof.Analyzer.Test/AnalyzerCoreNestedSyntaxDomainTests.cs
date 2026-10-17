@@ -23,7 +23,7 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
                 }
             }
             """, ["SP0002", "SP0024", "SP0047"]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
@@ -36,7 +36,7 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
         var root = await tree.GetRootAsync().ConfigureAwait(false);
         SyntaxNode declaration = localDeclaration
             ? root.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single()
-            : root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node.Identifier.ValueText == "Ordinary");
+            : root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Ordinary"));
         var model = actual.GetSemanticModel(tree);
         var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         Assert.That(method.MethodKind, Is.EqualTo(localDeclaration ? MethodKind.LocalFunction : MethodKind.Ordinary));

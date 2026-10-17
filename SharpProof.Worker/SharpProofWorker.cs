@@ -19,6 +19,7 @@ public sealed class SharpProofWorker : IDisposable
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, ReadResources(backend))
     {
+        System.ArgumentNullException.ThrowIfNull(backend, nameof(backend));
     }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount)
     {
@@ -35,6 +36,7 @@ public sealed class SharpProofWorker : IDisposable
     private SharpProofWorker(Func<ISmtBackend> backendFactory, uint configuredQueryRlimit)
         : this(backendFactory)
     {
+        System.ArgumentNullException.ThrowIfNull(backendFactory);
         _configuredQueryRlimit = configuredQueryRlimit;
     }
     public static SharpProofWorker Create(WorkerBudgets budgets)
@@ -52,12 +54,14 @@ public sealed class SharpProofWorker : IDisposable
     }
     internal static SharpProofWorker CreateNative(WorkerBudgets budgets)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
         return Create(budgets);
     }
 
     public Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
     {
+        System.ArgumentNullException.ThrowIfNull(request);
         return VerifyAsync(request, null, cancellationToken);
     }
 
@@ -108,6 +112,9 @@ public sealed class SharpProofWorker : IDisposable
         }
         WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "")
         {
+            System.ArgumentNullException.ThrowIfNull(code);
+            System.ArgumentNullException.ThrowIfNull(inputHash);
+            System.ArgumentNullException.ThrowIfNull(message);
             return Failure(inputHash, reason, request.Budgets, started, Error(code, message), requestHash);
         }
 
@@ -118,9 +125,9 @@ public sealed class SharpProofWorker : IDisposable
             {
                 // Lanes have settled before this projection. Keep their validated
                 // publications and synthesize interruption results only for work not started.
-                var settled = interruptedTargets.Select((target, index) => interruptedResults[index] ?? Unknown(target,
+                var settled = interruptedTargets.Select((target, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (target is null ? throw new System.ArgumentNullException(nameof(target)) : (interruptedResults[index] ?? Unknown(target,
                     canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
-                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout)).ToArray();
+                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout))))).ToArray();
                 var projected = ProjectResults(settled);
                 var run = WorkerResultAssembler.Classify(projected.Callables, projected.Claims);
                 return WorkerResultAssembler.Create(input.InputHash, input.CompilerManifest.Manifest,
@@ -183,6 +190,7 @@ public sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse FailedAfterManifest(WorkerRunFailureReason reason,
             IEnumerable<WorkerProtocolError> errors, WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure)
         {
+            System.ArgumentNullException.ThrowIfNull(errors);
             return ManifestFailure(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
                 request.Budgets, started, reason, errors, requestHash, claimReason);
         }
@@ -205,7 +213,7 @@ public sealed class SharpProofWorker : IDisposable
             {
                 return FailedAfterManifest(WorkerRunFailureReason.CompilationFailure,
                     snapshot.CompilerManifest.CompilerDiagnostics.Select(static item =>
-                        new WorkerProtocolError { Code = item.Code, Message = item.Message }));
+                        item is null ? throw new System.ArgumentNullException(nameof(item)) : (new WorkerProtocolError { Code = item.Code, Message = item.Message })));
             }
 
             var targets = snapshot.Callables;
@@ -215,6 +223,8 @@ public sealed class SharpProofWorker : IDisposable
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)
             {
+                System.ArgumentNullException.ThrowIfNull(callables);
+                System.ArgumentNullException.ThrowIfNull(claims);
                 ThrowIfProjectInterrupted();
                 var assembled = WorkerResultAssembler.Create(snapshot.InputHash, manifest, status, reason, callables, claims,
                     request.Budgets, resultCacheStatus, Elapsed(started), errors,
@@ -266,7 +276,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             ThrowIfProjectInterrupted();
             var orderedTargets = targets.OrderBy(
-                static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
+                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
                 CountSolverTargets(orderedTargets),
@@ -306,6 +316,7 @@ public sealed class SharpProofWorker : IDisposable
             var scheduler = new VerificationTargetScheduler(orderedTargets.Length);
             async Task RunLane(VerificationLane lane)
             {
+                System.ArgumentNullException.ThrowIfNull(lane);
                 while (scheduler.TryClaim(out var index))
                 {
                     if (!CanVerifyTarget(orderedTargets[index]))
@@ -432,6 +443,7 @@ public sealed class SharpProofWorker : IDisposable
     private static VerificationCache? CreateCacheIfEnabled(
         WorkerVerifyRequest request, string projectDirectory, out WorkerCacheStatus status)
     {
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
         if (!request.Cache.Enabled)
         {
             status = WorkerCacheStatus.Disabled;
@@ -459,6 +471,11 @@ public sealed class SharpProofWorker : IDisposable
         WorkerRunFailureReason reason, IEnumerable<WorkerProtocolError> errors, string requestHash,
         WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(errors);
+        System.ArgumentNullException.ThrowIfNull(inputHash);
+        System.ArgumentNullException.ThrowIfNull(manifest);
+        System.ArgumentNullException.ThrowIfNull(requestHash);
         return WorkerResultAssembler.CreateIncomplete(
             inputHash, requestHash, manifest, budgets,
             WorkerRunStatus.Failed, reason,
@@ -470,6 +487,9 @@ public sealed class SharpProofWorker : IDisposable
     private static WorkerVerifyResponse Failure(string inputHash, WorkerRunFailureReason reason,
         WorkerBudgets budgets, long started, IEnumerable<WorkerProtocolError> errors, string? requestHash = null)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(errors);
+        System.ArgumentNullException.ThrowIfNull(inputHash);
         return WorkerResultAssembler.Create(
             string.IsNullOrEmpty(inputHash) ? WorkerResultAssembler.EmptyInputHash : inputHash,
             WorkerResultAssembler.EmptyManifest(), WorkerRunStatus.Failed, reason,
@@ -490,6 +510,8 @@ public sealed class SharpProofWorker : IDisposable
 
     private static WorkerProtocolError[] Error(string code, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(code);
+        System.ArgumentNullException.ThrowIfNull(message);
         return [new WorkerProtocolError { Code = code, Message = message }];
     }
 
@@ -503,6 +525,7 @@ public sealed class SharpProofWorker : IDisposable
         int targetCount,
         out VerificationLane[] lanes, out string? error)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
         lanes = [];
         error = null;
         if (targetCount == 0)
@@ -530,7 +553,7 @@ public sealed class SharpProofWorker : IDisposable
             {
                 var backend = backendFactory() ??
                     throw new InvalidOperationException("The backend factory returned null.");
-                if (created.Any(lane => ReferenceEquals(lane.Backend, backend)))
+                if (created.Any(lane => lane is null ? throw new System.ArgumentNullException(nameof(lane)) : (ReferenceEquals(lane.Backend, backend))))
                 {
                     throw new InvalidOperationException("The backend factory returned the same backend for multiple lanes.");
                 }
@@ -559,6 +582,7 @@ public sealed class SharpProofWorker : IDisposable
     internal static int CountSolverTargets(
         IEnumerable<CompilerCallablePreparation> targets)
     {
+        System.ArgumentNullException.ThrowIfNull(targets);
         return targets.Count(CanVerifyTarget);
     }
 
@@ -571,6 +595,9 @@ public sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse response, WorkerInputSnapshot snapshot, WorkerBudgets budgets,
         string requestHash, long started, CancellationTokenSource projectBoundary)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(projectBoundary);
+        System.ArgumentNullException.ThrowIfNull(requestHash);
         var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash,
             snapshot.CompilerManifest.Manifest);
         if (responseValidation.IsValid)
@@ -590,14 +617,20 @@ public sealed class SharpProofWorker : IDisposable
     internal static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
     {
-        var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
-            WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
+
+        if (targets.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(targets));
+        }
+        var malformed = targets.Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (Unknown(target, WorkerClaimReason.InfrastructureFailure,
+            WorkerCallableCoverageReason.MissingClaimResult))).ToArray();
         return ProjectResults(malformed);
     }
 
     private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectResults(CallableVerificationResult[] results)
     {
+        System.ArgumentNullException.ThrowIfNull(results, nameof(results));
         var callables = new WorkerCallableResult[results.Length];
         var claims = new List<WorkerClaimResult>();
         for (var index = 0; index < results.Length; index++)
@@ -612,6 +645,7 @@ public sealed class SharpProofWorker : IDisposable
 
     private static Func<long>? ReadResources(ISmtBackend backend)
     {
+        System.ArgumentNullException.ThrowIfNull(backend);
         return backend switch
         {
             NativeCallableBackend native => () => native.ConsumedResourceCount,
@@ -626,7 +660,7 @@ public sealed class SharpProofWorker : IDisposable
         private readonly Func<ISmtBackend>? _backendFactory = backendFactory;
         private IDisposable? _ownedBackend = ownedBackend;
         private (ISmtBackend Backend, Func<long>? ResourceReader)
-            _backend = ProjectBackend(backend, resourceReader);
+            _backend = ProjectBackend((backend ?? throw new System.ArgumentNullException(nameof(backend))), resourceReader);
         internal ISmtBackend Backend => _backend.Backend;
         internal Func<long>? ReadConsumedResourceCount => _backend.ResourceReader;
         internal LaneRenewalResult Renew(VerificationLane[] lanes)
@@ -645,8 +679,8 @@ public sealed class SharpProofWorker : IDisposable
                     var replacement = _backendFactory() ??
                         throw new InvalidOperationException("The backend factory returned null.");
                     if (ReferenceEquals(replacement, prior) ||
-                        lanes.Any(lane => !ReferenceEquals(lane, this) &&
-                            ReferenceEquals(lane.Backend, replacement)))
+                        lanes.Any(lane => lane is null ? throw new System.ArgumentNullException(nameof(lane)) : (!ReferenceEquals(lane, this) &&
+                            ReferenceEquals(lane.Backend, replacement))))
                     {
                         return LaneRenewalResult.BackendUnavailable;
                     }
@@ -681,6 +715,7 @@ public sealed class SharpProofWorker : IDisposable
             ISmtBackend backend,
             Func<long>? resourceReader = null)
         {
+            System.ArgumentNullException.ThrowIfNull(backend);
             return (backend, resourceReader ?? ReadResources(backend));
         }
         internal void DisposeOwnedBackend()

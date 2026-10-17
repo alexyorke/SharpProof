@@ -76,6 +76,7 @@ public sealed class FuzzSourceLifecycleControls
 
     private static (MemoryStream Image, SpecialType ReturnType) CompileActualSource(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var tree = CSharpSyntaxTree.ParseText(
             "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n",
             new CSharpParseOptions(LanguageVersion.CSharp12));
@@ -104,6 +105,8 @@ public sealed class FuzzSourceLifecycleControls
 
     private static void AssertLoadedTarget(MemoryStream image, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(image);
         var context = new AssemblyLoadContext("SharpProofSourceCampaignBoolean", isCollectible: true);
         try
         {

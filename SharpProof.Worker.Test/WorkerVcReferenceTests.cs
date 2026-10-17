@@ -18,6 +18,9 @@ public sealed class WorkerVcReferenceTests
     [TestCase("string", "x == null", "try { return Length(x); } catch (System.NullReferenceException) when (++seen == 1) { return seen; } finally { seen += 10; }", 1)]
     public async Task ReferenceLengthProofAndRefutationSurviveArtifactAndCache(string type, string requires, string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(type);
         var source = $$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -32,7 +35,7 @@ public sealed class WorkerVcReferenceTests
             }
             """;
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -53,10 +56,10 @@ public sealed class WorkerVcReferenceTests
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(invocation == 0 ? WorkerCacheStatus.Written : WorkerCacheStatus.Hit));
             Assert.That(response.Errors, Is.Empty);
-            var ordinals = response.Manifest.Claims.Where(claim => claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)
-                .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
-            Assert.That(posts.Select(result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition))
+                .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
@@ -88,6 +91,8 @@ public sealed class WorkerVcReferenceTests
     [TestCase("string", "Contract.Result<string>() != null && Contract.Result<string>().Length == x.Length")]
     public async Task ReferenceResultsCrossFreshSourceFramesWithoutLosingIdentityOrLength(string type, string predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(predicate);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -101,7 +106,7 @@ public sealed class WorkerVcReferenceTests
                 private static {{type}} Copy({{type}} value) { return value; }
             }
             """);
-        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -129,6 +134,8 @@ public sealed class WorkerVcReferenceTests
     [TestCase("bool", "true", 1UL)]
     public async Task ScalarArrayReadsPreserveBitsThroughArtifactAndOriginalReplay(string type, string constant, ulong bits)
     {
+        System.ArgumentNullException.ThrowIfNull(constant);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -141,7 +148,7 @@ public sealed class WorkerVcReferenceTests
                 private static {{type}} Read({{type}}[] value) { return value[0]; }
             }
             """);
-        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -165,6 +172,7 @@ public sealed class WorkerVcReferenceTests
     [TestCase("x != null && x.Length == 1 && x[0] == 42", 42)]
     public async Task ArrayReadFaultsPreserveArgumentEffectsFilterSelectionAndCapturedReturn(string requires, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(requires);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -181,7 +189,7 @@ public sealed class WorkerVcReferenceTests
                 private static int Read(int[] value, uint index) { return value[index]; }
             }
             """);
-        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var reason), Is.True, reason.ToString());
@@ -228,6 +236,7 @@ public sealed class WorkerVcReferenceTests
     [TestCase("int Target(string x) { Contract.Ensures(true); try { return x.Length; } catch (System.NullReferenceException error) { return error == null ? 1 : 0; } }")]
     public void UnsupportedReferenceOperationsRemainUnenrolled(string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class Subject { public static " + member + " }");
         Assert.That(artifact.Callables.Single().Total, Is.Null);
@@ -259,6 +268,7 @@ public sealed class WorkerVcReferenceTests
     [TestCase("long[] values = new long[] { 1L, -2L }; return (int)(values[0] + values[1]);", -1)]
     public async Task ConstantArrayInitializersPreserveContents(string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var subject = PassiveSourceSubject.Create("using SharpProof.Attributes; public static class Subject { " +
             "[DoesNotThrow, EnforcePure] public static int Target() { Contract.Ensures(Contract.Result<int>() == " + expected + "); " + body + " } }");
         var candidate = subject.Enroll();

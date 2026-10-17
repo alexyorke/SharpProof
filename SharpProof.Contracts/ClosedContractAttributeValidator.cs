@@ -38,16 +38,44 @@ internal readonly struct ClosedContractAttributeValidation(
 
     internal bool SupportsLegacyValue(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).SupportsLegacyValue(factory, value);
     }
 
     internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).CreateLegacyPredicate(factory, value, Minimum, Maximum);
     }
 
     internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return _classification?.CreateTotalPredicate(factory, value, type, Minimum, Maximum);
     }
 }
@@ -150,11 +178,23 @@ internal static class ClosedContractAttributeValidator
         ClosedContractAttributeClassification classification,
         string reason)
     {
+        if (classification is null)
+        {
+            throw new System.ArgumentNullException(nameof(classification));
+        }
+        if (reason is null)
+        {
+            throw new System.ArgumentNullException(nameof(reason));
+        }
         return new ClosedContractAttributeValidation(classification, reason);
     }
 
     private static bool IsSupportedInteger(ITypeSymbol type, bool includeUnsigned64)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return CSharpOperationSemantics.IsSupportedInteger(type.SpecialType) ||
             includeUnsigned64 && type.SpecialType == SpecialType.System_UInt64;
     }
@@ -202,6 +242,26 @@ internal sealed class ClosedContractAttributeClassification
         Func<IrTypeInfo, bool> supportsTotalValue,
         Func<IrFactory, IrTerm, IrTypeInfo, long, long, IrTerm> createTotalPredicate)
     {
+        if (attributeName is null)
+        {
+            throw new System.ArgumentNullException(nameof(attributeName));
+        }
+        if (createLegacyPredicate is null)
+        {
+            throw new System.ArgumentNullException(nameof(createLegacyPredicate));
+        }
+        if (createTotalPredicate is null)
+        {
+            throw new System.ArgumentNullException(nameof(createTotalPredicate));
+        }
+        if (supportsLegacyValue is null)
+        {
+            throw new System.ArgumentNullException(nameof(supportsLegacyValue));
+        }
+        if (supportsTotalValue is null)
+        {
+            throw new System.ArgumentNullException(nameof(supportsTotalValue));
+        }
         Kind = kind;
         AttributeName = attributeName;
         _supportsLegacyValue = supportsLegacyValue;
@@ -215,16 +275,44 @@ internal sealed class ClosedContractAttributeClassification
 
     internal bool SupportsLegacyValue(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return _supportsLegacyValue(factory, value);
     }
 
     internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return _createLegacyPredicate(factory, value, minimum, maximum);
     }
 
     internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return _supportsTotalValue(type)
             ? _createTotalPredicate(factory, value, type, minimum, maximum)
             : null;
@@ -232,26 +320,71 @@ internal sealed class ClosedContractAttributeClassification
 
     private static bool IsTotalReferenceValue(IrTypeInfo type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence;
     }
 
     private static bool IsTotalIntegerValue(IrTypeInfo type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return type.Kind == IrTypeKind.Integer && type.Width > 0;
     }
 
-    private static IrTerm CreateTotalNotNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo _, long __, long ___)
+    private static IrTerm CreateTotalNotNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long __, long ___)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return CreateNotNullPredicate(factory, value, 0, 0);
     }
 
     private static IrTerm CreateTotalPositivePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long _, long __)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThan, 0);
     }
 
     private static IrTerm CreateTotalRangePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return factory.Binary(IrBinaryOperator.AndAlso,
             CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThanOrEqual, minimum),
             CompareTotalBound(factory, value, type, IrBinaryOperator.LessThanOrEqual, maximum));
@@ -260,6 +393,18 @@ internal sealed class ClosedContractAttributeClassification
     private static IrTerm CompareTotalBound(IrFactory factory, IrTerm value, IrTypeInfo type, IrBinaryOperator op, long bound)
     {
         // Fold bounds outside the scalar domain; never truncate an attribute's long bound.
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var minimum = type.Signed ? type.Width == 64 ? long.MinValue : -(1L << (type.Width - 1)) : 0L;
         var maximum = type.Signed ? type.Width == 64 ? (ulong)long.MaxValue : (1UL << (type.Width - 1)) - 1 :
             type.Width == 64 ? ulong.MaxValue : (1UL << type.Width) - 1;
@@ -272,6 +417,14 @@ internal sealed class ClosedContractAttributeClassification
 
     private static bool IsReferenceValue(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var type = factory.GetTypeInfo(value.Type);
         return type.Kind is
             IrTypeKind.Reference or
@@ -281,21 +434,53 @@ internal sealed class ClosedContractAttributeClassification
 
     private static bool IsIntegerValue(IrFactory factory, IrTerm value)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return value.Type == factory.IntegerType;
     }
 
     private static IrTerm CreateNotNullPredicate(IrFactory factory, IrTerm value, long _, long __)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(value.Type));
     }
 
     private static IrTerm CreatePositivePredicate(IrFactory factory, IrTerm value, long _, long __)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return factory.Binary(IrBinaryOperator.GreaterThan, value, factory.Integer(0));
     }
 
     private static IrTerm CreateRangePredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return factory.Binary(
             IrBinaryOperator.AndAlso,
             factory.Binary(IrBinaryOperator.GreaterThanOrEqual, value, factory.Integer(minimum)),

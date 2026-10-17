@@ -112,6 +112,7 @@ public sealed class CSharpScalarSemanticsTests
     private static (bool IsSigned, int BitWidth, long Minimum, long Maximum)
         GetExpectedSemantics(Type type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var typeCode = Type.GetTypeCode(type);
         var bitWidth = typeCode switch
         {

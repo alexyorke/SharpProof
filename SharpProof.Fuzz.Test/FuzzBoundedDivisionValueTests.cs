@@ -40,6 +40,21 @@ public sealed class FuzzBoundedDivisionValueTests
 
     private static long ReferenceValue(long first, long second, long third)
     {
+        if (first is < -3037000499L or > 3037000499L)
+        {
+            throw new ArgumentOutOfRangeException(nameof(first));
+        }
+
+        if (second is < -3037000499L or > 3037000499L)
+        {
+            throw new ArgumentOutOfRangeException(nameof(second));
+        }
+
+        if (third is < -3037000499L or > 3037000499L)
+        {
+            throw new ArgumentOutOfRangeException(nameof(third));
+        }
+
         return long.MaxValue / checked(first * first + 1) /
             checked(second * second + 1) / checked(third * third + 1);
     }

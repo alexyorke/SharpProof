@@ -361,11 +361,12 @@ public sealed class EffectContractWireParityTests
 
     private static Dictionary<string, long> GetNamedValues(Type enumType)
     {
+        System.ArgumentNullException.ThrowIfNull(enumType);
         return Enum.GetNames(enumType).ToDictionary(
-            static name => name,
-            name => Convert.ToInt64(
+            static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
+            name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (Convert.ToInt64(
                 Enum.Parse(enumType, name),
-                System.Globalization.CultureInfo.InvariantCulture),
+                System.Globalization.CultureInfo.InvariantCulture)),
             StringComparer.Ordinal);
     }
 

@@ -23,6 +23,7 @@ public sealed class NativeMetadataNominalOwnerTests
     [TestCase("string", true, false)]
     public async Task ImplicitObjectWideningPreservesConcreteIdentityAndNativeNullness(string kind, bool isNull, bool nominalReturn)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var (definition, type) = kind switch
         {
             "class" => ("public sealed class Token { }", "Token"),
@@ -59,7 +60,7 @@ public sealed class NativeMetadataNominalOwnerTests
         var replay = new IrProgramInterpreter(factory).Execute(decoded.Body.Program,
             new Dictionary<IrVarId, IrValue> { [entry] = value }, 10000,
             new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, assigned, _) => { if (instruction.Id == marker) { observations.Add(assigned.Boolean); } } });
+            { AssignmentObserver = (instruction, assigned, _) => { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations.Add(assigned.Boolean); } } });
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.Type, Is.EqualTo(nominalReturn ? entryType : factory.ObjectType));
@@ -120,7 +121,7 @@ public sealed class NativeMetadataNominalOwnerTests
                     [entries[1]] = factory.CreateReferenceValue(factory.ObjectType, other)
                 }, 10000,
                 new IrProgramReplayOptions(static _ => null)
-                { AssignmentObserver = (instruction, _, _) => { if (instruction.Id == marker) { observations++; } } });
+                { AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations++; } } });
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(aliases ? 7 : 0));

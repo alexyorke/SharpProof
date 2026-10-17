@@ -18,7 +18,7 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var compilation = CSharpCompilation.Create("RecursiveBuiltinWitness", [tree],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var root = await tree.GetRootAsync().ConfigureAwait(false);
         var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
@@ -31,10 +31,10 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var binding = context.Parameters.Single();
         var receiver = binding.Entry;
         var receiverTerm = factory.Variable(receiver);
-        var actualRead = lowered.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrAssignInstruction>().Select(instruction => instruction.Value)
-            .OfType<IrOpaqueTerm>().Single(term => factory.GetString(factory.GetMemberInfo(term.Member).Name)
-                .StartsWith("field:", StringComparison.Ordinal));
+        var actualRead = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrAssignInstruction>().Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Value))
+            .OfType<IrOpaqueTerm>().Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetString(factory.GetMemberInfo(term.Member).Name)
+                .StartsWith("field:", StringComparison.Ordinal)));
         var field = IrSubstitution.Substitute(factory, actualRead, binding.Current, receiverTerm);
         Assert.That(field.Type, Is.EqualTo(factory.StringType));
         var nonnullReceiver = factory.Binary(IrBinaryOperator.NotEqual, receiverTerm, factory.Null(receiverTerm.Type));
@@ -42,8 +42,8 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var alias = factory.Binary(requireAlias ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
             factory.Cast(factory.ObjectType, field), factory.Cast(factory.ObjectType, receiverTerm));
         var query = new VerificationQuery(factory,
-            new[] { nonnullReceiver, nonnullField, alias }.Select(predicate => new Assumption(factory, predicate,
-                new LoweredJustification(factory.CreateOperation()))),
+            new[] { nonnullReceiver, nonnullField, alias }.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate,
+                new LoweredJustification(factory.CreateOperation())))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [receiver]);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(backend).VerifyAsync(query);

@@ -43,6 +43,10 @@ public sealed class MetadataIlShiftSemanticsTests
     [TestCase("ulong", "value >> 65", ulong.MaxValue, 9223372036854775807UL)]
     public async Task NearbyMetadataShiftsProveMatchingClaims(string resultType, string expression, object input, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(resultType);
         var library = $"public static class Library {{ public static {resultType} Target({resultType} value) => {expression}; }}";
         var source = $$"""
             #undef SHARPPROOF_CONTRACTS

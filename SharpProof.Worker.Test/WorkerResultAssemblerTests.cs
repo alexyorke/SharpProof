@@ -133,6 +133,7 @@ public sealed class WorkerResultAssemblerTests
         WorkerClaimManifest manifest,
         int expectedSize)
     {
+        System.ArgumentNullException.ThrowIfNull(manifest);
         var stopwatch = Stopwatch.StartNew();
         var response = WorkerResultAssembler.CreateIncomplete(
             WorkerProtocolVersions.EmptySha256,
@@ -148,7 +149,7 @@ public sealed class WorkerResultAssemblerTests
         Assert.That(response.ClaimResults, Has.Length.EqualTo(expectedSize));
         Assert.That(
             response.ClaimResults.Select(static claim =>
-                claim.Assumptions.Length),
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Assumptions.Length)),
             Is.All.EqualTo(1));
         return stopwatch.Elapsed;
     }

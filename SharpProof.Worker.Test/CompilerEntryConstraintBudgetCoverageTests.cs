@@ -69,13 +69,13 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
             Assert.That(owner.GetMembers().OfType<IFieldSymbol>().Count(), Is.EqualTo(count));
             Assert.That(owner.GetMembers(), Has.Length.EqualTo(count + 1));
             Assert.That(Array.IndexOf(owner.GetMembers().ToArray(), method), Is.EqualTo(shape == "fields-before" ? count : 0));
-            Assert.That(owner.GetMembers().OfType<IFieldSymbol>().All(field => field.IsStatic && !field.IsConst && field.DeclaringSyntaxReferences.Length == 1), Is.True);
+            Assert.That(owner.GetMembers().OfType<IFieldSymbol>().All(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.IsStatic && !field.IsConst && field.DeclaringSyntaxReferences.Length == 1)), Is.True);
         }
         else if (shape == "module")
         {
             var types = compilation.Assembly.GlobalNamespace.GetTypeMembers();
             Assert.That(types, Has.Length.EqualTo(count + 1));
-            Assert.That(types.Where(type => !SymbolEqualityComparer.Default.Equals(type, owner)).All(type => type.IsStatic && type.GetMembers().IsEmpty), Is.True);
+            Assert.That(types.Where(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (!SymbolEqualityComparer.Default.Equals(type, owner))).All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.IsStatic && type.GetMembers().IsEmpty)), Is.True);
             Assert.That(owner.GetMembers(), Has.Length.EqualTo(1));
             Assert.That(owner.StaticConstructors, Is.Empty);
         }
@@ -88,11 +88,11 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
             if (shape == "empty-body")
             {
                 Assert.That(constructorSyntax.Body!.Statements, Has.Count.EqualTo(count));
-                Assert.That(constructorSyntax.Body.Statements.All(statement => statement is EmptyStatementSyntax), Is.True);
+                Assert.That(constructorSyntax.Body.Statements.All(statement => statement is null ? throw new System.ArgumentNullException(nameof(statement)) : (statement is EmptyStatementSyntax)), Is.True);
             }
             if (shape == "constructor-reference")
             {
-                Assert.That(owner.GetMembers().Take(count).All(member => member is IFieldSymbol { IsConst: true }), Is.True);
+                Assert.That(owner.GetMembers().Take(count).All(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member is IFieldSymbol { IsConst: true })), Is.True);
                 Assert.That(owner.GetMembers()[count], Is.EqualTo(constructor));
                 Assert.That(constructorSyntax.Body!.Statements, Is.Empty);
             }

@@ -6,11 +6,14 @@ internal sealed class TempDirectory : IDisposable
 
     internal TempDirectory(string prefix)
     {
+        System.ArgumentNullException.ThrowIfNull(prefix);
         directory = Directory.CreateTempSubdirectory(prefix);
     }
 
     internal TempDirectory(string prefix, string parentDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(parentDirectory);
+        System.ArgumentNullException.ThrowIfNull(prefix);
         var parent = Directory.CreateDirectory(parentDirectory);
         directory = parent.CreateSubdirectory(
             prefix + Guid.NewGuid().ToString("N"));
@@ -21,6 +24,9 @@ internal sealed class TempDirectory : IDisposable
         string expectedRoot,
         string errorMessage)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(errorMessage);
+        System.ArgumentNullException.ThrowIfNull(expectedRoot);
         this.directory = directory;
         this.expectedRoot = expectedRoot;
         this.errorMessage = errorMessage;
@@ -31,6 +37,8 @@ internal sealed class TempDirectory : IDisposable
         string prefix,
         string errorMessage = "Refusing to remove an unexpected test directory.")
     {
+        System.ArgumentNullException.ThrowIfNull(errorMessage);
+        System.ArgumentNullException.ThrowIfNull(prefix);
         if (string.IsNullOrWhiteSpace(rootName) ||
             Path.IsPathRooted(rootName) ||
             rootName is "." or ".." ||

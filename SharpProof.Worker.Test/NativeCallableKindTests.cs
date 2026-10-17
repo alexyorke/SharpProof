@@ -35,6 +35,8 @@ public sealed class NativeCallableKindTests
     [TestCase("[ZeroAllocations] public static explicit operator int(C value) { var box = new object(); return 1; }", typeof(RefutedOutcome))]
     public async Task BodiedAccessorsAndOperatorsAreLowered(string member, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await NativeEffectSiteVerifier.VerifyAsync(Prepare("public sealed class C { " + member + " }"),
             new WorkerBudgets());
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
@@ -48,6 +50,7 @@ public sealed class NativeCallableKindTests
     [TestCase("SharpProofCapability.None", true, null)]
     public async Task TrustedBoundaryCallsUseTheirDeclaredCapabilities(string allowed, bool hasBody, Type? outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(allowed);
         using var directory = new TempDirectory("sharpproof-boundary-");
         var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(
             PrepareBoundaryCaller(directory, "[AllowedCapabilities(" + allowed + ")]", hasBody), new WorkerBudgets());
@@ -75,6 +78,8 @@ public sealed class NativeCallableKindTests
 
     private static CompilerCallablePreparation PrepareBoundaryCaller(TempDirectory directory, string attribute, bool hasBody = false)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(directory);
         var external = TestCompilation.Create("TrustedBoundary", """
             using SharpProof.Attributes;
             public static class Boundary {
@@ -95,7 +100,7 @@ public sealed class NativeCallableKindTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 
     // A constructor that runs no member initializers or base constructor
@@ -113,8 +118,10 @@ public sealed class NativeCallableKindTests
     [TestCase("public static int Target(int x) { return Times(x); [ZeroAllocations] int Times(int y) => y * x; }", "unknown")]
     public async Task ConstructorsAndLocalFunctionsAreLowered(string members, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
         var preparation = Prepare("public sealed class C { " + members + " }");
-        var outcome = preparation.EffectClaims.Any(static claim => claim.ContractKind == WorkerEffectContractKind.EnforcePure)
+        var outcome = preparation.EffectClaims.Any(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.EnforcePure))
             ? (await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome
             : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome;
         if (preparation.EffectClaims.Length > 1)
@@ -150,6 +157,7 @@ public sealed class NativeCallableKindTests
     [TestCase("System.Environment.TickCount")]
     public async Task AmbientCallsAreNotPure(string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(
             Prepare("public static class C { [EnforcePure] public static long Target() => " + expression + "; }"), new WorkerBudgets());
         Assert.That(purity.Outcome, Is.Not.TypeOf<ProvenOutcome>());
@@ -157,8 +165,9 @@ public sealed class NativeCallableKindTests
 
     private static CompilerCallablePreparation Prepare(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + type);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

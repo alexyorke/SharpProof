@@ -25,7 +25,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
     [TestCase(1400)]
     public async Task DefaultContractsModeRecordsBoundedCalleeOutcomes(int valueCopies)
     {
-        var testCase = s_cases.Single(candidate => candidate.ValueCopies == valueCopies);
+        var testCase = s_cases.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ValueCopies == valueCopies));
         var observation = InspectCompiler(testCase);
         AssertCompilerGate(observation);
         var factory = new RecordingSessionFactory();
@@ -45,6 +45,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
 
     private static CompilerObservation InspectCompiler(FrozenCase testCase)
     {
+        System.ArgumentNullException.ThrowIfNull(testCase);
         var path = testCase.FileName;
         var source = "using SharpProof.Attributes;\npublic static class Fixture\n{\n" +
             "    private static long Need(int value)\n    {\n        Contract.Requires(value > 0);\n" +
@@ -54,13 +55,13 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(sourceBytes));
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0027"], filePath: path);
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => diagnostic.ToString())
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
             .ToArray();
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate.Identifier.ValueText == "Need");
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == "Need"));
         var symbol = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         var operation = model.GetOperation(method);
         var syntaxNodes = method.DescendantNodesAndSelf().Count();
@@ -69,8 +70,8 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         var typeMembers = symbol.ContainingType.GetMembers();
         var typeInitializationMemberCharges = typeMembers.Length;
         var typeInitializationReferenceCharges = typeMembers
-            .Where(static member => member.IsStatic && member is not IFieldSymbol { IsConst: true })
-            .Sum(static member => member.DeclaringSyntaxReferences.Length);
+            .Where(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.IsStatic && member is not IFieldSymbol { IsConst: true }))
+            .Sum(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.DeclaringSyntaxReferences.Length));
         var typeInitializationCost = typeInitializationMemberCharges + typeInitializationReferenceCharges;
         var sourceBudgetSpentBeforePrepare = symbol.Parameters.Length + 1 +
             method.DescendantNodesAndSelf().Count() + typeInitializationCost +
@@ -97,6 +98,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
 
     private static void AssertCompilerGate(CompilerObservation observation)
     {
+        System.ArgumentNullException.ThrowIfNull(observation);
         Assert.That(observation.SourceHash, Is.EqualTo(observation.TestCase.ExpectedSha256), observation.TestCase.FileName);
         Assert.That(observation.CompilerErrors, Is.Empty, observation.TestCase.FileName);
         Assert.That(observation.EmitBytes, Is.GreaterThan(0), observation.TestCase.FileName);
@@ -117,6 +119,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
 
     private static int CountOperationNodes(IOperation root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         var count = 0;
         var pending = new Stack<IOperation>();
         pending.Push(root);
@@ -135,6 +138,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
 
     private static int CountImplicitIntToLongConversions(IOperation root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         var count = 0;
         var pending = new Stack<IOperation>();
         pending.Push(root);
@@ -163,7 +167,12 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         int ValueCopies,
         bool MustExceedOperationBudget,
         string[] ExpectedDiagnosticIds,
-        AnalyzerSemanticOutcome ExpectedOutcome);
+        AnalyzerSemanticOutcome ExpectedOutcome)
+    {
+        public string FileName { get; init; } = FileName ?? throw new System.ArgumentNullException(nameof(FileName));
+        public string ExpectedSha256 { get; init; } = ExpectedSha256 ?? throw new System.ArgumentNullException(nameof(ExpectedSha256));
+        public string[] ExpectedDiagnosticIds { get; init; } = ExpectedDiagnosticIds ?? throw new System.ArgumentNullException(nameof(ExpectedDiagnosticIds));
+    }
 
     private sealed record CompilerObservation(
         FrozenCase TestCase,
@@ -179,6 +188,12 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         int TypeInitializationReferenceCharges,
         int SourceBudgetSpentBeforePrepare,
         int SourceBudgetRemainingBeforePrepare,
-        int EmitBytes);
+        int EmitBytes)
+    {
+        public FrozenCase TestCase { get; init; } = TestCase ?? throw new System.ArgumentNullException(nameof(TestCase));
+        public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public string SourceHash { get; init; } = SourceHash ?? throw new System.ArgumentNullException(nameof(SourceHash));
+        public string[] CompilerErrors { get; init; } = CompilerErrors ?? throw new System.ArgumentNullException(nameof(CompilerErrors));
+    }
 
 }

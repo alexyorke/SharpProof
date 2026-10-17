@@ -84,6 +84,10 @@ internal sealed class ContractApiIdentityResolver
 
     internal bool IsResolvedContractAssembly(IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         return assembly != null &&
             Contract is { } contract &&
             SymbolEqualityComparer.Default.Equals(
@@ -96,7 +100,7 @@ internal sealed class ContractApiIdentityResolver
     {
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            static value => new(value));
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     internal INamedTypeSymbol? ResolveAttribute(string metadataName)
@@ -152,6 +156,10 @@ internal sealed class ContractApiIdentityResolver
 
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
+        if (metadataName is null)
+        {
+            throw new System.ArgumentNullException(nameof(metadataName));
+        }
         var candidate = _compilation.GetTypeByMetadataName(metadataName);
         return new AttributeResolution(
             Contract is { } contract &&
@@ -170,7 +178,7 @@ internal sealed class ContractApiIdentityResolver
     {
         if (candidate == null ||
             !HasMetadataName(candidate, metadataName) ||
-            candidate.Locations.Any(static location => location.IsInSource) ||
+            candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ||
             IsCompilationReference(candidate.ContainingAssembly))
         {
             return false;
@@ -189,16 +197,20 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         return assembly is not null &&
             _compilationReferenceCache.GetOrAdd(
             assembly,
-            candidate => _compilation.References.Any(reference =>
-                reference is CompilationReference &&
+            candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (_compilation.References.Any(reference =>
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference &&
                 _compilation.GetAssemblyOrModuleSymbol(reference) is
                     IAssemblySymbol referenced &&
                 SymbolEqualityComparer.Default.Equals(
                     candidate,
-                    referenced)));
+                    referenced)))));
     }
 
     /// <summary>
@@ -215,6 +227,10 @@ internal sealed class ContractApiIdentityResolver
     private bool HasTrustedAttributesPayload(
         IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         if (AttributesAssemblyPayloadSha256.IsDefaultOrEmpty)
         {
             return false;
@@ -267,6 +283,10 @@ internal sealed class ContractApiIdentityResolver
     /// </summary>
     private static bool HasExpectedPayloadHash(string path, PortableExecutableReference reference, out string? unreadableReason)
     {
+        if (path is null)
+        {
+            throw new System.ArgumentNullException(nameof(path));
+        }
         unreadableReason = null;
         try
         {
@@ -308,6 +328,10 @@ internal sealed class ContractApiIdentityResolver
 
     private static Guid GetBoundModuleVersionId(PortableExecutableReference reference)
     {
+        if (reference is null)
+        {
+            throw new System.ArgumentNullException(nameof(reference));
+        }
         return reference.GetMetadata() is AssemblyMetadata metadata &&
             metadata.GetModules() is { Length: 1 } modules
                 ? modules[0].GetModuleVersionId()
@@ -388,20 +412,28 @@ internal sealed class ContractApiIdentityResolver
     private static ImmutableArray<string> ReadAssemblyMetadataValues(
         string key)
     {
+        if (key is null)
+        {
+            throw new System.ArgumentNullException(nameof(key));
+        }
         return typeof(ContractApiIdentityResolver)
             .Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(attribute => string.Equals(
+            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (string.Equals(
                 attribute.Key,
                 key,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
+                StringComparison.Ordinal)))
+            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Value))
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
     {
+        if (candidate is null)
+        {
+            throw new System.ArgumentNullException(nameof(candidate));
+        }
         return candidate is
         {
             TypeKind: TypeKind.Class,
@@ -447,6 +479,14 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol contract,
         string name)
     {
+        if (contract is null)
+        {
+            throw new System.ArgumentNullException(nameof(contract));
+        }
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         return GetSingleMethod(contract, name) is
         {
             MethodKind: MethodKind.Ordinary,
@@ -469,6 +509,10 @@ internal sealed class ContractApiIdentityResolver
 
     private bool HasOnlyElidingConditionalAttribute(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         if (_conditionalAttribute == null)
         {
             return false;
@@ -503,6 +547,10 @@ internal sealed class ContractApiIdentityResolver
 
     private static bool HasConditionalSymbol(INamedTypeSymbol contract)
     {
+        if (contract is null)
+        {
+            throw new System.ArgumentNullException(nameof(contract));
+        }
         var members = contract.GetMembers("ConditionalSymbol");
         return members.Length == 1 &&
             members[0] is IFieldSymbol
@@ -555,6 +603,14 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol contract,
         string name)
     {
+        if (contract is null)
+        {
+            throw new System.ArgumentNullException(nameof(contract));
+        }
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         IMethodSymbol? member = null;
         var count = 0;
         foreach (var candidate in contract.GetMembers(name))
@@ -577,6 +633,10 @@ internal sealed class ContractApiIdentityResolver
     private static bool HasUnconstrainedTypeParameter(
         ITypeParameterSymbol parameter)
     {
+        if (parameter is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameter));
+        }
         return !parameter.HasConstructorConstraint &&
             !parameter.HasReferenceTypeConstraint &&
             !parameter.HasValueTypeConstraint &&
@@ -589,6 +649,14 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
+        if (candidate is null)
+        {
+            throw new System.ArgumentNullException(nameof(candidate));
+        }
+        if (expectedBase is null)
+        {
+            throw new System.ArgumentNullException(nameof(expectedBase));
+        }
         return RoslynSymbolFacts.IsOrDerivesFrom(
             candidate,
             expectedBase,
@@ -623,6 +691,10 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol? type,
         string metadataName)
     {
+        if (metadataName is null)
+        {
+            throw new System.ArgumentNullException(nameof(metadataName));
+        }
         if (type == null || type.ContainingType != null)
         {
             return false;
@@ -630,7 +702,7 @@ internal sealed class ContractApiIdentityResolver
 
         var parts = _metadataNames.GetOrAdd(
             metadataName,
-            static value => new MetadataNameParts(value));
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new MetadataNameParts(value)));
         return string.Equals(
             type.MetadataName,
             parts.TypeName,
@@ -665,6 +737,10 @@ internal sealed class ContractApiIdentityResolver
     {
         internal MetadataNameParts(string metadataName)
         {
+            if (metadataName is null)
+            {
+                throw new System.ArgumentNullException(nameof(metadataName));
+            }
             var separator = metadataName.LastIndexOf('.');
             // Every construction input is a fixed, namespace-qualified catalog name.
             TypeName = metadataName.Substring(separator + 1);

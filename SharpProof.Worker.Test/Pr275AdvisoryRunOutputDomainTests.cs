@@ -131,6 +131,11 @@ public sealed class Pr275AdvisoryRunOutputDomainTests
     }
     private static IrProgram Build(IrFactory factory, IrVarId value, bool assumeFalse)
     {
+        if (value.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(value));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (assumeFalse)

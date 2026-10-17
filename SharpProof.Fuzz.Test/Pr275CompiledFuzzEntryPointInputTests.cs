@@ -12,6 +12,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
     [TestCase("-h")]
     public void ActualCompiledEntryPointPrintsHelpWithoutRunningCampaign(string option)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
         var result = InvokeCompiledEntryPoint([option]);
         Assert.That(result.Exit, Is.Zero);
         Assert.That(result.Output, Is.Empty);
@@ -23,6 +24,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
     [TestCase("--max-parallelism")]
     public void ActualCompiledEntryPointRejectsMissingValues(string option)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
         AssertRejected([option], "Missing value for " + option + ".");
     }
 
@@ -31,6 +33,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
     [TestCase("--Cases")]
     public void ActualCompiledEntryPointRejectsUnknownOptions(string option)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
         AssertRejected([option, "1"], "Unknown option: " + option + ".");
     }
 
@@ -48,6 +51,9 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
     [TestCase("--seed", "2147483648", "--seed requires a 32-bit integer.")]
     public void ActualCompiledEntryPointRejectsMalformedValues(string option, string value, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(message);
+        System.ArgumentNullException.ThrowIfNull(option);
+        System.ArgumentNullException.ThrowIfNull(value);
         AssertRejected([option, value], message);
     }
 
@@ -71,6 +77,8 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
 
     private static void AssertRejected(string[] arguments, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(message);
         var result = InvokeCompiledEntryPoint(arguments);
         Assert.That(result.Exit, Is.EqualTo(2));
         Assert.That(result.Output, Is.Empty);
@@ -80,6 +88,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
 
     private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         var entryPoint = typeof(FuzzOptions).Assembly.EntryPoint;
         Assert.That(entryPoint, Is.Not.Null);
         Assert.That(entryPoint!.ReturnType, Is.EqualTo(typeof(int)));

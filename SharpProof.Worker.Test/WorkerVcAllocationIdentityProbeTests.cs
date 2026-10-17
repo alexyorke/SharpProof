@@ -14,6 +14,8 @@ public sealed class WorkerVcAllocationIdentityProbeTests
     public async Task FreshAllocationsHaveDistinctObjectIdentities(string first, string second,
         bool expectedResult, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(first);
+        System.ArgumentNullException.ThrowIfNull(second);
         var body = "object first = " + first + "; object second = " + second + "; return first == second;";
         var declaration = "public static class Subject { public static bool Target() { ";
         using var image = new MemoryStream();

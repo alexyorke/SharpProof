@@ -13,7 +13,11 @@ namespace SharpProof.Gates.Corpus;
 
 internal sealed record OpenSourceCorpusImportPlan(
     OpenSourceCorpusDocument Document,
-    CorpusFileUpdate[] Updates);
+    CorpusFileUpdate[] Updates)
+{
+    public OpenSourceCorpusDocument Document { get; init; } = Document ?? throw new System.ArgumentNullException(nameof(Document));
+    public CorpusFileUpdate[] Updates { get; init; } = Updates ?? throw new System.ArgumentNullException(nameof(Updates));
+}
 
 internal static class OpenSourceCorpusImporter
 {
@@ -63,6 +67,7 @@ SOFTWARE.
         string repositoryRoot,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         var upstreamRoot = Environment.GetEnvironmentVariable(
             SourceEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(upstreamRoot))
@@ -86,6 +91,8 @@ SOFTWARE.
         string upstreamRoot,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
+        System.ArgumentNullException.ThrowIfNull(upstreamRoot);
         var resolvedUpstreamRoot = Path.GetFullPath(upstreamRoot);
         var commit = await ReadGitAsync(
                 resolvedUpstreamRoot,
@@ -170,14 +177,14 @@ SOFTWARE.
             licenseHash);
         var provisionalMethods = selected
             .Select((candidate, index) =>
-                candidate.ToMethod(
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ToMethod(
                     $"OSS{index + 1:D4}",
                     CorpusVerdict.SilentUnknown,
                     existingSupport.TryGetValue(
                         candidate.DeclarationSha256,
                         out var support)
                         ? support
-                        : CorpusSupport.Unspecified))
+                        : CorpusSupport.Unspecified)))
             .ToImmutableArray();
         var provisionalDocument = new OpenSourceCorpusDocument(
             2,
@@ -189,8 +196,8 @@ SOFTWARE.
                 cancellationToken)
             .ConfigureAwait(false);
         var verdicts = observations.ToImmutableDictionary(
-            static observation => observation.CaseId,
-            static observation => observation.Verdict,
+            static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
+            static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.Verdict),
             StringComparer.Ordinal);
         var methods = provisionalMethods
             .Select(method => method with
@@ -211,8 +218,8 @@ SOFTWARE.
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var unreviewedMethods = methods
             .Where(static method =>
-                method.Support == CorpusSupport.Unspecified)
-            .Select(static method => method.Id)
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Unspecified))
+            .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))
             .ToArray();
         if (unreviewedMethods.Length != 0)
         {
@@ -244,6 +251,7 @@ SOFTWARE.
     private static ImmutableDictionary<string, CorpusSupport>
         LoadExistingSupport(string corpusDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         if (!File.Exists(manifestPath))
         {
@@ -264,6 +272,8 @@ SOFTWARE.
         string commit,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(commit);
+        System.ArgumentNullException.ThrowIfNull(upstreamRoot);
         var sourceRoots = new[] {
             Path.Combine(upstreamRoot, "Algorithms"),
             Path.Combine(upstreamRoot, "DataStructures")
@@ -287,8 +297,8 @@ SOFTWARE.
             .ConfigureAwait(false);
         foreach (var relativePath in trackedPaths
                      .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
-                     .OrderBy(static path => path, StringComparer.Ordinal))
+                     .Where(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.EndsWith(".cs", StringComparison.Ordinal)))
+                     .OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.Ordinal))
         {
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 Encoding.UTF8.GetString(
@@ -312,7 +322,7 @@ SOFTWARE.
             foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
                          .DescendantNodes()
                          .OfType<MethodDeclarationSyntax>()
-                         .OrderBy(static method => method.SpanStart))
+                         .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.SpanStart)))
             {
                 if (!IsCandidate(method))
                 {
@@ -360,10 +370,15 @@ SOFTWARE.
         ImmutableArray<ImportCandidate> candidates,
         int count)
     {
+
+        if (candidates.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
+        }
         var byFile = candidates
-            .GroupBy(static candidate => candidate.Path, StringComparer.Ordinal)
-            .OrderBy(static group => group.Key, StringComparer.Ordinal)
-            .Select(static group => group.ToImmutableArray())
+            .GroupBy(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path), StringComparer.Ordinal)
+            .OrderBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
+            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()))
             .ToImmutableArray();
         var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
         for (var offset = 0; selected.Count < count; offset++)
@@ -396,7 +411,7 @@ SOFTWARE.
         }
 
         var fileCount = selected
-            .Select(static candidate => candidate.Path)
+            .Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path))
             .Distinct(StringComparer.Ordinal)
             .Count();
         if (fileCount < OpenSourceCorpusCatalog.MinimumSourceFileCount)
@@ -415,6 +430,9 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
+        System.ArgumentNullException.ThrowIfNull(arguments);
+        System.ArgumentNullException.ThrowIfNull(gitExecutable);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = GateProcess.CreateCaptured(
             gitExecutable,
             workingDirectory);
@@ -443,6 +461,10 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
+        System.ArgumentNullException.ThrowIfNull(commit);
+        System.ArgumentNullException.ThrowIfNull(gitExecutable);
+        System.ArgumentNullException.ThrowIfNull(relativePath);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = GateProcess.CreateCaptured(
             gitExecutable,
             workingDirectory);
@@ -484,6 +506,7 @@ SOFTWARE.
 
     internal static string NormalizeRepositoryUrl(string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         var normalized = value.Trim()
             .TrimEnd('/')
             .Replace(
@@ -502,6 +525,7 @@ SOFTWARE.
         string commit,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(commit);
         var verificationRoot = Directory.CreateTempSubdirectory(
             "SharpProof-OSS-origin-");
         try
@@ -557,6 +581,7 @@ SOFTWARE.
             CorpusVerdict verdict,
             CorpusSupport support)
         {
+            System.ArgumentNullException.ThrowIfNull(id);
             return new(
                 id,
                 SourceId,
@@ -569,5 +594,8 @@ SOFTWARE.
                 verdict,
                 support);
         }
+        public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+        public string DeclarationSha256 { get; init; } = DeclarationSha256 ?? throw new System.ArgumentNullException(nameof(DeclarationSha256));
+        public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
     }
 }

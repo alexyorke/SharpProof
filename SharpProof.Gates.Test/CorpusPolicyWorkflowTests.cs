@@ -31,6 +31,9 @@ public sealed class CorpusPolicyWorkflowTests
     public void GateRejectsInvalidPolicyBeforeRunningCases(
         string policyFile, string contents, string expectedMessage)
     {
+        System.ArgumentNullException.ThrowIfNull(contents);
+        System.ArgumentNullException.ThrowIfNull(expectedMessage);
+        System.ArgumentNullException.ThrowIfNull(policyFile);
         using var temporary = new TempDirectory("SharpProof-corpus-policy-");
         var source = Path.Combine(RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus");
         var destination = Path.Combine(temporary.FullName, "SharpProof.Gates", "Corpus");
@@ -63,9 +66,9 @@ public sealed class CorpusPolicyWorkflowTests
         }
         var snapshotPath = Path.Combine(destination, "expected.canonical.snapshot");
         var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
-        var repeatedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
+        var repeatedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
         rows.Add(repeatedRow);
-        var contents = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row, StringComparer.Ordinal));
+        var contents = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
         File.WriteAllText(snapshotPath, contents);
 
         var error = Assert.ThrowsAsync<InvalidDataException>(

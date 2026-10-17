@@ -51,8 +51,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 } ||
                 !string.Equals(entry.InputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(entry.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
-                callables.Any(static result => result == null) ||
-                claims.Any(static result => result == null))
+                callables.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)) ||
+                claims.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)))
             {
                 TryDelete(path);
                 return null;
@@ -91,6 +91,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerClaimManifest manifest,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(inputHash);
         ArgumentNullException.ThrowIfNull(response);
         ArgumentNullException.ThrowIfNull(manifest);
         try
@@ -148,12 +149,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private void EvictOldest(string protectedPath)
     {
+        System.ArgumentNullException.ThrowIfNull(protectedPath);
         var entries = new DirectoryInfo(_directory)
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
-            .OrderBy(static file => file.LastWriteTimeUtc)
-            .ThenBy(static file => file.Name, StringComparer.Ordinal)
+            .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.LastWriteTimeUtc))
+            .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Name), StringComparer.Ordinal)
             .ToList();
-        var total = entries.Sum(static file => file.Length);
+        var total = entries.Sum(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Length));
         foreach (var file in entries)
         {
             if (total <= _maximumBytes)
@@ -171,6 +173,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static void TryDelete(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         try
         {
             File.Delete(path);

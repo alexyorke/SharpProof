@@ -21,7 +21,7 @@ public sealed class Pr275CorpusInputParserTests
     {
         var catalog = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
         var expected = catalog.Methods.ToImmutableDictionary(
-            method => method.DeclarationSha256, method => method.Support, StringComparer.Ordinal);
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256), method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support), StringComparer.Ordinal);
         var actual = CorpusInputParsers.ReadExistingSupport(catalog);
         Assert.That(actual, Is.EquivalentTo(expected));
         Assert.That(actual.KeyComparer, Is.SameAs(StringComparer.Ordinal));
@@ -31,6 +31,8 @@ public sealed class Pr275CorpusInputParserTests
     [TestCase("null-entry", "The existing OSS corpus manifest contains a null method entry.")]
     public void ExistingSupportRequiresAnInitializedArrayOfMethods(string input, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(message);
         var path = Path.Combine(RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus", "oss-methods.json");
         var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         if (input == "missing")
@@ -77,6 +79,7 @@ public sealed class Pr275CorpusInputParserTests
     [TestCase("reason")]
     public void AllowancePropertiesAreRequired(string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         var json = CreateAllowanceInput();
         var target = property is "schemaVersion" or "allowances"
             ? json
@@ -101,6 +104,7 @@ public sealed class Pr275CorpusInputParserTests
     [TestCase("reason", " \t")]
     public void AllowanceFieldsRequireText(string field, string? value)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         var json = CreateAllowanceInput();
         json["allowances"]!.AsArray()[0]!.AsObject()[field] = value;
         AssertAllowanceError(json, "Every Proven->Unknown allowance needs a caseId and explanation.");
@@ -132,6 +136,8 @@ public sealed class Pr275CorpusInputParserTests
 
     private static void AssertAllowanceError(JsonObject json, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(json);
+        System.ArgumentNullException.ThrowIfNull(message);
         using var document = JsonDocument.Parse(json.ToJsonString());
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusInputParsers.ReadAllowances(document.RootElement)));

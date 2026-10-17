@@ -37,21 +37,21 @@ public sealed class CorpusSnapshotWorkflowTests
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
         var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
-        var changedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
+        var changedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
         var fields = changedRow.Split('|');
         Assert.That(fields[1], Is.EqualTo("Proven"));
         fields[1] = "Unknown";
         rows[rows.IndexOf(changedRow)] = string.Join('|', fields);
-        var allowedRow = rows.Single(static row => row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal));
+        var allowedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal)));
         var allowedFields = allowedRow.Split('|');
         Assert.That(allowedFields[1], Is.EqualTo("Unknown"));
         allowedFields[1] = "Proven";
         rows[rows.IndexOf(allowedRow)] = string.Join('|', allowedFields);
-        var removedRow = rows.Single(static row => row.StartsWith("E02.baseline|", StringComparison.Ordinal));
+        var removedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E02.baseline|", StringComparison.Ordinal)));
         rows.Remove(removedRow);
         rows.Add("obsolete-case-a|Proven|Proven|");
         rows.Add("obsolete-case-b|Proven|Proven|");
-        var changedSnapshot = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row, StringComparer.Ordinal));
+        var changedSnapshot = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
         await File.WriteAllTextAsync(snapshotPath, changedSnapshot);
         var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
         const string allowance = """
@@ -62,7 +62,7 @@ public sealed class CorpusSnapshotWorkflowTests
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
         var misclassified = manifest["methods"]!.AsArray()
-            .Single(static method => method!["id"]!.GetValue<string>() == "OSS0003")!;
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method!["id"]!.GetValue<string>() == "OSS0003"))!;
         Assert.That(misclassified["support"]!.GetValue<string>(), Is.EqualTo("IntentionallyUnsupported"));
         Assert.That(misclassified["expectedVerdict"]!.GetValue<string>(), Is.EqualTo("Unknown"));
         misclassified["support"] = "Supported";
@@ -106,6 +106,7 @@ public sealed class CorpusSnapshotWorkflowTests
 
     private static string CopyCorpus(string targetRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(targetRoot);
         var source = Path.Combine(RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus");
         var destination = OpenSourceCorpusCatalog.GetCorpusDirectory(targetRoot);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))

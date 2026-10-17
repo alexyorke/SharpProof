@@ -12,11 +12,12 @@ public sealed class CfgExpressionLoweringCoverageTests
     [TestCase("long Target(bool flag, long left, long right) => flag ? left : right;")]
     public void ActualCfgCapturesAndNullTestsRemainExact(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
-        var operations = subject.Graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue])).ToArray();
+        var operations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
         Assert.That(operations.OfType<IFlowCaptureOperation>(), Is.Not.Empty);
         foreach (var operation in operations)
         {
@@ -44,7 +45,7 @@ public sealed class CfgExpressionLoweringCoverageTests
         var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
         Assert.That(result.IsExact, Is.False);
         Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.InvalidOperation));
-        Assert.That(compilation.GetDiagnostics().Single(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).Id, Is.EqualTo("CS0103"));
+        Assert.That(compilation.GetDiagnostics().Single(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Id, Is.EqualTo("CS0103"));
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var targetSyntax = tree.GetRoot().DescendantNodes()

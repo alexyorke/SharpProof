@@ -32,6 +32,7 @@ internal static class WorkerHost
     // VerifyAsync retains the fatal and aggregate catch policy.
     internal static WorkerVerifyResponse Failure(Exception exception, WorkerBudgets budgets)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullException.ThrowIfNull(exception);
         var backendUnavailable = IsBackendUnavailable(exception);
         var message = exception.GetBaseException().Message;
@@ -56,6 +57,8 @@ internal static class WorkerHost
         IEnumerable<WorkerProtocolError> errors,
         WorkerBudgets budgets)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(errors);
         return WorkerResultAssembler.Create(
             WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
             WorkerRunStatus.Failed, reason, [], [], budgets, WorkerCacheStatus.Disabled, 0, errors);
@@ -63,6 +66,7 @@ internal static class WorkerHost
 
     internal static bool IsBackendUnavailable(Exception exception)
     {
+        System.ArgumentNullException.ThrowIfNull(exception);
         for (Exception? current = exception; current != null; current = current.InnerException)
         {
             if (current is DllNotFoundException or EntryPointNotFoundException or

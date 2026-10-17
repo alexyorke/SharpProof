@@ -27,7 +27,7 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
     {
         var root = CSharpSyntaxTree.ParseText(Source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(item => (item.ExpressionBody != null) == selectControl);
+            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : ((item.ExpressionBody != null) == selectControl));
         var location = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-erased-partial.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(Source), Source);
@@ -38,11 +38,11 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
             selectControl ? CorpusSupport.Supported : CorpusSupport.IntentionallyUnsupported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
-        Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var preparedTree = compilation.SyntaxTrees.Single(item => item.FilePath == file.Path);
+        Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var preparedTree = compilation.SyntaxTrees.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.FilePath == file.Path));
         var preparedRoot = await preparedTree.GetRootAsync();
         var selectedDeclaration = preparedRoot.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(item => item.Identifier.ValueText == method.MethodName);
+            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Identifier.ValueText == method.MethodName));
         var selectedSymbol = compilation.GetSemanticModel(preparedTree).GetDeclaredSymbol(selectedDeclaration)!;
         Assert.That(selectedSymbol.IsPartialDefinition, Is.EqualTo(!selectControl));
         Assert.That(selectedSymbol.IsAbstract, Is.False);

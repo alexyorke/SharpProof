@@ -41,6 +41,8 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
     public void WholePolicyUsesActualCallableAndClausePlacement(string shape, string scenario,
         ContractClausePlacement placement, int count, string? reason)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, method, inventory) = Compile(shape, scenario);
         Assert.That(inventory.Callable.MethodKind, Is.EqualTo(method.MethodKind));
         Assert.That(inventory.Clauses, Has.Length.EqualTo(scenario == "empty" ? 0 : 1));
@@ -69,6 +71,7 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
     [TestCase("delegate", 1)]
     public void AnonymousPreconditionReportingIsOwnedByOnePolicyInstance(string shape, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, _, inventory) = Compile(shape, "requires");
         var policy = new ContractClausePlacementDiagnostics(compilation, CancellationToken.None);
         var reported = new List<Diagnostic>();
@@ -98,6 +101,8 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
     [TestCase("delegate", "late-requires", 1)]
     public void OuterInventoryFindsActualNestedClauseOwner(string shape, string scenario, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, _, _) = Compile(shape, scenario);
         var tree = compilation.SyntaxTrees.Single();
         var root = tree.GetRoot();
@@ -124,6 +129,7 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
     [TestCase("delegate")]
     public async Task CancelledNestedOwnerLookupReportsNoDiagnostics(string shape)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, _, _) = Compile(shape, "late-requires");
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -165,7 +171,7 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         var source = "using System; using SharpProof.Attributes; public static class Fixture { " +
             "public static void Target(bool condition) { " + body + " } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var emitted = new MemoryStream();
         Assert.That(compilation.Emit(emitted).Success, Is.True);
         var tree = compilation.SyntaxTrees.Single();

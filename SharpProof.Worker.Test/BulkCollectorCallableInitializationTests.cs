@@ -18,6 +18,7 @@ public sealed class BulkCollectorCallableInitializationTests
         // Script events can introduce a static expression variable without a
         // VariableDeclaratorSyntax. This tests the SDK declaration boundary;
         // it makes no claim about script admission by an MSBuild host.
+        System.ArgumentNullException.ThrowIfNull(input);
         var tree = CSharpSyntaxTree.ParseText($$"""
             static event System.Action Ready = int.TryParse("{{input}}", out var parsed) ? (() => { }) : null;
             [SharpProof.Attributes.ZeroAllocations] static int Read() => 1;
@@ -42,7 +43,7 @@ public sealed class BulkCollectorCallableInitializationTests
             Assert.That(field.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
             Assert.That(fieldDeclaration, Is.TypeOf<SingleVariableDesignationSyntax>());
             Assert.That(owner.GetMembers().OfType<IFieldSymbol>(), Does.Contain(field));
-            Assert.That(owner.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared), Is.True);
+            Assert.That(owner.StaticConstructors.All(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.IsImplicitlyDeclared)), Is.True);
         }
 
         using var image = new MemoryStream();
@@ -74,6 +75,7 @@ public sealed class BulkCollectorCallableInitializationTests
     [TestCase("public static int Value { get; set; } = 7;", false)]
     public void OrdinaryScalarInitializersRetainTheirCompilerDeclarationAdmission(string declaration, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         var compilation = TestCompilation.Create("ScalarInitialization",
             "public static class Subject { " + declaration +
             " [SharpProof.Attributes.ZeroAllocations] public static int Read() => Value; }");
@@ -98,6 +100,7 @@ public sealed class BulkCollectorCallableInitializationTests
 
     private static CompilerTotalCallablePreparation Prepare(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
         Assert.That(preparation.Total, Is.Not.Null);

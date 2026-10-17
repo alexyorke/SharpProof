@@ -139,7 +139,7 @@ public sealed class CompilerIlByteParserTests
             Assert.That(normalized[1].Offset, Is.EqualTo(2));
             Assert.That(normalized[2].Offset, Is.EqualTo(7));
             Assert.That(normalized[1].Target, Is.EqualTo(-1));
-            Assert.That(normalized.All(instruction => instruction.Method == null), Is.True);
+            Assert.That(normalized.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Method == null)), Is.True);
         }
     }
 
@@ -175,8 +175,8 @@ public sealed class CompilerIlByteParserTests
 
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
-        var captured = references.SelectMany(reference => reference.Modules).Single(module =>
-            Path.GetFullPath(module.Path) == Path.GetFullPath(subject.ImagePath));
+        var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(module =>
+            module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(subject.ImagePath)));
         Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image))));
         Assert.That(captured.SizeBytes, Is.EqualTo(subject.Image.LongLength));
         Assert.That(captured.Mvid, Is.EqualTo(subject.Method.Module.ModuleVersionId.ToString("D")));
@@ -203,6 +203,7 @@ public sealed class CompilerIlByteParserTests
     // supplied as compiler/worker authority; no method owner is fabricated.
     private static ImmutableArray<TotalIlInstruction>.Builder ReadUnboundSyntax(byte[] code)
     {
+        System.ArgumentNullException.ThrowIfNull(code, nameof(code));
         var decoded = ImmutableArray.CreateBuilder<TotalIlInstruction>();
         var cursor = 0;
         while (cursor != code.Length)

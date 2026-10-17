@@ -76,8 +76,8 @@ public sealed class MetadataSourceNativeProducerControls
             if (family == "static-read")
             {
                 Assert.That(actualSubject.GetField("State")!.GetValue(null), Is.EqualTo(7L));
-                Assert.That(total.Program.Blocks.SelectMany(block => block.Instructions)
-                    .OfType<IrHavocInstruction>().Any(instruction => instruction.Origin == IrHavocOrigin.Approximation), Is.True);
+                Assert.That(total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                    .OfType<IrHavocInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.True);
                 Assert.That(executed.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
             }
             else
@@ -104,11 +104,14 @@ public sealed class MetadataSourceNativeProducerControls
 
     private static SyntaxTree Parse(string text, string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(text);
         return CSharpSyntaxTree.ParseText(text, new CSharpParseOptions(LanguageVersion.CSharp12), path);
     }
 
     private static MemoryStream EmitActual(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var image = new MemoryStream();
         try
         {

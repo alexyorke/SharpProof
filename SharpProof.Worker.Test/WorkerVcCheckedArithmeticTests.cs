@@ -16,6 +16,8 @@ public sealed class WorkerVcCheckedArithmeticTests
     [TestCase("long", "checked(long.MinValue % -1L)")]
     public async Task ConstantFoldedRemainderDoesNotProveFalsePostcondition(string type, string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -31,13 +33,13 @@ public sealed class WorkerVcCheckedArithmeticTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
-        var claimIds = total!.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)
-            .Select(clause => clause.ClaimId).ToArray();
-        Assert.That(response.ClaimResults.Single(result => result.ClaimId == claimIds[0]).Outcome,
+        var claimIds = total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToArray();
+        Assert.That(response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimIds[0])).Outcome,
             Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(response.ClaimResults.Single(result => result.ClaimId == claimIds[1]).Outcome,
+        Assert.That(response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimIds[1])).Outcome,
             Is.EqualTo(WorkerClaimOutcome.Refuted));
-        Assert.That(response.ClaimResults.Select(result => result.Vacuity), Is.All.EqualTo(WorkerVacuityKind.None));
+        Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity)), Is.All.EqualTo(WorkerVacuityKind.None));
     }
 
     internal const string CheckedReturnSource = """
@@ -85,6 +87,7 @@ public sealed class WorkerVcCheckedArithmeticTests
     [TestCase("signed-multiply")]
     public async Task DecodedCheckedCandidateProvesAndReplaysFalseEnsuresWithCanonicalInputs(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var source = kind switch
         {
             "return" => CheckedReturnSource,
@@ -126,10 +129,10 @@ public sealed class WorkerVcCheckedArithmeticTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(first, project.Bind().InputHash, first.Manifest).IsValid, Is.True);
-        var claimIds = total.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures).Select(clause => clause.ClaimId).ToArray();
+        var claimIds = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)).Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToArray();
         Assert.That(first.Errors, Is.Empty);
-        Assert.That(first.ClaimResults.Single(result => result.ClaimId == claimIds[0]).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        var witness = first.ClaimResults.Single(result => result.ClaimId == claimIds[1]);
+        Assert.That(first.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimIds[0])).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        var witness = first.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimIds[1]));
         Assert.That(witness.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(witness.Model, Is.Not.Empty);
         var hit = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -164,8 +167,9 @@ public sealed class WorkerVcCheckedArithmeticTests
 
     private static WorkerClaimResult Postcondition(WorkerVerifyResponse response)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
-        var id = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
-        return response.ClaimResults.Single(result => result.ClaimId == id);
+        var id = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ClaimId;
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == id));
     }
 }

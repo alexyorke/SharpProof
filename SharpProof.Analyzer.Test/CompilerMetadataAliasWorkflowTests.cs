@@ -47,8 +47,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
             Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
                 "net8.0", [], CancellationToken.None);
-            var authority = captured.References.SelectMany(item => item.Modules).Single(module =>
-                Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath));
+            var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
+                module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
             await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : originalImage);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
@@ -92,6 +92,9 @@ public sealed class CompilerMetadataAliasWorkflowTests
     public async Task OrdinaryDebugMetadataLocalBodiesRespectAdmission(string localType,
         string initializer, string returned, bool expectedPrepared)
     {
+        System.ArgumentNullException.ThrowIfNull(initializer);
+        System.ArgumentNullException.ThrowIfNull(localType);
+        System.ArgumentNullException.ThrowIfNull(returned);
         var directory = Path.Combine(Path.GetTempPath(),
             "SharpProofMetadataLocals-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -179,7 +182,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], references);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
                 "net8.0", [], CancellationToken.None);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
@@ -254,6 +257,10 @@ public sealed class CompilerMetadataAliasWorkflowTests
     private static async Task<string> PublishAsync(string source, string directory,
         string name, MetadataReference[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(source);
         var path = Path.Combine(directory, name + ".json");
         var options = new Dictionary<string, string>
         {

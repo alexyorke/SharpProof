@@ -33,7 +33,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                 typeof(CallableSolverSession).Assembly.Location, typeof(SharpProof.Host.ContainerNativeLibrary).Assembly.Location,
                 typeof(Microsoft.Z3.Context).Assembly.Location])
             .Distinct(StringComparer.Ordinal)
-            .Select(static path => MetadataReference.CreateFromFile(path));
+            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)));
         var compilation = CSharpCompilation.Create(
             "SharpProof.Smt.DispatchChild",
             [CSharpSyntaxTree.ParseText(ChildSource, new CSharpParseOptions(LanguageVersion.CSharp12))],

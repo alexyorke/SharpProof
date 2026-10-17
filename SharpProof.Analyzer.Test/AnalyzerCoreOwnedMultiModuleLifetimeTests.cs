@@ -19,7 +19,7 @@ public sealed class AnalyzerCoreOwnedMultiModuleLifetimeTests
             .WithAssemblyName("OwnedAdditionalModule");
         moduleCompilation = moduleCompilation.WithOptions(moduleCompilation.Options
             .WithOutputKind(OutputKind.NetModule).WithModuleName(moduleName));
-        Assert.That(moduleCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(moduleCompilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var moduleImage = AnalyzerTestHost.EmitImage(moduleCompilation);
         Assert.That(moduleImage, Is.Not.Empty);
         var directory = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "SharpProofCore052-" + Guid.NewGuid().ToString("N")));
@@ -37,7 +37,7 @@ public sealed class AnalyzerCoreOwnedMultiModuleLifetimeTests
             var assemblyCompilation = AnalyzerTestHost.CreateCompilation(
                 "public static class Container { public static int Target() => Api.Value(1); }", [])
                 .WithAssemblyName("OwnedMultiModuleAssembly").AddReferences(moduleReference);
-            Assert.That(assemblyCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(assemblyCompilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var assemblyImage = AnalyzerTestHost.EmitImage(assemblyCompilation);
             Assert.That(assemblyImage, Is.Not.Empty);
             File.WriteAllBytes(assemblyPath, assemblyImage);

@@ -13,6 +13,7 @@ public sealed class ExplicitFilterThrowTests
     [TestCase("null")]
     public async Task ThrowingFilterRejectsHandlerAndPreservesOriginalException(string exception)
     {
+        System.ArgumentNullException.ThrowIfNull(exception);
         var source = "using SharpProof.Attributes; public static class C { " +
             "[DoesNotThrow] public static void Target(bool flag) { " +
             "try { throw new System.DivideByZeroException(); } " +

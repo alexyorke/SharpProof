@@ -16,7 +16,7 @@ public sealed class ActualParenthesizedOperationCoverageTests
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "parentheses.vb");
         var compilation = VisualBasicCompilation.Create("ActualParenthesizedSubject", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("ActualParenthesizedSubject", isCollectible: true);
@@ -36,7 +36,7 @@ public sealed class ActualParenthesizedOperationCoverageTests
             var entry = builder.CreateBlock("entry");
             builder.SetEntry(entry);
             var lowerer = new RoslynTotalExpressionLowerer(context, builder);
-            var environment = context.Parameters.ToDictionary(binding => binding.Current, _ => factory.CreateIntegerValue(17));
+            var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), _ => factory.CreateIntegerValue(17));
             var clause = lowerer.LowerClause(operation);
             Assert.That(clause.Classification.IsExact, Is.True);
             Assert.That(new IrInterpreter(factory).Evaluate(clause.SafeCondition, environment).Value!.Boolean, Is.True);

@@ -15,6 +15,7 @@ public sealed class NativeExceptionEffectTests
     [TestCase("System.ArithmeticException", false)]
     public async Task InstanceDelegateFaultUsesOwnedDeclaredExceptionConstraints(string allowed, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(allowed);
         var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
             "[AllowedExceptions(typeof(" + allowed + "))] public static System.Action Target(Receiver instance) { " +
             "return new System.Action(instance.Sink); } }";
@@ -35,6 +36,7 @@ public sealed class NativeExceptionEffectTests
     [TestCase("Contract.Requires(x > 0 && x < 0); return 10 / x;", true)]
     public async Task SerializedEffectOnlyCallableQualifiesWithoutPostconditions(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { [DoesNotThrow] public static int Target(int x) { " + body + " } }";
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
@@ -74,6 +76,7 @@ public sealed class NativeExceptionEffectTests
     [TestCase("while (x > 0) { x--; } return 10 / x;", false)]
     public async Task SourceExceptionReachabilityUsesUncaughtExits(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var subject = PassiveSourceSubject.Create("class C { public static int Target(int x) { " + body + " } }");
         var candidate = subject.Enroll();
         Assert.That(candidate, Is.Not.Null);

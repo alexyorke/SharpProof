@@ -74,8 +74,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 Measure("int/string", stringTarget, expected: false)
             ];
             control = Measure("control", controlTarget, expected: true);
-            var hasBox = instructions.Any(instruction => instruction.OpCode == "box");
-            var hasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst");
+            var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
+            var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
             var noInlining = (generic.GetMethodImplementationFlags() & MethodImplAttributes.NoInlining) != 0;
             await Save(evidenceDirectory, "runtime-observations.json", new
             {
@@ -126,10 +126,10 @@ public sealed class GenericTestedTypeAllocationAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() }).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToArray(),
             Cases = cases,
             Control = control,
-            AnyObservedAllocation = cases.Any(observed => observed.AllocatedBytes > 0),
+            AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.AllocatedBytes > 0)),
             FrozenRule = "Observed allocation > 0 implies the allocation-free claim cannot be Proven. Zero measured allocation rejects this hypothesis for the tested runtime."
         });
         Assert.That(response.Errors, Is.Empty);
@@ -146,6 +146,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static CaseObservation Measure(string name, Func<int, bool> target, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(target);
         var actual = target(InputValue);
         for (var index = 0; index < WarmupCount; index++)
         {
@@ -166,10 +168,11 @@ public sealed class GenericTestedTypeAllocationAuditTests
 
     private static IlInstruction[] ReadIl(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field.FieldType == typeof(OpCode))
-            .Select(field => (OpCode)field.GetValue(null)!)
-            .ToDictionary(opcode => unchecked((ushort)opcode.Value));
+            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = new List<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
@@ -197,11 +200,21 @@ public sealed class GenericTestedTypeAllocationAuditTests
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record CaseObservation(string Name, bool Expected, bool Actual, int TrueResults,
-        long AllocatedBytes, double BytesPerCall);
+        long AllocatedBytes, double BytesPerCall)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+    }
 
-    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex);
+    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string OperandHex { get; init; } = OperandHex ?? throw new System.ArgumentNullException(nameof(OperandHex));
+    }
 }

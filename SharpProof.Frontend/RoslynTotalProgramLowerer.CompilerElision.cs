@@ -32,6 +32,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     private bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
         out BasicBlock continuation)
     {
+        if (omitted is null)
+        {
+            throw new System.ArgumentNullException(nameof(omitted));
+        }
         SpendRegion();
         continuation = null!;
         var value = source.BranchValue!;
@@ -71,6 +75,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private bool BelongsToCompilerElidedOwner(IOperation operation, IInvocationOperation owner)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (owner is null)
+        {
+            throw new System.ArgumentNullException(nameof(owner));
+        }
         var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true &&
             _emission.OwningInvocation(expression) is { } actual &&
@@ -101,6 +113,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private ControlFlowRegion CompilerElisionBoundary(ControlFlowRegion region)
     {
+        if (region is null)
+        {
+            throw new System.ArgumentNullException(nameof(region));
+        }
         while (region.Kind == ControlFlowRegionKind.LocalLifetime)
         {
             SpendRegion();
@@ -111,12 +127,20 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RestoreCompilerBlock(BasicBlock block)
     {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
         if (!block.IsReachable && _compilerRestoredBlocks.Add(block))
         { _compilerRestorePending.Enqueue(block); }
     }
 
     private void RestoreCompilerElidedReachability(HashSet<ControlFlowRegion> filterRegions)
     {
+        if (filterRegions is null)
+        {
+            throw new System.ArgumentNullException(nameof(filterRegions));
+        }
         while (_compilerRestorePending.Count != 0)
         {
             SpendRegion();

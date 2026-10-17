@@ -60,10 +60,10 @@ public sealed class EffectSummaryDomainEquivalenceTests
         var graph = new DataflowGraph<EffectSummary>(
             [
                 new(0, state =>
-                    (state.AnalysisIncompleteReason & BothReasons) == BothReasons
+                    state is null ? throw new System.ArgumentNullException(nameof(state)) : ((state.AnalysisIncompleteReason & BothReasons) == BothReasons
                         ? receiverWrite
-                        : callPreconditionNotProven),
-                new(1, state => state)
+                        : callPreconditionNotProven)),
+                new(1, state => state is null ? throw new System.ArgumentNullException(nameof(state)) : (state))
             ],
             [
                 new(0, 0),
@@ -85,7 +85,7 @@ public sealed class EffectSummaryDomainEquivalenceTests
 
     private static EffectSummary IncompleteSummary(
         EffectAnalysisIncompleteReason reason,
-        EffectRegionSet writes = default)
+        EffectRegionSet writes /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */ = default)
     {
         return new EffectSummary(
             EffectRegionSet.Empty,

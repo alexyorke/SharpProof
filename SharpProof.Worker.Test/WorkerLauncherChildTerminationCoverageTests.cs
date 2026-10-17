@@ -84,6 +84,8 @@ public sealed partial class WorkerTests
 
     private static async Task VerifyTerminatedLauncherChildAsync(string marker, string token)
     {
+        System.ArgumentNullException.ThrowIfNull(marker);
+        System.ArgumentNullException.ThrowIfNull(token);
         using var project = TestProject.Create(TautologySource);
         var originalRequest = project.CreateRequest(cacheEnabled: false);
         var requestPath = Path.Combine(project.DirectoryPath, "terminated-request.json");
@@ -101,6 +103,7 @@ public sealed partial class WorkerTests
                 "--verify-policy", "advisory", "--assumption-policy", "allow", "--cache-enabled", "false"
             ], async (request, cancellationToken) =>
             {
+                System.ArgumentNullException.ThrowIfNull(request);
                 using var worker = new SharpProofWorker(new SignalingDelayingBackend(started));
                 var verification = worker.VerifyAsync(request, cancellationToken);
                 await Task.WhenAny(started.Task, verification);

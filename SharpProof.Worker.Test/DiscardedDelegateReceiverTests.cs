@@ -15,6 +15,7 @@ public sealed class DiscardedDelegateReceiverTests
     [TestCase("EnforcePure", false)]
     public async Task ErasurePreservesReceiverEvaluation(string claim, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
         var source = "using SharpProof.Attributes; public sealed class Receiver { public void Sink() {} } " +
             "public static class Subject { public static int State; " +
             "static Receiver GetReceiver() { State++; return null; } [" + claim +

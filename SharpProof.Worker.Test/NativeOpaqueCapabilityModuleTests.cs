@@ -34,6 +34,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
     public async Task LegalMayFacetsPreserveBoundsAndConcreteLockReplay(
         string facet, bool locked, bool synchronizationAllowed)
     {
+        System.ArgumentNullException.ThrowIfNull(facet);
         var (effects, capabilities) = Facets(facet);
         var (candidate, callSite, lockSite) = CreateModule(effects, locked);
         var decoded = IrOpaqueCallSite.Effects(candidate.Factory, callSite);
@@ -65,6 +66,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
     [TestCase("io-randomness")]
     public async Task MayCallFacetsCannotManufactureAConcreteRefutation(string facet)
     {
+        System.ArgumentNullException.ThrowIfNull(facet);
         var (effects, _) = Facets(facet);
         var (candidate, _, _) = CreateModule(effects, locked: false);
         var synchronizationFacet = (effects & IrOpaqueCallEffects.Synchronizes) != 0;
@@ -136,6 +138,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
     public async Task InferredIoMayFacetAndConcreteLockHaveIndependentNativeBounds(
         bool locked, bool synchronizationAllowed, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");

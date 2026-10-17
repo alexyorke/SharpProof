@@ -114,11 +114,11 @@ public sealed class WorkerVcCyclicRegionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
-        var claimId = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition && claim.Ordinal == 0).ClaimId;
-        var claim = response.ClaimResults.Single(result => result.ClaimId == claimId);
+        var claimId = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition && claim.Ordinal == 0)).ClaimId;
+        var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimId));
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(claim.Vacuity, Is.EqualTo(contradictory ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));
-        Assert.That(claim.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True);
+        Assert.That(claim.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.True);
     }
 
     [Test]
@@ -146,7 +146,7 @@ public sealed class WorkerVcCyclicRegionTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(RepeatedFilterSource);
         var total = artifact.Callables.Single().Total!;
-        var throws = total.Graph.Blocks.SelectMany(block => block.Instructions).Where(instruction => instruction.Kind == IrInstructionKind.Throw).ToArray();
+        var throws = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).ToArray();
         Assert.That(throws, Is.Not.Empty);
         foreach (var instruction in throws)
         {
@@ -203,10 +203,10 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
         Assert.That(first.Errors, Is.Empty);
         Assert.That(cached.Errors, Is.Empty);
-        var ordinals = cached.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
-            .ToDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
-        var posts = cached.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToArray();
-        Assert.That(posts.Select(result => result.Outcome),
+        var ordinals = cached.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
+            .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+        var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
             Is.EqualTo(new[] { repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
         Assert.That(posts[1].Model, Is.Not.Empty);
         Assert.That(JsonSerializer.Serialize(cached.ClaimResults, WorkerProtocolJson.SharedOptions),
@@ -233,7 +233,7 @@ public sealed class WorkerVcCyclicRegionTests
     public async Task HistoricalRepeatedFilterHasConcreteOriginalRefutationAndCache()
     {
         using var project = new ShadowTestProject(GoldenTest.Load("worker", "vc-shadow-exception-search").Source, cacheEnabled: true);
-        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("IRepeatedFilterClosed", StringComparison.Ordinal));
+        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("IRepeatedFilterClosed", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -252,8 +252,8 @@ public sealed class WorkerVcCyclicRegionTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             Assert.That(response.Errors, Is.Empty);
-            var claimId = response.Manifest.Claims.Single(claim => claim.CallableId == preparation.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
-            var claim = response.ClaimResults.Single(result => result.ClaimId == claimId);
+            var claimId = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == preparation.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)).ClaimId;
+            var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimId));
             Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(claim.Model, Is.Not.Empty);
         }

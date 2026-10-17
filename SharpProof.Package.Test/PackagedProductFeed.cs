@@ -46,6 +46,9 @@ internal sealed class PackagedProductFeed : IDisposable
         IReadOnlyList<PackagedPackage> symbolPackages,
         TempDirectory? ownedDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(packages);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(symbolPackages);
         Source = source;
         Packages = packages;
         SymbolPackages = symbolPackages;
@@ -84,19 +87,22 @@ internal sealed class PackagedProductFeed : IDisposable
 
     internal PackagedPackage GetPackage(string id)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
         return Packages.Single(package =>
-            string.Equals(package.Id, id, StringComparison.Ordinal));
+            package is null ? throw new System.ArgumentNullException(nameof(package)) : (string.Equals(package.Id, id, StringComparison.Ordinal)));
     }
 
     internal string GetPackagePath(string id)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
         return GetPackage(id).Path;
     }
 
     internal string GetSymbolPackagePath(string id)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
         return SymbolPackages.Single(package =>
-            string.Equals(package.Id, id, StringComparison.Ordinal)).Path;
+            package is null ? throw new System.ArgumentNullException(nameof(package)) : (string.Equals(package.Id, id, StringComparison.Ordinal))).Path;
     }
 
     public void Dispose()
@@ -169,6 +175,7 @@ internal sealed class PackagedProductFeed : IDisposable
         string source,
         TempDirectory? ownedDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var packages = ReadPackages(source, ".nupkg");
         var symbolPackages = ReadPackages(source, ".snupkg");
         ValidatePackages(packages, "package");
@@ -194,19 +201,21 @@ internal sealed class PackagedProductFeed : IDisposable
         string source,
         string extension)
     {
+        System.ArgumentNullException.ThrowIfNull(extension);
+        System.ArgumentNullException.ThrowIfNull(source);
         return [
             .. Directory.EnumerateFiles(
                 source,
                 "*",
                 SearchOption.TopDirectoryOnly)
-            .Where(path => string.Equals(
+            .Where(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (string.Equals(
                 Path.GetExtension(path),
                 extension,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase)))
             .Select(ReadPackage)
-            .OrderBy(package => Array.IndexOf(
+            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (Array.IndexOf(
                 s_expectedPackageIds,
-                package.Id))
+                package.Id)))
         ];
     }
 
@@ -214,7 +223,8 @@ internal sealed class PackagedProductFeed : IDisposable
         PackagedPackage[] packages,
         string kind)
     {
-        if (!packages.Select(static package => package.Id)
+        System.ArgumentNullException.ThrowIfNull(kind);
+        if (!packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id))
                 .SequenceEqual(s_expectedPackageIds, StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
@@ -224,10 +234,10 @@ internal sealed class PackagedProductFeed : IDisposable
                 string.Join(
                     ", ",
                     packages.Select(static package =>
-                        package.Id + " " + package.Version)));
+                        package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id + " " + package.Version))));
         }
 
-        if (packages.Select(static package => package.Version)
+        if (packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Version))
                 .Distinct(StringComparer.Ordinal).Count() != 1)
         {
             throw new InvalidOperationException(
@@ -237,21 +247,23 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static PackagedPackage ReadPackage(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var document = PackageNuspecReader.Read(path);
         var metadata = document.Root?.Elements()
             .Single(element =>
-                element.Name.LocalName == "metadata") ??
+                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "metadata")) ??
             throw new InvalidDataException(
                 "Package nuspec metadata was not found: " + path);
         var id = metadata.Elements()
-            .Single(element => element.Name.LocalName == "id").Value;
+            .Single(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "id")).Value;
         var version = metadata.Elements()
-            .Single(element => element.Name.LocalName == "version").Value;
+            .Single(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "version")).Value;
         return new PackagedPackage(id, version, path);
     }
 
     private static string[] ReadPackageProjects(string repositoryRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         var path = Path.Combine(
             repositoryRoot,
             "scripts",
@@ -292,6 +304,8 @@ internal sealed class PackagedProductFeed : IDisposable
         string workingDirectory,
         params string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = ProcessRunner.CreateStartInfo(
             workingDirectory,
             "dotnet",
@@ -312,21 +326,30 @@ internal sealed class PackagedProductFeed : IDisposable
 internal sealed record PackagedPackage(
     string Id,
     string Version,
-    string Path);
+    string Path)
+{
+    public string Id { get; init; } = Id ?? throw new System.ArgumentNullException(nameof(Id));
+    public string Version { get; init; } = Version ?? throw new System.ArgumentNullException(nameof(Version));
+    public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+}
 
 internal readonly record struct PackageProcessResult(
     int ExitCode,
-    string Output);
+    string Output)
+{
+    public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+}
 
 internal static class PackageNuspecReader
 {
     internal static XDocument Read(string packagePath)
     {
+        System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var nuspec = archive.Entries.Single(entry =>
-            entry.FullName.EndsWith(
+            entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName.EndsWith(
                 ".nuspec",
-                StringComparison.OrdinalIgnoreCase));
+                StringComparison.OrdinalIgnoreCase)));
         using var stream = nuspec.Open();
         return XDocument.Load(stream);
     }

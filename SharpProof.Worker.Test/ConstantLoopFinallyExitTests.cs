@@ -30,6 +30,9 @@ public sealed class ConstantLoopFinallyExitTests
     [TestCase("[EnforcePure]", "", "try { return x; } finally { State = 1; }", WorkerClaimOutcome.Refuted)]
     public async Task ConstantLoopFinallyBodiesVerify(string attribute, string contract, string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(contract);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "private static int Callee(int x) { while (true) { try { return x; } finally { x = 1; } } } " +
             "private static int ImpureCallee(int x) { while (true) { try { return x; } finally { State = 1; } } } " + attribute +

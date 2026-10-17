@@ -386,7 +386,7 @@ try {
     Assert-ExitCode $outcomes $false 'Mixed-outcomes verification'
     Assert-OutputContains `
         $outcomes `
-        @('failed with exit code 5') `
+        @('SP0051') `
         'Mixed-outcomes verification'
     $outcomeResult = Read-WorkerResult $outcomesResultPath
     if ([string]$outcomeResult.runStatus -ne 'Complete' -or

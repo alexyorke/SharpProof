@@ -7,6 +7,10 @@ internal static partial class CompilerOptionWireMappings
         CSharpCompilationOptions options,
         string name)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         if (options is null)
         {
             throw new ArgumentNullException(nameof(options));
@@ -23,6 +27,10 @@ internal static partial class CompilerOptionWireMappings
         string name)
     {
 
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         return ReadInternalBoolean(
             properties,
             typeof(MetadataReferenceProperties),
@@ -34,6 +42,14 @@ internal static partial class CompilerOptionWireMappings
         Type declaringType,
         string name)
     {
+        if (declaringType is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaringType));
+        }
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         var property = declaringType.GetProperty(
             name,
             System.Reflection.BindingFlags.Instance |

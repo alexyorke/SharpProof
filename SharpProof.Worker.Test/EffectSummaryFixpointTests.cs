@@ -273,6 +273,7 @@ public sealed class EffectSummaryFixpointTests
     [TestCase("[ZeroAllocations] public static int Root(object gate) { lock (gate) {} return 1; }", (int)SourceMayEffect.Synchronization)]
     public void LocalNonlocalWritesAndLocksRetainTheirEffectFacet(string members, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var summary = EffectSummaryFixpoint.ComputeValidated(Graph(members)).Values.Single();
         Assert.That(summary.MayEffects.HasFlag((SourceMayEffect)expected), Is.True);
         Assert.That(summary.UnknownEffects, Is.EqualTo(SourceMayEffect.None));
@@ -318,6 +319,7 @@ public sealed class EffectSummaryFixpointTests
 
     private static CompilerReachableSourceArtifact Graph(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { " + members + " }");
         return CompilerManifestArtifactJson.DeserializePrepared(

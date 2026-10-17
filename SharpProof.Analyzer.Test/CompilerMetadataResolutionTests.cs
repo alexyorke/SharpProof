@@ -16,8 +16,8 @@ public sealed class CompilerMetadataResolutionTests
         var compilation = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []);
         var reference = compilation.References
             .OfType<PortableExecutableReference>()
-            .First(candidate => candidate.FilePath != null &&
-                compilation.GetAssemblyOrModuleSymbol(candidate) is IAssemblySymbol);
+            .First(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.FilePath != null &&
+                compilation.GetAssemblyOrModuleSymbol(candidate) is IAssemblySymbol));
         var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
         var module = ((AssemblyMetadata)reference.GetMetadata()).GetModules()[0];
         var moduleName = CompilerCompilationCapture.ReadModuleName(
@@ -72,7 +72,7 @@ public sealed class CompilerMetadataResolutionTests
         using var pe = new PEReader(image);
         var reader = pe.GetMetadataReader();
         var definitions = reader.MethodDefinitions.ToDictionary(
-            handle => reader.GetString(reader.GetMethodDefinition(handle).Name),
+            handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetString(reader.GetMethodDefinition(handle).Name))),
             handle => handle);
 
         foreach (var (name, hasManagedBody) in new[]

@@ -36,7 +36,7 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
             }
             """, "OrdinaryMetadataShadowCaller", includeExternalEffectsFixture: false)
             .AddReferences(MetadataReference.CreateFromFile(libraryPath));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("MetadataHelper")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(method.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),

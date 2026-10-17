@@ -39,14 +39,14 @@ public sealed class ContractForCycleAnalyzerTests
         compilation = compilation.AddSyntaxTrees(excluded);
         var candidates = ContractForValidationEngine.FindCandidates(
             compilation,
-            tree => tree.FilePath != "excluded.cs",
+            tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"),
             CancellationToken.None);
 
         var diagnostics = ContractForValidationEngine.Validate(
             compilation,
             candidates,
             CancellationToken.None,
-            tree => tree.FilePath != "excluded.cs");
+            tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"));
 
         Assert.That(diagnostics, Is.Empty);
     }
@@ -103,18 +103,18 @@ public sealed class ContractForCycleAnalyzerTests
             """);
 
         var cycleDiagnostics = diagnostics
-            .Where(static diagnostic => diagnostic.Id == "SPCF0010")
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0010"))
             .ToArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
+                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EqualTo(
                     ["SPCF0010", "SP0047", "SPCF0010", "SP0047"]));
             Assert.That(
                 cycleDiagnostics.Select(static diagnostic =>
-                    diagnostic.GetMessage(
-                        System.Globalization.CultureInfo.InvariantCulture)),
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture))),
                 Is.EqualTo(
                     [
                         "Contract companion 'LeftContracts' targets " +
@@ -202,6 +202,7 @@ public sealed class ContractForCycleAnalyzerTests
     private static Task<System.Collections.Immutable.ImmutableArray<Diagnostic>>
         AnalyzeAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return AnalyzerTestHost.AnalyzeAsync(
             source,
             mode: "CONTRACTS",

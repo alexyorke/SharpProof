@@ -16,7 +16,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "integer-division.vb");
         var compilation = VisualBasicCompilation.Create("ActualIntegerDivision", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("ActualIntegerDivision", isCollectible: true);
@@ -28,7 +28,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             Assert.That(divide.Invoke(null, [7, 2]), Is.EqualTo(3));
             Assert.That(divide.Invoke(null, [-7, 2]), Is.EqualTo(-3));
             var syntax = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.BinaryExpressionSyntax>()
-                .Single(node => node.OperatorToken.ValueText == "\\");
+                .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.OperatorToken.ValueText == "\\"));
             var operation = (IBinaryOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
             Assert.That(operation.OperatorKind, Is.EqualTo(BinaryOperatorKind.IntegerDivide));
             Assert.That(operation.OperatorMethod, Is.Null);
@@ -37,10 +37,10 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, target);
             var lowerer = new RoslynTotalExpressionLowerer(context);
-            var children = operation.ChildOperations.Select(child => lowerer.LowerClause(child)).ToArray();
+            var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
             Assert.That(children, Has.Length.EqualTo(2));
-            Assert.That(children.All(child => child.Classification.IsExact), Is.True);
-            var rule = CSharpOperationSemantics.Apply(factory, operation, [.. children.Select(child => child.Value)]);
+            Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
+            var rule = CSharpOperationSemantics.Apply(factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]);
             Assert.That(rule.Classification.IsExact, Is.False);
             Assert.That(rule.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
             Assert.That(rule.Throws, Is.Empty);
@@ -51,7 +51,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             Assert.That(new IrInterpreter(factory).Evaluate(clause.SafeCondition).Value!.Boolean, Is.False);
             var addMethod = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Add").OfType<IMethodSymbol>().Single();
             var addContext = new TotalLoweringContext(factory, addMethod);
-            var addSyntax = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.BinaryExpressionSyntax>().Single(node => node.OperatorToken.ValueText == "+");
+            var addSyntax = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.BinaryExpressionSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.OperatorToken.ValueText == "+"));
             var addOperation = compilation.GetSemanticModel(tree).GetOperation(addSyntax)!;
             var builder = new IrProgramBuilder(factory);
             var entry = builder.CreateBlock("entry");
@@ -61,7 +61,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             var add = new RoslynTotalExpressionLowerer(addContext, builder, exceptionalExit).LowerBodyValue(addOperation, entry);
             Assert.That(add.Classification.IsExact, Is.True);
             builder.Return(add.Continuation, addContext.Site(addOperation), add.Value);
-            var environment = addContext.Parameters.ToDictionary(binding => binding.Current, binding => factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2));
+            var environment = addContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2)));
             var replay = new IrProgramInterpreter(factory).Execute(builder.Build(), environment);
             Assert.That(type.GetMethod("Add")!.Invoke(null, [7, 2]), Is.EqualTo(9));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

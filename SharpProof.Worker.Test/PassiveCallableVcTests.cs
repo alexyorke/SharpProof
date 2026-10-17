@@ -82,6 +82,9 @@ public sealed class PassiveCallableVcTests
     [TestCase("ulong", "18446744073709551615UL", "0UL")]
     public async Task SourceWrapUsesTheOriginalTypedBody(string type, string maximum, string wrapped)
     {
+        System.ArgumentNullException.ThrowIfNull(maximum);
+        System.ArgumentNullException.ThrowIfNull(type);
+        System.ArgumentNullException.ThrowIfNull(wrapped);
         var subject = PassiveSourceSubject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -128,7 +131,7 @@ public sealed class PassiveCallableVcTests
         var proof = await solver.VerifyEnsuresAsync(0);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
-        Assert.That(proof.Core.Any(label => label.StartsWith("assume:", StringComparison.Ordinal)), Is.True);
+        Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.True);
         var normal = await solver.VerifyFeasibilityAsync();
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
         Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
@@ -234,6 +237,7 @@ public sealed class PassiveCallableVcTests
     [TestCase("return Helper(x);")]
     public void UnsupportedSourceAssumeAndNonExactBodyCannotEnroll(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var subject = PassiveSourceSubject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -275,6 +279,7 @@ public sealed class PassiveCallableVcTests
     [TestCase("result")]
     public void CanonicalRoleAliasesCannotEnroll(string alias)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
         var subject = new ScalarSubject();
         subject.Builder.Return(subject.Builder.CreateBlock(), subject.Site, subject.Factory.Integer(0));
         var program = subject.Builder.Build();
@@ -321,11 +326,11 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Return(block, subject.Site, subject.Factory.Integer(0));
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false)));
         var query = plan.EnsuresQuery(0);
-        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
-        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<LoweredJustification>()
-            .Select(justification => justification.Operation).Distinct(),
+        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
+        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<LoweredJustification>()
+            .Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (justification.Operation)).Distinct(),
             Is.EqualTo(new[] { subject.Site }));
-        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<UserAssumedJustification>()
+        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<UserAssumedJustification>()
             .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
         var proof = (ProvenOutcome)await kernel.VerifyAsync(query);
@@ -367,6 +372,7 @@ public sealed class PassiveCallableVcTests
     [TestCase("call")]
     public void UnsupportedEffectsClose(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var subject = new ScalarSubject();
         var block = subject.Builder.CreateBlock();
         switch (scenario)
@@ -490,7 +496,7 @@ public sealed class PassiveCallableVcTests
         using var session = new CallableSolverSession(subject.Factory, new IrSmtBackendOptions());
         var actual = await session.CheckAsync(query, CancellationToken.None);
         Assert.That(actual.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
-        var missing = query.ModelVariables.First(variable => variable != subject.Parameter.Entry && variable != subject.Parameter.Current);
+        var missing = query.ModelVariables.First(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable != subject.Parameter.Entry && variable != subject.Parameter.Current));
         var kernel = new ProofKernel(new FixedModelBackend(new BackendModel(actual.Model!.Assignments.Remove(missing))));
         var outcome = await kernel.VerifyCallableAsync(query, plan.Replay(0));
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
@@ -670,7 +676,7 @@ public sealed class PassiveCallableVcTests
     public async Task BodyOldHeapReadsUseOwnedSnapshotRoles(bool array, bool correctClaim)
     {
         var (candidate, inputs) = BodyOldHeapCandidate(array);
-        var returned = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id;
+        var returned = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().Single().Value!.Id;
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, inputs);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
@@ -684,7 +690,7 @@ public sealed class PassiveCallableVcTests
         var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0);
         Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id,
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().Single().Value!.Id,
             Is.EqualTo(returned));
         if (!correctClaim)
         { Assert.That(result.EntryModel.All(row => row.Key == candidate.Parameters.Single().Entry), Is.True); }
@@ -699,7 +705,7 @@ public sealed class PassiveCallableVcTests
         var owner = new PassiveParameterBinding(factory.CreateVariable("a", type), factory.CreateVariable("b", type), factory.CreateVariable("c", type));
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
         IrTerm Read(IrVarId variable)
-        { return array ? factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)) : factory.PureOpaque(field, factory.Variable(variable)); }
+        { if (variable.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(variable)); } return array ? factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)) : factory.PureOpaque(field, factory.Variable(variable)); }
         var block = subject.Builder.CreateBlock();
         subject.Builder.Assign(block, subject.Site, owner.Current, factory.Variable(owner.Entry));
         subject.Builder.Assign(block, subject.Site, owner.Old, factory.Variable(owner.Entry));
@@ -733,6 +739,7 @@ public sealed class PassiveCallableVcTests
     [TestCase("write", null, false)]
     public async Task EffectReplayChecksApproximationAtSite(string kind, bool? readBefore, bool throwAfter)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var subject = new ScalarSubject();
         var factory = subject.Factory;
         var block = subject.Builder.CreateBlock();
@@ -780,6 +787,7 @@ public sealed class PassiveCallableVcTests
     [TestCase("orphan")]
     public void CallMarkersRequireFreshUnreadOwnedTargets(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
@@ -846,6 +854,7 @@ public sealed class PassiveCallableVcTests
         internal int Calls { get; private set; }
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(++Calls == 1 ? BackendCheckResult.Unknown(BackendFailureReason.Incomplete)
                 : BackendCheckResult.Unsatisfiable(Enumerable.Range(0, query.Assumptions.Length)));
@@ -870,21 +879,25 @@ public sealed class PassiveCallableVcTests
 
     private sealed class FixedModelBackend(BackendModel model) : ISmtBackend
     {
+        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(BackendCheckResult.Satisfiable(model));
+            return Task.FromResult(BackendCheckResult.Satisfiable(_guarded_model));
         }
     }
 
     private static PassiveCallableVcPlan Build(PassiveCallableCandidate candidate)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
         return plan!;
     }
 
     private static void AssertClosed(PassiveCallableCandidate candidate)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
@@ -894,6 +907,7 @@ public sealed class PassiveCallableVcTests
     {
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(BackendCheckResult.Unsatisfiable(Enumerable.Range(0, query.Assumptions.Length).Reverse()));
         }
@@ -918,6 +932,7 @@ public sealed class PassiveCallableVcTests
 
         internal PassiveCallableCandidate Candidate(IrTerm ensures, IrTerm? requires = null, IrTerm? additionalEnsures = null)
         {
+            System.ArgumentNullException.ThrowIfNull(ensures);
             var clauses = ImmutableArray.CreateBuilder<PassiveContractClause>();
             clauses.Add(new(ensures, Factory.Boolean(true), Site));
             if (additionalEnsures != null)

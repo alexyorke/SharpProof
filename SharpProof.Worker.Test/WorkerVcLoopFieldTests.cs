@@ -89,6 +89,7 @@ public sealed class WorkerVcLoopFieldTests
     [TestCase("FillKeepsFlag")]
     public void LoopFieldPostconditionIsProven(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
@@ -101,11 +102,12 @@ public sealed class WorkerVcLoopFieldTests
 
     private static WorkerClaimResult Claim(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var name = "M:Counter." + method;
-        var callable = response.Manifest.Callables.Single(callable => callable.CallableId == name ||
+        var callable = response.Manifest.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == name ||
             callable.CallableId.StartsWith(name + "(", StringComparison.Ordinal) ||
-            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal));
-        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

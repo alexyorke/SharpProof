@@ -20,6 +20,10 @@ public sealed class InactiveConcatLengthBoundaryTests
             factory.Binary(IrBinaryOperator.StringConcat, factory.Variable(first), factory.Variable(second)), factory.Variable(third));
         Assumption Length(SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag> variable, int count)
         {
+            if (variable.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(variable));
+            }
             return
             new(factory, factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(variable)), factory.Integer(count)),
                 new LoweredJustification(factory.CreateOperation()));

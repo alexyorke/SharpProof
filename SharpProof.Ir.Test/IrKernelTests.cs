@@ -93,6 +93,9 @@ public sealed class IrKernelTests
         var interpreter = new IrInterpreter(factory);
         bool Evaluate(IrTerm term, IrValue a, IrValue b)
         {
+            System.ArgumentNullException.ThrowIfNull(a);
+            System.ArgumentNullException.ThrowIfNull(b);
+            System.ArgumentNullException.ThrowIfNull(term);
             return interpreter.Evaluate(term, new Dictionary<IrVarId, IrValue> { [left] = a, [right] = b }).Value!.Boolean;
         }
         var text = factory.CreateStringValue(new string('a', 2));
@@ -716,6 +719,7 @@ public sealed class IrKernelTests
         IrTypeKind operandKind,
         string expectedText)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedText);
         var factory = new IrFactory();
         var type = operandKind == IrTypeKind.Boolean
             ? factory.BooleanType
@@ -754,6 +758,7 @@ public sealed class IrKernelTests
         IrTypeKind operandKind,
         string token)
     {
+        System.ArgumentNullException.ThrowIfNull(token);
         var factory = new IrFactory();
         var type = operandKind switch
         {
@@ -807,13 +812,15 @@ public sealed class IrKernelTests
             IrBinaryOperator[] operators,
             IrTerm[] operands)
         {
+            System.ArgumentNullException.ThrowIfNull(operands, nameof(operands));
+            System.ArgumentNullException.ThrowIfNull(operators, nameof(operators));
             var terms = operators
                 .Select(value => factory.Binary(value, operands[0], operands[1]))
                 .Cast<IrBinaryTerm>()
                 .ToArray();
             Assert.That(terms, Is.Unique);
             Assert.That(
-                terms.Select(static term => term.Operator),
+                terms.Select(static term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Operator)),
                 Is.EqualTo(operators));
         }
     }
@@ -936,6 +943,7 @@ public sealed class IrKernelTests
     public void InterpreterRejectsNonIntegerRuntimeKindsForIntegerBinaryOperators(
         IrBinaryOperator @operator, string expectedDetail)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedDetail);
         var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.IntegerType);
         var right = factory.CreateVariable("right", factory.IntegerType);
@@ -1297,6 +1305,9 @@ public sealed class IrKernelTests
         string flagName,
         string textName)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(flagName);
+        System.ArgumentNullException.ThrowIfNull(textName);
         var flag = factory.CreateVariable(flagName, factory.BooleanType);
         var text = factory.CreateVariable(textName, factory.StringType);
         return factory.Conditional(
@@ -1314,6 +1325,9 @@ public sealed class IrKernelTests
         IrTerm operand,
         int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(operand);
+        System.ArgumentNullException.ThrowIfNull(seed);
         var term = seed;
         for (var index = 0; index < depth; index++)
         {
@@ -1365,6 +1379,7 @@ public sealed class IrKernelTests
 
         IrTerm Nest(IrTerm leaf)
         {
+            System.ArgumentNullException.ThrowIfNull(leaf);
             var term = leaf;
             for (var index = 0; index < maximumDepth; index++)
             {
@@ -1437,6 +1452,8 @@ public sealed class IrKernelTests
 
         public ChangingIrTermList(IrTerm first, IrTerm later)
         {
+            System.ArgumentNullException.ThrowIfNull(first);
+            System.ArgumentNullException.ThrowIfNull(later);
             _first = first;
             _later = later;
         }

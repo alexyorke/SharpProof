@@ -70,6 +70,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
     [TestCase("00112233-4455-6677-8899-aabbccddeeff")]
     public async Task InvalidInvocationReportsFailureWithoutPublishing(string invocation)
     {
+        System.ArgumentNullException.ThrowIfNull(invocation);
         var directory = CreateDirectory();
         try
         {
@@ -223,7 +224,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
-                Assert.That(artifact.Manifest.Claims.Select(claim => claim.ClaimId).Distinct().Count(),
+                Assert.That(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().Count(),
                     Is.EqualTo(2));
                 Assert.That(await File.ReadAllTextAsync(request + ".completed"),
                     Is.EqualTo("00112233445566778899aabbccddeeff"));
@@ -263,9 +264,13 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string path, string request, string? packs = null,
         string source = "internal static class Subject { }",
-        ImmutableArray<AdditionalText> additionalFiles = default,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
         CancellationToken cancellationToken = default)
     {
+
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(source);
         var options = new Dictionary<string, string>
         {
             ["build_property.SharpProofProfile"] = "advisory",
@@ -293,13 +298,14 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText,
         ICompilerAdditionalTextSnapshot
     {
+        private CancellationTokenSource _guarded_cancellation = cancellation ?? throw new System.ArgumentNullException(nameof(cancellation));
         public override string Path => "input.data";
 
-        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellation.Token);
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(_guarded_cancellation.Token);
 
         public override SourceText GetText(CancellationToken cancellationToken = default)
         {
-            cancellation.Cancel();
+            _guarded_cancellation.Cancel();
             cancellationToken.ThrowIfCancellationRequested();
             return SourceText.From(string.Empty);
         }

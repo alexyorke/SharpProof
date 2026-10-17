@@ -3,6 +3,10 @@ using SharpProof.Fuzz;
 using var cancellation = new CancellationTokenSource();
 ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
 {
+    if (eventArgs is null)
+    {
+        throw new System.ArgumentNullException(nameof(eventArgs));
+    }
     eventArgs.Cancel = true;
     cancellation.Cancel();
 };

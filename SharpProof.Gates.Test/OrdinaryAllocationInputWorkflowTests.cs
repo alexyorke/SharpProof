@@ -20,6 +20,7 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         """)]
     public async Task ActualSourcePreconditionSelectsAConcreteStringInput(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var report = await ObserveSourceAsync(source);
 
         using (Assert.EnterMultipleScope())
@@ -55,6 +56,7 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         """)]
     public async Task ActualSameTypeSourcePreconditionsSelectConcreteNominalAndSharedInputs(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var report = await ObserveSourceAsync(source);
 
         using (Assert.EnterMultipleScope())
@@ -73,6 +75,7 @@ public sealed class OrdinaryAllocationInputWorkflowTests
     [TestCase("public static class C { public static int Target<T>(int value) where T : class => value; }")]
     public async Task ActualGenericConstraintsSelectOnlyTheAdmissibleReferenceInstantiation(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var report = await ObserveSourceAsync(source);
 
         using (Assert.EnterMultipleScope())
@@ -101,10 +104,10 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         {
             Assert.That(report.NativeProven, Is.EqualTo(2));
             Assert.That(report.Rows, Has.Length.EqualTo(2));
-            Assert.That(report.Rows.Select(static row => row.NativeOutcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(report.Rows.Select(static row => row.RuntimeOracle), Is.All.EqualTo("Confirmed"));
-            Assert.That(report.Rows.Select(static row => row.RuntimeChecks), Is.All.EqualTo(1));
-            Assert.That(report.Rows.Select(static row => row.AllocatedBytes), Is.All.EqualTo(0L));
+            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeOutcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RuntimeOracle)), Is.All.EqualTo("Confirmed"));
+            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RuntimeChecks)), Is.All.EqualTo(1));
+            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AllocatedBytes)), Is.All.EqualTo(0L));
             Assert.That(report.RuntimeContradictions, Is.Zero);
             Assert.That(report.Passed, Is.True);
         }
@@ -112,11 +115,13 @@ public sealed class OrdinaryAllocationInputWorkflowTests
 
     private static Task<NativeEffectOracleReport> ObserveSourceAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-allocation-inputs.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Select(declaration =>
         {
+            System.ArgumentNullException.ThrowIfNull(declaration);
             var span = declaration.GetLocation().GetLineSpan();
             return new OpenSourceCorpusMethod("ordinary-" + declaration.Identifier.ValueText, "fixture", file.Path,
                 span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
@@ -125,7 +130,7 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         }).ToImmutableArray();
         var document = new OpenSourceCorpusDocument(2, [], [file], methods);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
-        return NativeEffectOracleGate.ObserveAsync(compilation, methods.Select(static method => method.Id).ToImmutableArray(),
+        return NativeEffectOracleGate.ObserveAsync(compilation, methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(),
             RepositoryLayout.FindRoot(), "ordinary-allocation-inputs", methods.Length, allocations: true);
     }
 }

@@ -49,6 +49,8 @@ public sealed class ConfigurationDiagnosticsRegressionTests
     [TestCase("sharpproof_profile", "off")]
     public async Task TreeOverridesOfPackageDefaultsAreDiagnosed(string key, string value)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
+        System.ArgumentNullException.ThrowIfNull(value);
         var compilation = AnalyzerTestHost.CreateCompilation(
             "public static class Fixture { public static int Run() => 1; }", ["SP0025"]);
         var options = new FixedOptionsProvider(
@@ -84,18 +86,18 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         {
             AnalyzerTestHost.AssertIds(diagnostics, "SP0025", "SP0025");
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.GetMessage(
-                    CultureInfo.InvariantCulture)),
+                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture))),
                 Has.Some.Contain("sharpproof_profile"));
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.GetMessage(
-                    CultureInfo.InvariantCulture)),
+                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture))),
                 Has.Some.Contain("sharpproof_features"));
             Assert.That(
                 diagnostics.Single(static diagnostic =>
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains(
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains(
                         "sharpproof_features",
-                        StringComparison.Ordinal))
+                        StringComparison.Ordinal)))
                     .Location.SourceTree,
                 Is.SameAs(compilation.SyntaxTrees.Single()));
         }
@@ -105,15 +107,19 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         AnalyzerConfigOptions global,
         AnalyzerConfigOptions tree) : AnalyzerConfigOptionsProvider
     {
-        public override AnalyzerConfigOptions GlobalOptions { get; } = global;
+        public override AnalyzerConfigOptions GlobalOptions { get; } = (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (global ?? throw new System.ArgumentNullException(nameof(global))));
 
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree _)
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree syntaxTree)
         {
+            ArgumentNullException.ThrowIfNull(syntaxTree);
+
             return tree;
         }
 
-        public override AnalyzerConfigOptions GetOptions(AdditionalText _)
+        public override AnalyzerConfigOptions GetOptions(AdditionalText text)
         {
+            ArgumentNullException.ThrowIfNull(text);
+
             return tree;
         }
     }
@@ -133,6 +139,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return failTreeOptions
                 ? throw new AggregateException(
                     new OperationCanceledException())
@@ -141,6 +148,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return Empty;
         }
     }

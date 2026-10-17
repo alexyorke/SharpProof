@@ -51,7 +51,7 @@ public sealed class NativeCompilerEntryConstraintReplayTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
         var preparation = preparations.Single(static item =>
-            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.CallPreconditions, Is.Not.Empty);
         Assert.That(preparation.Total.DisjointInputs, Is.Not.Empty);
@@ -62,6 +62,7 @@ public sealed class NativeCompilerEntryConstraintReplayTests
 
     private static PassiveCallableVcPlan BuildPlan(PassiveCallableCandidate candidate)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         var success = PassiveCallableVcBuilder.TryBuild(candidate,
             out var plan, out var failure);
         Assert.That(success, Is.True, failure.ToString());

@@ -6,10 +6,10 @@ internal sealed class ContractApiSymbols(
     IMethodSymbol old,
     ContractSelectionInventory selections)
 {
-    internal ContractClauseSymbols Clauses { get; } = clauses;
-    internal IMethodSymbol Result { get; } = result;
-    internal IMethodSymbol Old { get; } = old;
-    internal ContractSelectionInventory Selections { get; } = selections;
+    internal ContractClauseSymbols Clauses { get; } = (clauses ?? throw new System.ArgumentNullException(nameof(clauses)));
+    internal IMethodSymbol Result { get; } = (result ?? throw new System.ArgumentNullException(nameof(result)));
+    internal IMethodSymbol Old { get; } = (old ?? throw new System.ArgumentNullException(nameof(old)));
+    internal ContractSelectionInventory Selections { get; } = (selections ?? throw new System.ArgumentNullException(nameof(selections)));
 
     internal static ContractApiSymbols? TryCreate(Compilation compilation)
     {
@@ -59,7 +59,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
             [ContractApiClauseRole.Assume] = ContractClauseClassification.Assume
         }.ToImmutableDictionary();
 
-    internal INamedTypeSymbol ContractType { get; } = contractType;
+    internal INamedTypeSymbol ContractType { get; } = (contractType ?? throw new System.ArgumentNullException(nameof(contractType)));
 
     internal static ContractClauseSymbols? TryCreate(Compilation compilation)
     {
@@ -78,6 +78,10 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal ContractClauseClassification? GetClauseClassification(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         var definition = method.OriginalDefinition;
         if (!SymbolEqualityComparer.Default.Equals(
                 definition.ContainingType,

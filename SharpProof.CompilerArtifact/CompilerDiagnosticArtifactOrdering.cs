@@ -13,15 +13,23 @@ internal static class CompilerDiagnosticArtifactOrdering
     internal static CompilerDiagnosticArtifact[] Canonicalize(
         IEnumerable<CompilerDiagnosticArtifact> diagnostics)
     {
+        if (diagnostics is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnostics));
+        }
         return [.. diagnostics
-            .OrderBy(static item => item, Comparer)];
+            .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), Comparer)];
     }
 
     internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
     {
+        if (diagnostics is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnostics));
+        }
         return diagnostics.Zip(
                 diagnostics.Skip(1),
-                static (left, right) => Compare(left, right) <= 0)
+                static (left, right) => left is null ? throw new System.ArgumentNullException(nameof(left)) : right is null ? throw new System.ArgumentNullException(nameof(right)) : (Compare(left, right) <= 0))
             .All(static ordered => ordered);
     }
 

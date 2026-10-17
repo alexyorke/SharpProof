@@ -28,6 +28,7 @@ public sealed class GoldenWorkerTests
     [TestCaseSource(nameof(Cases))]
     public async Task WorkerOutcomesMatchGolden(string caseName)
     {
+        System.ArgumentNullException.ThrowIfNull(caseName);
         var fixture = GoldenTest.Load("worker", caseName);
         const string prefix = "// golden-scenario: ";
         var first = fixture.Source.Split('\n')[0];
@@ -48,8 +49,8 @@ public sealed class GoldenWorkerTests
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
             : scenario == "vc-shadow-reference" ? await NativeVc(fixture.Source)
             : scenario == "typed-il-call-requires" ? await TypedIlCallRequires(fixture.Source)
-            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => NativeVc(artifact))
-            : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
+            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (NativeVc(artifact)))
+            : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (TotalArtifact(artifact)))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
             : scenario == "vc-exception-multi-entry" ? await VcExceptionMultiEntry()
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
@@ -72,6 +73,11 @@ public sealed class GoldenWorkerTests
                 var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
                 PassiveParameterBinding Parameter(string name, IrTypeId parameterType)
                 {
+                    if (parameterType.IsDefault)
+                    {
+                        throw new System.ArgumentOutOfRangeException(nameof(parameterType));
+                    }
+                    System.ArgumentNullException.ThrowIfNull(name);
                     return new(factory.CreateVariable(name + ":entry", parameterType), factory.CreateVariable(name + ":current", parameterType),
                         factory.CreateVariable(name + ":old", parameterType));
                 }
@@ -80,9 +86,9 @@ public sealed class GoldenWorkerTests
                 var flag = Parameter("flag", factory.BooleanType);
                 var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
                 IrTerm Read(IrTerm owner)
-                { return array ? factory.SequenceAccess(owner, factory.Integer(0)) : factory.PureOpaque(field, owner); }
+                { System.ArgumentNullException.ThrowIfNull(owner, nameof(owner)); return array ? factory.SequenceAccess(owner, factory.Integer(0)) : factory.PureOpaque(field, owner); }
                 IrTerm Equal(IrTerm left, IrTerm right)
-                { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+                { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
                 var site = factory.CreateOperation();
                 var requires = new List<PassiveContractClause>();
                 foreach (var parameter in new[] { a, b })
@@ -178,16 +184,18 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> TotalClaimResults(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
         var claims = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+                check => { System.ArgumentNullException.ThrowIfNull(check); claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, CancellationToken.None);
         }
         var callables = project.Snapshot.Callables.Select(preparation =>
         {
-            var reason = WorkerResultAssembler.ProjectCallableReasons(preparation.Entry.ClaimIds.Select(id => claims[id])).Reason;
+            System.ArgumentNullException.ThrowIfNull(preparation);
+            var reason = WorkerResultAssembler.ProjectCallableReasons(preparation.Entry.ClaimIds.Select(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (claims[id]))).Reason;
             return new WorkerCallableResult
             {
                 CallableId = preparation.Entry.CallableId,
@@ -201,13 +209,13 @@ public sealed class GoldenWorkerTests
             runStatus, failureReason, callables, claims.Values, project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var json = WorkerProtocolJson.SerializeResponse(response);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var output = new StringBuilder();
         output.AppendLine("candidate-authority: Total IR (legacy worker routing retained)");
         output.AppendLine("run: " + response.RunStatus);
         output.AppendLine("wire-valid: True");
         output.AppendLine("serialized: " + (json.Length > 0));
-        foreach (var claim in response.Manifest.Claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal))
+        foreach (var claim in response.Manifest.Claims.OrderBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal).ThenBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal)))
         {
             var result = claims[claim.ClaimId];
             output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal);
@@ -222,6 +230,7 @@ public sealed class GoldenWorkerTests
 
     private static string VcLoopPrologueReentry(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var output = new StringBuilder();
         output.AppendLine("source-contract: finite direct prologue before scalar loop");
         output.AppendLine("payload: canonical re-encoding with original ID/site/predicate");
@@ -259,8 +268,8 @@ public sealed class GoldenWorkerTests
         {
             var pendingCandidate = PassiveExceptionLoopTests.ChangingPendingExceptionCandidate(explicitThrows);
             var pendingExecution = new IrProgramInterpreter(pendingCandidate.Factory).Execute(pendingCandidate.Program);
-            var sites = pendingCandidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>()
-                .Select(thrown => thrown.Operation).ToArray();
+            var sites = pendingCandidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>()
+                .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToArray();
             var prefix = explicitThrows ? "explicit-pending" : "builtin-pending";
             output.AppendLine(prefix + "-original-kind: " + pendingExecution.Exception!.Kind);
             Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason), Is.True, reason.ToString());
@@ -271,7 +280,7 @@ public sealed class GoldenWorkerTests
                 if (!explicitThrows && allowReplacement)
                 { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
                 var pendingPolicy = await pendingSolver.VerifyExceptionsAsync(allowed,
-                    allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true);
+                    allowedSite: site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (site == sites[0] || allowReplacement && site == sites[1]), exactSite: _ => true);
                 output.AppendLine(prefix + (allowReplacement ? "-complete-policy: " : "-restricted-policy: ") + pendingPolicy.Outcome!.GetType().Name);
             }
         }
@@ -291,6 +300,7 @@ public sealed class GoldenWorkerTests
 
     private static string VcAssumePlacement(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var output = new StringBuilder();
         output.AppendLine("source-contract: direct prologue");
         output.AppendLine("payload: canonical re-encoding with original ID/site/predicate");
@@ -301,6 +311,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> NativeMeterBoundary(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
@@ -316,7 +327,7 @@ public sealed class GoldenWorkerTests
         Assert.That(normalCost, Is.GreaterThan(0));
         project.Request.Budgets.MethodRlimit = checked((uint)(project.Request.Budgets.QueryRlimit + entryCost + normalCost / 2));
         TotalCallableClaimCheck? check = null;
-        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, value => check = value, CancellationToken.None);
+        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, value => { System.ArgumentNullException.ThrowIfNull(value); check = value; }, CancellationToken.None);
         Assert.That(check, Is.Not.Null);
         Assert.That(check!.Feasibility, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
         Assert.That(check.Enrolled, Is.True);
@@ -340,6 +351,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> NativeCompletedBoundary(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var backend = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
@@ -369,18 +381,21 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> NativeVc(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source, cacheEnabled: true);
         return await NativeVc(project);
     }
 
     private static async Task<string> NativeVc(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact, cacheEnabled: true);
         return await NativeVc(project);
     }
 
     private static async Task<string> TypedIlCallRequires(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         const string boundaryMarker = "// golden-library:";
         var boundary = source.IndexOf(boundaryMarker, StringComparison.Ordinal);
@@ -423,7 +438,7 @@ public sealed class GoldenWorkerTests
             var replay = new IrProgramReplayOptions(static _ => null)
             {
                 AssignmentObserver = (instruction, value, _) =>
-                { if (instruction.Id == marker) { observations.Add(value.Boolean); } }
+                { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observations.Add(value.Boolean); } }
             };
             var concrete = referenceInputs ? input == null ? factory.CreateNullValue(factory.GetVariableInfo(entry).Type) :
                 nominalInputs ? factory.CreateReferenceValue(factory.GetVariableInfo(entry).Type, input) : factory.CreateStringValue((string)input) : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)(int)input!);
@@ -459,6 +474,8 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> TypedIlGolden(string source, Func<CompilerManifestArtifact, Task<string>> render)
     {
+        System.ArgumentNullException.ThrowIfNull(render);
+        System.ArgumentNullException.ThrowIfNull(source);
         const string marker = "// metadata-library";
         var boundary = source.IndexOf(marker, StringComparison.Ordinal);
         Assert.That(boundary, Is.GreaterThan(0));
@@ -472,7 +489,7 @@ public sealed class GoldenWorkerTests
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => checks[check.ClaimId] = check, CancellationToken.None);
+                check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, CancellationToken.None);
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var output = new StringBuilder();
@@ -489,27 +506,27 @@ public sealed class GoldenWorkerTests
                     Is.EqualTo(JsonSerializer.Serialize(original, WorkerProtocolJson.SharedOptions)));
             }
             original = response.ClaimResults;
-            var claims = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
-            var ids = claims.Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
-            var results = response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToDictionary(result => result.ClaimId, StringComparer.Ordinal);
+            var claims = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
+            var ids = claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
+            var results = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToDictionary(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
             Assert.That(results.Keys, Is.EquivalentTo(ids));
             output.AppendLine("run: " + run);
             output.AppendLine("authority: native");
             output.AppendLine("request-bindings: True");
             output.AppendLine("cache: " + response.Summary.CacheStatus);
             output.AppendLine("postconditions: " + claims.Length);
-            output.AppendLine("enrolled: " + checks.Values.Count(check => check.Enrolled));
-            output.AppendLine("checked: " + checks.Values.Count(check => check.Checked));
-            output.AppendLine("unknown: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Unknown));
-            output.AppendLine("proven: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Proven));
-            output.AppendLine("refuted: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Refuted));
+            output.AppendLine("enrolled: " + checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled)));
+            output.AppendLine("checked: " + checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)));
+            output.AppendLine("unknown: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown)));
+            output.AppendLine("proven: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)));
+            output.AppendLine("refuted: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)));
             // Artifact claim hashes can include temporary metadata document paths.
             // Callable identity and source ordinal give every fixture stable ordering.
-            var ordered = claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal);
+            var ordered = claims.OrderBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal).ThenBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal));
             foreach (var claim in ordered)
             {
                 var result = results[claim.ClaimId];
-                var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == claim.CallableId);
+                var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == claim.CallableId));
                 checks.TryGetValue(claim.ClaimId, out var check);
                 if (check != null)
                 {
@@ -524,8 +541,8 @@ public sealed class GoldenWorkerTests
                 output.AppendLine("  reason: " + result.Reason);
                 output.AppendLine("  vacuity: " + result.Vacuity);
                 output.AppendLine("  feasibility: " + (check?.Feasibility ?? PassiveCallableFeasibilityKind.Unknown));
-                output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption.Used &&
-                    assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification));
+                output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used &&
+                    assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification)));
             }
         }
         return output.ToString();
@@ -533,31 +550,32 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> ReachableSource(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var reachable = artifact.ReachableSource!;
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"collection-complete: {reachable.CollectionComplete}");
         output.AppendLine(CultureInfo.InvariantCulture, $"bodies: {reachable.Bodies.Length}");
-        output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => !body.CallsComplete)}");
-        output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body.SourceCalls.Length)}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (!body.CallsComplete))}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceCalls.Length))}");
         if (source.Contains("// golden-total-call-preconditions: true", StringComparison.Ordinal))
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
-            var encodedCount = artifact.Callables.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
-            var decodedCount = prepared.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
+            var encodedCount = artifact.Callables.Sum(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length ?? 0));
+            var decodedCount = prepared.Sum(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length ?? 0));
             Assert.That(encodedCount, Is.EqualTo(2));
             Assert.That(decodedCount, Is.EqualTo(encodedCount));
             output.AppendLine(CultureInfo.InvariantCulture, $"total-call-preconditions: encoded={encodedCount} decoded={decodedCount}");
         }
         if (source.Contains("// golden-mutation: void-call-return", StringComparison.Ordinal))
         {
-            var graph = reachable.Bodies.Single(body => body.IsCallSkeleton).Graph!;
+            var graph = reachable.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)).Graph!;
             // Keep the first void member unchanged so canonical graph closure
             // cannot mask the second member's invalid return signature.
-            var member = graph.Members.Single(value => value.Name.Contains("Helper", StringComparison.Ordinal));
+            var member = graph.Members.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Name.Contains("Helper", StringComparison.Ordinal)));
             member.ReturnType = Array.FindIndex(graph.Types,
-                type => type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed);
+                type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed));
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
             PortableIrGraphCodec.Decode(graph);
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
@@ -568,7 +586,7 @@ public sealed class GoldenWorkerTests
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
             var count = 0;
-            foreach (var owner in prepared.Where(owner => owner.Total?.CallPreconditions.Length > 0))
+            foreach (var owner in prepared.Where(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length > 0)))
             {
                 var candidate = PassiveCallableArtifactAdapter.Enroll(owner)!;
                 Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -659,18 +677,19 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> TotalArtifact(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var output = new StringBuilder(await TotalArtifact(artifact));
         using var project = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedSource);
         var total = project.Snapshot.Callables.Single().Total!;
-        output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair.Left + ":" + pair.Right)));
+        output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : (pair.Left + ":" + pair.Right))));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
         output.AppendLine("distinct-sealed-identity: " + response.ClaimResults.Single().Outcome);
         using var fields = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
         var fieldArtifact = CompilerTotalCallableArtifactCodec.Encode(fields.Snapshot.Callables.Single().Total)!;
-        output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type.ClosedSealedReference));
+        output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ClosedSealedReference)));
         using var fieldWorker = SharpProofWorker.Create(fields.Request.Budgets);
         var fieldResponse = await fieldWorker.VerifyAsync(fields.Request, fields.Snapshot, CancellationToken.None);
         Assert.That(fieldResponse.Errors, Is.Empty);
@@ -680,6 +699,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> TotalArtifact(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         var row = artifact.Callables.Single();
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
         var preparation = prepared.Single();
@@ -696,14 +716,15 @@ public sealed class GoldenWorkerTests
         output.AppendLine("total-present: " + (row.Total != null));
         output.AppendLine("integer-width: " + type.Width);
         output.AppendLine("unsigned: " + !type.Signed);
-        output.AppendLine("roots-interleaved: " + row.Total!.Clauses.Select((clause, ordinal) => clause.ValueRoot == ordinal * 2 && clause.SafeRoot == ordinal * 2 + 1).All(value => value));
-        output.AppendLine("same-claim-ids: " + total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).Select(clause => clause.ClaimId).SequenceEqual(artifact.Manifest.Claims.Select(claim => claim.ClaimId)));
+        output.AppendLine("roots-interleaved: " + row.Total!.Clauses.Select((clause, ordinal) => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ValueRoot == ordinal * 2 && clause.SafeRoot == ordinal * 2 + 1)).All(value => value));
+        output.AppendLine("same-claim-ids: " + total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).SequenceEqual(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         output.AppendLine("full-ulong-wrap: " + proven.Outcome!.GetType().Name);
         return output.ToString();
     }
 
     private static async Task<string> ArtifactPassiveEnrollment(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
         var candidate = PassiveCallableArtifactAdapter.Enroll(prepared.Single())!;
@@ -723,6 +744,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> PassiveVc(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var subject = PassiveSourceSubject.Create(source);
         var candidate = subject.Enroll()!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
@@ -793,6 +815,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> SynchronizationProjection(GoldenCase fixture)
     {
+        System.ArgumentNullException.ThrowIfNull(fixture);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(fixture.Source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         var preparation = preparations.Single();
@@ -804,6 +827,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> Verify(GoldenCase fixture, string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(fixture);
         using var directory = new TempDirectory("sharpproof-golden-worker-");
         var sourcePath = Path.Combine(directory.FullName, Path.GetFileName(fixture.RelativePath));
         var compilation = TestCompilation.Create("GoldenWorker", OutputKind.DynamicallyLinkedLibrary,
@@ -839,6 +863,7 @@ public sealed class GoldenWorkerTests
                 "--publish-request", stableRequest, "--publish-result", stableResult,
                 "--publish-compiler-manifest", stableManifest], async (invocation, token) =>
             {
+                System.ArgumentNullException.ThrowIfNull(invocation);
                 using var worker = SharpProofWorker.Create(invocation.Budgets);
                 var expired = Stopwatch.GetTimestamp() - Stopwatch.Frequency;
                 var interrupted = await worker.VerifyAsync(invocation, null, token, expired);
@@ -921,6 +946,7 @@ public sealed class GoldenWorkerTests
                     runtimeExit = await Program.RunMain(arguments.ToArray(),
                         async (invocation, token) =>
                         {
+                            System.ArgumentNullException.ThrowIfNull(invocation);
                             entered = true;
                             using var worker = SharpProofWorker.Create(invocation.Budgets);
                             return await worker.VerifyAsync(invocation, token);
@@ -968,6 +994,7 @@ public sealed class GoldenWorkerTests
                         "--cache-enabled", "false", "--publish-request", Path.Combine(directory.FullName, name + "-published-request.json"),
                         "--publish-result", stableResult, "--publish-compiler-manifest", stableManifest], async (invocation, token) =>
                         {
+                            System.ArgumentNullException.ThrowIfNull(invocation);
                             using var worker = SharpProofWorker.Create(invocation.Budgets);
                             return await worker.VerifyAsync(invocation, token);
                         });
@@ -1000,7 +1027,7 @@ public sealed class GoldenWorkerTests
                 mixed = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(mixed))!;
                 var bound = WorkerProtocolJson.ValidateForRequest(mixed, WorkerProtocolJson.ComputeRequestHash(request),
                     input.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
-                Assert.That(bound.IsValid, Is.True, string.Join(';', bound.Errors.Select(error => error.Code)));
+                Assert.That(bound.IsValid, Is.True, string.Join(';', bound.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
                 mixedOutput.AppendLine("record-order: " + (reverseRecords ? "timeout-first" : "fatal-first"));
                 mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"run: {mixed.RunStatus}/{mixed.FailureReason}");
                 mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"request-bound: {bound.IsValid}");
@@ -1046,12 +1073,14 @@ public sealed class GoldenWorkerTests
 
             Task<int> Publish(string name, TaskCompletionSource? signal)
             {
+                System.ArgumentNullException.ThrowIfNull(name);
                 return Program.RunMain(["verify", "--request", Path.Combine(directory.FullName, name + "-request.json"),
                     "--result", Path.Combine(directory.FullName, name + "-result.json"), "--compiler-manifest", path,
                     "--verify-policy", "advisory", "--assumption-policy", "allow", "--cache-enabled", "false",
                     "--publish-request", stableRequest, "--publish-result", stableResult,
                     "--publish-compiler-manifest", stableManifest, "--publish-sarif", stableSarif], async (invocation, token) =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(invocation);
                     using var worker = SharpProofWorker.Create(invocation.Budgets);
                     var verifiedResponse = await worker.VerifyAsync(invocation, token);
                     signal?.SetResult();
@@ -1070,6 +1099,7 @@ public sealed class GoldenWorkerTests
                 "--assumption-policy", "allow", "--cache-enabled", "false"];
             exit = await Program.RunMain(arguments, async (invocation, _) =>
             {
+                System.ArgumentNullException.ThrowIfNull(invocation);
                 if (scenario == "promotion")
                 {
                     return WorkerResultAssembler.Create(WorkerResultAssembler.EmptyInputHash,
@@ -1096,7 +1126,7 @@ public sealed class GoldenWorkerTests
         var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
         var binding = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
             snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
-        Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error.Code)));
+        Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         Assert.That(response.RunStatus, Is.EqualTo(scenario is "identity" or "publication" or "publication-private-binding" ? WorkerRunStatus.Complete
             : scenario == "empty-canceled" ? WorkerRunStatus.Canceled : WorkerRunStatus.TimedOut));
         var output = new StringBuilder();
@@ -1122,10 +1152,10 @@ public sealed class GoldenWorkerTests
         }
         foreach (var claim in response.ClaimResults)
         {
-            var declaration = artifact.Manifest.Claims.Single(item => item.ClaimId == claim.ClaimId);
+            var declaration = artifact.Manifest.Claims.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == claim.ClaimId));
             output.AppendLine(CultureInfo.InvariantCulture, $"claim: {declaration.Kind}[{declaration.Ordinal}] {claim.Outcome}/{claim.Reason} vacuity={claim.Vacuity}");
         }
-        foreach (var error in response.Errors.OrderBy(error => error.Code, StringComparer.Ordinal))
+        foreach (var error in response.Errors.OrderBy(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code), StringComparer.Ordinal))
         {
             output.AppendLine("error: " + error.Code);
             if (scenario == "promotion")
@@ -1142,6 +1172,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> Replay(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         Assert.That(scenario, Is.AnyOf("replay-postcondition-approximation", "replay-guard-approximation",
             "replay-spec-result-unbound", "replay-spec-result-substitution", "replay-input-bound", "replay-input-no-provider",
             "replay-guard-unresolved"));
@@ -1203,6 +1234,7 @@ public sealed class GoldenWorkerTests
 
     private static async Task<string> TypedModel(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var isSigned = scenario[6] == 's';
         Assert.That(scenario[6], Is.AnyOf('s', 'u'));
         var width = int.Parse(scenario[7..], CultureInfo.InvariantCulture);
@@ -1321,10 +1353,14 @@ public sealed class GoldenWorkerTests
 
     private sealed class EntryModelBackend(IrVarId variable, IrValue value) : ISmtBackend
     {
+        private readonly IrVarId _variable = (value is null ? throw new System.ArgumentNullException(nameof(value)) : variable.IsDefault
+            ? throw new System.ArgumentOutOfRangeException(nameof(variable))
+            : variable);
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(BackendCheckResult.Satisfiable(new BackendModel([KeyValuePair.Create(variable, value)])));
+            return Task.FromResult(BackendCheckResult.Satisfiable(new BackendModel([KeyValuePair.Create(_variable, value)])));
         }
     }
 }

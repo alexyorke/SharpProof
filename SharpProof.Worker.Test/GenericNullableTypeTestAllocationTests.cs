@@ -53,6 +53,9 @@ public sealed class GenericNullableTypeTestAllocationTests
     [TestCase(8)]
     public async Task NullableTypeTestCannotProveZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var (members, run, releaseAllocates) = s_nullable[index];
         var source = Source(members, run);
         Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, 1), Is.GreaterThan(0), "Debug x=1");
@@ -72,6 +75,9 @@ public sealed class GenericNullableTypeTestAllocationTests
     [TestCase(3)]
     public async Task NonNullableTypeTestStillProvesZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var (members, run) = s_nonNullable[index];
         var source = Source(members, run);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
@@ -85,12 +91,15 @@ public sealed class GenericNullableTypeTestAllocationTests
 
     private static string Source(string members, string run)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(run);
         return "using SharpProof.Attributes; public enum E { A, B } public struct S { public int A; } " +
             "public static class C { [ZeroAllocations] " + members + " public static int Run(int x) => " + run + " ? 1 : 0; }";
     }
 
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("GenericNullableTypeTest", ("Subject.cs", source));
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
@@ -98,11 +107,12 @@ public sealed class GenericNullableTypeTestAllocationTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
     private static long AllocatedBytes(string source, OptimizationLevel optimization, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("GenericNullableTypeTestRuntime", source);
         using var image = new MemoryStream();
         var emission = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization)).Emit(image);

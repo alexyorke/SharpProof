@@ -17,7 +17,7 @@ public sealed class NativeFieldGoalAdmissionTests
 
     [TestCaseSource(nameof(RemainingPrimitiveCases))]
     public Task PrimitivePostconditionFieldsPreserveSnapshotAndViewAdmission(string typeName, bool upcastStoreView, bool oldSnapshot)
-    { return VerifyGoalAsync(typeName, upcastStoreView, oldSnapshot); }
+    { System.ArgumentNullException.ThrowIfNull(typeName, nameof(typeName)); return VerifyGoalAsync(typeName, upcastStoreView, oldSnapshot); }
 
     public static IEnumerable<TestCaseData> RemainingPrimitiveCases()
     {
@@ -57,9 +57,9 @@ public sealed class NativeFieldGoalAdmissionTests
             factory.CreateVariable("owner:current", boxType), factory.CreateVariable("owner:old", boxType));
         var site = factory.CreateOperation("postcondition-field-view-write");
         IrTerm Read(IrVarId owner)
-        { return factory.PureOpaque(field, factory.Variable(owner)); }
+        { if (owner.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(owner)); } return factory.PureOpaque(field, factory.Variable(owner)); }
         IrTerm Equal(IrTerm left, IrTerm right)
-        { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+        { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         var target = upcastStoreView ? factory.Cast(factory.ObjectType, factory.Variable(parameter.Current))

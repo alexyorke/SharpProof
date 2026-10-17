@@ -65,10 +65,11 @@ public sealed class TypedPortableIntegerTests
     [TestCase("bits")]
     public void MissingIntegerWireMetadataIsRejected(string field)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         var graph = CreateLiteralGraph(64);
         var json = JsonSerializer.SerializeToNode(graph, WorkerProtocolJson.SharedOptions)!;
         var row = field == "bits" ? json["terms"]![0]!
-            : json["types"]!.AsArray().Single(type => type!["width"]!.GetValue<int>() == 64)!;
+            : json["types"]!.AsArray().Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type!["width"]!.GetValue<int>() == 64))!;
         Assert.That(row.AsObject().Remove(field), Is.True);
         Assert.Throws<JsonException>((Action)(() => JsonSerializer.Deserialize<PortableIrGraph>(json.ToJsonString(),
             WorkerProtocolJson.SharedOptions)));
@@ -80,7 +81,7 @@ public sealed class TypedPortableIntegerTests
     public void InvalidTypedWidthCannotBecomeLegacy(int width)
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type.Width == 64).Width = width;
+        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Width = width;
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
@@ -88,7 +89,7 @@ public sealed class TypedPortableIntegerTests
     public void SignednessAndOutOfWidthBitsAreRejected()
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type.Width == 64).Signed = true;
+        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Signed = true;
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph)));
         graph = CreateLiteralGraph(8);
         graph.Terms[0].Bits = 256;

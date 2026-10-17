@@ -28,7 +28,7 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation(Source, ["SP0024"]);
         compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));

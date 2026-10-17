@@ -112,8 +112,8 @@ public sealed class CompilerScalarIlDecoderTests
                 Assert.That(decoded.IsDefault, Is.False);
                 Assert.That(decoded, Is.Not.Empty);
                 Assert.That(decoded.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(decoded.Any(instruction => instruction.Code == "Ldloc" && instruction.Operand >= 256), Is.EqualTo(!expectedProviderAdmission));
-                Assert.That(decoded.Any(instruction => instruction.Code == "Stloc" && instruction.Operand >= 256), Is.EqualTo(!expectedProviderAdmission));
+                Assert.That(decoded.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Ldloc" && instruction.Operand >= 256)), Is.EqualTo(!expectedProviderAdmission));
+                Assert.That(decoded.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Stloc" && instruction.Operand >= 256)), Is.EqualTo(!expectedProviderAdmission));
             }
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();

@@ -16,6 +16,8 @@ public sealed class TypedLoopLoweringTests
     [TestCase("int Target(int x) { do { x++; } while (x < 3); return x; }", 0, 3)]
     public void CompiledFiniteLoopBoundary(string members, object argument, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(argument);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(Convert.ToInt32(subject.Invoke([argument]), System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo(expected));
         var lowered = subject.Lower();
@@ -28,6 +30,7 @@ public sealed class TypedLoopLoweringTests
     [TestCase("long Target(long x) { do { unchecked { x++; } } while (x > 0L); return x; }", long.MaxValue, long.MinValue)]
     public void Signed64LoopWrapMatchesCompiled(string members, long argument, long expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([argument]), Is.EqualTo(expected));
         var lowered = subject.Lower();
@@ -66,7 +69,7 @@ public sealed class TypedLoopLoweringTests
         using var subject = TypedProgramSubject.Create("int Target(int x) { while (true) x++; }");
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var inputs = subject.Context.Parameters.ToDictionary(parameter => parameter.Entry, parameter => subject.Value(parameter.Entry, 0));
+        var inputs = subject.Context.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry), parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (subject.Value(parameter.Entry, 0)));
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs, maximumSteps: 4096);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.StepLimit));
         using var cancellation = new CancellationTokenSource();

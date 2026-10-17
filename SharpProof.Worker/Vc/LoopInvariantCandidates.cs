@@ -35,15 +35,15 @@ internal static class LoopInvariantCandidates
                 if (factory.GetTypeInfo(type) is not { Kind: IrTypeKind.Integer, Width: > 0 })
                 { continue; }
                 var others = anchors.Concat(tracked.Skip(ordinal + 1)).Append(factory.Integer(type, 0L));
-                foreach (var other in others.Where(other => other.Type == type).Distinct())
+                foreach (var other in others.Where(other => other is null ? throw new System.ArgumentNullException(nameof(other)) : (other.Type == type)).Distinct())
                 {
                     conditions.Add(factory.Binary(IrBinaryOperator.LessThanOrEqual, value, other));
                     conditions.Add(factory.Binary(IrBinaryOperator.LessThanOrEqual, other, value));
                     conditions.Add(factory.Binary(IrBinaryOperator.Equal, value, other));
                 }
             }
-            invariants.AddRange(conditions.Where(condition => condition is not IrBooleanTerm).Distinct()
-                .Take(MaximumPerLoop).Select(condition => new PassiveLoopCutter.Invariant(loop.Header, condition)));
+            invariants.AddRange(conditions.Where(condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (condition is not IrBooleanTerm)).Distinct()
+                .Take(MaximumPerLoop).Select(condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new PassiveLoopCutter.Invariant(loop.Header, condition))));
         }
         return invariants.ToImmutable();
     }
@@ -63,7 +63,7 @@ internal static class LoopInvariantCandidates
         var constants = new HashSet<IrTerm>();
         var lengths = new List<IrTerm>();
         var copies = new Dictionary<IrVarId, IrTerm?>();
-        foreach (var block in loop.Blocks.OrderBy(block => block.Value))
+        foreach (var block in loop.Blocks.OrderBy(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)))
         {
             foreach (var instruction in candidate.Program.GetBlock(block).Instructions)
             {
@@ -91,6 +91,7 @@ internal static class LoopInvariantCandidates
                 read.UnionWith(IrTraversal.CollectVariables(term));
                 _ = IrTraversal.Any(term, child =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(child);
                     if (child is IrLengthTerm)
                     { lengths.Add(child); }
                     return false;
@@ -99,6 +100,7 @@ internal static class LoopInvariantCandidates
                 {
                     _ = IrTraversal.Any(term, child =>
                     {
+                        System.ArgumentNullException.ThrowIfNull(child);
                         if (child is IrIntegerTerm)
                         { constants.Add(child); }
                         return false;
@@ -108,8 +110,8 @@ internal static class LoopInvariantCandidates
         }
         // Only state that enters the loop can be checked on its entry edges:
         // a variable the loop writes must also be set before it.
-        var entering = new HashSet<IrVarId>(candidate.Parameters.SelectMany(parameter => new[] { parameter.Current, parameter.Old }));
-        foreach (var block in candidate.Program.Blocks.Where(block => !loop.Blocks.Contains(block.Id)))
+        var entering = new HashSet<IrVarId>(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Current, parameter.Old }))));
+        foreach (var block in candidate.Program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (!loop.Blocks.Contains(block.Id))))
         {
             foreach (var instruction in block.Instructions)
             {
@@ -119,19 +121,19 @@ internal static class LoopInvariantCandidates
             }
         }
         // A field read through an input's Old snapshot is its entry value.
-        var snapshots = candidate.Parameters.SelectMany(parameter => new[]
+        var snapshots = candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[]
         {
             (parameter.Entry, (IrTerm)factory.Variable(parameter.Old)), (parameter.Current, factory.Variable(parameter.Old))
-        }).ToDictionary(pair => pair.Item1, pair => pair.Item2);
-        var entered = loop.Fields.Select(field => IrSubstitution.Substitute(factory, field, snapshots)).Where(field => !loop.Fields.Contains(field));
+        }))).ToDictionary(pair => pair.Item1, pair => pair.Item2);
+        var entered = loop.Fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (IrSubstitution.Substitute(factory, field, snapshots))).Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (!loop.Fields.Contains(field)));
         // The length of an array the loop does not replace is fixed.
         var resolved = copies.Where(pair => pair.Value != null).ToDictionary(pair => pair.Key, pair => pair.Value!);
-        var fixedLengths = lengths.Select(length => IrSubstitution.Substitute(factory, length, resolved))
-            .Where(length => IrTraversal.CollectVariables(length).All(variable => !written.Contains(variable))).Distinct();
-        var anchors = read.Where(variable => !written.Contains(variable)).OrderBy(variable => variable.Value)
-            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(entered).Concat(fixedLengths)
-            .Concat(constants.OrderBy(constant => constant.Id.Value)).ToArray();
-        return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.Value)
-            .Select(variable => (IrTerm)factory.Variable(variable)).Concat(loop.Fields)], anchors);
+        var fixedLengths = lengths.Select(length => length is null ? throw new System.ArgumentNullException(nameof(length)) : (IrSubstitution.Substitute(factory, length, resolved)))
+            .Where(length => length is null ? throw new System.ArgumentNullException(nameof(length)) : (IrTraversal.CollectVariables(length).All(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!written.Contains(variable))))).Distinct();
+        var anchors = read.Where(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!written.Contains(variable))).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
+            .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((IrTerm)factory.Variable(variable))).Concat(entered).Concat(fixedLengths)
+            .Concat(constants.OrderBy(constant => constant is null ? throw new System.ArgumentNullException(nameof(constant)) : (constant.Id.Value))).ToArray();
+        return ([.. loop.Writes.Where(entering.Contains).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
+            .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((IrTerm)factory.Variable(variable))).Concat(loop.Fields)], anchors);
     }
 }

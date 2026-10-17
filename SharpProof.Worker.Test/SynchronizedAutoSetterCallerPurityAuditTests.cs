@@ -69,7 +69,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -237,7 +237,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             Assert.That(syntaxRoot.DescendantNodes().OfType<ConstructorDeclarationSyntax>(), Is.Empty);
             Assert.That(syntaxRoot.DescendantNodes().OfType<FieldDeclarationSyntax>(), Is.Empty);
             Assert.That(propertySyntax.Initializer, Is.Null);
-            Assert.That(propertySyntax.AccessorList!.Accessors.All(accessor => accessor.Body == null && accessor.ExpressionBody == null), Is.True);
+            Assert.That(propertySyntax.AccessorList!.Accessors.All(accessor => accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body == null && accessor.ExpressionBody == null)), Is.True);
             Assert.That(setterSymbol.GetAttributes(), Has.Length.EqualTo(1));
             Assert.That(setterSymbol.GetAttributes().Single().AttributeClass!.ToDisplayString(), Is.EqualTo("System.Runtime.CompilerServices.MethodImplAttribute"));
             Assert.That(selectedTarget.Declaration!.Span, Is.EqualTo(targetSyntax.Span));
@@ -297,15 +297,15 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The fresh-receiver caller of the synchronized auto setter cannot be Proven EnforcePure."
                 : "The fresh-receiver caller of the NoInlining-only auto setter remains complete Proven EnforcePure."
         });
@@ -347,11 +347,15 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 }

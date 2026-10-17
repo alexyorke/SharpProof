@@ -22,12 +22,12 @@ public sealed class NullValueCompilerApiCoverageTests
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);
         var syntax = tree.GetRoot().DescendantNodes().OfType<LiteralExpressionSyntax>()
-            .Single(literal => literal.IsKind(SyntaxKind.NullLiteralExpression));
+            .Single(literal => literal is null ? throw new System.ArgumentNullException(nameof(literal)) : (literal.IsKind(SyntaxKind.NullLiteralExpression)));
         var model = compilation.GetSemanticModel(tree);
         var operation = model.GetOperation(syntax);
         Assert.That(operation, Is.AssignableTo<ILiteralOperation>());

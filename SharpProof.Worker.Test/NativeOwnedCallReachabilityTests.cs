@@ -14,6 +14,7 @@ public sealed class NativeOwnedCallReachabilityTests
     [TestCase("conditional-true", true)]
     public async Task OwnedCallObligationsFollowActualOriginalMarkerReach(string topology, bool reached)
     {
+        System.ArgumentNullException.ThrowIfNull(topology);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");

@@ -25,8 +25,8 @@ internal static class PublicationPaths
             var member = PublicationLease.CanonicalMember(path);
             var file = new FileInfo(member);
             var target = file.LinkTarget == null ? null : file.ResolveLinkTarget(returnFinalTarget: true);
-            if (directories.Any(directory => IsWithin(member, directory) ||
-                target != null && IsWithin(PublicationLease.CanonicalMember(target.FullName), directory)))
+            if (directories.Any(directory => directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (IsWithin(member, directory) ||
+                target != null && IsWithin(PublicationLease.CanonicalMember(target.FullName), directory))))
             {
                 throw new ArgumentException("SharpProof I/O paths must not be inside the worker runtime.", nameof(paths));
             }
@@ -35,6 +35,8 @@ internal static class PublicationPaths
 
     internal static bool IsWithin(string path, string directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(path);
         var root = Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar;
         return string.Equals(path, directory, StringComparison.Ordinal) || path.StartsWith(root, StringComparison.Ordinal);
     }

@@ -37,7 +37,7 @@ public sealed class CallableIdentityCollisionRegressionTests
         var result = new ClaimManifestBuilder(compilation).Build();
         Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
         Assert.That(
-            result.Manifest.Callables.Select(static callable => callable.CallableId)
+            result.Manifest.Callables.Select(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId))
                 .Distinct(StringComparer.Ordinal)
                 .Count(),
             Is.EqualTo(2));
@@ -81,7 +81,7 @@ public sealed class CallableIdentityCollisionRegressionTests
         var callables = result.Manifest.Callables;
         Assert.That(callables, Has.Length.EqualTo(4));
         Assert.That(
-            callables.Select(static callable => callable.CallableId)
+            callables.Select(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId))
                 .Distinct(StringComparer.Ordinal)
                 .Count(),
             Is.EqualTo(callables.Length));

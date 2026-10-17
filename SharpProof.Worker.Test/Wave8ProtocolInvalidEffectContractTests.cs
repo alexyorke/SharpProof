@@ -26,8 +26,8 @@ public sealed class Wave8ProtocolInvalidEffectContractTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(validation.IsValid, Is.False);
-            Assert.That(validation.Errors.Select(static error => error.Code), Contains.Item("manifest.claim_shape"));
-            Assert.That(validation.Errors.Select(static error => error.Code), Contains.Item("response.effect_witness"));
+            Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Contains.Item("manifest.claim_shape"));
+            Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Contains.Item("response.effect_witness"));
         }
     }
 }

@@ -45,7 +45,7 @@ public sealed class ClaimManifestBuilderTests
         {
             Assert.That(caller.OwnerId, Is.EqualTo(caller.Body.CallableId));
             Assert.That(caller.Body.CallPreconditions, Has.Length.EqualTo(2));
-            Assert.That(caller.Body.CallPreconditions.Select(static call => call.ClauseOrdinal), Is.EqualTo(DenseOrdinals));
+            Assert.That(caller.Body.CallPreconditions.Select(static call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseOrdinal)), Is.EqualTo(DenseOrdinals));
             var factory = caller.Body.Program.Factory;
             var entry = caller.Body.Parameters.Single().Entry;
             foreach (var input in FailingShadowInputs)
@@ -57,15 +57,15 @@ public sealed class ClaimManifestBuilderTests
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
                 var failed = caller.Body.CallPreconditions[input == 0 ? 0 : 1];
-                var marker = caller.Body.Program.Blocks.SelectMany(static block => block.Instructions)
-                    .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == failed.Instruction);
+                var marker = caller.Body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                    .OfType<IrAssignInstruction>().Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == failed.Instruction));
                 Assert.That(execution.GetCurrentValue(marker.Target)!.Boolean, Is.False);
             }
             Assert.That(caller.Body.Clauses, Is.Empty);
             Assert.That(caller.Body.ValidEffectClaimIds, Is.Empty);
             Assert.That(caller.Body.ExceptionConstraints, Is.Empty);
             Assert.That(caller.Body.IsBodyAbstraction, Is.False);
-            Assert.That(baseline.Manifest.Callables.Any(entry => entry.CallableId == caller.OwnerId), Is.False);
+            Assert.That(baseline.Manifest.Callables.Any(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId == caller.OwnerId)), Is.False);
         }
         Assert.That(System.Text.Json.JsonSerializer.Serialize(new ClaimManifestBuilder(compilation).Build().Manifest),
             Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
@@ -78,6 +78,9 @@ public sealed class ClaimManifestBuilderTests
     public void ShadowCallerPreparationRejectsUnmodeledInitialization(string ownerInitialization,
         string calleeInitialization, string expectedReason, bool moduleInitializer = false)
     {
+        System.ArgumentNullException.ThrowIfNull(calleeInitialization);
+        System.ArgumentNullException.ThrowIfNull(expectedReason);
+        System.ArgumentNullException.ThrowIfNull(ownerInitialization);
         var module = moduleInitializer ? """
             static class Bootstrap {
                 [System.Runtime.CompilerServices.ModuleInitializer]
@@ -99,7 +102,7 @@ public sealed class ClaimManifestBuilderTests
             """));
         var batch = PrepareShadowBatch(compilation);
         Assert.That(batch.Callers, Is.Empty);
-        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo(expectedReason));
+        Assert.That(batch.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)), Has.Some.EqualTo(expectedReason));
     }
 
     [Test]
@@ -152,8 +155,8 @@ public sealed class ClaimManifestBuilderTests
         var execution = new IrProgramInterpreter(body.Program.Factory).Execute(body.Program);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
-        var marker = body.Program.Blocks.SelectMany(static block => block.Instructions)
-            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == body.CallPreconditions.Single().Instruction);
+        var marker = body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrAssignInstruction>().Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == body.CallPreconditions.Single().Instruction));
         Assert.That(execution.GetCurrentValue(marker.Target), Is.Null);
     }
 
@@ -186,7 +189,7 @@ public sealed class ClaimManifestBuilderTests
             CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
         Assert.That(batch.Callers, Is.Empty);
-        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo("UnsupportedOwnContracts"));
+        Assert.That(batch.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)), Has.Some.EqualTo("UnsupportedOwnContracts"));
     }
 
     [Test]
@@ -207,6 +210,7 @@ public sealed class ClaimManifestBuilderTests
 
     private static CompilerShadowPreparationBatch PrepareShadowBatch(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
@@ -228,12 +232,12 @@ public sealed class ClaimManifestBuilderTests
         Assert.That(baseline.PotentialCalls, Is.Null);
         Assert.That(System.Text.Json.JsonSerializer.Serialize(shadow.Manifest),
             Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
-        var caller = shadow.PotentialCalls!.Owners.Single(static owner => owner.Method.Name == "Root");
+        var caller = shadow.PotentialCalls!.Owners.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.Name == "Root"));
         Assert.That(caller.DiscoveryComplete, Is.True);
         Assert.That(caller.Calls, Has.Length.EqualTo(1));
         Assert.That(caller.Calls.Single().Target.Name, Is.EqualTo("Positive"));
         Assert.That(caller.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(caller.Method)));
-        Assert.That(shadow.Manifest.Callables.Any(entry => entry.CallableId == caller.CallableId), Is.False);
+        Assert.That(shadow.Manifest.Callables.Any(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId == caller.CallableId)), Is.False);
         Assert.That(shadow.PotentialCalls.Gaps, Is.Empty);
     }
 
@@ -249,7 +253,7 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
-        Assert.That(shadow.Gaps.Select(static gap => gap.Reason),
+        Assert.That(shadow.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)),
             Is.EquivalentTo(PotentialOwnerGapReasons));
         Assert.That(shadow.Owners.Single().Method.Name, Is.EqualTo("Incomplete"));
         Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
@@ -365,9 +369,9 @@ public sealed class ClaimManifestBuilderTests
             """));
         Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
         Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
-        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+        Assert.That(result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).Distinct().Count(),
             Is.EqualTo(2));
-        Assert.That(result.Manifest.Claims.Select(static entry => entry.ClaimId).Distinct().Count(),
+        Assert.That(result.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)).Distinct().Count(),
             Is.EqualTo(2));
         Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
     }
@@ -388,11 +392,11 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         Assert.That(result.Manifest.Callables, Has.Length.EqualTo(3));
-        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+        Assert.That(result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).Distinct().Count(),
             Is.EqualTo(3));
         Assert.That(result.Manifest.Claims, Is.Empty);
-        Assert.That(result.Manifest.Callables.All(static entry => entry.Assumptions.Length == 1 &&
-            entry.Assumptions[0].Kind == WorkerAssumptionKind.TrustedBoundary), Is.True);
+        Assert.That(result.Manifest.Callables.All(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.Assumptions.Length == 1 &&
+            entry.Assumptions[0].Kind == WorkerAssumptionKind.TrustedBoundary)), Is.True);
         Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
     }
 
@@ -413,7 +417,7 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
-        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+        Assert.That(result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).Distinct().Count(),
             Is.EqualTo(2));
         Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
     }
@@ -438,9 +442,9 @@ public sealed class ClaimManifestBuilderTests
         var prepared = AssertIdentityArtifactRoundTrip(compilation, result);
         Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
         Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
-        Assert.That(prepared.All(static entry => entry.Total == null &&
-            entry.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
-        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+        Assert.That(prepared.All(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.Total == null &&
+            entry.FailureReason == WorkerClaimReason.UnsupportedCallable)), Is.True);
+        Assert.That(result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).Distinct().Count(),
             Is.EqualTo(2));
         Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
     }
@@ -535,8 +539,8 @@ public sealed class ClaimManifestBuilderTests
             """;
         var before = BuildIdentityArtifact(("Subject.cs", source));
         var after = BuildIdentityArtifact(("Subject.cs", source.Replace("Parent", "Renamed", StringComparison.Ordinal)));
-        var beforeTarget = before.Targets.Values.Single(static target => target.Method.Name == "Child");
-        var afterTarget = after.Targets.Values.Single(static target => target.Method.Name == "Child");
+        var beforeTarget = before.Targets.Values.Single(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Child"));
+        var afterTarget = after.Targets.Values.Single(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Child"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(afterTarget.Entry.CallableId, Is.EqualTo(beforeTarget.Entry.CallableId));
@@ -569,6 +573,9 @@ public sealed class ClaimManifestBuilderTests
     {
         MetadataReference Library(string assemblyName, string alias, string body)
         {
+            System.ArgumentNullException.ThrowIfNull(alias);
+            System.ArgumentNullException.ThrowIfNull(assemblyName);
+            System.ArgumentNullException.ThrowIfNull(body);
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 [CSharpSyntaxTree.ParseText("namespace Shared { public static class Api { public static int Helper(int value) => " + body + "; } }")],
@@ -601,13 +608,14 @@ public sealed class ClaimManifestBuilderTests
             """;
         ClaimManifestBuildResult Compile(string alias)
         {
+            System.ArgumentNullException.ThrowIfNull(alias);
             var tree = CSharpSyntaxTree.ParseText(source.Replace("CALLEE", alias, StringComparison.Ordinal),
                 new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
             var compilation = CSharpCompilation.Create("ManifestTests", [tree], references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Single(static invocation => invocation.Expression.ToString().Contains("::", StringComparison.Ordinal));
+                .Single(static invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString().Contains("::", StringComparison.Ordinal)));
             var callee = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol!;
             Assert.That(callee.ContainingAssembly.Identity.Name,
                 Is.EqualTo(alias == "first" ? "FirstLibrary" : "SecondLibrary"));
@@ -637,13 +645,14 @@ public sealed class ClaimManifestBuilderTests
             """;
         ClaimManifestBuildResult Compile(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             var tree = CSharpSyntaxTree.ParseText(source.Replace("MEMBER", name, StringComparison.Ordinal),
                 new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
             var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
-                .Single(identifier => identifier.Identifier.ValueText == name);
+                .Single(identifier => identifier is null ? throw new System.ArgumentNullException(nameof(identifier)) : (identifier.Identifier.ValueText == name));
             var member = compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol;
             Assert.That(member, Is.Not.Null);
             Assert.That(member!.MetadataName, Is.EqualTo(name));
@@ -828,8 +837,8 @@ public sealed class ClaimManifestBuilderTests
             var svSe = Build(("ä.cs", definition), ("z.cs", implementation));
 
             Assert.That(
-                svSe.Manifest.Claims.Select(static claim => claim.ClaimId),
-                Is.EqualTo(enUs.Manifest.Claims.Select(static claim => claim.ClaimId)));
+                svSe.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
+                Is.EqualTo(enUs.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         }
         finally
         {
@@ -842,6 +851,8 @@ public sealed class ClaimManifestBuilderTests
     [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "\\u005A")]
     public void GlobalAttributeAliasSelectsASeparateTokenFreeTree(string alias, string attribute)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
+        System.ArgumentNullException.ThrowIfNull(attribute);
         var result = Build(
             ("Aliases.cs", alias),
             ("Subject.cs", $"public static class Subject {{ [{attribute}] public static int Target() => 0; }}"));
@@ -858,7 +869,7 @@ public sealed class ClaimManifestBuilderTests
             ("Implementation.cs", "public static partial class Subject { public static int Target() => 0; }"));
         var target = result.Targets.Values.Single();
         Assert.That(target.Method.Name, Is.EqualTo("Target"));
-        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
             Does.Contain(WorkerAssumptionKind.TrustedBoundary));
     }
 
@@ -868,7 +879,7 @@ public sealed class ClaimManifestBuilderTests
         var result = Build(
             ("Boundary.cs", "using SharpProof.Attributes; [assembly: SharpProofTrusted(\"Reviewed boundary\")]"),
             ("Implementation.cs", "public static class Subject { public static int Target() => 0; }"));
-        Assert.That(result.Targets.Values.Single().Entry.Assumptions.Select(static assumption => assumption.Kind),
+        Assert.That(result.Targets.Values.Single().Entry.Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
             Does.Contain(WorkerAssumptionKind.TrustedBoundary));
     }
 
@@ -880,7 +891,7 @@ public sealed class ClaimManifestBuilderTests
             ("Implementation.cs", "public static partial class Subject { public static partial class Nested { public static int Target() => 0; } }"));
         var target = result.Targets.Values.Single();
         Assert.That(target.Method.ContainingType.Name, Is.EqualTo("Nested"));
-        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
             Does.Contain(WorkerAssumptionKind.TrustedBoundary));
     }
 
@@ -892,6 +903,8 @@ public sealed class ClaimManifestBuilderTests
     [TestCase("SharpProofSuppressAttribute", "nested")]
     public void RejectedControlScopesSelectTokenFreeDeclarationsWithoutGrantingTrust(string attribute, string scope)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(scope);
         var shadow = $$"""
             namespace SharpProof.Attributes {
                 public sealed class {{attribute}} : System.Attribute {
@@ -906,12 +919,12 @@ public sealed class ClaimManifestBuilderTests
             ? "public static partial class Subject { public static class Nested { public static int Target() => 0; } }"
             : "public static partial class Subject { public static int Target() => 0; }";
         var compilation = GetCompilation(("Shadow.cs", shadow), ("Boundary.cs", boundary), ("Implementation.cs", implementation));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var result = new ClaimManifestBuilder(compilation).Build();
-        var target = result.Targets.Values.Single(static target => target.Method.Name == "Target");
+        var target = result.Targets.Values.Single(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Target"));
         Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Contracts));
         Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Effects));
-        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
             Does.Not.Contain(WorkerAssumptionKind.TrustedBoundary));
         Assert.That(target.Entry.ClaimIds, Is.Empty);
     }
@@ -935,17 +948,17 @@ public sealed class ClaimManifestBuilderTests
             """));
 
         var assumptions = result.Manifest.Callables
-            .SelectMany(static callable => callable.Assumptions)
+            .SelectMany(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Assumptions))
             .Where(static assumption =>
-                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
             .ToArray();
 
         Assert.That(assumptions, Has.Length.EqualTo(2));
         Assert.That(
-            assumptions.Select(static assumption => assumption.Id),
+            assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)),
             Is.All.Matches("^spa1:[0-9a-f]{64}$"));
         Assert.That(
-            assumptions.Select(static assumption => assumption.Id).Distinct().ToArray(),
+            assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct().ToArray(),
             Has.Length.EqualTo(2));
     }
 
@@ -956,9 +969,9 @@ public sealed class ClaimManifestBuilderTests
         var changed = Build(("Subject.cs", TwoClaims("==", ">")));
 
         Assert.That(
-            changed.Manifest.Claims.Select(static claim => claim.ClaimId)
+            changed.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
                 .Intersect(first.Manifest.Claims.Select(static claim =>
-                    claim.ClaimId)),
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))),
             Has.Exactly(1).Items);
     }
 
@@ -1027,13 +1040,13 @@ public sealed class ClaimManifestBuilderTests
             source.Replace("1.25m < 2.5m", "1.5m < 2.5m",
                 StringComparison.Ordinal)));
         var firstIds = first.Manifest.Claims
-            .Select(static claim => claim.ClaimId)
+            .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
             .ToArray();
         var renamedIds = renamed.Manifest.Claims
-            .Select(static claim => claim.ClaimId)
+            .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
             .ToArray();
         var changedIds = changed.Manifest.Claims
-            .Select(static claim => claim.ClaimId)
+            .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
             .ToArray();
 
         using (Assert.EnterMultipleScope())
@@ -1052,11 +1065,11 @@ public sealed class ClaimManifestBuilderTests
         var reordered = Build(("Subject.cs", TwoClaims(">=", "==")));
 
         Assert.That(
-            reordered.Manifest.Claims.Select(static claim => claim.ClaimId),
+            reordered.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
             Is.EquivalentTo(first.Manifest.Claims.Select(static claim =>
-                claim.ClaimId)));
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         Assert.That(
-            reordered.Manifest.Claims.Select(static claim => claim.Ordinal),
+            reordered.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal)),
             Is.EqualTo(DenseOrdinals));
     }
 
@@ -1078,12 +1091,12 @@ public sealed class ClaimManifestBuilderTests
         var second = Build(("Other.cs", source));
 
         Assert.That(
-            first.Manifest.Claims.Select(static claim => claim.ClaimId),
+            first.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
             Is.Unique);
         Assert.That(
-            second.Manifest.Claims.Select(static claim => claim.ClaimId),
+            second.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
             Is.EqualTo(first.Manifest.Claims.Select(static claim =>
-                claim.ClaimId)));
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
     }
 
     [Test]
@@ -1150,10 +1163,10 @@ public sealed class ClaimManifestBuilderTests
 
         var target = result.Targets.Values.Single();
         Assert.That(
-            target.Claims.Select(static claim => claim.Entry.Evidence),
+            target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.Evidence)),
             Is.EqualTo(CompanionEvidence));
         Assert.That(
-            target.Claims.Select(static claim => claim.Entry.CallableId),
+            target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.CallableId)),
             Is.All.EqualTo(target.Entry.CallableId));
         Assert.That(target.Claims[0].SourceOperation, Is.Not.Null);
         Assert.That(target.Claims[1].SourceAttribute, Is.Not.Null);
@@ -1187,9 +1200,9 @@ public sealed class ClaimManifestBuilderTests
             """));
 
         var identity = result.Targets.Values.Single(static target =>
-            target.Method.Name == "Identity");
+            target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Identity"));
         var local = result.Targets.Values.Single(static target =>
-            target.Method.MethodKind == MethodKind.LocalFunction);
+            target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.MethodKind == MethodKind.LocalFunction));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
@@ -1232,12 +1245,12 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(result.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 result.Manifest.Callables.Any(static callable =>
-                    callable.CallableId.Contains(
+                    callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains(
                         "Outer",
                         StringComparison.Ordinal) &&
                     !callable.CallableId.Contains(
                         "Local",
-                        StringComparison.Ordinal)),
+                        StringComparison.Ordinal))),
                 Is.False);
         }
     }
@@ -1362,7 +1375,7 @@ public sealed class ClaimManifestBuilderTests
 
         Assert.That(target.Claims, Has.Length.EqualTo(2));
         Assert.That(
-            target.Claims.Select(static claim => claim.Placement),
+            target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Placement)),
             Is.EqualTo(new ContractClausePlacement?[] {
                 ContractClausePlacement.ValidPrologue,
                 ContractClausePlacement.Conditional
@@ -1406,18 +1419,18 @@ public sealed class ClaimManifestBuilderTests
             string.Join(
                 ", ",
                 result.Manifest.Callables.Select(static callable =>
-                    callable.CallableId)));
+                    callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId))));
         Assert.That(
             result.Targets.Values.All(static target =>
-                !target.IsVerifierSupported),
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (!target.IsVerifierSupported)),
             Is.True);
         Assert.That(
             result.Manifest.Claims,
             Has.Length.EqualTo(3));
         Assert.That(
             result.Manifest.Callables.Single(callable =>
-                callable.SelectedFeatures.Contains(
-                WorkerSelectedFeature.Effects)).SelectedFeatures,
+                callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.SelectedFeatures.Contains(
+                WorkerSelectedFeature.Effects))).SelectedFeatures,
             Does.Contain(WorkerSelectedFeature.Effects));
     }
 
@@ -1457,58 +1470,58 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(targets, Has.Length.EqualTo(8));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
-                    target.Method.MethodKind == MethodKind.EventAdd),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
-                    target.Method.MethodKind == MethodKind.EventRemove),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
-                    target.Method.MethodKind == MethodKind.EventAdd),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
-                    target.Method.MethodKind == MethodKind.EventRemove),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "Custom" &&
-                    target.Method.MethodKind == MethodKind.EventAdd),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventAdd)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "Custom" &&
-                    target.Method.MethodKind == MethodKind.EventRemove),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventRemove)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.AssociatedSymbol?.Name == "Value" &&
-                    target.Method.MethodKind == MethodKind.PropertyGet),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "Value" &&
+                    target.Method.MethodKind == MethodKind.PropertyGet)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Count(static target =>
-                    target.Method.Name == "Method" &&
-                    target.Method.MethodKind == MethodKind.Ordinary),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Method" &&
+                    target.Method.MethodKind == MethodKind.Ordinary)),
                 Is.EqualTo(1));
             Assert.That(
                 targets.Any(static target =>
-                    target.Method.AssociatedSymbol?.Name == "Unselected"),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.AssociatedSymbol?.Name == "Unselected")),
                 Is.False);
             Assert.That(
                 result.Manifest.Callables.Select(static callable =>
-                    callable.CallableId).Distinct(StringComparer.Ordinal).ToArray(),
+                    callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).Distinct(StringComparer.Ordinal).ToArray(),
                 Has.Length.EqualTo(8));
             Assert.That(
                 result.Manifest.Claims.Select(static claim =>
-                    claim.ClaimId).Distinct(StringComparer.Ordinal).ToArray(),
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct(StringComparer.Ordinal).ToArray(),
                 Has.Length.EqualTo(8));
             Assert.That(
-                targets.SelectMany(static target => target.EffectClaims).ToArray(),
+                targets.SelectMany(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims)).ToArray(),
                 Has.Length.EqualTo(8));
         }
     }
@@ -1520,7 +1533,7 @@ public sealed class ClaimManifestBuilderTests
             "Subject.cs",
             WorkerTestSources.UnsupportedEffectCallables));
         var targets = result.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
             StringComparer.Ordinal);
 
         AssertUnsupportedEffectTargets(
@@ -1537,7 +1550,7 @@ public sealed class ClaimManifestBuilderTests
             "Subject.cs",
             WorkerTestSources.UnsupportedContractCallables));
         var targets = result.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
             StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
@@ -1547,11 +1560,11 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(targets, Does.ContainKey("Generic"));
             Assert.That(
                 targets.Values.All(static target =>
-                    !target.IsVerifierSupported),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (!target.IsVerifierSupported)),
                 Is.True);
             Assert.That(
                 targets.Values.SelectMany(static target =>
-                    target.Claims).Count(),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Claims)).Count(),
                 Is.EqualTo(2));
         }
     }
@@ -1578,7 +1591,7 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         var targets = result.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
             StringComparer.Ordinal);
 
         AssertUnsupportedEffectTargets(
@@ -1640,16 +1653,16 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(first.Manifest.Callables, Has.Length.EqualTo(2));
             Assert.That(first.Manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(first.Manifest.Callables.Select(
-                static callable => callable.CallableId), Is.Unique);
+                static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)), Is.Unique);
             Assert.That(first.Targets.Values.All(static target =>
-                target.Method.MethodKind == MethodKind.AnonymousFunction &&
-                !target.IsVerifierSupported), Is.True);
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.MethodKind == MethodKind.AnonymousFunction &&
+                !target.IsVerifierSupported)), Is.True);
             Assert.That(renamed.Manifest.Callables.Select(
-                    static callable => callable.CallableId),
+                    static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)),
                 Is.EqualTo(first.Manifest.Callables.Select(
-                    static callable => callable.CallableId)));
-            Assert.That(renamed.Manifest.Claims.Select(static claim => claim.ClaimId),
-                Is.EqualTo(first.Manifest.Claims.Select(static claim => claim.ClaimId)));
+                    static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId))));
+            Assert.That(renamed.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
+                Is.EqualTo(first.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         }
     }
 
@@ -1679,9 +1692,9 @@ public sealed class ClaimManifestBuilderTests
         var without = Build(("Subject.cs", Source(false)));
         var with = Build(("Subject.cs", Source(true)));
         var withoutId = without.Manifest.Callables.Single(static callable =>
-            callable.CallableId != "M:Subject.Outer()").CallableId;
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId != "M:Subject.Outer()")).CallableId;
         var withId = with.Manifest.Callables.Single(static callable =>
-            callable.CallableId != "M:Subject.Outer()").CallableId;
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId != "M:Subject.Outer()")).CallableId;
 
         Assert.That(withId, Is.EqualTo(withoutId));
     }
@@ -1722,15 +1735,15 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(result.Manifest.Callables, Has.Length.EqualTo(4));
             Assert.That(result.Manifest.Claims, Has.Length.EqualTo(4));
             Assert.That(result.Manifest.Callables.Select(
-                static callable => callable.CallableId), Is.Unique);
+                static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)), Is.Unique);
             Assert.That(result.Manifest.Claims.Select(
-                static claim => claim.Location.Start), Is.Unique);
+                static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Start)), Is.Unique);
             Assert.That(result.Targets.Values.Count(static target =>
-                target.Method.MethodKind == MethodKind.AnonymousFunction), Is.EqualTo(2));
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.MethodKind == MethodKind.AnonymousFunction)), Is.EqualTo(2));
             Assert.That(result.Targets.Values.Count(static target =>
-                target.Method.MethodKind == MethodKind.LocalFunction), Is.EqualTo(2));
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.MethodKind == MethodKind.LocalFunction)), Is.EqualTo(2));
             Assert.That(result.Targets.Values.All(static target =>
-                !target.IsVerifierSupported), Is.True);
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (!target.IsVerifierSupported)), Is.True);
         }
     }
 
@@ -1756,16 +1769,16 @@ public sealed class ClaimManifestBuilderTests
         var result = new ClaimManifestBuilder(GetCompilation(
             OutputKind.ConsoleApplication, ("Program.cs", source))).Build();
         var topLevel = result.Targets.Values.Single(static target =>
-            target.Declaration is CompilationUnitSyntax);
+            target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Declaration is CompilationUnitSyntax));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Manifest.Callables, Has.Length.EqualTo(3));
             Assert.That(result.Manifest.Claims, Has.Length.EqualTo(3));
             Assert.That(result.Manifest.Claims.Select(
-                static claim => claim.Location.Start), Is.Unique);
+                static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Start)), Is.Unique);
             Assert.That(result.Targets.Values.All(static target =>
-                !target.IsVerifierSupported), Is.True);
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (!target.IsVerifierSupported)), Is.True);
             Assert.That(topLevel.Method.MethodKind, Is.EqualTo(MethodKind.Ordinary));
             Assert.That(topLevel.Claims.Single().Placement,
                 Is.EqualTo(ContractClausePlacement.ValidPrologue));
@@ -1808,13 +1821,13 @@ public sealed class ClaimManifestBuilderTests
         var second = Build(("Second.cs", source)).Targets.Values.Single();
 
         Assert.That(
-            first.Entry.Assumptions.Select(static value => value.Kind),
+            first.Entry.Assumptions.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)),
             Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
         Assert.That(
-            first.Entry.Assumptions.Select(static value => value.Id),
-            Is.EqualTo(second.Entry.Assumptions.Select(static value => value.Id)));
+            first.Entry.Assumptions.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id)),
+            Is.EqualTo(second.Entry.Assumptions.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id))));
         Assert.That(
-            first.Entry.Assumptions.All(static value => !value.Used),
+            first.Entry.Assumptions.All(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (!value.Used)),
             Is.True);
     }
 
@@ -1894,7 +1907,7 @@ public sealed class ClaimManifestBuilderTests
             """));
 
         var target = result.Targets.Values.Single(static candidate =>
-            candidate.Method.Name == "Call");
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.Name == "Call"));
         var evidence = target.EffectClaims.Single().Evidence;
 
         using (Assert.EnterMultipleScope())
@@ -1980,24 +1993,24 @@ public sealed class ClaimManifestBuilderTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                control.Manifest.Claims.Select(static claim => claim.Kind),
+                control.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)),
                 Is.EquivalentTo([
                     WorkerClaimKind.Postcondition,
                     WorkerClaimKind.Effect
                 ]));
             Assert.That(suppressed.Manifest.Callables, Has.Length.EqualTo(2));
             Assert.That(
-                suppressed.Manifest.Claims.Select(static claim => claim.Kind),
+                suppressed.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)),
                 Is.EquivalentTo(control.Manifest.Claims.Select(
-                    static claim => claim.Kind)));
+                    static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind))));
             Assert.That(
                 control.Targets.Values
-                    .SelectMany(static target => target.EffectClaims)
+                    .SelectMany(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims))
                     .Single().Evidence.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 suppressed.Targets.Values
-                    .SelectMany(static target => target.EffectClaims)
+                    .SelectMany(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims))
                     .Single().Evidence.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
         }
@@ -2063,7 +2076,7 @@ public sealed class ClaimManifestBuilderTests
             WorkerFeatureSet.Effects).Build().Targets.Values.Single();
 
         Assert.That(
-            target.Entry.Assumptions.Select(static evidence => evidence.Kind),
+            target.Entry.Assumptions.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind)),
             Is.EqualTo([WorkerAssumptionKind.TrustedBoundary]));
     }
 
@@ -2156,7 +2169,7 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         var targets = discovery.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
             StringComparer.Ordinal);
         var wrongAllowed = targets["WrongAllowed"].EffectClaims.Single().Evidence;
         var exactAllowed = targets["ExactAllowed"].EffectClaims.Single().Evidence;
@@ -2178,7 +2191,7 @@ public sealed class ClaimManifestBuilderTests
                 Is.EqualTo([integerIdentity]));
             // The compiler only declares these claims; Z3 decides them.
             Assert.That(new[] { wrongAllowed, exactAllowed, derivedAllowed, wrongCatch, exactCatch }
-                .Select(static evidence => evidence.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+                .Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
 
@@ -2212,32 +2225,34 @@ public sealed class ClaimManifestBuilderTests
         {
             Assert.That(claims, Has.Length.EqualTo(3));
             Assert.That(
-                claims.Select(static claim => claim.EffectContractKind),
+                claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)),
                 Is.EqualTo([
                     WorkerEffectContractKind.AllowedExceptions,
                     WorkerEffectContractKind.EffectContract,
                     WorkerEffectContractKind.EffectContract
                 ]));
             Assert.That(
-                claims.Select(static claim => claim.Ordinal),
+                claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal)),
                 Is.EqualTo([0, 1, 2]));
             Assert.That(
-                claims.Select(static claim => claim.ClaimId).Distinct().ToArray(),
+                claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().ToArray(),
                 Has.Length.EqualTo(3));
             Assert.That(
                 second.Manifest.Claims.Select(static claim =>
-                    claim.ClaimId),
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
                 Is.EqualTo(claims.Select(static claim =>
-                    claim.ClaimId)));
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             Assert.That(
                 first.Targets.Values.Single().EffectClaims.Select(
-                    static claim => claim.Evidence.Outcome),
+                    static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
 
     private static string TwoClaims(string first, string second)
     {
+        System.ArgumentNullException.ThrowIfNull(first);
+        System.ArgumentNullException.ThrowIfNull(second);
         return $$"""
         using SharpProof.Attributes;
         public static class Subject {
@@ -2256,6 +2271,8 @@ public sealed class ClaimManifestBuilderTests
         IReadOnlyDictionary<string, ManifestCallableTarget> targets,
         params string[] expectedNames)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedNames, nameof(expectedNames));
+        System.ArgumentNullException.ThrowIfNull(targets);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(targets, Has.Count.EqualTo(expectedNames.Length));
@@ -2265,17 +2282,17 @@ public sealed class ClaimManifestBuilderTests
             }
             Assert.That(
                 targets.Values.All(static target =>
-                    !target.IsVerifierSupported),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (!target.IsVerifierSupported)),
                 Is.True);
             Assert.That(
                 targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Outcome),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims)).Select(static claim =>
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Reason),
+                    target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.EffectClaims)).Select(static claim =>
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence.Reason)),
                 Is.All.EqualTo(
                     WorkerClaimReason.UnsupportedContract));
         }
@@ -2283,6 +2300,8 @@ public sealed class ClaimManifestBuilderTests
 
     private static string LocalReferenceSource(string firstName, string predicateName)
     {
+        System.ArgumentNullException.ThrowIfNull(firstName);
+        System.ArgumentNullException.ThrowIfNull(predicateName);
         return $$"""
         using SharpProof.Attributes;
         public static class Subject {
@@ -2319,7 +2338,7 @@ public sealed class ClaimManifestBuilderTests
         var result = Build(("Subject.cs", source));
 
         var claims = result.Manifest.Claims.Where(static claim =>
-            claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
         Assert.That(claims, Has.Length.EqualTo(1));
         Assert.That(claims[0].ClaimId, Is.Not.Empty);
     }
@@ -2406,11 +2425,11 @@ public sealed class ClaimManifestBuilderTests
         var createRange = typeof(ImmutableArray)
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Single(static method =>
-                method.Name == nameof(ImmutableArray.CreateRange) &&
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == nameof(ImmutableArray.CreateRange) &&
                 method.IsGenericMethodDefinition &&
                 method.GetParameters() is [{ ParameterType: { } parameter }] &&
                 parameter.IsGenericType &&
-                parameter.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                parameter.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
             .MakeGenericMethod(seedType);
         var seeds = createRange.Invoke(null, [seedArray])!;
         ImmutableDictionary<IMethodSymbol, string>? ids = null;
@@ -2446,12 +2465,14 @@ public sealed class ClaimManifestBuilderTests
     private static ClaimManifestBuildResult Build(
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return new ClaimManifestBuilder(GetCompilation(sources)).Build();
     }
 
     private static ClaimManifestBuildResult BuildIdentityArtifact(
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         var compilation = GetCompilation(sources);
         var result = new ClaimManifestBuilder(compilation).Build();
         AssertIdentityArtifactRoundTrip(compilation, result);
@@ -2461,24 +2482,26 @@ public sealed class ClaimManifestBuilderTests
     private static ImmutableArray<CompilerCallablePreparation> AssertIdentityArtifactRoundTrip(
         CSharpCompilation compilation, ClaimManifestBuildResult discovery)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(discovery);
         TestCompilation.AssertNoErrors(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
-        Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
-            Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
-        Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),
-            Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry.ClaimId)));
-        Assert.That(prepared.Select(static entry => entry.Entry.CallableId),
-            Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry.CallableId)));
+        Assert.That(decoded.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)),
+            Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))));
+        Assert.That(decoded.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)),
+            Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId))));
+        Assert.That(prepared.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.Entry.CallableId)),
+            Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))));
         foreach (var entry in decoded.Manifest.Callables)
         {
             Assert.That(entry.ClaimIds, Is.EqualTo(decoded.Manifest.Claims
-                .Where(claim => claim.CallableId == entry.CallableId).Select(static claim => claim.ClaimId)));
-            Assert.That(entry.Assumptions.Select(static assumption => assumption.Id),
-                Is.EqualTo(discovery.Manifest.Callables.Single(original => original.CallableId == entry.CallableId)
-                    .Assumptions.Select(static assumption => assumption.Id)));
+                .Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == entry.CallableId)).Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+            Assert.That(entry.Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)),
+                Is.EqualTo(discovery.Manifest.Callables.Single(original => original is null ? throw new System.ArgumentNullException(nameof(original)) : (original.CallableId == entry.CallableId))
+                    .Assumptions.Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))));
         }
         return prepared;
     }
@@ -2486,6 +2509,7 @@ public sealed class ClaimManifestBuilderTests
     private static CSharpCompilation GetCompilation(
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return GetCompilation(OutputKind.DynamicallyLinkedLibrary, sources);
     }
 
@@ -2493,6 +2517,7 @@ public sealed class ClaimManifestBuilderTests
         OutputKind outputKind,
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return TestCompilation.Create(
             "ManifestTests",
             outputKind,

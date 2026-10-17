@@ -22,8 +22,8 @@ public sealed class GenericNullReceiverLoweringTests
 
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var faults = lowered.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrThrowInstruction>().Select(instruction => instruction.ExceptionKind);
+        var faults = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrThrowInstruction>().Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.ExceptionKind));
         Assert.That(faults, Does.Contain(IrExceptionKind.NullReference),
             "An unconstrained T can be a null reference, so its instance call must have a null-fault edge.");
     }
@@ -33,13 +33,14 @@ public sealed class GenericNullReceiverLoweringTests
     [TestCase("where T : System.Enum", true)]
     public void GenericReceiverNullGuardMatchesConstraint(string constraint, bool mayBeNull)
     {
+        System.ArgumentNullException.ThrowIfNull(constraint);
         using var subject = TypedProgramSubject.Create(
             "int Target<T>(T value) " + constraint + " { value.ToString(); return 1; }" +
             (constraint == "where T : System.Enum" ? " static int Witness() => Target<System.Enum>(null);" : ""));
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var hasNullFault = lowered.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrThrowInstruction>().Any(instruction => instruction.ExceptionKind == IrExceptionKind.NullReference);
+        var hasNullFault = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrThrowInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.ExceptionKind == IrExceptionKind.NullReference));
         Assert.That(hasNullFault, Is.EqualTo(mayBeNull));
     }
 }

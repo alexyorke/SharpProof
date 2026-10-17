@@ -34,7 +34,7 @@ public sealed class PartialSourceCompletionControls
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method.Identifier.ValueText, StringComparer.Ordinal);
+            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory();
         var bindings = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
@@ -104,6 +104,7 @@ public sealed class PartialSourceCompletionControls
         await TestContext.Out.WriteLineAsync("Actual Legacy admission: " + admissionException.Message);
         FrontendLoweringResult LowerActual(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             var syntax = methods[name];
             var symbol = model.GetDeclaredSymbol(syntax);
             Assert.That(symbol, Is.Not.Null);

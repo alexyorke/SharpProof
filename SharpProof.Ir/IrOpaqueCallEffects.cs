@@ -53,11 +53,15 @@ internal static class IrOpaqueCallSite
     }
 
     internal static string Describe(IrOpaqueCallEffects effects, string member)
-    { return Prefix + ((int)effects).ToString(CultureInfo.InvariantCulture) + ":" + member; }
+    { if (member is null) { throw new System.ArgumentNullException(nameof(member)); } return Prefix + ((int)effects).ToString(CultureInfo.InvariantCulture) + ":" + member; }
 
     // A call site that does not carry this description may do anything.
     internal static IrOpaqueCallEffects Effects(IrFactory factory, OperationId site)
     {
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         var description = factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : "";
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))

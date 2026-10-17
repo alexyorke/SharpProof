@@ -78,8 +78,8 @@ public sealed class CorpusCatalogWorkflowTests
         var originalPath = methods[1]!["path"]!.GetValue<string>();
         var firstPath = methods[0]!["path"]!.GetValue<string>();
         var files = manifest["files"]!.AsArray();
-        var firstFile = files.Single(file => file!["path"]!.GetValue<string>() == firstPath)!;
-        var secondFile = files.Single(file => file!["path"]!.GetValue<string>() == originalPath)!;
+        var firstFile = files.Single(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file!["path"]!.GetValue<string>() == firstPath))!;
+        var secondFile = files.Single(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file!["path"]!.GetValue<string>() == originalPath))!;
         secondFile["content"] = firstFile["content"]!.DeepClone();
         secondFile["contentSha256"] = firstFile["contentSha256"]!.DeepClone();
         var duplicate = methods[0]!.DeepClone();
@@ -103,11 +103,17 @@ public sealed class CorpusCatalogWorkflowTests
         var document = OpenSourceCorpusCatalog.Load(repositoryRoot);
         var candidates = document.Files.SelectMany(file =>
         {
+            System.ArgumentNullException.ThrowIfNull(file);
             var root = CSharpSyntaxTree.ParseText(file.Content).GetCompilationUnitRoot();
             return OpenSourceCorpusCatalog.BuildDeclarationIndex(root).Values
                 .Where(static declarations => declarations.Length == 1)
                 .Select(declarations =>
                 {
+
+                    if (declarations.IsDefault)
+                    {
+                        throw new System.ArgumentException("Array must be initialized.", nameof(declarations));
+                    }
                     var declaration = declarations.Single();
                     var span = declaration.GetLocation().GetLineSpan();
                     return new OpenSourceCorpusMethod("pending", file.SourceId, file.Path,
@@ -115,17 +121,17 @@ public sealed class CorpusCatalogWorkflowTests
                         OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
                         declaration.Identifier.ValueText, "effects", CorpusVerdict.Unknown, CorpusSupport.IntentionallyUnsupported);
                 });
-        }).DistinctBy(static method => method.DeclarationSha256).ToArray();
-        var groups = candidates.GroupBy(static method => OpenSourceCorpusCatalog.GetSourceFileKey(method.SourceId, method.Path))
-            .OrderByDescending(static group => group.Count())
-            .ThenBy(static group => group.Key, StringComparer.Ordinal)
+        }).DistinctBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256)).ToArray();
+        var groups = candidates.GroupBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpenSourceCorpusCatalog.GetSourceFileKey(method.SourceId, method.Path)))
+            .OrderByDescending(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()))
+            .ThenBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
             .Take(OpenSourceCorpusCatalog.MinimumSourceFileCount - 1)
-            .Select(static group => group.ToArray()).ToArray();
+            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToArray())).ToArray();
         Assert.That(groups, Has.Length.EqualTo(24));
-        var selected = groups.Select(static group => group[0])
-            .Concat(groups.SelectMany(static group => group.Skip(1)))
+        var selected = groups.Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group[0]))
+            .Concat(groups.SelectMany(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Skip(1))))
             .Take(OpenSourceCorpusCatalog.MinimumMethodCount)
-            .Select(static (method, index) => method with { Id = $"OSS{index + 1:D4}" }).ToArray();
+            .Select(static (method, index) => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method with { Id = $"OSS{index + 1:D4}" })).ToArray();
         Assert.That(selected, Has.Length.EqualTo(200));
         Assert.That(OpenSourceCorpusCatalog.CountSourceFiles(selected), Is.EqualTo(24));
 

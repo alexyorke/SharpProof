@@ -9,12 +9,16 @@ internal static class CompilerReachableSourceCollector
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
+        if (specificationPackAuthority is null)
+        {
+            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
+        }
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(targets, nameof(targets));
         ArgumentNullGuard.NotNull(trees, nameof(trees));
         if (trees.Length < compilation.SyntaxTrees.Length)
         { throw new ArgumentException("Snapshot array must cover every compilation syntax tree.", nameof(trees)); }
-        var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => (tree, ordinal))
+        var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
             .ToDictionary(item => item.tree, item => item.ordinal);
         var pending = new Queue<IMethodSymbol>();
         var bodies = new Dictionary<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
@@ -22,7 +26,7 @@ internal static class CompilerReachableSourceCollector
         var roots = new List<CompilerSourceRootArtifact>();
         var complete = true;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        foreach (var target in targets.OrderBy(target => target.Entry.CallableId, StringComparer.Ordinal))
+        foreach (var target in targets.OrderBy(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal))
         {
             var body = Enqueue(target.Method);
             if (body != null)
@@ -87,17 +91,17 @@ internal static class CompilerReachableSourceCollector
                     { stack.Push(child); }
                 }
             }
-            body.Callees = [.. calls.OrderBy(id => id, StringComparer.Ordinal)];
+            body.Callees = [.. calls.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
             // Calls stay as shadow boundaries rather than expanding bodies.
             if (syntax is MethodDeclarationSyntax declaration && method.IsStatic && !method.IsGenericMethod &&
                 !method.ContainingType.IsGenericType &&
-                !method.ContainingType.StaticConstructors.Any(constructor => !constructor.IsImplicitlyDeclared) &&
-                method.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
-                    CSharpOperationSemantics.IsValueDomain(parameter.Type)) &&
+                !method.ContainingType.StaticConstructors.Any(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (!constructor.IsImplicitlyDeclared)) &&
+                method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
+                    CSharpOperationSemantics.IsValueDomain(parameter.Type))) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
                 var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
-                    tree => trees[ordinals[tree]].Path);
+                    tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (trees[ordinals[tree]].Path));
                 var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
                 if (binding.IsSuccess && operation != null)
                 {
@@ -109,8 +113,8 @@ internal static class CompilerReachableSourceCollector
                     {
                         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
                         var lowered = new RoslynProgramLowerer(context.Factory).LowerShadowSourceBody(graph, context,
-                            callee => Enqueue(callee) != null, cancellationToken,
-                            method => TotalBodyLowering.ResolveScalarModel(method, context.Factory, apiSpecs) ?? specificationPacks.ResolveTotal(method));
+                            callee => callee is null ? throw new System.ArgumentNullException(nameof(callee)) : (Enqueue(callee) != null), cancellationToken,
+                            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (TotalBodyLowering.ResolveScalarModel(method, context.Factory, apiSpecs) ?? specificationPacks.ResolveTotal(method)));
                         if (lowered.Classification.IsExact && body.CallsComplete)
                         {
                             var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken);
@@ -120,9 +124,9 @@ internal static class CompilerReachableSourceCollector
                             {
                                 InstructionIndex = encoded.InstructionIndices[call.Key.Id],
                                 CalleeBodyId = (Enqueue(call.Value) ?? throw new InvalidOperationException("Preserved source call has no collectable callee body.")).BodyId
-                            }).OrderBy(call => call.InstructionIndex)];
-                            body.Callees = [.. body.SourceCalls.Select(call => call.CalleeBodyId).Distinct(StringComparer.Ordinal)
-                                .OrderBy(id => id, StringComparer.Ordinal)];
+                            }).OrderBy(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.InstructionIndex))];
+                            body.Callees = [.. body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId)).Distinct(StringComparer.Ordinal)
+                                .OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
                         }
                     }
                 }
@@ -131,7 +135,7 @@ internal static class CompilerReachableSourceCollector
         // The compiler CFG can omit statically unreachable calls. Retain only
         // bodies connected by the final IR edges (or an incomplete boundary).
         var retained = new HashSet<string>(StringComparer.Ordinal);
-        var reachable = new Stack<string>(roots.Select(root => root.BodyId));
+        var reachable = new Stack<string>(roots.Select(root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root.BodyId)));
         while (reachable.Count != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -141,27 +145,31 @@ internal static class CompilerReachableSourceCollector
             foreach (var callee in bodies[id].Callees)
             { reachable.Push(callee); }
         }
-        foreach (var id in bodies.Keys.Where(id => !retained.Contains(id)).ToArray())
+        foreach (var id in bodies.Keys.Where(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!retained.Contains(id))).ToArray())
         { bodies.Remove(id); }
         return new()
         {
             CollectionComplete = complete,
-            Roots = [.. roots.OrderBy(root => root.CallableId, StringComparer.Ordinal)],
-            Bodies = [.. bodies.Values.OrderBy(body => body.BodyId, StringComparer.Ordinal)],
-            Documents = [.. bodies.Values.Select(body => body.SourceTreeOrdinal).Distinct().OrderBy(ordinal => ordinal)
-                .Select(ordinal => new CompilerSourceDocumentArtifact
+            Roots = [.. roots.OrderBy(root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root.CallableId), StringComparer.Ordinal)],
+            Bodies = [.. bodies.Values.OrderBy(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId), StringComparer.Ordinal)],
+            Documents = [.. bodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().OrderBy(ordinal => ordinal)
+                .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (new CompilerSourceDocumentArtifact
                 {
                     SourceTreeOrdinal = ordinal, Path = trees[ordinal].Path,
-                    MaximumBodyEnd = bodies.Values.Where(body => body.SourceTreeOrdinal == ordinal)
-                        .Max(body => body.Start + body.Length)
-                })]
+                    MaximumBodyEnd = bodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == ordinal))
+                        .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length))
+                })))]
         };
 
         string Id(SyntaxNode syntax)
-        { return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
+        { if (syntax is null) { throw new System.ArgumentNullException(nameof(syntax)); } return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
 
         CompilerSourceBodyArtifact? Enqueue(IMethodSymbol requested)
         {
+            if (requested is null)
+            {
+                throw new System.ArgumentNullException(nameof(requested));
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var method = requested.OriginalDefinition;
             if (method.DeclaringSyntaxReferences.Length != 1)
@@ -185,13 +193,13 @@ internal static class CompilerReachableSourceCollector
             body.CallIdentity = CompilerIdentityBridge.CreateSymbolDisplay(method);
             body.IsStatic = method.IsStatic;
             if (method.Parameters.Length <= CompilerArtifactLimits.MaximumInstructions &&
-                method.Parameters.All(parameter => CSharpOperationSemantics.IsValueDomain(parameter.Type)) &&
+                method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CSharpOperationSemantics.IsValueDomain(parameter.Type))) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
                 var signatureFactory = new IrFactory(IrExecutionSemantics.Total);
                 var mapper = new RoslynTypeMapper(signatureFactory);
                 body.ParameterTypes = [.. method.Parameters.Select(parameter =>
-                    CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(parameter.Type)))];
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(parameter.Type))))];
                 body.ReturnType = method.ReturnsVoid ? null :
                     CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType));
             }
@@ -204,6 +212,10 @@ internal static class CompilerReachableSourceCollector
     private static bool HasUncollectedCall(IOperation operation, Compilation compilation, SemanticModel model,
         CancellationToken cancellationToken, ref int remaining)
     {
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
             var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
@@ -258,6 +270,10 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMethod(IMethodSymbol? method, Compilation compilation)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
         var callable = method?.ReducedFrom ?? method;
         return callable != null &&
             (SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, compilation.Assembly) ||
@@ -266,6 +282,10 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMember(ISymbol member, Compilation compilation)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
         if (member is IMethodSymbol method)
         {
             return IsUncollectedMethod(method, compilation);
@@ -278,6 +298,18 @@ internal static class CompilerReachableSourceCollector
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,
         InvocationEmissionPolicy emission, CancellationToken cancellationToken)
     {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        if (emission is null)
+        {
+            throw new System.ArgumentNullException(nameof(emission));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var pending = new Stack<IOperation>();
         pending.Push(operation);
         var remaining = CompilerArtifactLimits.MaximumInstructions;

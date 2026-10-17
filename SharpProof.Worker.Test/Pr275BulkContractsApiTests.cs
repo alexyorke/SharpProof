@@ -47,19 +47,19 @@ public sealed class Pr275BulkContractsApiTests
         Assert.That(full.Contracts, Is.Not.Null);
         var fullContracts = full.Contracts!;
         Assert.That(SymbolEqualityComparer.Default.Equals(fullContracts.Target, target), Is.True);
-        Assert.That(fullContracts.Clauses.Select(static clause => clause.Kind), Is.EqualTo(FullClauseKinds));
-        Assert.That(fullContracts.Clauses.Select(static clause => clause.DiagnosticText), Is.EqualTo(FullClauseTexts));
+        Assert.That(fullContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(FullClauseKinds));
+        Assert.That(fullContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)), Is.EqualTo(FullClauseTexts));
         Assert.That(fullContracts.Clauses.All(static clause =>
-            clause.Evidence == BoundContractEvidence.CompilerBoundInvocation &&
-            clause.SourceSyntax != null), Is.True);
+            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.CompilerBoundInvocation &&
+            clause.SourceSyntax != null)), Is.True);
 
         var requires = binder.BindRequires(target);
 
         Assert.That(requires.IsSuccess, Is.True);
         Assert.That(requires.Contracts, Is.Not.Null);
         var requiresContracts = requires.Contracts!;
-        Assert.That(requiresContracts.Clauses.Select(static clause => clause.Kind), Is.EqualTo(RequiresClauseKinds));
-        Assert.That(requiresContracts.Clauses.Select(static clause => clause.DiagnosticText), Is.EqualTo(RequiresClauseTexts));
+        Assert.That(requiresContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(RequiresClauseKinds));
+        Assert.That(requiresContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)), Is.EqualTo(RequiresClauseTexts));
 
         var empty = binder.Bind(plain);
 
@@ -122,6 +122,8 @@ public sealed class Pr275BulkContractsApiTests
         string memberKind,
         string expectedBody)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedBody);
+        System.ArgumentNullException.ThrowIfNull(memberKind);
         var compilation = CreateCompilation(
             "Pr275BulkContractsApiAccessor",
             """
@@ -133,7 +135,7 @@ public sealed class Pr275BulkContractsApiTests
         var type = compilation.GetTypeByMetadataName("Subject")!;
         var property = memberKind == "property"
             ? type.GetMembers("Value").OfType<IPropertySymbol>().Single()
-            : type.GetMembers().OfType<IPropertySymbol>().Single(static candidate => candidate.IsIndexer);
+            : type.GetMembers().OfType<IPropertySymbol>().Single(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsIndexer));
         var accessor = property.GetMethod!;
         var declaration = property.DeclaringSyntaxReferences.Single().GetSyntax();
         var expectedExpression = memberKind == "property"
@@ -154,11 +156,13 @@ public sealed class Pr275BulkContractsApiTests
 
     private static CSharpCompilation CreateCompilation(string assemblyPrefix, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyPrefix);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(assemblyPrefix, source);
         TestCompilation.AssertNoErrors(compilation);
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream);
-        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emitted.Success, Is.True);
         return compilation;
     }
@@ -168,6 +172,9 @@ public sealed class Pr275BulkContractsApiTests
         string expectedParameter,
         Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(expectedParameter);
         var error = Assert.Throws<ArgumentNullException>((Action)(() => action()),
             $"{api} must reject a missing callable.");
         Assert.That(error!.ParamName, Is.EqualTo(expectedParameter));

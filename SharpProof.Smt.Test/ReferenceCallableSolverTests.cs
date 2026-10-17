@@ -221,28 +221,49 @@ public sealed class ReferenceCallableSolverTests
 
     private static Assumption NotNull(IrFactory factory, IrVarId variable)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         return Assume(factory, factory.Binary(IrBinaryOperator.NotEqual,
             factory.Variable(variable), factory.Null(factory.GetVariableInfo(variable).Type)));
     }
 
     private static Assumption Assume(IrFactory factory, IrTerm predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         return new(factory, predicate, new LoweredJustification(factory.CreateOperation()));
     }
 
     private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return factory.Binary(IrBinaryOperator.Equal, left, right);
     }
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<Assumption> assumptions,
         IrTerm goal, ImmutableArray<IrVarId> variables)
     {
+
+        System.ArgumentNullException.ThrowIfNull(assumptions);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(goal);
+        if (variables.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
+        }
         return new(factory, assumptions, new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
     }
 
     private static void AssertAssumptions(IrFactory factory, VerificationQuery query, IReadOnlyDictionary<IrVarId, IrValue> model)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(model);
+        System.ArgumentNullException.ThrowIfNull(query);
         var interpreter = new IrInterpreter(factory);
         foreach (var assumption in query.Assumptions)
         {

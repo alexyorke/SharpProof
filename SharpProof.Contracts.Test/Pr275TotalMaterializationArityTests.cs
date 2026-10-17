@@ -17,6 +17,7 @@ public sealed class Pr275TotalMaterializationArityTests
     public void ActualOrdinaryInvocationsRejectRawClauseArityWithoutEnrollment(
         string methodName, int argumentCount, bool requiresOnly)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var compilation = TestCompilation.Create("Pr275RawClauseArity", """
             public static class Subject
             {

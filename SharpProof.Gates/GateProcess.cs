@@ -8,6 +8,8 @@ internal static class GateProcess
         string fileName,
         string workingDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(fileName);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return new ProcessStartInfo
         {
             FileName = fileName,
@@ -65,4 +67,8 @@ internal static class GateProcess
 internal readonly record struct GateProcessResult(
     int ExitCode,
     string Output,
-    string Error);
+    string Error)
+{
+    public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    public string Error { get; init; } = Error ?? throw new System.ArgumentNullException(nameof(Error));
+}

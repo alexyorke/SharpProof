@@ -36,7 +36,7 @@ public sealed class Pr275NativeAssumptionMapTests
         var clause = entry.Clauses.Single();
         Assert.That(clause.Kind, Is.EqualTo(CompilerContractKind.Requires));
         Assert.That(clause.AssumptionId, Is.Not.Null.And.Not.Empty);
-        Assert.That(preparation.Entry.Assumptions.Select(assumption => assumption.Id), Does.Contain(clause.AssumptionId));
+        Assert.That(preparation.Entry.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)), Does.Contain(clause.AssumptionId));
         var factory = entry.Factory;
         var justification = new LoweredJustification(clause.Operation);
         var assumption = new Assumption(factory,

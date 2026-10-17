@@ -13,6 +13,8 @@ public sealed class WorkerVcFieldFreshnessControlTests
     [TestCase("box != null && box.Item != null && box.Item.Value == 7", "var fresh = new Cell(); return box.Item.Value;", 7)]
     public async Task FreshAllocationsPreservePriorFieldsAndAllowLaterFieldReplacement(string requires, string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(requires);
         using var project = new ShadowTestProject("using SharpProof.Attributes; " +
             "public sealed class Cell { public int Value; } public sealed class Box { public int[] Data; public Cell Item; } " +
             "public static class Subject { public static int Target(Box box) { Contract.Requires(" + requires + "); " +

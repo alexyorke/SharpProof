@@ -67,7 +67,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         var mapping = tree.GetLineMappings().Single(static item => item.CharacterOffset.HasValue);
         var captured = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None).Single();
         var line = tree.GetText().Lines[mapping.Span.Start.Line];
-        var entry = captured.LineMap.Single(item => item.SourceStart == line.Start);
+        var entry = captured.LineMap.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceStart == line.Start));
 
         Assert.That(mapping.CharacterOffset, Is.EqualTo(offset));
         Assert.That(entry.CharacterOffset, Is.EqualTo(mapping.CharacterOffset));
@@ -86,7 +86,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "generated.cs");
         var compilation = CSharpCompilation.Create("Pr275ActualRejectedZeroOffset", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)).ToArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS8938"));
         Assert.That(errors[0].Location.SourceTree, Is.SameAs(tree));

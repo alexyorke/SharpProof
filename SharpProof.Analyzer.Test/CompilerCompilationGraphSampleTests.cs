@@ -21,7 +21,7 @@ public sealed class CompilerCompilationGraphSampleTests
                 filePath: "Leaf" + index.ToString(CultureInfo.InvariantCulture) + ".cs")
                 .WithAssemblyName("GraphLeaf_" + leafCount.ToString(CultureInfo.InvariantCulture) +
                     "_" + index.ToString(CultureInfo.InvariantCulture))).ToArray();
-        var references = leaves.Select(static leaf => leaf.ToMetadataReference()).ToArray();
+        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToArray();
         var expression = string.Join(" + ", Enumerable.Range(0, leafCount).Select(index =>
             "Leaf" + index.ToString(CultureInfo.InvariantCulture) + ".Value(value)"));
         var caller = AnalyzerTestHost.CreateCompilation(
@@ -32,16 +32,16 @@ public sealed class CompilerCompilationGraphSampleTests
         foreach (var compilation in compilations)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         }
         using (Assert.EnterMultipleScope())
         {
             Assert.That(caller.References.OfType<CompilationReference>().Count(), Is.EqualTo(leafCount));
-            Assert.That(compilations.SelectMany(static compilation => compilation.SyntaxTrees)
+            Assert.That(compilations.SelectMany(static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (compilation.SyntaxTrees))
                 .Distinct().Count(), Is.EqualTo(leafCount + 1));
             Assert.That(references.Select(reference =>
-                ((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(reference)!).Name),
-                Is.EqualTo(leaves.Select(static leaf => leaf.AssemblyName)));
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(reference)!).Name)),
+                Is.EqualTo(leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.AssemblyName))));
         }
         var images = compilations.Select(AnalyzerTestHost.EmitImage).ToArray();
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("GraphControl", isCollectible: true);

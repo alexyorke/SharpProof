@@ -86,6 +86,7 @@ public sealed class Pr275SmtNativeRequiredInputGuardTests
 
     private static void AssertOwnedParameterAllowsAnActualSolverCheck(Context context)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
         using var solver = context.MkSolver();
         using var parameters = context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, context.MkSymbol("rlimit"), 1_000_000);
@@ -98,6 +99,8 @@ public sealed class Pr275SmtNativeRequiredInputGuardTests
 
     private static void AssertNativeCheckAcceptsActualZ3Inputs(Context context, Solver solver)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(solver);
         using var assumption = context.MkTrue();
         var meter = new SmtQueryResourceMeter(1_000_000, CancellationToken.None);
 

@@ -8,6 +8,10 @@ public static class IrSubstitution
         IrVarId variable,
         IrTerm replacement)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(replacement, nameof(replacement));
@@ -38,6 +42,14 @@ public static class IrSubstitution
         IrTerm root,
         Dictionary<IrVarId, IrTerm> replacementMap)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (root is null)
+        {
+            throw new System.ArgumentNullException(nameof(root));
+        }
         if (replacementMap.Count == 0)
         {
             return root;
@@ -62,6 +74,10 @@ public static class IrSubstitution
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
         Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?> read)
     {
+        if (replacements is null)
+        {
+            throw new System.ArgumentNullException(nameof(replacements));
+        }
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(read, nameof(read));
@@ -142,6 +158,10 @@ public static class IrSubstitution
         // Materialize the caller-supplied view once. IReadOnlyDictionary is an
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         var replacementMap = replacements.ToDictionary(
             static pair => pair.Key,
             static pair => pair.Value);
@@ -175,12 +195,28 @@ public static class IrSubstitution
         out bool variablesValid,
         Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?>? read = null)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (memo is null)
+        {
+            throw new System.ArgumentNullException(nameof(memo));
+        }
+        if (replacements is null)
+        {
+            throw new System.ArgumentNullException(nameof(replacements));
+        }
+        if (root is null)
+        {
+            throw new System.ArgumentNullException(nameof(root));
+        }
         var allVariablesValid = true;
         var result = IrTraversal.FoldBottomUp(
             root,
             memo,
-            (term, _, rewritten) => (read != null && term is IrSequenceAccessTerm or IrOpaqueTerm
-                ? read(term, child => rewritten[child.Id]) : null) ?? RewriteNode(factory, term, rewritten),
+            (term, _, rewritten) => rewritten is null ? throw new System.ArgumentNullException(nameof(rewritten)) : term is null ? throw new System.ArgumentNullException(nameof(term)) : ((read != null && term is IrSequenceAccessTerm or IrOpaqueTerm
+                ? read(term, child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (rewritten[child.Id])) : null) ?? RewriteNode(factory, term, rewritten)),
             term =>
             {
                 if (term is not IrVariableTerm variable)
@@ -212,6 +248,18 @@ public static class IrSubstitution
         IrTerm term,
         Dictionary<IrId, IrTerm> memo)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (memo is null)
+        {
+            throw new System.ArgumentNullException(nameof(memo));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         return term.Accept(RewriteVisitor.Instance, (factory, memo));
     }
 
@@ -221,31 +269,55 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrBooleanTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
         public IrTerm Visit(IrIntegerTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
         public IrTerm Visit(IrStringTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
         public IrTerm Visit(IrNullTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
         public IrTerm Visit(IrEmptyArrayTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
         public IrTerm Visit(IrVariableTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return term;
         }
 
@@ -286,6 +358,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrUnaryTerm unary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (unary is null)
+            {
+                throw new System.ArgumentNullException(nameof(unary));
+            }
             var operand = IrSubstitution.Visit(state.Memo, unary.Operand);
             return ReferenceEquals(operand, unary.Operand)
                 ? unary
@@ -294,6 +370,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrBinaryTerm binary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (binary is null)
+            {
+                throw new System.ArgumentNullException(nameof(binary));
+            }
             var left = IrSubstitution.Visit(state.Memo, binary.Left);
             var right = IrSubstitution.Visit(state.Memo, binary.Right);
             return ReferenceEquals(left, binary.Left) &&
@@ -304,6 +384,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrConditionalTerm conditional, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (conditional is null)
+            {
+                throw new System.ArgumentNullException(nameof(conditional));
+            }
             var condition = IrSubstitution.Visit(state.Memo, conditional.Condition);
             var whenTrue = IrSubstitution.Visit(state.Memo, conditional.WhenTrue);
             var whenFalse = IrSubstitution.Visit(state.Memo, conditional.WhenFalse);
@@ -316,6 +400,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrCastTerm cast, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (cast is null)
+            {
+                throw new System.ArgumentNullException(nameof(cast));
+            }
             var operand = IrSubstitution.Visit(state.Memo, cast.Operand);
             return ReferenceEquals(operand, cast.Operand)
                 ? cast
@@ -324,6 +412,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrLengthTerm length, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (length is null)
+            {
+                throw new System.ArgumentNullException(nameof(length));
+            }
             var value = IrSubstitution.Visit(state.Memo, length.Value);
             return ReferenceEquals(value, length.Value)
                 ? length
@@ -332,6 +424,10 @@ public static class IrSubstitution
 
         public IrTerm Visit(IrSequenceAccessTerm access, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
+            if (access is null)
+            {
+                throw new System.ArgumentNullException(nameof(access));
+            }
             var sequence = IrSubstitution.Visit(state.Memo, access.Sequence);
             var index = IrSubstitution.Visit(state.Memo, access.Index);
             return ReferenceEquals(sequence, access.Sequence) &&
@@ -343,11 +439,23 @@ public static class IrSubstitution
 
     private static IrTerm Visit(Dictionary<IrId, IrTerm> memo, IrTerm child)
     {
+        if (child is null)
+        {
+            throw new System.ArgumentNullException(nameof(child));
+        }
+        if (memo is null)
+        {
+            throw new System.ArgumentNullException(nameof(memo));
+        }
         return memo[child.Id];
     }
 
     private static IrTerm? VisitNullable(Dictionary<IrId, IrTerm> memo, IrTerm? child)
     {
+        if (memo is null)
+        {
+            throw new System.ArgumentNullException(nameof(memo));
+        }
         return child == null ? null : Visit(memo, child);
     }
 }

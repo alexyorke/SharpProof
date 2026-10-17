@@ -14,6 +14,10 @@ internal sealed class ProbeJsonObject
 
     internal void PropertyName(string name)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         if (!_first)
         {
             Builder.Append(',');
@@ -26,32 +30,64 @@ internal sealed class ProbeJsonObject
 
     internal void String(string name, string value)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         PropertyName(name);
         AppendString(Builder, value);
     }
 
     internal void Boolean(string name, bool value)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         PropertyName(name);
         Builder.Append(value ? "true" : "false");
     }
 
     internal void Integer(string name, int value)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         PropertyName(name);
         Builder.Append(value.ToString(CultureInfo.InvariantCulture));
     }
 
     internal void StringArray(string name, IEnumerable<string> values)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         PropertyName(name);
         AppendStringArray(Builder, values);
     }
 
     internal void RawArray(string name, IEnumerable<string> rows)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
+        if (rows is null)
+        {
+            throw new System.ArgumentNullException(nameof(rows));
+        }
         PropertyName(name);
-        AppendArray(Builder, rows, static (builder, row) => builder.Append(row));
+        AppendArray(Builder, rows, static (builder, row) => { if (builder is null) { throw new System.ArgumentNullException(nameof(builder)); } if (row is null) { throw new System.ArgumentNullException(nameof(row)); } builder.Append(row); });
     }
 
     internal void Complete()
@@ -63,6 +99,14 @@ internal sealed class ProbeJsonObject
         StringBuilder builder,
         IEnumerable<string> values)
     {
+        if (builder is null)
+        {
+            throw new System.ArgumentNullException(nameof(builder));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         AppendArray(builder, values, AppendString);
     }
 
@@ -71,6 +115,18 @@ internal sealed class ProbeJsonObject
         IEnumerable<string> values,
         Action<StringBuilder, string> append)
     {
+        if (append is null)
+        {
+            throw new System.ArgumentNullException(nameof(append));
+        }
+        if (builder is null)
+        {
+            throw new System.ArgumentNullException(nameof(builder));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         builder.Append('[');
         var first = true;
         foreach (var value in values)
@@ -88,6 +144,14 @@ internal sealed class ProbeJsonObject
 
     private static void AppendString(StringBuilder builder, string value)
     {
+        if (builder is null)
+        {
+            throw new System.ArgumentNullException(nameof(builder));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         builder.Append('"');
         foreach (var character in value)
         {

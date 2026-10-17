@@ -54,7 +54,7 @@ internal static class SharpProofControlAttributePolicy
             var location = attribute.ApplicationSyntaxReference?
                 .GetSyntax(cancellationToken).GetLocation() ??
                 symbol.Locations.FirstOrDefault(static candidate =>
-                    candidate.IsInSource) ??
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource)) ??
                 Location.None;
             ReportRejectedContractApi(
                 symbol.Name,
@@ -69,6 +69,10 @@ internal static class SharpProofControlAttributePolicy
         Location location,
         Action<Diagnostic> reportDiagnostic)
     {
+        if (ownerName is null)
+        {
+            throw new System.ArgumentNullException(nameof(ownerName));
+        }
         location = ArgumentNullGuard.NotNull(location, nameof(location));
         reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         reportDiagnostic(Diagnostic.Create(
@@ -85,6 +89,10 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        if (declaration is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaration));
+        }
         semanticModel = ArgumentNullGuard.NotNull(semanticModel, nameof(semanticModel));
         session = ArgumentNullGuard.NotNull(session, nameof(session));
         reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
@@ -99,7 +107,7 @@ internal static class SharpProofControlAttributePolicy
             _ => default
         };
         foreach (var attribute in attributeLists.SelectMany(
-                     static list => list.Attributes))
+                     static list => list is null ? throw new System.ArgumentNullException(nameof(list)) : (list.Attributes)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var constructor = semanticModel.GetSymbolInfo(
@@ -141,6 +149,10 @@ internal static class SharpProofControlAttributePolicy
 
     private static bool TryGetReason(AttributeData attribute, out string reason)
     {
+        if (attribute is null)
+        {
+            throw new System.ArgumentNullException(nameof(attribute));
+        }
         reason = attribute.ConstructorArguments.Length == 1 &&
                  attribute.ConstructorArguments[0].Value is string value
             ? value
@@ -168,6 +180,23 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+
+        if (attributes.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(attributes));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
+        if (session is null)
+        {
+            throw new System.ArgumentNullException(nameof(session));
+        }
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
         var suppress = false;
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var attribute in attributes)
@@ -196,6 +225,18 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        if (reason is null)
+        {
+            throw new System.ArgumentNullException(nameof(reason));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
         if (!session.TryMarkAttributeValidated(attribute))
         {
             return;
@@ -203,7 +244,7 @@ internal static class SharpProofControlAttributePolicy
 
         var location =
             attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-            symbol.Locations.FirstOrDefault(static candidate => candidate.IsInSource) ??
+            symbol.Locations.FirstOrDefault(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource)) ??
             Location.None;
         ReportInvalidReasonDiagnostic(
             suppressing, reason, location, reportDiagnostic);
@@ -215,6 +256,18 @@ internal static class SharpProofControlAttributePolicy
         Location location,
         Action<Diagnostic> reportDiagnostic)
     {
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
+        if (reason is null)
+        {
+            throw new System.ArgumentNullException(nameof(reason));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
         reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
             suppressing ? "[SharpProofSuppress]" : "[SharpProofTrusted]",
             string.IsNullOrEmpty(reason) ? "<empty>" : reason,
@@ -226,6 +279,14 @@ internal static class SharpProofControlAttributePolicy
         AttributeData attribute,
         ContractSelectionInventory inventory)
     {
+        if (attribute is null)
+        {
+            throw new System.ArgumentNullException(nameof(attribute));
+        }
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
         return ContractSelectionInventory.GetControlSelection(
             attribute.AttributeClass,
             inventory.Suppress,
@@ -236,6 +297,14 @@ internal static class SharpProofControlAttributePolicy
         INamedTypeSymbol attributeType,
         ContractSelectionInventory inventory)
     {
+        if (attributeType is null)
+        {
+            throw new System.ArgumentNullException(nameof(attributeType));
+        }
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
         return ContractSelectionInventory.GetControlSelection(
             attributeType,
             inventory.Suppress,

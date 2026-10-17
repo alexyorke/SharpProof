@@ -18,6 +18,10 @@ public sealed class MultidimensionalArrayLengthTests
     [TestCase("int Target(Box box)", "box != null && box.Cells != null", "Contract.Result<int>() == 1", "return box.Cells.Length;")]
     public async Task MultidimensionalLengthIsNotSequenceLength(string signature, string requires, string ensures, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(signature);
         Assert.That(await Verify(signature, requires, ensures, body), Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
@@ -30,11 +34,19 @@ public sealed class MultidimensionalArrayLengthTests
     public async Task SingleDimensionalAndStringLengthsRemainExact(string signature, string requires, string ensures, string body,
         WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(signature);
         Assert.That(await Verify(signature, requires, ensures, body), Is.EqualTo(expected));
     }
 
     private static async Task<WorkerClaimOutcome> Verify(string signature, string requires, string ensures, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(signature);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public sealed class Box { public int[,] Cells; } " +
             "public static class Subject { public static " + signature + " { Contract.Requires(" + requires + "); Contract.Ensures(" +
             ensures + "); " + body + " } }", cacheEnabled: false);

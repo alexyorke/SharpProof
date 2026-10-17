@@ -70,7 +70,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                         $"{measured.Name}: bytes{MeasurementCount}={measured.Target.AllocatedBytes}; " +
                         $"native={observation.Outcome}/{observation.Reason}");
                 }
-                if (observation.Cases.All(measured => measured.Target.AllocatedBytes == 0))
+                if (observation.Cases.All(measured => measured is null ? throw new System.ArgumentNullException(nameof(measured)) : (measured.Target.AllocatedBytes == 0)))
                 {
                     Assert.That(observation.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
                         observation.Boundary + ": existing-behavior preservation control for the four sampled inputs; " +
@@ -82,6 +82,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
 
     private static async Task<BoundaryObservation> ObserveForm(string form, string evidenceDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(evidenceDirectory);
+        System.ArgumentNullException.ThrowIfNull(form);
         var source = SourceFor(form);
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen fixed-type subject changed.");
@@ -121,8 +123,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 TargetNoOptimization = (flags & MethodImplAttributes.NoOptimization) != 0,
                 ControlNoInlining = (controlFlags & MethodImplAttributes.NoInlining) != 0,
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
-                HasBox = instructions.Any(instruction => instruction.OpCode == "box"),
-                HasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst"),
+                HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
+                HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
                 IlHex = Convert.ToHexString(il),
                 Instructions = instructions,
                 Cases = cases,
@@ -164,21 +166,21 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = discovery.Manifest.Claims.Select(claim => new
+            ManifestClaims = discovery.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            }).ToArray(),
+            })).ToArray(),
             Cases = cases,
-            AnyObservedAllocation = cases.Any(observed => observed.Target.AllocatedBytes > 0),
-            AllFourObservedZero = cases.All(observed => observed.Target.AllocatedBytes == 0),
+            AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0)),
+            AllFourObservedZero = cases.All(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes == 0)),
             FrozenCorrectnessRule = "Any observed allocation > 0 implies the corresponding universal ZeroAllocations claim cannot be Proven.",
             FrozenPreservationControl = "When all four sampled inputs are zero-byte observations, preserve existing Proven behavior; sampling does not establish zero allocation for every T or runtime."
         });
@@ -194,6 +196,9 @@ public sealed class GenericFixedTestedTypeControlAuditTests
 
     private static CaseObservation[] ObserveCases(string form, MethodInfo target, MethodInfo control)
     {
+        System.ArgumentNullException.ThrowIfNull(control);
+        System.ArgumentNullException.ThrowIfNull(form);
+        System.ArgumentNullException.ThrowIfNull(target);
         return
         [
             Observe<int>(form + "/int7", form, target, control, 7, expected: true),
@@ -204,8 +209,12 @@ public sealed class GenericFixedTestedTypeControlAuditTests
     }
 
     private static CaseObservation Observe<TValue>(string name, string testedType, MethodInfo target, MethodInfo control,
-        TValue value, bool expected)
+        TValue value /* SPINT001: all values valid - runtime type probes intentionally accept all values, including null */, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(control);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(target);
+        System.ArgumentNullException.ThrowIfNull(testedType);
         var typedTarget = target.MakeGenericMethod(typeof(TValue)).CreateDelegate<Func<TValue, int, bool>>();
         var typedControl = control.MakeGenericMethod(typeof(TValue)).CreateDelegate<Func<TValue, int, bool>>();
         return new(name, typeof(TValue).ToString(), testedType,
@@ -213,8 +222,9 @@ public sealed class GenericFixedTestedTypeControlAuditTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Measurement Measure<TValue>(Func<TValue, int, bool> target, TValue value, bool expected)
+    private static Measurement Measure<TValue>(Func<TValue, int, bool> target, TValue value /* SPINT001: all values valid - runtime type probes intentionally accept all values, including null */, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         var actual = target(value, InputGuard);
         for (var index = 0; index < WarmupCount; index++)
         {
@@ -235,6 +245,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
 
     private static void AssertMeasurement(string name, Measurement measured)
     {
+        System.ArgumentNullException.ThrowIfNull(measured);
+        System.ArgumentNullException.ThrowIfNull(name);
         Assert.That(measured.Actual, Is.EqualTo(measured.Expected), name);
         Assert.That(measured.TrueResults, Is.EqualTo(measured.Expected ? MeasurementCount : 0), name);
         Assert.That(measured.AllocatedBytes, Is.GreaterThanOrEqualTo(0), name);
@@ -264,10 +276,11 @@ public sealed class GenericFixedTestedTypeControlAuditTests
 
     private static IlInstruction[] ReadIl(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field.FieldType == typeof(OpCode))
-            .Select(field => (OpCode)field.GetValue(null)!)
-            .ToDictionary(opcode => unchecked((ushort)opcode.Value));
+            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = new List<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
@@ -295,14 +308,32 @@ public sealed class GenericFixedTestedTypeControlAuditTests
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
-    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason);
+    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
+    {
+        public string Boundary { get; init; } = Boundary ?? throw new System.ArgumentNullException(nameof(Boundary));
+        public CaseObservation[] Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+    }
 
-    private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control);
+    private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public string ValueType { get; init; } = ValueType ?? throw new System.ArgumentNullException(nameof(ValueType));
+        public string TestedType { get; init; } = TestedType ?? throw new System.ArgumentNullException(nameof(TestedType));
+        public Measurement Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
+        public Measurement Control { get; init; } = Control ?? throw new System.ArgumentNullException(nameof(Control));
+    }
 
     private sealed record Measurement(bool Expected, bool Actual, int TrueResults, long AllocatedBytes, double BytesPerCall);
 
-    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex);
+    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string OperandHex { get; init; } = OperandHex ?? throw new System.ArgumentNullException(nameof(OperandHex));
+    }
 }

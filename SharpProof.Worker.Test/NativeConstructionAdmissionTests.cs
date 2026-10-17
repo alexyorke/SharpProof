@@ -12,6 +12,7 @@ public sealed class NativeConstructionAdmissionTests
     [TestCase("parameters")]
     public async Task DefaultConstructionBoundsRejectLegalOwnedGraphEnlargement(string dimension)
     {
+        System.ArgumentNullException.ThrowIfNull(dimension);
         var bounded = CreateCandidate(dimension, 1);
         var enlarged = CreateCandidate(dimension, PassiveCallableVcBuilder.MaximumSteps + 1);
         foreach (var candidate in new[] { bounded, enlarged })
@@ -72,7 +73,7 @@ public sealed class NativeConstructionAdmissionTests
         var ensures = new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(input.Current), factory.Boolean(false)), factory.Boolean(true), site);
         var candidate = new PassiveCallableCandidate("bounded-expansion-admission", builder.Build(), [input], null, [], [ensures]);
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
         Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
         foreach (var value in new[] { false, true })
         {
@@ -119,6 +120,7 @@ public sealed class NativeConstructionAdmissionTests
 
     private static PassiveCallableCandidate CreateCandidate(string dimension, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(dimension);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("default-construction-admission");

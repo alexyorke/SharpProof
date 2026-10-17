@@ -13,6 +13,7 @@ public sealed class WorkerVcFieldArrayFreshnessTests
     public async Task FreshArrayDoesNotAliasAnArrayReachedThroughAField(string body, int contractResult,
         int runtimeResult, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         const string prefix = "public sealed class Box { public int[] Data; } public static class Subject { ";
         var source = "using SharpProof.Attributes; " + prefix + "public static int Target(Box box) { " +
             "Contract.Requires(box != null && box.Data != null && box.Data.Length == 1 && box.Data[0] == 7); " +
@@ -28,6 +29,7 @@ public sealed class WorkerVcFieldArrayFreshnessTests
 
     private static void AssertRuntimeResult(string source, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("FieldArrayRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

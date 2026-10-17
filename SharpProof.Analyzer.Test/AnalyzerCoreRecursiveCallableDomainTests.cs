@@ -15,7 +15,7 @@ public sealed class AnalyzerCoreRecursiveCallableDomainTests
         var source = "using System; using System.Collections.Generic; public static class Fixture { public static " +
             type + " Target(" + type + " value) => value; }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

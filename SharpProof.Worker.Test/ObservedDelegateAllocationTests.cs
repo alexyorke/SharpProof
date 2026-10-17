@@ -72,7 +72,7 @@ public sealed class ObservedDelegateAllocationTests
         var tree = compilation.SyntaxTrees.Single();
         var model = CompilationModelProvider.GetSemanticModel(compilation, tree);
         var targetSyntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var creation = model.GetOperation(targetSyntax)!.Descendants().OfType<IDelegateCreationOperation>()
             .First(CSharpOperationSemantics.IsExplicitDelegateCreation);
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -82,7 +82,7 @@ public sealed class ObservedDelegateAllocationTests
         var lowered = new RoslynTotalExpressionLowerer(context, builder).LowerBodyValue(creation, builder.CreateBlock());
         Assert.That(lowered.Classification.IsExact, Is.True);
         builder.Return(lowered.Continuation, factory.CreateOperation("return"), lowered.Value);
-        Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
+        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAllocationInstruction>(), Has.Exactly(1).Items,
             "Keep the observed delegate's allocation in the lowered program.");
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());

@@ -112,6 +112,7 @@ public sealed class WorkerVcStringEqualityTests
     [TestCase("InstanceEqualsInClause", WorkerClaimOutcome.Proven)]
     public void ContentEqualityIsDecided(string method, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
     }
@@ -121,10 +122,10 @@ public sealed class WorkerVcStringEqualityTests
     {
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal));
-        var claims = response.ClaimResults.Where(result => callable.ClaimIds.Contains(result.ClaimId)).ToArray();
-        Assert.That(claims.Select(claim => claim.Outcome).ToArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
-            string.Join(", ", claims.Select(claim => claim.Reason)));
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal)));
+        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId))).ToArray();
+        Assert.That(claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)).ToArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
+            string.Join(", ", claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason))));
     }
 
     // A string equal in content to a literal need not be the literal's object.
@@ -136,9 +137,10 @@ public sealed class WorkerVcStringEqualityTests
 
     private static WorkerClaimResult Claim(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal));
-        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

@@ -17,7 +17,7 @@ public sealed class StringFromEndIndexBoundaryTests
             }
             """;
 
-        Assert.Throws<NullReferenceException>(new Action(() => { _ = Runtime(null!); }));
+        Assert.Throws<NullReferenceException>(new Action(() => { string value = null!; _ = value[^1]; }));
         Assert.Throws<IndexOutOfRangeException>(new Action(() => { _ = Runtime(""); }));
 
         using var project = new ShadowTestProject(source, cacheEnabled: false);
@@ -32,6 +32,7 @@ public sealed class StringFromEndIndexBoundaryTests
     [TestCase("value != null && value.Length == 0", WorkerClaimOutcome.Refuted)]
     public async Task FromEndIndexRespectsStringLengthGuard(string precondition, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(precondition);
         using var project = new ShadowTestProject(
             "using SharpProof.Attributes; public static class Subject { [DoesNotThrow] " +
             "public static char Target(string value) { Contract.Requires(" + precondition + "); return value[^1]; } }",
@@ -43,5 +44,5 @@ public sealed class StringFromEndIndexBoundaryTests
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
     }
 
-    private static char Runtime(string value) { return value[^1]; }
+    private static char Runtime(string value) { ArgumentNullException.ThrowIfNull(value); return value[^1]; }
 }

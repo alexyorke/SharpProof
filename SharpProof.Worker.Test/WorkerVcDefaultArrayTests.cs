@@ -13,6 +13,8 @@ public sealed class WorkerVcDefaultArrayTests
     [TestCase("bool", "false")]
     public async Task FreshScalarArrayReadsItsDefaultValue(string type, string zero)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
+        System.ArgumentNullException.ThrowIfNull(zero);
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "public static " + type + " Target(int length, int index) { " +
             "Contract.Requires(length > 0 && index >= 0 && index < length); " +
@@ -34,6 +36,8 @@ public sealed class WorkerVcDefaultArrayTests
     [TestCase("var values = new object[2]; return values[0] == null ? 0 : 1;", "0", WorkerClaimOutcome.Unknown)]
     public async Task NeighboringArrayBehaviorIsPreserved(string body, string expected, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(expected);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public static int Target() { Contract.Ensures(Contract.Result<int>() == " + expected + "); " + body + " } }",
             cacheEnabled: false);
@@ -49,6 +53,7 @@ public sealed class WorkerVcDefaultArrayTests
     [TestCase("int[] values; if (flag) values = new int[2]; else values = new int[3]; return values[0];")]
     public async Task DefaultInitializationSurvivesUnrelatedStores(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public static int Target(bool flag) { Contract.Ensures(Contract.Result<int>() == 0); " + body + " } }",
             cacheEnabled: false);

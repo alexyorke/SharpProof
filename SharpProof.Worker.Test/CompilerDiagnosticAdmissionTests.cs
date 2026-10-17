@@ -15,6 +15,7 @@ public sealed class CompilerDiagnosticAdmissionTests
     [TestCase("[{\"isSource\":false,\"code\":null,\"message\":\"error\"}]")]
     public void MalformedDiagnosticArraysRejectAsJsonErrors(string diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         var json = MalformedArtifact(diagnostics);
         Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Deserialize(json)));
     }
@@ -24,6 +25,7 @@ public sealed class CompilerDiagnosticAdmissionTests
     [TestCase("[{\"isSource\":false,\"code\":null,\"message\":\"error\"}]")]
     public async Task MalformedDiagnosticArraysReturnManifestMismatch(string diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         using var directory = new TempDirectory("SharpProof.DiagnosticAdmission-");
         var path = Path.Combine(directory.FullName, "manifest.json");
         var bytes = Encoding.UTF8.GetBytes(MalformedArtifact(diagnostics));
@@ -44,13 +46,14 @@ public sealed class CompilerDiagnosticAdmissionTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(response.Errors.Select(error => error.Code), Does.Contain("compiler_manifest.invalid"));
+            Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("compiler_manifest.invalid"));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     private static string MalformedArtifact(string diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("public static class Subject { }");
         var document = JsonNode.Parse(CompilerManifestArtifactJson.Serialize(artifact))!;
         document["compilerDiagnostics"] = JsonNode.Parse(diagnostics);

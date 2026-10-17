@@ -28,6 +28,8 @@ public sealed class NativeCanonicalStorageAdmissionTests
     [TestCase("initialized-array-allocate", "local", true)]
     public async Task CanonicalEntryStorageIsReadOnlyAtNativeAdmission(string operation, string storage, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
+        System.ArgumentNullException.ThrowIfNull(storage);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = operation switch
         {

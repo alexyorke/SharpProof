@@ -73,6 +73,7 @@ public sealed class Wave7CompanionAssumptionControlTests
     private static async Task Verify(string source, WorkerClaimOutcome expected,
         WorkerVacuityKind vacuity = WorkerVacuityKind.None, int assumptions = 1)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -80,7 +81,7 @@ public sealed class Wave7CompanionAssumptionControlTests
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
         Assert.That(claim.Vacuity, Is.EqualTo(vacuity));
-        Assert.That(claim.Assumptions.Count(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume), Is.EqualTo(assumptions));
+        Assert.That(claim.Assumptions.Count(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)), Is.EqualTo(assumptions));
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 }

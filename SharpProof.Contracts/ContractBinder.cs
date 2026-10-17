@@ -23,6 +23,10 @@ public sealed partial class ContractBinder
             clauseInventory,
             contractSources: null)
     {
+        if (compilation is null)
+        { throw new System.ArgumentNullException(nameof(compilation)); }
+        if (factory is null)
+        { throw new System.ArgumentNullException(nameof(factory)); }
     }
 
     internal static ContractBinder CreateWithContractSources(
@@ -31,6 +35,18 @@ public sealed partial class ContractBinder
         ContractClauseInventoryBuilder clauseInventory,
         EffectiveContractSourceResolver contractSources)
     {
+        if (clauseInventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(clauseInventory));
+        }
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         return new ContractBinder(
             compilation,
             factory,
@@ -118,10 +134,18 @@ public sealed partial class ContractBinder
         ConcurrentDictionary<IMethodSymbol, ContractBindingResult> cache,
         CancellationToken cancellationToken)
     {
+        if (cache is null)
+        {
+            throw new System.ArgumentNullException(nameof(cache));
+        }
+        if (target is null)
+        {
+            throw new System.ArgumentNullException(nameof(target));
+        }
         return implementationBody == null
             ? cache.GetOrAdd(
                 target,
-                value => BindCore(value, null, requiresOnly, cancellationToken))
+                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (BindCore(value, null, requiresOnly, cancellationToken)))
             : BindCore(target, implementationBody, requiresOnly, cancellationToken);
     }
 
@@ -241,10 +265,14 @@ public sealed partial class ContractBinder
     private static bool HasRequiresPlacementErrors(
         ContractClauseInventory inventory)
     {
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
         return inventory.Clauses.Any(static clause =>
-            clause.Kind == BoundContractKind.Requires &&
+            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires &&
             !clause.IsValid &&
-            clause.Placement != ContractClausePlacement.NestedCallable);
+            clause.Placement != ContractClausePlacement.NestedCallable));
     }
 
     private ContractInvocationMaterializationResult BindInvocations(
@@ -254,6 +282,10 @@ public sealed partial class ContractBinder
         bool requiresOnly,
         bool intrinsicsAlreadyValidated)
     {
+        if (expressionBinder is null)
+        {
+            throw new System.ArgumentNullException(nameof(expressionBinder));
+        }
         var body = inventory.ImplementationBody;
         if (body == null)
         {
@@ -268,8 +300,8 @@ public sealed partial class ContractBinder
         }
         return ContractInvocationMaterialization.Bind(
             _factory, expressionBinder,
-            [.. inventory.Clauses.Where(static occurrence => occurrence.IsValid)
-                .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))],
+            [.. inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
+                .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation)))],
             usesCompanion, requiresOnly);
     }
 
@@ -295,6 +327,18 @@ public sealed partial class ContractBinder
         bool requiresOnly,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
+        if (clauses is null)
+        {
+            throw new System.ArgumentNullException(nameof(clauses));
+        }
+        if (target is null)
+        {
+            throw new System.ArgumentNullException(nameof(target));
+        }
+        if (variables is null)
+        {
+            throw new System.ArgumentNullException(nameof(variables));
+        }
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
                      target,
                      includeReturn: !requiresOnly))
@@ -333,6 +377,23 @@ public sealed partial class ContractBinder
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
+
+        if (attributes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(attributes));
+        }
+        if (clauses is null)
+        {
+            throw new System.ArgumentNullException(nameof(clauses));
+        }
+        if (sourceType is null)
+        {
+            throw new System.ArgumentNullException(nameof(sourceType));
+        }
+        if (valueName is null)
+        {
+            throw new System.ArgumentNullException(nameof(valueName));
+        }
         var bound = ClosedContractAttributeBinding.BindValue(
             _factory, _api!.Selections, attributes, sourceType, refKind, () => value, valueName, kind,
             total: false, _ => _factory.CreateOperation("closed-attribute"));

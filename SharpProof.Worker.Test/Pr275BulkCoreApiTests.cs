@@ -166,7 +166,7 @@ public sealed class Pr275BulkCoreApiTests
         var method = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("IsNullOrEmpty")
             .OfType<IMethodSymbol>()
-            .Single(candidate => candidate.Parameters.Length == 1);
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 1));
 
         Assert.That(session.HasCreatedApiSpecs, Is.False);
         var specs = session.ApiSpecs;
@@ -412,7 +412,7 @@ public sealed class Pr275BulkCoreApiTests
             .Single();
         var ordinaryMethod = root.DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Local");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Local"));
 
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             localFunction,
@@ -435,11 +435,11 @@ public sealed class Pr275BulkCoreApiTests
 
         Assert.That(diagnostics, Has.Count.EqualTo(2));
         Assert.That(
-            diagnostics.All(static diagnostic => diagnostic.Id == "SP0024"),
+            diagnostics.All(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")),
             Is.True);
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture)),
+            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture))),
             Has.All.Contain("expected a non-empty reason"));
     }
 
@@ -487,6 +487,7 @@ public sealed class Pr275BulkCoreApiTests
 
     private static AnalyzerSession NewSession(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return new AnalyzerSession(
             compilation,
             AnalyzerConfiguration.AdvisoryAll,
@@ -498,6 +499,8 @@ public sealed class Pr275BulkCoreApiTests
         string source,
         MetadataReference? additionalReference = null)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(assemblyName, source);
         if (additionalReference is not null)
         {
@@ -508,7 +511,7 @@ public sealed class Pr275BulkCoreApiTests
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.That(
-            emit.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+            emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
             Is.Empty);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
         return (compilation, stream.ToArray());
@@ -517,6 +520,9 @@ public sealed class Pr275BulkCoreApiTests
     private static (AnalyzerSemanticOutcome Outcome, ImmutableArray<Diagnostic> Diagnostics)
         Analyze(CSharpCompilation compilation, AnalyzerSession session, string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(session);
         var method = GetMethod(compilation, methodName);
         var declaration = method.DeclaringSyntaxReferences.Single()
             .GetSyntax(CancellationToken.None);
@@ -532,6 +538,8 @@ public sealed class Pr275BulkCoreApiTests
 
     private static IMethodSymbol GetMethod(CSharpCompilation compilation, string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(methodName);
         return compilation.GetTypeByMetadataName("Fixture")!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -543,6 +551,8 @@ public sealed class Pr275BulkCoreApiTests
         string id,
         string message)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
+        System.ArgumentNullException.ThrowIfNull(message);
         Assert.That(result.Outcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         Assert.That(result.Diagnostics, Has.Length.EqualTo(1));
         Assert.That(result.Diagnostics[0].Id, Is.EqualTo(id));
@@ -560,6 +570,8 @@ public sealed class Pr275BulkCoreApiTests
 
     private static void AssertArgumentNull(string parameterName, Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(parameterName);
         var exception = Assert.Throws<ArgumentNullException>(action);
         Assert.That(exception!.ParamName, Is.EqualTo(parameterName));
     }

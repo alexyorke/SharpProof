@@ -14,6 +14,7 @@ public sealed class ConstructedGenericContractTests
     [TestCase("object", false)]
     public void DynamicSignatureIdentityDoesNotCollapseIntoObject(string companionType, bool matches)
     {
+        System.ArgumentNullException.ThrowIfNull(companionType);
         var source = $$"""
             using SharpProof.Attributes;
             public interface IReader { int Read(dynamic value, bool condition); }
@@ -45,6 +46,7 @@ public sealed class ConstructedGenericContractTests
     [TestCase("(T Left, T Right)[]")]
     public void UnmappedTupleTypesInsideGenericClausesRemainUnsupported(string clauseType)
     {
+        System.ArgumentNullException.ThrowIfNull(clauseType);
         AssertFailure(
             $$"""
             using SharpProof.Attributes;
@@ -66,6 +68,7 @@ public sealed class ConstructedGenericContractTests
     [TestCase("Outer<T>.Item<T>")]
     public void NestedGenericTypesUsedOnlyInClausesPreserveTheScalarCondition(string clauseType)
     {
+        System.ArgumentNullException.ThrowIfNull(clauseType);
         var compilation = CreateCompilation(
             $$"""
             using SharpProof.Attributes;
@@ -89,7 +92,7 @@ public sealed class ConstructedGenericContractTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var contracts = result.Contracts!;
         Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var type = factory.GetVariableInfo(parameter.Variable).Type;
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -1, 1 })
@@ -172,6 +175,7 @@ public sealed class ConstructedGenericContractTests
     [TestCase("delegate*<T, T>")]
     public void CompoundPointerTypesInsideGenericClausesCannotBecomeProofEvidence(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         AssertFailure(
             $$"""
             using SharpProof.Attributes;
@@ -197,6 +201,8 @@ public sealed class ConstructedGenericContractTests
     public void FunctionPointerCompanionMustPreserveEveryCallingConvention(
         string targetConventions, string companionConventions)
     {
+        System.ArgumentNullException.ThrowIfNull(companionConventions);
+        System.ArgumentNullException.ThrowIfNull(targetConventions);
         AssertFailure(
             $$"""
             using SharpProof.Attributes;
@@ -855,6 +861,7 @@ public sealed class ConstructedGenericContractTests
 
     private static void AssertBinds(string source, int expectedClauses)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         var tree = compilation.SyntaxTrees.Single();
         var invocation = tree.GetRoot()
@@ -879,6 +886,7 @@ public sealed class ConstructedGenericContractTests
         string source,
         ContractBindingFailure expectedFailure)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         var tree = compilation.SyntaxTrees.Single();
         var invocation = tree.GetRoot()
@@ -901,19 +909,22 @@ public sealed class ConstructedGenericContractTests
         CSharpCompilation compilation,
         string expressionPrefix)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(expressionPrefix);
         var tree = compilation.SyntaxTrees.Single();
         var semanticModel = compilation.GetSemanticModel(tree);
         return [.. tree.GetRoot()
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
-            .Where(invocation => invocation.Expression.ToString()
-                .StartsWith(expressionPrefix, StringComparison.Ordinal))
-            .Select(invocation => semanticModel.GetSymbolInfo(invocation).Symbol)
+            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString()
+                .StartsWith(expressionPrefix, StringComparison.Ordinal)))
+            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (semanticModel.GetSymbolInfo(invocation).Symbol))
             .OfType<IMethodSymbol>()];
     }
 
     private static CSharpCompilation CreateCompilation(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return TestCompilation.Create(
             "ConstructedContracts",
             source,
@@ -923,6 +934,11 @@ public sealed class ConstructedGenericContractTests
     private sealed record ConstructedMethodFixture(
         CSharpCompilation Compilation,
         IMethodSymbol[] Targets,
-        ContractBinder Binder);
+        ContractBinder Binder)
+    {
+        public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public ContractBinder Binder { get; init; } = Binder ?? throw new System.ArgumentNullException(nameof(Binder));
+        public IMethodSymbol[] Targets { get; init; } = Targets ?? throw new System.ArgumentNullException(nameof(Targets));
+    }
 
 }

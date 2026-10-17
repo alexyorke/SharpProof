@@ -14,6 +14,7 @@ public sealed class CompilerReferenceStackMergeCoverageTests
     [TestCase("uint")]
     public void RealConditionalCallWidensTheZeroStackSubsetAtItsJoin(string valueType)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         var library = "public static class Library { public static " + valueType +
             " Target(bool choose, " + valueType + " value) => Check(choose ? value : 0); public static " +
             valueType + " Check(" + valueType + " value) => value; }";
@@ -46,6 +47,9 @@ public sealed class CompilerReferenceStackMergeCoverageTests
     public void SharedCallJoinPreservesReferenceAdmission(string firstType, string secondType,
         string checkType, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(checkType);
+        System.ArgumentNullException.ThrowIfNull(firstType);
+        System.ArgumentNullException.ThrowIfNull(secondType);
         var librarySource = $$"""
             public static class Library {
                 public static bool Target(bool choose, {{firstType}} first, {{secondType}} second)
@@ -77,7 +81,7 @@ public sealed class CompilerReferenceStackMergeCoverageTests
         Assert.That(call.Method.Parameters[0].Type.SpecialType,
             Is.EqualTo(checkType == "string" ? SpecialType.System_String : SpecialType.System_Object));
         Assert.That(call.Method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
-        Assert.That(code.Any(instruction => instruction.Code is "Brtrue" or "Brfalse"), Is.True);
+        Assert.That(code.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code is "Brtrue" or "Brfalse")), Is.True);
         Assert.That(Enumerable.Range(0, code.Length)
             .Count(index => TotalIlStack.Successors(code, index).Contains(callIndex)), Is.EqualTo(2),
             "Both actual ternary paths must join at the shared call.");

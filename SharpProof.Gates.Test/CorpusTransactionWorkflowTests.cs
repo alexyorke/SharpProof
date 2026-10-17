@@ -57,6 +57,8 @@ public sealed class CorpusTransactionWorkflowTests
     [TestCase("{\"SchemaVersion\":1,\"Entries\":[]}", "The corpus transaction marker is invalid.")]
     public void IncompleteTransactionMetadataFailsRecoveryBeforeChangingOutput(string marker, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(marker);
+        System.ArgumentNullException.ThrowIfNull(message);
         using var temporary = new TempDirectory("SharpProof-corpus-recovery-metadata-");
         var path = Path.Combine(temporary.FullName, "snapshot.txt");
         File.WriteAllText(path, "reviewed snapshot\n");

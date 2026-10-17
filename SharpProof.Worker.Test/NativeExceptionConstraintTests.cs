@@ -21,6 +21,7 @@ public sealed class NativeExceptionConstraintTests
     [TestCase("System.ArgumentException", false)]
     public async Task BoundAllowedTypesControlJoinedFaultsAndAgreeWithRuntime(string allowedType, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(allowedType);
         var source = "using SharpProof.Attributes; public static class C { [AllowedExceptions(typeof(" + allowedType +
             "))] public static int Target(int x) { if (x == 0) return 10 / x; return checked(x + 1); } }";
         var preparation = RoundTrip(source);
@@ -39,6 +40,7 @@ public sealed class NativeExceptionConstraintTests
     [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => x; }", WorkerClaimReason.EffectSummaryIncomplete)]
     public async Task GenericDeclarationsWithSupportedValueDomainsRetainNativeExceptionConstraints(string declaration, WorkerClaimReason compilerReason)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);
         Assert.That(preparation.EffectClaims.Single().Reason, Is.EqualTo(compilerReason));
         Assert.That(preparation.Total, Is.Not.Null);
@@ -90,6 +92,7 @@ public sealed class NativeExceptionConstraintTests
     [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => System.Environment.TickCount; }")]
     public async Task UnsupportedGenericDomainsAndOperationsRemainUnknown(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
@@ -119,7 +122,7 @@ public sealed class NativeExceptionConstraintTests
             }
             """);
         var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets());
-        Assert.That(checks.Keys, Is.EquivalentTo(preparation.EffectClaims.Select(claim => claim.ClaimId)));
+        Assert.That(checks.Keys, Is.EquivalentTo(preparation.EffectClaims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         foreach (var claim in preparation.EffectClaims)
         {
             Assert.That(checks[claim.ClaimId].Outcome, claim.ContractKind == WorkerEffectContractKind.DoesNotThrow
@@ -220,6 +223,7 @@ public sealed class NativeExceptionConstraintTests
 
     private static CompilerCallablePreparation RoundTrip(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
         return preparations.Single();
@@ -227,6 +231,7 @@ public sealed class NativeExceptionConstraintTests
 
     private static Exception RuntimeException(string source, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("NativeConstraintOracle", source).Emit(image).Success, Is.True);
         image.Position = 0;

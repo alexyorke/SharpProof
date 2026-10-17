@@ -100,15 +100,17 @@ public sealed class VerificationBoundaryTests
 
     private static Goal FalseGoal(IrFactory factory)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         return new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0));
     }
 
-    private sealed class ResultBackend(BackendCheckResult? result) : ISmtBackend
+    private sealed class ResultBackend(BackendCheckResult? result /* SPINT001: all values valid - the test backend deliberately returns null to exercise caller validation */) : ISmtBackend
     {
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(result!);
         }

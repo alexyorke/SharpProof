@@ -55,7 +55,7 @@ public readonly record struct EffectRegionId : IComparable<EffectRegionId>
         get;
     }
 
-    public int CompareTo(EffectRegionId other)
+    public int CompareTo(EffectRegionId other /* SPINT001: all values valid - every constructed region and default receiver region are valid */)
     {
         return Kind.CompareTo(other.Kind) is var kind && kind != 0 ? kind : Ordinal.CompareTo(other.Ordinal);
     }
@@ -67,6 +67,11 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
 
     private EffectRegionSet(ImmutableArray<EffectRegionId> regions)
     {
+
+        if (regions.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(regions));
+        }
         _regions = regions;
     }
 
@@ -90,7 +95,7 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
         };
     }
 
-    public static EffectRegionSet Create(EffectRegionId region)
+    public static EffectRegionSet Create(EffectRegionId region /* SPINT001: all values valid - every constructed region and default receiver region are valid */)
     {
         return region.Kind == EffectRegionKind.Unknown
             ? Unknown
@@ -162,7 +167,7 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
 
     public override int GetHashCode()
     {
-        return Regions.Aggregate(17, static (hash, region) => unchecked(hash * 31 + region.GetHashCode()));
+        return Regions.Aggregate(17, static (hash, region /* SPINT001: all values valid - every constructed region and default receiver region are valid */) => unchecked(hash * 31 + region.GetHashCode()));
     }
 
     public static bool operator ==(EffectRegionSet left, EffectRegionSet right)

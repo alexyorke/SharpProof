@@ -14,6 +14,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
     [TestCase("float")]
     public async Task NaNInequalityCannotProveFalsePostcondition(string valueType)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         object witness = valueType == "double" ? (object)double.NaN : float.NaN;
         var source = CreateSource("(" + valueType + " value)", "", "!Contract.Result<bool>()",
             "var copy = value; return value != copy;");
@@ -28,6 +29,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
     [TestCase("int[]", true)]
     public async Task SupportedAliasEqualityRemainsProven(string valueType, bool isNull)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         object? witness = isNull ? null : valueType == "object" ? new object() : new int[1];
         var source = CreateSource("(" + valueType + "? value)", "", "Contract.Result<bool>()",
             "var copy = value; return value == copy;");
@@ -42,6 +44,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
     [TestCase("int[]", true)]
     public async Task SupportedNullComparisonsRemainProven(string valueType, bool isNull)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         object? witness = isNull ? null : valueType == "object" ? new object() : new int[1];
         var predicate = isNull ? "value == null" : "value != null";
         var body = isNull ? "return null == value;" : "return value != null;";
@@ -76,6 +79,10 @@ public sealed class FloatingPredicateBoundaryAuditTests
 
     private static string CreateSource(string signature, string requires, string ensures, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(signature);
         return "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes;\npublic static class Subject {\n" +
             "    public static bool Target" + signature + " {\n" +
             (requires.Length == 0 ? "" : "        Contract.Requires(" + requires + ");\n") +
@@ -85,6 +92,9 @@ public sealed class FloatingPredicateBoundaryAuditTests
 
     private static async Task<WorkerClaimResult> ObserveAndVerifyAsync(string scenario, string source, object?[] witnesses)
     {
+        System.ArgumentNullException.ThrowIfNull(witnesses, nameof(witnesses));
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(source);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
             throw new AssertionException("Canonical container repository root is missing.");
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit", "nearby-boundaries");

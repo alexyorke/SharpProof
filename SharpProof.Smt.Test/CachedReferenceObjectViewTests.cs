@@ -26,6 +26,9 @@ public sealed class CachedReferenceObjectViewTests
 
     private static async Task AssertObjectView(IrFactory factory, IrTerm original, object identity)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(identity);
+        System.ArgumentNullException.ThrowIfNull(original);
         var view = factory.CreateVariable("view", factory.ObjectType);
         var predicate = factory.Binary(IrBinaryOperator.Equal, factory.Variable(view), factory.Cast(factory.ObjectType, original));
         var query = new VerificationQuery(factory,

@@ -25,6 +25,7 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
     public async Task RefutationWitnessMustDescribeTheDeclaredContractViolation(
         WorkerEffectContractKind contract, WorkerEffectSet effects, bool expectedValid, string boundary)
     {
+        System.ArgumentNullException.ThrowIfNull(boundary);
         var request = CreateRequest();
         var response = CreateResponse(request, contract, effects);
         var json = WorkerProtocolJson.SerializeResponse(response);
@@ -96,6 +97,7 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
 
     private static WorkerVerifyResponse CreateResponse(WorkerVerifyRequest request, WorkerEffectContractKind contract, WorkerEffectSet effects)
     {
+        System.ArgumentNullException.ThrowIfNull(request);
         var location = new WorkerSourceLocation { Path = "Subject.cs", Start = 1, Length = 1, Line = 1, Column = 1 };
         var manifest = new WorkerClaimManifest
         {
@@ -131,6 +133,7 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
 
     private static WorkerEffectViolationWitness CreateWitness(WorkerEffectSet effects, WorkerSourceLocation location)
     {
+        System.ArgumentNullException.ThrowIfNull(location);
         return new WorkerEffectViolationWitness
         {
             Kind = effects == WorkerEffectSet.Allocates ? "managed-allocation" : "implicit-throw",

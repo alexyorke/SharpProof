@@ -10,20 +10,22 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
     public void ActualNestedCandidatesRetainCompiledCSharpAndIrAgreement(
         string name, GeneratedCSharpExpression expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(name);
         var candidates = CSharpStructuralShrinker.GetCandidates(expression);
         Assert.That(candidates, Is.Not.Empty, name);
-        Assert.That(candidates.All(candidate => candidate.Type == expression.Type), Is.True, name);
-        Assert.That(candidates.All(candidate => candidate.NodeCount < expression.NodeCount), Is.True, name);
-        Assert.That(candidates.Any(candidate => candidate.Kind == expression.Kind), Is.True, name);
-        Assert.That(candidates.Select(candidate => candidate.Render()).Distinct(StringComparer.Ordinal).Count(),
+        Assert.That(candidates.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Type == expression.Type)), Is.True, name);
+        Assert.That(candidates.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.NodeCount < expression.NodeCount)), Is.True, name);
+        Assert.That(candidates.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind == expression.Kind)), Is.True, name);
+        Assert.That(candidates.Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Render())).Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(candidates.Length), name);
         var cases = candidates.Prepend(expression).Select(candidate =>
-            new GeneratedCSharpCase(candidate, 1, 2, true)
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (new GeneratedCSharpCase(candidate, 1, 2, true)
             {
                 Text = "proof",
                 Values = [2L, 3L],
                 Reference = "proof"
-            }).ToArray();
+            })).ToArray();
         var results = FrontendDifferentialOracle.CompareBatch(cases);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)
@@ -88,6 +90,8 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
 
     private static TestCaseData Case(string name, GeneratedCSharpExpression expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(name);
         return new TestCaseData(name, expression).SetName(name);
     }
 }

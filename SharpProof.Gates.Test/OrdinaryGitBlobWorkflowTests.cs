@@ -17,6 +17,7 @@ public sealed class OrdinaryGitBlobWorkflowTests
     [TestCase("cancelled")]
     public async Task ActualCommittedBlobPreservesBytesAndCleansUpGitAfterCancellation(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var repository = new TempDirectory("SharpProof-ordinary-git-blob-");
         await GitAsync(repository.FullName, "init", "--quiet");
         await GitAsync(repository.FullName, "config", "user.name", "SharpProof Test");
@@ -57,11 +58,14 @@ public sealed class OrdinaryGitBlobWorkflowTests
 
     private static Task<string> GitAsync(string path, params string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(path);
         return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, CancellationToken.None);
     }
 
     private static int[] GitProcessesIn(string directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         var ids = new List<int>();
         foreach (var process in Process.GetProcessesByName("git"))
         {

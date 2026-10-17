@@ -75,11 +75,15 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
         Func<TSource, TTarget> map,
         IEnumerable<TTarget> expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(map);
+        System.ArgumentNullException.ThrowIfNull(values);
         Assert.That(values.Select(map), Is.EqualTo(expected));
     }
 
     private static void AssertInvalid(Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         Assert.Throws<ArgumentOutOfRangeException>(action);
     }
 }

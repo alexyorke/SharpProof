@@ -17,6 +17,10 @@ internal static class CompilerSourceCoordinates
 
     private static int RememberedTree(WorkerSourceLocation location)
     {
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
         return TreeBindings.TryGetValue(location, out var binding) ? binding.Ordinal : -1;
     }
     private static bool TryValidateLineMap(
@@ -196,6 +200,10 @@ internal static class CompilerSourceCoordinates
         out string sourceTreeSha256,
         out string sourceLineMapSha256)
     {
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         var ordinal = FindUniqueTree(location, compilation);
         if (ordinal < 0)

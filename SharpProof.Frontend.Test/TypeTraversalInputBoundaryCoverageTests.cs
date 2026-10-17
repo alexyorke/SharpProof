@@ -43,8 +43,8 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
                      ReferencedTypeSymbols.GetAllCached(compilation, platformAssembly)
                  })
         {
-            Assert.That(types.Any(type => type.Name == "Subject" &&
-                SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly)), Is.True);
+            Assert.That(types.Any(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Name == "Subject" &&
+                SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly))), Is.True);
         }
     }
 
@@ -54,7 +54,7 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
             [CSharpSyntaxTree.ParseText("public static class Subject { public static int Target() => 17; }")],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

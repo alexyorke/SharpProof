@@ -33,6 +33,10 @@ internal static class FrontendAbstentionValidation
         FrontendAbstention value,
         string parameterName)
     {
+        if (parameterName is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameterName));
+        }
         var isDefined = value switch
         {
             FrontendAbstention.None or
@@ -119,19 +123,19 @@ public readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variable)
     {
         get;
     } = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
-    public IrVarId Variable { get; } = variable;
+    public IrVarId Variable { get; } = (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : variable);
 }
 
 public sealed partial class FrontendLoweringResult
 {
     internal FrontendLoweringResult(
         IrTerm term,
-        FrontendSubsetClassification classification,
+        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */,
         ImmutableArray<FrontendVariableBinding> variables)
         : this(
             ArgumentNullGuard.NotNull(term, nameof(term)),
             classification,
-            variables,
+            variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : variables,
             default)
     {
     }
@@ -185,26 +189,45 @@ public sealed partial class FrontendProgramLoweringResult
         ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
     internal object? TotalOrigin { get; }
     internal FrontendProgramLoweringResult(
-        IrProgram program, FrontendSubsetClassification classification,
+        IrProgram program, FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */,
         ImmutableArray<FrontendVariableBinding> variables, ImmutableArray<IrVarId> captures,
         ImmutableArray<FrontendProgramAbstention> abstentions, object totalOrigin)
         : this(program, classification, variables, captures, abstentions)
     {
+
+
+
+        if (abstentions.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(abstentions));
+        }
+        if (captures.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(captures));
+        }
+        if (variables.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         TotalOrigin = ArgumentNullGuard.NotNull(totalOrigin, nameof(totalOrigin));
     }
 
     internal FrontendProgramLoweringResult(
         IrProgram program,
-        FrontendSubsetClassification classification,
+        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */,
         ImmutableArray<FrontendVariableBinding> variables,
         ImmutableArray<IrVarId> captures,
         ImmutableArray<FrontendProgramAbstention> abstentions)
         : this(
             ArgumentNullGuard.NotNull(program, nameof(program)),
             classification,
-            variables,
-            captures,
-            abstentions,
+            variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : variables,
+            captures.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(captures)) : captures,
+            abstentions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(abstentions)) : abstentions,
             default)
     {
     }

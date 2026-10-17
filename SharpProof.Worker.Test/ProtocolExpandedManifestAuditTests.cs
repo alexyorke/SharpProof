@@ -15,6 +15,7 @@ public sealed class ProtocolExpandedManifestAuditTests
     [TestCase("launcher")]
     public async Task CompactResponseWithOversizedCanonicalManifestIsRejected(string boundary)
     {
+        System.ArgumentNullException.ThrowIfNull(boundary);
         var response = CreateResponse(new string('<', WorkerProtocolJson.MaximumJsonBytes / 6 + 1));
         var options = WorkerProtocolJson.Options;
         options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
@@ -47,7 +48,7 @@ public sealed class ProtocolExpandedManifestAuditTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(validation.IsValid, Is.False);
-                Assert.That(validation.Errors.Select(static error => error.Code),
+                Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
                     Does.Contain("manifest.hash_payload_size"));
             }
         }
@@ -69,7 +70,7 @@ public sealed class ProtocolExpandedManifestAuditTests
         Assert.That(validation.IsValid, Is.EqualTo(!invalidHash));
         if (invalidHash)
         {
-            Assert.That(validation.Errors.Select(static error => error.Code), Does.Contain("manifest.hash"));
+            Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("manifest.hash"));
         }
         using var directory = new TempDirectory("small-expanded-manifest-");
         var path = Path.Combine(directory.FullName, "response.json");
@@ -99,6 +100,7 @@ public sealed class ProtocolExpandedManifestAuditTests
 
     private static WorkerVerifyResponse CreateResponse(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         const string callableId = "M:Subject.Target";
         return new WorkerVerifyResponse
         {

@@ -66,6 +66,9 @@ public sealed class AnalyzerCoreEffectCoverageTests
     [TestCase("throw new System.InvalidOperationException();", "Allocates", "SharpProofEffect.Throws")]
     public async Task EffectContractReportsUndeclaredReachableEffects(string body, string detail, string declaredEffects)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(declaredEffects);
+        System.ArgumentNullException.ThrowIfNull(detail);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public class Fixture { public static int State; " +
@@ -88,6 +91,8 @@ public sealed class AnalyzerCoreEffectCoverageTests
     [TestCase("SharpProofEffect.UsesReflection", "UsesReflection")]
     public async Task ExternalBoundaryEffectsRemainVisibleToCaller(string effects, string detail)
     {
+        System.ArgumentNullException.ThrowIfNull(detail);
+        System.ArgumentNullException.ThrowIfNull(effects);
         var exceptions = effects == "SharpProofEffect.Throws"
             ? ", ThrownExceptions = new[] { typeof(System.Exception) }" : "";
         var external = AnalyzerTestHost.EmitReference(

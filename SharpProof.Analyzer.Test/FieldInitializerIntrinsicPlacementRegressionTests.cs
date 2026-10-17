@@ -95,8 +95,8 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var intrinsicCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(invocation => model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
-                method.Name is "Result" or "Old").ToArray();
+            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
+                method.Name is "Result" or "Old")).ToArray();
         Assert.That(intrinsicCalls, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsicCalls)
         {
@@ -150,6 +150,8 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
 
     private static string CreateSource(bool property, string expression, string type = "int")
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(type);
         var member = property
             ? $"public {type} Value {{ get; }} = {expression};"
             : $"public {type} Value = {expression};";
@@ -163,14 +165,16 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
 
     private static void AssertNoCompilationErrors(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
     }
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(diagnostic =>
-            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceSpan}|" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceSpan}|" +
+            diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 }

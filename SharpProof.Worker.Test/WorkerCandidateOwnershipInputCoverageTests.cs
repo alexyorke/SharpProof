@@ -25,6 +25,7 @@ public sealed class WorkerCandidateOwnershipInputCoverageTests
     [TestCase(1, "Disjoint inputs require distinct nominal reference types")]
     public void DisjointInputPairsRequireOwnedNominalReferenceParameters(int right, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(message);
         var original = EnrollSourceControl();
         var exception = Assert.Throws<ArgumentException>(new Action(() =>
             new PassiveCallableCandidate(original.CallableId, original.Program, original.Parameters, original.Result,

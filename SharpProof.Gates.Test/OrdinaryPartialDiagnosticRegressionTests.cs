@@ -35,8 +35,8 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         var root = CSharpSyntaxTree.ParseText(Source).GetCompilationUnitRoot();
         var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
-        var definition = declarations.Single(static method => method.Body == null && method.ExpressionBody == null);
-        var implementation = declarations.Single(static method => method.Body != null || method.ExpressionBody != null);
+        var definition = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body == null && method.ExpressionBody == null));
+        var implementation = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
         var selected = selectImplementation ? implementation : definition;
         var location = selected.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-partial-diagnostics.cs",
@@ -49,11 +49,11 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         Assert.That(OpenSourceCorpusCatalog.FindDeclaration(index, method), Is.SameAs(selected));
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
-        Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var preparedTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "ordinary-partial-diagnostics.cs");
+        Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var preparedTree = compilation.SyntaxTrees.Single(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath == "ordinary-partial-diagnostics.cs"));
         var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-        var preparedDefinition = preparedMethods.Single(static item => item.Body == null && item.ExpressionBody == null);
-        var preparedImplementation = preparedMethods.Single(static item => item.Body != null || item.ExpressionBody != null);
+        var preparedDefinition = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body == null && item.ExpressionBody == null));
+        var preparedImplementation = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body != null || item.ExpressionBody != null));
         var model = compilation.GetSemanticModel(preparedTree);
         var definitionSymbol = model.GetDeclaredSymbol(preparedDefinition)!;
         var implementationSymbol = model.GetDeclaredSymbol(preparedImplementation)!;
@@ -67,8 +67,8 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         Assert.That(SymbolEqualityComparer.Default.Equals(target.Method, implementationSymbol), Is.True);
         Assert.That(target.Declaration, Is.SameAs(preparedImplementation));
         Assert.That(target.EffectClaims, Has.Length.EqualTo(2));
-        Assert.That(target.EffectClaims.Select(static claim => claim.Entry.EffectContractKind), Has.Member(WorkerEffectContractKind.EnforcePure));
-        Assert.That(target.EffectClaims.Select(static claim => claim.Entry.EffectContractKind), Has.Member(WorkerEffectContractKind.ZeroAllocations));
+        Assert.That(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.EffectContractKind)), Has.Member(WorkerEffectContractKind.EnforcePure));
+        Assert.That(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.EffectContractKind)), Has.Member(WorkerEffectContractKind.ZeroAllocations));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -88,7 +88,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         }
         var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true);
         Assert.That(analysis.Diagnostics, Has.Length.EqualTo(2));
-        Assert.That(analysis.Diagnostics.Select(static item => item.Id).OrderBy(static id => id, StringComparer.Ordinal), Is.EqualTo(ExpectedDiagnosticIds));
+        Assert.That(analysis.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id)).OrderBy(static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal), Is.EqualTo(ExpectedDiagnosticIds));
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(1));
         Assert.That(analysis.SemanticOutcomes.Single().Outcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         var native = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
@@ -100,9 +100,9 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         Assert.That(observation.SemanticOutcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         Assert.That(observation.Verdict, Is.EqualTo(CorpusVerdict.Refuted));
         Assert.That(observation.Diagnostics, Has.Length.EqualTo(2));
-        Assert.That(observation.Diagnostics.Select(static item => item.Split('@')[0]), Is.EqualTo(ExpectedDiagnosticIds));
+        Assert.That(observation.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Split('@')[0])), Is.EqualTo(ExpectedDiagnosticIds));
         Assert.That(observation.Diagnostics,
-            Is.EqualTo(observation.Diagnostics.OrderBy(static item => item, StringComparer.Ordinal)));
+            Is.EqualTo(observation.Diagnostics.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), StringComparer.Ordinal)));
         foreach (var diagnostic in observation.Diagnostics)
         {
             var fields = diagnostic.Split('@');

@@ -283,7 +283,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         builder.Return(entry, factory.CreateOperation(), factory.Variable(equal));
         var program = builder.Build();
         var markers = program.Blocks
-            .SelectMany(static block => block.Instructions)
+            .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAssignInstruction>()
             .ToImmutableArray();
 

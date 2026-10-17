@@ -11,6 +11,15 @@ internal static partial class ApiSpecTermValidator
             object? payload,
             ImmutableArray<SpecTermDeclaration> children)
         {
+
+            if (children.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(children));
+            }
+            if (declaration is null)
+            {
+                throw new System.ArgumentNullException(nameof(declaration));
+            }
             Declaration = declaration;
             Payload = payload;
             Children = children;
@@ -27,6 +36,18 @@ internal static partial class ApiSpecTermValidator
             IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
             bool allowResult)
         {
+            if (facets is null)
+            {
+                throw new System.ArgumentNullException(nameof(facets));
+            }
+            if (validatedTerms is null)
+            {
+                throw new System.ArgumentNullException(nameof(validatedTerms));
+            }
+            if (variables is null)
+            {
+                throw new System.ArgumentNullException(nameof(variables));
+            }
             var facts = new ValidationContext(variables, facets, validatedTerms, allowResult)
                 .Validate(declaration, depth: 1);
             ValidateExpansion(declaration);

@@ -71,6 +71,11 @@ public sealed class TypedMetadataCallTests
     public void CompiledMetadataScalarMatchesOwnedOriginal(string resultType, string parameterType,
         string expression, object input, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(parameterType);
+        System.ArgumentNullException.ThrowIfNull(resultType);
         using var subject = new MetadataTestSubject(
             $"public static class Library {{ public static {resultType} Target({parameterType} value) {{ return {expression}; }} }}",
             $$"""
@@ -87,7 +92,7 @@ public sealed class TypedMetadataCallTests
         { Assert.That(runtime, Is.EqualTo(expected)); }
         var artifact = subject.CreateArtifact();
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
+        var total = preparations.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total!;
         Assert.That(total, Is.Not.Null);
         var factory = total.Program.Factory;
         var entry = total.Parameters.Single().Entry;
@@ -119,7 +124,7 @@ public sealed class TypedMetadataCallTests
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
         Assert.That(subject.InvokeRoot(0), Is.EqualTo(1));
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
-        var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
+        var total = preparations.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total!;
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
@@ -176,6 +181,7 @@ public sealed class TypedMetadataCallTests
     [TestCase("locals")]
     public void MalformedImplementationBodyCannotSupplyConcreteEvidence(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var library = mutation == "locals"
             ? "public static class Library { public static int Target(int value) { int result = 0; for (int i = 0; i < value; i++) result += i; return result; } }"
             : "public static class Library { public static int Target(int value) { return value; } }";
@@ -185,6 +191,10 @@ public sealed class TypedMetadataCallTests
             """);
         subject.MutateImage((bytes, header, il) =>
         {
+            if (il < 0)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(il)); }
+
+            System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
             switch (mutation)
             {
                 case "stack":
@@ -223,7 +233,7 @@ public sealed class TypedMetadataCallTests
         var owned = provider.Resolve(method, CancellationToken.None)!;
         Assert.That(owned, Is.Not.Null);
         Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
-        subject.MutateImage((bytes, _, il) => bytes[il] = 0x26);
+        subject.MutateImage((bytes, _, il) => { System.ArgumentNullException.ThrowIfNull(bytes); if ((uint)il >= (uint)bytes.Length) { throw new ArgumentOutOfRangeException(nameof(il)); } bytes[il] = 0x26; });
         Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(owned));
         Assert.That(owned.Instructions[0].Code, Is.EqualTo("Ldarg"));
         Assert.That(new CompilerTotalIlBodyProvider(subject.Compilation, captured).Resolve(method, CancellationToken.None), Is.Null);
@@ -234,6 +244,7 @@ public sealed class TypedMetadataCallTests
     [TestCase("")]
     public void TypeInitializationAndDependencyAdmissionIsExplicit(string initialization)
     {
+        System.ArgumentNullException.ThrowIfNull(initialization);
         var body = string.IsNullOrEmpty(initialization) ? "return System.Math.Abs(value);" : "return value;";
         using var subject = new MetadataTestSubject($"public static class Library {{ {initialization} public static int Target(int value) {{ {body} }} }}", """
             using SharpProof.Attributes;
@@ -293,6 +304,7 @@ public sealed class TypedMetadataCallTests
     [TestCase("[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.Synchronized)] public static int Target(int value) { return value; }")]
     public void UnsupportedCallingConventionsAndSynchronizationStayClosed(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         using var subject = new MetadataTestSubject("public static class Library { " + declaration + " }", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return x; } }
@@ -322,12 +334,14 @@ public sealed class TypedMetadataCallTests
     [TestCase("amd64-pe32")]
     public void IncompatibleImplementationImageCannotSupplyConcreteEvidence(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         using var subject = new MetadataTestSubject("public static class Library { public static int Target(int value) { return value; } }", """
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
         subject.MutateImage((bytes, _, _) =>
         {
+            System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
             using var pe = new PEReader(new MemoryStream(bytes, writable: false));
             if (mutation is "arm64" or "amd64-pe32")
             {
@@ -380,6 +394,8 @@ internal sealed class MetadataTestSubject : IDisposable
 
     internal MetadataTestSubject(string librarySource, string source, Platform platform = Platform.AnyCpu)
     {
+        System.ArgumentNullException.ThrowIfNull(librarySource);
+        System.ArgumentNullException.ThrowIfNull(source);
         try
         {
             var implementation = TestCompilation.Create("TypedIlLibrary", librarySource, includeSharpProofReference: false)
@@ -409,7 +425,7 @@ internal sealed class MetadataTestSubject : IDisposable
         { Dispose(); throw; }
     }
 
-    internal object? Invoke(object input)
+    internal object? Invoke(/* SPINT001: all values valid - Null inputs are part of the differential matrix. */ object? input)
     {
         var value = Convert.ChangeType(input, Method.GetParameters().Single().ParameterType, CultureInfo.InvariantCulture);
         try
@@ -424,7 +440,7 @@ internal sealed class MetadataTestSubject : IDisposable
             new ClaimManifestBuilder(Compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
     }
 
-    internal object? InvokeRoot(object input)
+    internal object? InvokeRoot(/* SPINT001: all values valid - Null inputs are part of the differential matrix. */ object? input)
     {
         var value = Convert.ChangeType(input, RootMethod.GetParameters().Single().ParameterType, CultureInfo.InvariantCulture);
         try
@@ -434,6 +450,7 @@ internal sealed class MetadataTestSubject : IDisposable
 
     internal void MutateImage(Action<byte[], int, int> mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var bytes = Image.ToArray();
         int header;
         using (var image = new PEReader(new MemoryStream(Image, writable: false)))

@@ -21,6 +21,7 @@ public sealed class GoldenLoweringTests
     [TestCaseSource(nameof(Cases))]
     public void ProgramLoweringMatchesGolden(string caseName)
     {
+        System.ArgumentNullException.ThrowIfNull(caseName);
         var fixture = GoldenTest.Load("lowering", caseName);
         var tree = CSharpSyntaxTree.ParseText(fixture.Source, new CSharpParseOptions(LanguageVersion.CSharp12), caseName + ".cs");
         var bindContracts = fixture.Source.Contains("// golden-contracts: true", StringComparison.Ordinal);
@@ -28,9 +29,9 @@ public sealed class GoldenLoweringTests
             MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location)) : TestMetadataReferences.Platform;
         var compilation = CSharpCompilation.Create("GoldenLowering", [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node.Identifier.ValueText == "Target").ToArray();
-        var method = methods.Single(node => node.Body != null || node.ExpressionBody != null);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target")).ToArray();
+        var method = methods.Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Body != null || node.ExpressionBody != null));
         var total = fixture.Source.StartsWith("// golden-mode: Total\n", StringComparison.Ordinal);
         var factory = new IrFactory(total ? IrExecutionSemantics.Total : IrExecutionSemantics.Legacy);
         var model = compilation.GetSemanticModel(tree);
@@ -86,11 +87,11 @@ public sealed class GoldenLoweringTests
                 RememberTerm(clause.Value);
             }
         }
-        foreach (var binding in result.Variables.OrderBy(binding => binding.Variable.Value))
+        foreach (var binding in result.Variables.OrderBy(binding => ((binding.Variable.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : (binding.Variable.Value))))
         {
             output.AppendLine(CultureInfo.InvariantCulture, $"variable: {Variable(binding.Variable)} source={binding.Symbol.Name}");
         }
-        foreach (var block in result.Program.Blocks.OrderBy(block => block.Id.Value))
+        foreach (var block in result.Program.Blocks.OrderBy(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value)))
         {
             output.AppendLine(CultureInfo.InvariantCulture, $"block: {block.Id} {(block.Name is { } name ? factory.GetString(name) : "unnamed")}");
             foreach (var instruction in block.Instructions)
@@ -101,19 +102,19 @@ public sealed class GoldenLoweringTests
                 RememberInstruction(instruction);
             }
         }
-        foreach (var term in terms.Values.OrderBy(term => term.Id.Value))
+        foreach (var term in terms.Values.OrderBy(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Id.Value)))
         {
             var type = factory.GetTypeInfo(term.Type);
             var bits = term is IrIntegerTerm integer ? " bits=" + integer.Bits.ToString(CultureInfo.InvariantCulture) : "";
             output.AppendLine(CultureInfo.InvariantCulture, $"term: {term.Id} {term.Kind} type={term.Type}:{factory.GetString(type.Name)} width={type.Width} signed={type.Signed}{bits} value={printer.Print(term)}");
         }
-        foreach (var diagnostic in result.Abstentions.OrderBy(diagnostic => diagnostic.Operation.Value))
+        foreach (var diagnostic in result.Abstentions.OrderBy(diagnostic => ((diagnostic.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(diagnostic)) : (diagnostic.Operation.Value))))
         {
             var description = factory.GetOperationInfo(diagnostic.Operation).Description;
             output.AppendLine(CultureInfo.InvariantCulture, $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? factory.GetString(text) : "none")}");
         }
         const string callInputPrefix = "// golden-call-precondition-input: ";
-        var callInput = fixture.Source.Split('\n').SingleOrDefault(line => line.StartsWith(callInputPrefix, StringComparison.Ordinal));
+        var callInput = fixture.Source.Split('\n').SingleOrDefault(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith(callInputPrefix, StringComparison.Ordinal)));
         if (callInput != null)
         {
             Assert.That(result.IsExact, Is.True);
@@ -126,6 +127,8 @@ public sealed class GoldenLoweringTests
                 AllocationObserver = _ => allocated++,
                 AssignmentObserver = (assignment, value, approximation) =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(assignment);
+                    System.ArgumentNullException.ThrowIfNull(value);
                     if (result.CallPreconditions.ContainsKey(assignment))
                     { observations.Add((assignment, value.Boolean, approximation)); }
                 }
@@ -157,8 +160,8 @@ public sealed class GoldenLoweringTests
         {
             if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_String &&
                 target.Name == "Concat" && target.Parameters.Length == 2 &&
-                target.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_String))
-            { return new(2, arguments => CSharpOperationSemantics.StringConcat(factory, arguments[0], arguments[1]), stringConcatenation: true); }
+                target.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_String)))
+            { return new(2, arguments => arguments.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(arguments)) : (CSharpOperationSemantics.StringConcat(factory, arguments[0], arguments[1])), stringConcatenation: true); }
             if (target.IsStatic && target.ContainingType.SpecialType == SpecialType.System_Array &&
                 target.Name == "Empty" && target.Arity == 1 && target.Parameters.IsEmpty &&
                 CSharpOperationSemantics.IsReferenceDomain(target.ReturnType))
@@ -168,16 +171,21 @@ public sealed class GoldenLoweringTests
 
         bool PrepareCallee(TotalLoweringContext frame)
         {
+            System.ArgumentNullException.ThrowIfNull(frame);
             if (!bindContracts)
             { return true; }
             var binding = new ContractBinder(compilation, factory).BindTotal(frame);
-            frame.SourceCallPreconditions = [.. binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)
-                .Select(clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
-            return binding.IsSuccess && binding.Clauses.All(clause => clause.Kind != BoundContractKind.Assume);
+            frame.SourceCallPreconditions = [.. binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
+                .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation)))];
+            return binding.IsSuccess && binding.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind != BoundContractKind.Assume));
         }
 
         string Variable(IrVarId id)
         {
+            if (id.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(id));
+            }
             var type = factory.GetTypeInfo(factory.GetVariableInfo(id).Type);
             return $"{id}:{factory.GetString(type.Name)}[width={type.Width},signed={type.Signed}]";
         }
@@ -227,6 +235,7 @@ public sealed class GoldenLoweringTests
 
         void RememberInstruction(IrInstruction instruction)
         {
+            System.ArgumentNullException.ThrowIfNull(instruction);
             switch (instruction)
             {
                 case IrLockInstruction value:
@@ -269,6 +278,7 @@ public sealed class GoldenLoweringTests
 
         void RememberLocation(IrLocation location)
         {
+            System.ArgumentNullException.ThrowIfNull(location);
             switch (location)
             {
                 case IrMemberLocation value:

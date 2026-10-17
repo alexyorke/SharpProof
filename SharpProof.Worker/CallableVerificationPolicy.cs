@@ -24,12 +24,12 @@ internal static partial class CallableVerificationPolicy
         }
 
         var effectClaims = target.EffectClaims.ToDictionary(
-            static evidence => evidence.ClaimId,
+            static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId),
             StringComparer.Ordinal);
         var hasRequires = target.Entry.Assumptions.Any(static assumption =>
-            assumption.Kind == WorkerAssumptionKind.Precondition);
+            assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition));
         var claims = target.Entry.ClaimIds.Select((claimId, index) =>
-            effectClaims.TryGetValue(claimId, out var evidence) && NativeEffectClaims.IsNative(evidence.ContractKind) &&
+            claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (effectClaims.TryGetValue(claimId, out var evidence) && NativeEffectClaims.IsNative(evidence.ContractKind) &&
                 evidence.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary
                 // Without a Total program no native goal exists.
                 ? NativeEffectClaims.Unknown(target, claimId, target.FailureReason)
@@ -48,7 +48,7 @@ internal static partial class CallableVerificationPolicy
                 : CallableClaimResultAssembler.Unknown(
                     target,
                     index,
-                    target.FailureReason)).ToImmutableArray();
+                    target.FailureReason))).ToImmutableArray();
         var reason = claims.Length == 0
             ? WorkerCallableCoverageReason.SemanticUnknown
             : WorkerResultAssembler.ProjectCallableReasons(claims).Reason;
@@ -59,6 +59,12 @@ internal static partial class CallableVerificationPolicy
         CompilerCallablePreparation target, WorkerCallableCoverageReason reason,
         ImmutableArray<WorkerClaimResult> claims)
     {
+
+        System.ArgumentNullException.ThrowIfNull(target);
+        if (claims.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
+        }
         return new(
             new WorkerCallableResult
             {

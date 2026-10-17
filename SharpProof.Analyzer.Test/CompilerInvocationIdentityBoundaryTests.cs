@@ -38,14 +38,14 @@ public sealed class CompilerInvocationIdentityBoundaryTests
             }
             """, [], filePath: "query-arity-identity.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Root");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Root"));
         var owner = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Target");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Target"));
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         Assert.That(invocation.Arguments, Has.Length.EqualTo(arity));
         Assert.That(SymbolEqualityComparer.Default.Equals(model.GetEnclosingSymbol(syntax.SpanStart), owner), Is.True);
@@ -88,6 +88,7 @@ public sealed class CompilerInvocationIdentityBoundaryTests
     [TestCase(" \t")]
     public void NestedIdentityRejectsBlankParentForAnEmittedLocalMethod(string parent)
     {
+        System.ArgumentNullException.ThrowIfNull(parent);
         var compilation = AnalyzerTestHost.CreateCompilation(
             """
             public static class Subject {
@@ -98,7 +99,7 @@ public sealed class CompilerInvocationIdentityBoundaryTests
             }
             """, [], filePath: "nested-identity.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -160,6 +161,9 @@ public sealed class CompilerInvocationIdentityBoundaryTests
 
     private static string Fingerprint(int arity, string parameter, string target, string arguments, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments);
+        System.ArgumentNullException.ThrowIfNull(parameter);
+        System.ArgumentNullException.ThrowIfNull(target);
         var parameters = arity switch
         {
             0 => "",
@@ -182,11 +186,11 @@ public sealed class CompilerInvocationIdentityBoundaryTests
             }
             """, [], filePath: "invocation-identity.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Root");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Root"));
         var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var operation = (IInvocationOperation)model.GetOperation(syntax)!;

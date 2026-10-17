@@ -36,6 +36,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
     [TestCase("conversion", "implicit")]
     public void CallableLocationsSelectTheirUserVisibleDeclarationToken(string declarationKind, string expectedToken)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedToken);
         var tree = Compilation.SyntaxTrees.Single();
         var nodes = tree.GetRoot().DescendantNodes().ToArray();
         SyntaxNode declaration = declarationKind switch
@@ -45,10 +46,10 @@ public sealed class Pr275AnalyzerApiCoverageTests
             "property" => nodes.OfType<PropertyDeclarationSyntax>().Single(),
             "indexer" => nodes.OfType<IndexerDeclarationSyntax>().Single(),
             "property getter" => nodes.OfType<AccessorDeclarationSyntax>().Single(node =>
-                node.IsKind(SyntaxKind.GetAccessorDeclaration) && node.Parent?.Parent is PropertyDeclarationSyntax),
+                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.IsKind(SyntaxKind.GetAccessorDeclaration) && node.Parent?.Parent is PropertyDeclarationSyntax)),
             "indexer getter" => nodes.OfType<AccessorDeclarationSyntax>().Single(node =>
-                node.IsKind(SyntaxKind.GetAccessorDeclaration) && node.Parent?.Parent is IndexerDeclarationSyntax),
-            "event add" => nodes.OfType<AccessorDeclarationSyntax>().Single(node => node.IsKind(SyntaxKind.AddAccessorDeclaration)),
+                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.IsKind(SyntaxKind.GetAccessorDeclaration) && node.Parent?.Parent is IndexerDeclarationSyntax)),
+            "event add" => nodes.OfType<AccessorDeclarationSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.IsKind(SyntaxKind.AddAccessorDeclaration))),
             "operator" => nodes.OfType<OperatorDeclarationSyntax>().Single(),
             "conversion" => nodes.OfType<ConversionOperatorDeclarationSyntax>().Single(),
             _ => throw new ArgumentOutOfRangeException(nameof(declarationKind))

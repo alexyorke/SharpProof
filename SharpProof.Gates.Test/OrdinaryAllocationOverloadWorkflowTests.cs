@@ -20,7 +20,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             """;
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Modifiers.Any(static modifier => modifier.RawKind == (int)SyntaxKind.PublicKeyword));
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Modifiers.Any(static modifier => modifier.RawKind == (int)SyntaxKind.PublicKeyword)));
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-generic-overloads.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);
@@ -30,7 +30,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             "Target", "effects", CorpusVerdict.Proven, CorpusSupport.Supported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)), Is.Empty);
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
@@ -43,6 +43,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
     [TestCase("private static int Target<T>(int value) => 0;")]
     public async Task AllocationReplaySelectsTheActualPublicScalarOverload(string otherOverload)
     {
+        System.ArgumentNullException.ThrowIfNull(otherOverload);
         var source = $$"""
             public static class C {
                 {{otherOverload}}
@@ -51,7 +52,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             """;
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Modifiers.Any(static modifier => modifier.RawKind == (int)SyntaxKind.PublicKeyword));
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Modifiers.Any(static modifier => modifier.RawKind == (int)SyntaxKind.PublicKeyword)));
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-overloads.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);

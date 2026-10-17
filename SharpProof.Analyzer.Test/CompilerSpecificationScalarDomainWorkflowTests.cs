@@ -18,6 +18,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
     public void ActualEmittedSignaturesRetainTheSpecificationScalarDomain(
         string sourceType, object value, bool admitted, int width)
     {
+        System.ArgumentNullException.ThrowIfNull(sourceType);
         value = value ?? throw new ArgumentNullException(nameof(value));
         var expectedRuntimeType = value.GetType();
         var compilation = AnalyzerTestHost.CreateCompilation(
@@ -27,7 +28,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
             }
             """, []).WithAssemblyName("ScalarDomain_" + sourceType);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         Assert.That(image, Is.Not.Empty);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("ScalarDomainProbe")!

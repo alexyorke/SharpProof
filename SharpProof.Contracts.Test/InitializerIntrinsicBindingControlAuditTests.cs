@@ -26,7 +26,7 @@ public sealed class InitializerIntrinsicBindingControlAuditTests
             """);
         TestCompilation.AssertNoErrors(compilation);
         var constructor = compilation.GetTypeByMetadataName("Subject")!.InstanceConstructors
-            .Single(method => method.Parameters.Length == 1);
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 1));
         var inventory = new ContractClauseInventoryBuilder(compilation).Create(constructor);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var binder = new ContractBinder(compilation, factory);
@@ -36,7 +36,7 @@ public sealed class InitializerIntrinsicBindingControlAuditTests
         {
             Assert.That(inventory.HasPlacementErrors, Is.False);
             Assert.That(inventory.Clauses, Has.Length.EqualTo(2));
-            Assert.That(inventory.Clauses.All(clause => clause.IsValid), Is.True);
+            Assert.That(inventory.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid)), Is.True);
             Assert.That(legacy.IsSuccess, Is.True, legacy.Failure.ToString());
             Assert.That(legacy.Contracts!.Clauses, Has.Length.EqualTo(2));
             Assert.That(total.IsSuccess, Is.True, total.Failure.ToString());

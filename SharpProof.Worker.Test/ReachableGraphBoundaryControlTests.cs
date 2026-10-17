@@ -27,7 +27,7 @@ public sealed class ReachableGraphBoundaryControlTests
     public void CancellationPrecedesMalformedGraphRejection()
     {
         var artifact = CreateArtifact();
-        artifact.ReachableSource!.Bodies.First(body => body.Graph != null).Graph!.Types = null!;
+        artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph!.Types = null!;
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellation.Token)));
@@ -38,7 +38,7 @@ public sealed class ReachableGraphBoundaryControlTests
     public void GraphRejectionRetainsOriginalDecodeCause()
     {
         var artifact = CreateArtifact();
-        artifact.ReachableSource!.Bodies.First(body => body.Graph != null).Graph!.Types = null!;
+        artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph!.Types = null!;
         var exception = Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact)));
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidDataException>());
     }

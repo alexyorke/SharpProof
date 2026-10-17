@@ -25,7 +25,7 @@ public sealed class IrTotalExecutionTests
         var observed = new List<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
         var replay = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(true))
         {
-            AssignmentObserver = (instruction, value, approximation) => observed.Add((instruction, value.Boolean, approximation))
+            AssignmentObserver = (instruction, value, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction); System.ArgumentNullException.ThrowIfNull(value); observed.Add((instruction, value.Boolean, approximation)); }
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
@@ -47,7 +47,7 @@ public sealed class IrTotalExecutionTests
         var observed = new List<IrAssignInstruction>();
         var replay = new IrProgramReplayOptions(_ => null)
         {
-            AssignmentObserver = (instruction, _, _) => observed.Add(instruction)
+            AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction); observed.Add(instruction); }
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
@@ -60,6 +60,7 @@ public sealed class IrTotalExecutionTests
     [TestCase("lock", false)]
     public void EffectPrefixObservationsIncludeOperandApproximation(string kind, bool supplied)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var operand = factory.CreateVariable("operand", kind == "allocation" ? factory.IntegerType : factory.ObjectType);
         var builder = new IrProgramBuilder(factory);
@@ -83,8 +84,8 @@ public sealed class IrTotalExecutionTests
         var replay = new IrProgramReplayOptions(_ => kind == "allocation"
             ? factory.CreateIntegerValue(0) : factory.CreateReferenceValue(factory.ObjectType, new object()))
         {
-            AllocationPrefixObserver = (instruction, approximation) => observed.Add((instruction.Operation, approximation)),
-            LockPrefixObserver = (instruction, approximation) => observed.Add((instruction.Operation, approximation))
+            AllocationPrefixObserver = (instruction, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction); observed.Add((instruction.Operation, approximation)); },
+            LockPrefixObserver = (instruction, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction); observed.Add((instruction.Operation, approximation)); }
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(kind == "allocation" && supplied
@@ -186,6 +187,7 @@ public sealed class IrTotalExecutionTests
     [TestCase("untaken", false)]
     public void ApproximationIsConsumedOnlyByAnActualRead(string scenario, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var x = factory.CreateVariable("x", factory.IntegerType);
         var y = factory.CreateVariable("y", factory.IntegerType);
@@ -274,6 +276,7 @@ public sealed class IrTotalExecutionTests
     [TestCase("naked-exit", IrProgramExecutionStatus.Unsupported)]
     public void ExceptionalContinuationsAreDistinctFromNormalReturn(string scenario, IrProgramExecutionStatus expected)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -333,14 +336,15 @@ public sealed class IrTotalExecutionTests
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
             new IrProgramReplayOptions(request =>
             {
+                System.ArgumentNullException.ThrowIfNull(request);
                 requests.Add(request);
                 return factory.CreateIntegerValue(request.Occurrence);
             }));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(1));
         int[] expectedOccurrences = [0, 0, 1, 1];
-        Assert.That(requests.Select(request => request.Occurrence), Is.EqualTo(expectedOccurrences));
-        Assert.That(requests.Select(request => request.Instruction), Has.All.EqualTo(havoc.Id));
+        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
+        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(approximate));
     }
 
@@ -349,6 +353,7 @@ public sealed class IrTotalExecutionTests
     [TestCase("memory")]
     public void UnsupportedHavocModelsFailClosed(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var x = factory.CreateVariable("x", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -366,6 +371,7 @@ public sealed class IrTotalExecutionTests
     [TestCase("earlier-unsupported-argument", false)]
     public void CallOperandsUseTheSameActualReadObserver(string scenario, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var x = factory.CreateVariable("x", scenario == "receiver" ? factory.ObjectType : factory.IntegerType);
         var unavailable = factory.CreateVariable("unavailable", factory.IntegerType);
@@ -395,13 +401,14 @@ public sealed class IrTotalExecutionTests
     [TestCase("unused", false, true)]
     public void SkippedCallsStillEvaluateTheirOperands(string scenario, bool consumed, bool returned)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var unknown = factory.CreateVariable("unknown", factory.IntegerType);
         var missing = factory.CreateVariable("missing", factory.IntegerType);
         var arguments = scenario == "missing-first" ? new IrTerm[] { factory.Variable(missing), factory.Variable(unknown) }
             : new IrTerm[] { scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown) };
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
-            true, arguments.Select(argument => argument.Type).ToArray());
+            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToArray());
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
@@ -446,7 +453,7 @@ public sealed class IrTotalExecutionTests
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
             new Dictionary<IrVarId, IrValue> { [owner] = initial, [alias] = initial }, 100,
-            (_, _, values) => values.Single(),
+            (_, _, values) => values.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(values)) : (values.Single()),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
@@ -473,7 +480,7 @@ public sealed class IrTotalExecutionTests
         { initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
         var hostCalls = 0;
         IrValue? Host(IrCallInstruction call, IrValue? receiver, ImmutableArray<IrValue> arguments)
-        { hostCalls++; return factory.CreateIntegerValue(0); }
+        { System.ArgumentNullException.ThrowIfNull(call, nameof(call)); if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } hostCalls++; return factory.CreateIntegerValue(0); }
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
             hosted ? Host : null,
             new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)), CancellationToken.None);
@@ -510,7 +517,7 @@ public sealed class IrTotalExecutionTests
             [holder] = initialHolder,
             [alias] = initialHolder,
             [replacement] = newValue
-        }, 100, (_, receiver, _) => factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3),
+        }, 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
@@ -566,6 +573,7 @@ public sealed class IrTotalExecutionTests
     [TestCase(true, "nonnull", true)]
     public void MemberLocationOperandsPreserveReadOrderBeforeMemoryFailure(bool store, string receiverKind, bool consumed)
     {
+        System.ArgumentNullException.ThrowIfNull(receiverKind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var receiver = factory.CreateVariable("receiver", factory.ObjectType);
         var argument = factory.CreateVariable("argument", factory.IntegerType);
@@ -664,7 +672,7 @@ public sealed class IrTotalExecutionTests
             Task.Run(() => Evaluate(false, whenFalse))
         };
         var results = await Task.WhenAll(tasks);
-        Assert.That(results.Select(result => result.Status), Is.All.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(IrEvaluationStatus.Value));
         Assert.That(results[0].Value!.Integer, Is.EqualTo(11));
         Assert.That(results[1].Value!.Integer, Is.EqualTo(22));
         Assert.That(whenTrue, Is.EqualTo(new[] { flag, x }));
@@ -672,11 +680,16 @@ public sealed class IrTotalExecutionTests
 
         IrEvaluationResult Evaluate(bool selected, List<IrVarId> observed)
         {
+            System.ArgumentNullException.ThrowIfNull(observed);
             var values = ImmutableDictionary<IrVarId, IrValue>.Empty
                 .Add(flag, factory.CreateBooleanValue(selected))
                 .Add(x, factory.CreateIntegerValue(11)).Add(y, factory.CreateIntegerValue(22));
             return interpreter.Evaluate(term, values, variable =>
             {
+                if (variable.IsDefault)
+                {
+                    throw new System.ArgumentOutOfRangeException(nameof(variable));
+                }
                 observed.Add(variable);
                 if (variable == flag)
                 {

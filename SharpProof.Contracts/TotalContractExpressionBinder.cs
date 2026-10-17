@@ -4,16 +4,16 @@ internal sealed class BoundTotalMetadataRequires(int parameterOrdinal, Attribute
     ClosedContractAttributeValidation validation, IrTerm value, IrTerm safeCondition)
 {
     internal int ParameterOrdinal { get; } = parameterOrdinal;
-    internal AttributeData Attribute { get; } = attribute;
-    internal ClosedContractAttributeValidation Validation { get; } = validation;
-    internal IrTerm Value { get; } = value;
-    internal IrTerm SafeCondition { get; } = safeCondition;
+    internal AttributeData Attribute { get; } = (attribute ?? throw new System.ArgumentNullException(nameof(attribute)));
+    internal ClosedContractAttributeValidation Validation { get; } = validation.IsRecognized ? validation : throw new ArgumentException("A recognized contract is required.", nameof(validation));
+    internal IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
+    internal IrTerm SafeCondition { get; } = (safeCondition ?? throw new System.ArgumentNullException(nameof(safeCondition)));
 }
 
 internal sealed class TotalMetadataRequiresBindingResult(ImmutableArray<BoundTotalMetadataRequires> clauses,
     ContractBindingFailure failure)
 {
-    internal ImmutableArray<BoundTotalMetadataRequires> Clauses { get; } = clauses;
+    internal ImmutableArray<BoundTotalMetadataRequires> Clauses { get; } = (clauses.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauses)) : clauses);
     internal ContractBindingFailure Failure { get; } = failure;
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 }
@@ -24,6 +24,18 @@ public sealed class BoundTotalContractClause
         OperationId sourceOperation, string diagnosticText, BoundContractEvidence evidence = BoundContractEvidence.CompilerBoundInvocation,
         SyntaxReference? sourceSyntax = null)
     {
+        if (sourceOperation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(sourceOperation));
+        }
+        if (diagnosticText is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnosticText));
+        }
+        if (expression is null)
+        {
+            throw new System.ArgumentNullException(nameof(expression));
+        }
         Kind = kind;
         Value = expression.Value;
         SafeCondition = expression.SafeCondition;
@@ -45,6 +57,15 @@ public sealed class TotalContractBindingResult
 {
     internal TotalContractBindingResult(ImmutableArray<BoundTotalContractClause> clauses, ContractBindingFailure failure, object origin)
     {
+
+        if (clauses.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
+        }
+        if (origin is null)
+        {
+            throw new System.ArgumentNullException(nameof(origin));
+        }
         Clauses = clauses;
         Failure = failure;
         Origin = origin;
@@ -60,10 +81,10 @@ public sealed partial class ContractBinder
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
     // authoritative while the native worker route is qualified.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
-    { return BindTotalCore(context, implementationBody, requiresOnly: false); }
+    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: false); }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
-    { return BindTotalCore(context, implementationBody, requiresOnly: true); }
+    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: true); }
 
     // Binding does not authenticate a reference image. The collector must attach
     // the selected attribute's metadata ownership before recording an obligation.
@@ -78,8 +99,8 @@ public sealed partial class ContractBinder
         { return new([], ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature || context.Target.DeclaringSyntaxReferences.Length != 0)
         { return new([], ContractBindingFailure.UnsupportedTarget); }
-        var sites = context.Target.Parameters.Select(parameter => new ContractMetadataValueSite(
-            parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry)));
+        var sites = context.Target.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new ContractMetadataValueSite(
+            parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry))));
         return ClosedContractAttributeBinding.BindMetadataValueSites(
             _factory, _api.Selections, sites, cancellationToken);
     }
@@ -107,9 +128,9 @@ public sealed partial class ContractBinder
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
         var candidates = resolution.Inventory.Clauses
-            .Where(static occurrence => occurrence.IsValid)
-            .Select(static occurrence => new ContractInvocationCandidate(
-                occurrence.Kind, occurrence.Invocation))
+            .Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
+            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(
+                occurrence.Kind, occurrence.Invocation)))
             .ToImmutableArray();
         var materialized = TotalContractInvocationMaterialization.Bind(
             context, _api, _intrinsics, resolution, candidates, requiresOnly);
@@ -122,7 +143,7 @@ public sealed partial class ContractBinder
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
         var ordinal = 0;
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
+        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid)))
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
             if (requiresOnly)
@@ -145,6 +166,14 @@ public sealed partial class ContractBinder
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
         ImmutableArray<BoundTotalContractClause>.Builder clauses)
     {
+        if (clauses is null)
+        {
+            throw new System.ArgumentNullException(nameof(clauses));
+        }
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
             var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;

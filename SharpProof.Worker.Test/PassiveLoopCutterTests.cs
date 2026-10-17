@@ -18,11 +18,17 @@ public sealed class PassiveLoopCutterTests
     [TestCase("old-input")]
     public void HeapIndependentReceiverRetainsFixedCellCut(string shape)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var factory = subject.Factory;
         var builder = subject.Builder;
         PassiveParameterBinding Parameter(string name, IrTypeId type)
         {
+            if (type.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(type));
+            }
+            System.ArgumentNullException.ThrowIfNull(name);
             return new(factory.CreateVariable(name + ":entry", type), factory.CreateVariable(name + ":current", type),
                 factory.CreateVariable(name + ":old", type));
         }
@@ -72,11 +78,11 @@ public sealed class PassiveLoopCutterTests
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
         Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Has.Length.EqualTo(1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, CancellationToken.None), Is.True, reason.ToString());
-        var instructions = proof!.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.False);
-        var cell = instructions.OfType<IrWriteInstruction>().Single(write => factory.GetOperationInfo(write.Operation).Description is { } id &&
-            factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal));
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.False);
+        var cell = instructions.OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (factory.GetOperationInfo(write.Operation).Description is { } id &&
+            factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal)));
         Assert.That(cell.Target!.Id, Is.EqualTo(expectedReceiver.Id));
     }
 
@@ -108,8 +114,8 @@ public sealed class PassiveLoopCutterTests
         builder.Return(exit, subject.Site, factory.Integer(0));
         Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out _, out var reason,
             CancellationToken.None), Is.True, reason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
     }
 
     [TestCase(false)]
@@ -125,8 +131,8 @@ public sealed class PassiveLoopCutterTests
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out reason, CancellationToken.None), Is.True, reason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.True);
         Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Is.Empty);
     }
 
@@ -138,6 +144,7 @@ public sealed class PassiveLoopCutterTests
         var builder = subject.Builder;
         PassiveParameterBinding Parameter(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return new(factory.CreateVariable(name + ":entry", factory.ObjectType), factory.CreateVariable(name + ":current", factory.ObjectType),
                 factory.CreateVariable(name + ":old", factory.ObjectType));
         }
@@ -200,8 +207,8 @@ public sealed class PassiveLoopCutterTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var cutReason, CancellationToken.None), Is.True, cutReason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
@@ -223,6 +230,10 @@ public sealed class PassiveLoopCutterTests
         var exit = builder.CreateBlock();
         void Store(IrBlockId block, int value)
         {
+            if (block.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(block));
+            }
             if (array)
             { builder.ElementStore(block, subject.Site, factory.Variable(owner.Current), factory.Integer(0), factory.Integer(value)); }
             else
@@ -361,7 +372,7 @@ public sealed class PassiveLoopCutterTests
         var result = await solver.VerifyEnsuresAsync(0);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
-        Assert.That(plan!.EntryQuery().Assumptions.Select(assumption => assumption.Justification), Is.All.TypeOf<LoweredJustification>());
+        Assert.That(plan!.EntryQuery().Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)), Is.All.TypeOf<LoweredJustification>());
     }
 
     [TestCase("input")]
@@ -369,6 +380,7 @@ public sealed class PassiveLoopCutterTests
     [TestCase("approximation-overwritten")]
     public async Task OriginalLoopHavocRetainsEntryIdentityAndApproximationReadRules(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var factory = subject.Factory;
         var counter = factory.CreateVariable("counter", factory.IntegerType);

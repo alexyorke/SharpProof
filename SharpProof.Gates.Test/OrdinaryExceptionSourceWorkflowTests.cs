@@ -24,6 +24,8 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("int", "System.Exception exception = new System.DivideByZeroException(); throw exception;")]
     public async Task RealSourceRefutationsReplayWithTheDeclaredParameterType(string parameterType, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(parameterType);
         var source = $"public static class C {{ public static int Target({parameterType} value) {{ {body} }} }}";
         var report = await ObserveSourceAsync(source);
 
@@ -46,6 +48,8 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
     public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(source);
         var report = await ObserveSourceAsync(source);
 
         using (Assert.EnterMultipleScope())
@@ -61,6 +65,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
 
     private static async Task<NativeEffectOracleReport> ObserveSourceAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();

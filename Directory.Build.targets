@@ -1,21 +1,11 @@
 <Project>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
-    <_DefensiveAnalyzerProject>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj</_DefensiveAnalyzerProject>
-    <_DefensiveAnalyzerAssembly>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/bin/$(Configuration)/netstandard2.0/SharpProof.DefensiveCodingAnalyzer.dll</_DefensiveAnalyzerAssembly>
-  </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(RunAnalyzersDuringBuild)' != 'false'">
-    <Analyzer Include="$(_DefensiveAnalyzerAssembly)" />
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(MSBuildProjectName)' != 'SharpProof.Analyzer.Test' AND '$(RunAnalyzersDuringBuild)' != 'false'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all"
+                      GlobalPropertiesToRemove="BaseIntermediateOutputPath;BaseOutputPath;IntermediateOutputPath;OutputPath;MSBuildProjectExtensionsPath;ProjectAssetsFile" />
   </ItemGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/AllValuesValidAttribute.cs"
-             Link="AllValuesValidAttribute.cs" />
-  </ItemGroup>
-  <Target Name="_RequireDefensiveCodingAnalyzer"
-          BeforeTargets="ResolveReferences"
-          Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(DesignTimeBuild)' != 'true' AND '$(RunAnalyzersDuringBuild)' != 'false'">
-    <Error Condition="!Exists('$(_DefensiveAnalyzerAssembly)')"
-           Text="Internal defensive analyzer is missing. Build '$(_DefensiveAnalyzerProject)' in the canonical container before building this project." />
-  </Target>
   <Import Project="$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props"
           Condition="'$(SharpProofSelfApplication)' == 'true' AND Exists('$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props')" />
 

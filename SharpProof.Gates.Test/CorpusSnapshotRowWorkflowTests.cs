@@ -11,6 +11,7 @@ public sealed class CorpusSnapshotRowWorkflowTests
     [TestCase("ordinary|Proven|Proven")]
     public void SnapshotWriterRejectsRowsWithUnknownOrIncompleteVerdictMetadata(string row)
     {
+        System.ArgumentNullException.ThrowIfNull(row);
         var error = Assert.Throws<InvalidDataException>((Action)(() => CorpusSnapshotFormat.Render([row])));
 
         Assert.That(error!.Message,

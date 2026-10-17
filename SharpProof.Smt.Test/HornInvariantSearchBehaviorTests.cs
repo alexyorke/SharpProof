@@ -69,21 +69,35 @@ public sealed class HornInvariantSearchBehaviorTests
 
     private static IrOpaqueTerm Relation(IrFactory factory, IrMemberId member, IrTerm state)
     {
+        if (member.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(member));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(state);
         return factory.PureOpaque(member, receiver: null, state);
     }
 
     private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return factory.Binary(IrBinaryOperator.Equal, left, right);
     }
 
     private static Assumption Assume(IrFactory factory, IrTerm predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         return new(factory, predicate, new LoweredJustification(factory.CreateOperation()));
     }
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<Assumption> assumptions, IrTerm goal)
     {
+        System.ArgumentNullException.ThrowIfNull(assumptions);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(goal);
         return new(factory, assumptions,
             new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
     }

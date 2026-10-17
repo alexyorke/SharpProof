@@ -22,6 +22,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     [TestCase("object", true, true)]
     public async Task RealReferenceEntryAndReturnPreserveIdentityAndOwnedRequires(string type, bool isNull, bool guarded)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static {type} Target([NotNull] {type} value) => value; }}",
             $"public static class Subject {{ public static {type} Target({type} value) {{ {(guarded ? "if (value == null) return null;" : "")} return Library.Target(value); }} }}");
@@ -43,7 +44,7 @@ public sealed class NativeMetadataReferenceOwnerTests
         var execution = new IrProgramInterpreter(factory).Execute(body.Body.Program,
             new Dictionary<IrVarId, IrValue> { [entry] = input }, 10000,
             new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, value, _) => { if (instruction.Id == marker) { observed.Add(value.Boolean); } } });
+            { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observed.Add(value.Boolean); } } });
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         if (guarded && isNull)
@@ -83,7 +84,7 @@ public sealed class NativeMetadataReferenceOwnerTests
         var result = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
             new Dictionary<IrVarId, IrValue> { [entry] = decoded.Program.Factory.CreateNullValue(decoded.Program.Factory.StringType) },
             10000, new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, _, _) => { if (instruction.Id == marker) { observations++; } } });
+            { AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations++; } } });
         Assert.That(observations, Is.Zero);
         Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference));
         var fault = Assert.Throws<TargetInvocationException>(new Action(() => subject.RootMethod.Invoke(null, [null])));
@@ -95,6 +96,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     [TestCase("ValueToken")]
     public void UnqualifiedReferenceOwnerDomainsRemainExplicitGaps(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static object Target([NotNull] object value) => value; }",
             $"public struct ValueToken {{ }} public class Subject {{ public static object Target({type} value) => Library.Target(value); }}");
@@ -105,12 +107,15 @@ public sealed class NativeMetadataReferenceOwnerTests
 
     private static CompilerReferenceSnapshot[] Capture(MetadataTestSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
     }
 
     private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, CompilerReferenceSnapshot[] references, bool enabled)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: enabled);
@@ -118,6 +123,8 @@ public sealed class NativeMetadataReferenceOwnerTests
 
     private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(body);
         return CompilerDecodedShadowBody.Decode(body.CallableId, JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(
             JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(body)))!, CancellationToken.None, references);
     }

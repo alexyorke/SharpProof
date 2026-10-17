@@ -92,6 +92,7 @@ public sealed class IrTypedIntegerTests
     [TestCaseSource(nameof(BoxedIntegers))]
     public void UnboxingRetainsExactClrWidthSignAndHighBits(int width, bool isSigned, object boxed, ulong expected)
     {
+        System.ArgumentNullException.ThrowIfNull(boxed);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var variable = factory.CreateVariable("boxed", factory.ObjectType);

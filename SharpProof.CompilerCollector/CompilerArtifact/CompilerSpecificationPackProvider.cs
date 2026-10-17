@@ -14,6 +14,8 @@ internal sealed class CompilerSpecificationPackProvider
         IEnumerable<string>? enabledPacks)
         : this(factory, ResolveConfiguration(enabledPacks))
     {
+        if (factory is null)
+        { throw new System.ArgumentNullException(nameof(factory)); }
     }
 
     internal CompilerSpecificationPackProvider(
@@ -118,7 +120,7 @@ internal sealed class CompilerSpecificationPackProvider
         {
             try
             {
-                if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
+                if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type != parameters[ordinal])).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
                 var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
@@ -149,7 +151,7 @@ internal sealed class CompilerSpecificationPackProvider
             method.MethodKind != MethodKind.Ordinary ||
             !method.IsStatic ||
             method.TypeParameters.Length != 0 ||
-            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            method.Parameters.Any(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
             method.Parameters.Length != resolved.ParameterTypes.Length ||
             !MatchesAssembly(method.ContainingAssembly, resolved.Assemblies) ||
             !CompilerSpecificationScalarDomain.MatchesType(method.ReturnType, resolved.ResultType))
@@ -180,12 +182,16 @@ internal sealed class CompilerSpecificationPackProvider
         IAssemblySymbol assembly,
         ImmutableArray<ApiSpecAssemblyIdentity> approved)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         var identity = assembly.Identity;
         var token = identity.PublicKeyToken.IsDefaultOrEmpty
             ? string.Empty
             : HashEncoding.ToLowerHex(identity.PublicKeyToken);
         return approved.Any(candidate =>
-            candidate.Name == identity.Name &&
-            candidate.PublicKeyToken == token);
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == identity.Name &&
+            candidate.PublicKeyToken == token));
     }
 }

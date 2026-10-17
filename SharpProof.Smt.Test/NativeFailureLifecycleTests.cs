@@ -37,7 +37,7 @@ public sealed class NativeFailureLifecycleTests
                 placements[pigeon][hole] = owner.Own(runner.Context.MkBoolConst($"p{pigeon}h{hole}"));
             }
             solver.Assert(owner.Own(runner.Context.MkOr(
-                Enumerable.Range(0, holes).Select(hole => placements[pigeon][hole]).ToArray())));
+                Enumerable.Range(0, holes).Select(hole => ((hole < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(hole)) : (placements[pigeon][hole]))).ToArray())));
         }
         for (var hole = 0; hole < holes; hole++)
         {

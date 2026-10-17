@@ -58,6 +58,7 @@ public sealed class NativeFieldReferenceViewTests
     [TestCaseSource(nameof(AdditionalPrimitiveCases))]
     public async Task PublicFieldStoresPreserveTypedPrimitiveSnapshots(string typeName, bool upcastStoreView)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var scenario = CreateTypedScenario(typeName, upcastStoreView);
         var execution = new IrProgramInterpreter(scenario.Factory).Execute(scenario.Candidate.Program,
             scenario.InitialValues);
@@ -157,9 +158,9 @@ public sealed class NativeFieldReferenceViewTests
             factory.CreateVariable("owner:current", boxType), factory.CreateVariable("owner:old", boxType));
         var site = factory.CreateOperation("typed-field-view-write");
         IrTerm Read(IrVarId owner)
-        { return factory.PureOpaque(field, factory.Variable(owner)); }
+        { if (owner.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(owner)); } return factory.PureOpaque(field, factory.Variable(owner)); }
         IrTerm Equal(IrTerm left, IrTerm right)
-        { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+        { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
 
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
@@ -203,9 +204,9 @@ public sealed class NativeFieldReferenceViewTests
             factory.CreateVariable("owner:current", boxType), factory.CreateVariable("owner:old", boxType));
         var site = factory.CreateOperation("field-view-write");
         IrTerm Read(IrVarId owner)
-        { return factory.PureOpaque(field, factory.Variable(owner)); }
+        { if (owner.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(owner)); } return factory.PureOpaque(field, factory.Variable(owner)); }
         IrTerm Equal(IrTerm left, IrTerm right)
-        { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+        { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
 
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
@@ -241,9 +242,22 @@ public sealed class NativeFieldReferenceViewTests
     }
 
     private sealed record Scenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues);
+        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+    {
+        public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
+        public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
+        public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
+        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+    }
 
     private sealed record TypedScenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
         IrTypeId FieldType, bool IsBoolean, int IntegerWidth, bool IntegerSigned,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues);
+        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+    {
+        public IrTypeId FieldType { get; init; } = FieldType.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(FieldType)) : FieldType;
+        public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
+        public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
+        public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
+        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+    }
 }

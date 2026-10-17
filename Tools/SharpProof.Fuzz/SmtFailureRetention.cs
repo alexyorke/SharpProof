@@ -11,13 +11,21 @@ internal static class SmtFailureRetention
         int caseSeed,
         CancellationToken cancellationToken = default)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (formula is null)
+        {
+            throw new System.ArgumentNullException(nameof(formula));
+        }
         var minimized = await IrStructuralShrinker.MinimizeAsync(
             factory,
             formula,
             async (candidate, cancellation) =>
-                (await FiniteDomainSmtDifferentialOracle.CompareAsync(
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((await FiniteDomainSmtDifferentialOracle.CompareAsync(
                     factory, candidate, cancellation).ConfigureAwait(false)).Status !=
-                FuzzOracleStatus.Agreement,
+                FuzzOracleStatus.Agreement),
             cancellationToken).ConfigureAwait(false);
         var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(
             factory, minimized, cancellationToken).ConfigureAwait(false);
@@ -33,6 +41,14 @@ internal static class SmtFailureRetention
         int caseSeed,
         CancellationToken cancellationToken = default)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (generated is null)
+        {
+            throw new System.ArgumentNullException(nameof(generated));
+        }
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
             factory, generated, cancellationToken).ConfigureAwait(false);
         var printed = new IrPrinter(factory).Print(generated.Formula);

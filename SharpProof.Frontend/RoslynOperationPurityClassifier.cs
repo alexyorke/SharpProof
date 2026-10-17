@@ -5,10 +5,14 @@ namespace SharpProof.Frontend;
 internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> isKnownPure, int maximumDepth)
 {
     private readonly Dictionary<IOperation, Dictionary<int, bool>> _purityResults =
-        new(ReferenceComparer<IOperation>.Instance);
+        (isKnownPure is null ? throw new System.ArgumentNullException(nameof(isKnownPure)) : new(ReferenceComparer<IOperation>.Instance));
 
     internal bool IsDemonstrablyPure(IOperation operation, int depth)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         if (depth >= maximumDepth)
         {
             return false;
@@ -70,7 +74,7 @@ internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> 
                 (invocation.Instance == null ||
                  IsDemonstrablyPure(invocation.Instance, childDepth)) &&
                 invocation.Arguments.All(argument =>
-                    IsDemonstrablyPure(argument.Value, childDepth)),
+                    argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (IsDemonstrablyPure(argument.Value, childDepth))),
             _ => false
         };
     }

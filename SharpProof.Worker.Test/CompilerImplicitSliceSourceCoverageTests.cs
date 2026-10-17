@@ -71,8 +71,8 @@ public sealed class CompilerImplicitSliceSourceCoverageTests
             var claim = artifact.Manifest.Claims.Single();
             var reachable = artifact.ReachableSource!;
             var root = reachable.Roots.Single();
-            var body = reachable.Bodies.Single(candidate => candidate.BodyId == root.BodyId);
-            var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node.Identifier.ValueText == "Root");
+            var body = reachable.Bodies.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.BodyId == root.BodyId));
+            var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Root"));
             Assert.That(root.CallableId, Is.EqualTo(claim.CallableId));
             Assert.That(body.MethodIdentity, Is.EqualTo(claim.CallableId));
             Assert.That(body.Start, Is.EqualTo(declaration.SpanStart));

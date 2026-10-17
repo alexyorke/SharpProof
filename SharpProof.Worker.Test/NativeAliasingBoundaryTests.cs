@@ -31,6 +31,9 @@ public sealed class NativeAliasingBoundaryTests
     public async Task FieldIdentityPreservesCompatibleAliases(string declarations, string firstType, string secondType,
         bool nullInputs, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
+        System.ArgumentNullException.ThrowIfNull(firstType);
+        System.ArgumentNullException.ThrowIfNull(secondType);
         var source = "using SharpProof.Attributes; " + declarations + " public sealed class Holder { public " + firstType +
             " First; public " + secondType + " Second; } public static class C { public static bool Target(Holder holder) { " +
             "Contract.Requires(holder != null && holder.First " + (nullInputs ? "==" : "!=") + " null && holder.Second " +
@@ -74,6 +77,9 @@ public sealed class NativeAliasingBoundaryTests
         var identity = new object();
         var inputs = candidate.Parameters.Select((parameter, ordinal) =>
         {
+            if (parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(parameter)); }
+
             var type = candidate.Factory.GetVariableInfo(parameter.Entry).Type;
             return (parameter.Entry, Value: nullInputs ? candidate.Factory.CreateNullValue(type) :
                 candidate.Factory.CreateReferenceValue(type, alias || ordinal == 0 ? identity : new object()));
@@ -105,6 +111,9 @@ public sealed class NativeAliasingBoundaryTests
     public async Task EntryIdentityPreservesCompatibleAliases(string declarations, string firstType, string secondType,
         bool nullInputs, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
+        System.ArgumentNullException.ThrowIfNull(firstType);
+        System.ArgumentNullException.ThrowIfNull(secondType);
         var source = "using SharpProof.Attributes; " + declarations + " public static class C { public static bool Target(" +
             firstType + " a, " + secondType + " b) { Contract.Requires(a " + (nullInputs ? "==" : "!=") +
             " null && b " + (nullInputs ? "==" : "!=") + " null); Contract.Ensures(Contract.Result<bool>()); " +
@@ -149,6 +158,9 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("string", "\"before\"", "\"after\"")]
     public async Task GenericDependentFieldRetainsConservativeCallBoundary(string type, string before, string after)
     {
+        System.ArgumentNullException.ThrowIfNull(after);
+        System.ArgumentNullException.ThrowIfNull(before);
+        System.ArgumentNullException.ThrowIfNull(type);
         var source = "using SharpProof.Attributes; public class Cell<T> { public T Value; " +
             "public void Set(T value) { Value = value; } } public static class C { public static " + type + " Target() { " +
             "Contract.Ensures(Contract.Result<" + type + ">() == " + after + "); var cell = new Cell<" + type +
@@ -167,6 +179,10 @@ public sealed class NativeAliasingBoundaryTests
     public async Task NestedGenericReceiverWritesTheSameFieldSlot(string type, string before, string after,
         string result, int expected, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(after);
+        System.ArgumentNullException.ThrowIfNull(before);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(type);
         var source = "using SharpProof.Attributes; public class Node { public int Score; } " +
             "public class Outer<T> { public class Cell<U> { public " + type + " Value; public void Set(" + type +
             " value) { Value = value; } } } public static class C { public static int Target() { " +
@@ -182,6 +198,7 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("cell.Property = 7;", 3, WorkerClaimOutcome.Refuted)]
     public async Task GenericReceiverWritesTheSameFieldSlot(string mutation, int expected, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var source = "using SharpProof.Attributes; public class Cell<T> { public int Value; " +
             "public void Set() { Value = 7; } public int Property { get { return Value; } set { Value = value; } } } " +
             "public static class C { public static int Target() { Contract.Ensures(Contract.Result<int>() == " + expected +
@@ -220,6 +237,8 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("in", "try { cell.Mutate(); } catch (System.Exception) { }")]
     public async Task ReadonlyReferenceMayAliasWrittenField(string modifier, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(modifier);
         var source = "using SharpProof.Attributes; public class Cell { public int Value; " +
             "public virtual void Mutate() { Value = 5; throw new System.InvalidOperationException(); } } public static class C { " +
             "public static int Target(" + modifier + " int value, Cell cell) { Contract.Requires(cell != null); " +
@@ -232,6 +251,7 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("in")]
     public async Task ReadonlyReferenceMayAliasWrittenElement(string modifier)
     {
+        System.ArgumentNullException.ThrowIfNull(modifier);
         var source = "using SharpProof.Attributes; public static class C { public static int Target(" + modifier +
             " int value, int[] values) { Contract.Requires(values != null && values.Length > 0); " +
             "Contract.Ensures(Contract.Result<int>() == Contract.Old(value)); values[0] = 5; return value; } }";
@@ -242,6 +262,7 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("in")]
     public async Task MultipleReadonlyReferencesMayAliasReferenceCell(string modifier)
     {
+        System.ArgumentNullException.ThrowIfNull(modifier);
         var source = "using SharpProof.Attributes; public sealed class Item { } public sealed class Cell { public Item Value; } " +
             "public static class C { public static Item Target(" + modifier + " Item first, " + modifier +
             " Item second, Cell cell, Item replacement) { Contract.Requires(cell != null); " +
@@ -253,6 +274,7 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase("in")]
     public async Task ReadonlyReferenceWithoutWritesRemainsExact(string modifier)
     {
+        System.ArgumentNullException.ThrowIfNull(modifier);
         var source = "using SharpProof.Attributes; public static class C { public static int Target(" + modifier +
             " int value) { Contract.Ensures(Contract.Result<int>() == Contract.Old(value)); int local = value; return local; } }";
         Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -260,6 +282,7 @@ public sealed class NativeAliasingBoundaryTests
 
     private static async Task<WorkerClaimOutcome> Verify(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

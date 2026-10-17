@@ -29,6 +29,10 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCaseSource(nameof(CompatibleCases))]
     public async Task CompatibleViewStoreCannotProvePreservation(string left, string right, string stored, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         _ = expected;
         var outcome = await Verify(left, right, stored, "0", "");
         Assert.That(outcome.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), outcome.Reason.ToString());
@@ -37,6 +41,10 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCaseSource(nameof(CompatibleCases))]
     public async Task AliasedViewsObserveStoredBits(string left, string right, string stored, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         var outcome = await Verify(left, right, stored, expected, " && (object)written == (object)observed");
         Assert.That(outcome.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), outcome.Reason.ToString());
     }
@@ -44,6 +52,10 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCaseSource(nameof(CompatibleCases))]
     public async Task SeparateViewsRetainEntryContents(string left, string right, string stored, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         _ = expected;
         var outcome = await Verify(left, right, stored, "0", " && (object)written != (object)observed");
         Assert.That(outcome.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), outcome.Reason.ToString());
@@ -52,6 +64,10 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCaseSource(nameof(CompatibleCases))]
     public void ClrAliasedViewsObserveStoredBits(string left, string right, string stored, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         AssertRuntimeResult("public static class Subject { public static bool Witness() { var written = new " + left +
             "[1]; var observed = (" + right + "[])(object)written; written[0] = " + stored +
             "; return observed[0] == " + expected + "; } }");
@@ -64,6 +80,10 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCase("char", "ushort", "(char)1", "0")]
     public async Task UnrelatedArraysKeepStoresSeparate(string left, string right, string stored, string initial)
     {
+        System.ArgumentNullException.ThrowIfNull(initial);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { public static " +
             right + " Target(" + left + "[] written, " + right + "[] observed) { " +
             "Contract.Requires(written != null && observed != null && written.Length == 1 && observed.Length == 1 && observed[0] == " + initial + "); " +
@@ -76,12 +96,18 @@ public sealed class PrimitiveArrayAliasControlTests
     [TestCase("uint")]
     public async Task SameTypeAliasStillRefutesPreservation(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var outcome = await Verify(type, type, "1", "0", " && written == observed");
         Assert.That(outcome.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), outcome.Reason.ToString());
     }
 
     private static async Task<WorkerClaimResult> Verify(string left, string right, string stored, string expected, string alias)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(stored);
         var branch = alias switch
         {
             " && (object)written == (object)observed" => "object writtenView = written; object observedView = observed; if (writtenView != observedView) return " + expected + "; ",
@@ -98,6 +124,7 @@ public sealed class PrimitiveArrayAliasControlTests
 
     private static async Task<WorkerClaimResult> VerifyProject(ShadowTestProject project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
@@ -108,6 +135,7 @@ public sealed class PrimitiveArrayAliasControlTests
 
     private static void AssertRuntimeResult(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("PrimitiveArrayAliasControlRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

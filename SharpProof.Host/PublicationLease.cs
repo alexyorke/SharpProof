@@ -18,6 +18,7 @@ internal sealed class PublicationLease : IDisposable
         Justification = "The returned acquired lease transfers ownership to the caller, which disposes it after publication.")]
     internal static PublicationLease Acquire(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(paths);
         return AcquireAsync(paths, cancellationToken).GetAwaiter().GetResult();
     }
 
@@ -76,6 +77,7 @@ internal sealed class PublicationLease : IDisposable
 
     internal static string CanonicalMember(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var full = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(full) ??
             throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(path));

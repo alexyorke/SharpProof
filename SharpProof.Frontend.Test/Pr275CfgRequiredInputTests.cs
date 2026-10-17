@@ -11,7 +11,7 @@ public sealed class Pr275CfgRequiredInputTests
         using var subject = TypedProgramSubject.Create("int Target(int x) => x + 1;");
         Assert.That(subject.Invoke([6]), Is.EqualTo(7));
         Assert.That(RoslynCfgReachability.ReachableBlocks(subject.Graph).ToArray(),
-            Is.EqualTo(subject.Graph.Blocks.Where(block => block.IsReachable).ToArray()));
+            Is.EqualTo(subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable)).ToArray()));
         var missing = RoslynCfgReachability.ReachableBlocks(null!);
         var exception = Assert.Throws<ArgumentNullException>((Action)(() => _ = missing.ToArray()));
         Assert.That(exception!.ParamName, Is.EqualTo("graph"));

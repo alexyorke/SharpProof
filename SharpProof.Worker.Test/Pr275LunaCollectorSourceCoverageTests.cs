@@ -33,7 +33,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                 }
                 """));
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .Single(item => item.Method.Name == "Adjust");
+            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory())
             .Prepare(target);
 
@@ -65,7 +65,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                 """));
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(item =>
-            item.Method.Name == "Adjust");
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
         var trees = CompilerCompilationCapture.CaptureTrees(
             compilation,
             CancellationToken.None);
@@ -82,7 +82,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             references).Prepare(target);
         var artifact = CreateArtifact(compilation, discovery);
         var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact)
-            .Single(item => item.Entry.CallableId == target.Entry.CallableId);
+            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == target.Entry.CallableId));
 
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
@@ -124,15 +124,15 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
                 """));
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var targets = discovery.Targets.Values
-            .Where(item => item.Method.MethodKind is
-                MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet)
+            .Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind is
+                MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet))
             .ToArray();
         var artifact = CreateArtifact(compilation, discovery);
         var callables = artifact.Callables.ToDictionary(
-            item => item.CallableId,
+            item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
             StringComparer.Ordinal);
 
-        Assert.That(targets.Select(item => item.Method.MethodKind), Is.EquivalentTo(new[]
+        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(new[]
         {
             MethodKind.Constructor,
             MethodKind.PropertyGet,
@@ -141,10 +141,10 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         foreach (var target in targets)
         {
             var manifestClaims = target.EffectClaims
-                .Select(item => item.Evidence.ClaimId)
+                .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))
                 .ToArray();
             var artifactClaims = callables[target.Entry.CallableId].EffectClaims
-                .Select(item => item.ClaimId)
+                .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId))
                 .ToArray();
 
             Assert.That(manifestClaims, Has.Length.EqualTo(1), target.Method.MethodKind.ToString());
@@ -180,8 +180,8 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             Assert.That(target.Entry.CallableId, Is.Not.Empty);
             Assert.That(callable.CallableId, Is.EqualTo(target.Entry.CallableId));
             Assert.That(target.EffectClaims, Has.Length.EqualTo(1));
-            Assert.That(callable.EffectClaims.Select(item => item.ClaimId),
-                Is.EqualTo(target.EffectClaims.Select(item => item.Evidence.ClaimId)));
+            Assert.That(callable.EffectClaims.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId)),
+                Is.EqualTo(target.EffectClaims.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))));
         }
     }
 
@@ -189,6 +189,8 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         CSharpCompilation compilation,
         ClaimManifestBuildResult discovery)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(discovery);
         return CompilerManifestArtifactProducer.Create(
             compilation,
             TestContext.CurrentContext.WorkDirectory,

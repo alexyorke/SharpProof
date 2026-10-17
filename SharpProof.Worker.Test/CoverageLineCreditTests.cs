@@ -30,7 +30,7 @@ public sealed class CoverageLineCreditTests
                 Assert.That(result.GetProperty("permitted").GetBoolean(), Is.True,
                     $"Line {number} is authenticated even when it has no credit.");
                 Assert.That(result.GetProperty("credits").EnumerateArray()
-                    .Select(static value => value.GetInt32()), Is.EquivalentTo(credits),
+                    .Select(static value => ((value.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(value)) : (value.GetInt32()))), Is.EquivalentTo(credits),
                     $"Line {number} must credit all overlapping starts exactly once.");
             }
         }
@@ -54,6 +54,7 @@ public sealed class CoverageLineCreditTests
 
     private static JsonElement FindResult(JsonDocument results, int number)
     {
+        System.ArgumentNullException.ThrowIfNull(results);
         return results.RootElement.EnumerateArray().Single(result =>
             result.GetProperty("number").GetInt32() == number);
     }

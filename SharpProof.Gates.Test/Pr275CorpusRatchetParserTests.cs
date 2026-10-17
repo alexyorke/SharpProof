@@ -34,6 +34,7 @@ public sealed class Pr275CorpusRatchetParserTests
     [TestCase("maximumByReason")]
     public void RatchetPropertiesAreRequired(string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         var json = ReviewedInput();
         json.Remove(property);
         AssertError(json, $"Corpus JSON is missing required property '{property}'.");
@@ -52,6 +53,7 @@ public sealed class Pr275CorpusRatchetParserTests
     [TestCase("maximumTotalUnknown")]
     public void ThresholdsCannotBeNegative(string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         var json = ReviewedInput();
         json[property] = -1;
         AssertError(json, "Corpus support minima and Unknown maxima cannot be negative.");
@@ -158,6 +160,8 @@ public sealed class Pr275CorpusRatchetParserTests
 
     private static void AssertError(JsonObject json, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(json);
+        System.ArgumentNullException.ThrowIfNull(message);
         using var document = JsonDocument.Parse(json.ToJsonString());
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement)));

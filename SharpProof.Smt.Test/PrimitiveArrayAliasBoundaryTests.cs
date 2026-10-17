@@ -64,6 +64,8 @@ public sealed class PrimitiveArrayAliasBoundaryTests
 
     private static Assumption Assume(IrFactory factory, IrTerm predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         return new(factory, predicate, new LoweredJustification(factory.CreateOperation()));
     }
 }

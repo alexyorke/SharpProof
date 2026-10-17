@@ -21,14 +21,19 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class TypedWidthLongFuzzTests
 {
     private const string Harness = "typed-width";
-    private sealed record GeneratedCase(string Name, string Source, object[][] Inputs, bool ExceptionClaim, bool ViolatedOnGrid);
+    private sealed record GeneratedCase(string Name, string Source, object[][] Inputs, bool ExceptionClaim, bool ViolatedOnGrid)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public string Source { get; init; } = Source ?? throw new System.ArgumentNullException(nameof(Source));
+        public object[][] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+    }
     private sealed record Observation(int Normal, int Overflow, int Violations, string? Witness, string? Error);
 
     [Test]
     public async Task GeneratedWidthClaimsAgreeWithClrWitnesses()
     {
         var core = Cases().ToArray();
-        var variableShifts = core.Where(item => !item.ExceptionClaim).ToArray();
+        var variableShifts = core.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.ExceptionClaim)).ToArray();
         var session = new LongFuzzSession(Harness, harnessIndex: 3, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
@@ -53,12 +58,16 @@ public sealed class TypedWidthLongFuzzTests
     private static async Task RunCase(LongFuzzSession session, int seed, GeneratedCase item, string family, string type,
         string variant)
     {
+        System.ArgumentNullException.ThrowIfNull(family);
+        System.ArgumentNullException.ThrowIfNull(session);
+        System.ArgumentNullException.ThrowIfNull(type);
+        System.ArgumentNullException.ThrowIfNull(variant);
         var compilation = Compile(item.Source);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, item.Name,
-                "", "", "", string.Join(" | ", errors.Select(error => error.ToString())), item.Source));
+                "", "", "", string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))), item.Source));
             return;
         }
         session.Count("compiled:" + family + ":" + type);
@@ -95,12 +104,12 @@ public sealed class TypedWidthLongFuzzTests
         {
             session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, item.Name,
                 "", "", runtime, response.Errors.Length != 0
-                    ? string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message))
+                    ? string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message)))
                     : "Worker response failed protocol validation.", item.Source));
             return;
         }
-        var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(claim =>
-            claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, item.Name,
@@ -134,6 +143,7 @@ public sealed class TypedWidthLongFuzzTests
 
     private static CSharpCompilation Compile(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "/project/Subject.cs");
         return CSharpCompilation.Create("WidthFuzz_" + Guid.NewGuid().ToString("N"), [tree],
             TestMetadataReferences.WithSharpProof,
@@ -143,6 +153,7 @@ public sealed class TypedWidthLongFuzzTests
 
     private static Observation Observe(CSharpCompilation compilation, GeneratedCase item)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         if (!emission.Success)
@@ -193,9 +204,10 @@ public sealed class TypedWidthLongFuzzTests
 
     private static string FormatInput(object[] input)
     {
-        return "input=" + string.Join(",", input.Select(value => value is char character
+        System.ArgumentNullException.ThrowIfNull(input, nameof(input));
+        return "input=" + string.Join(",", input.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value is char character
             ? ((int)character).ToString(CultureInfo.InvariantCulture)
-            : Convert.ToString(value, CultureInfo.InvariantCulture)));
+            : Convert.ToString(value, CultureInfo.InvariantCulture))));
     }
 
     private static IEnumerable<GeneratedCase> Cases()
@@ -209,12 +221,12 @@ public sealed class TypedWidthLongFuzzTests
                 {
                     var name = $"{type}/{shift}/{count}/masked";
                     yield return new GeneratedCase(name, ShiftSource(type, shift, count, mask, false),
-                        values.Select(value => new object[] { value, count }).ToArray(), false, false);
+                        values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value, count })).ToArray(), false, false);
                     if (count == mask)
                     {
                         name = $"{type}/{shift}/{count}/identity";
                         yield return new GeneratedCase(name, ShiftSource(type, shift, count, mask, true),
-                            values.Select(value => new object[] { value, count }).ToArray(), false, true);
+                            values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value, count })).ToArray(), false, true);
                     }
                 }
             }
@@ -229,6 +241,7 @@ public sealed class TypedWidthLongFuzzTests
         // Every 302 consecutive seeds cover the 167 pinned edge/cast shapes
         // and 135 distinct shift-count variants. The latter retain the same
         // low count bits while exercising both signs and high count bits.
+        System.ArgumentNullException.ThrowIfNull(variableShifts, nameof(variableShifts));
         var index = (int)((uint)seed % (uint)(core.Length + variableShifts.Length));
         if (index < core.Length)
         { return core[index]; }
@@ -247,7 +260,7 @@ public sealed class TypedWidthLongFuzzTests
         {
             Name = name,
             Source = ShiftSource(type, shift, count, mask, identity),
-            Inputs = template.Inputs.Select(input => new object[] { input[0], count }).ToArray()
+            Inputs = template.Inputs.Select(input => input is null ? throw new System.ArgumentNullException(nameof(input)) : (new object[] { input[0], count })).ToArray()
         };
     }
 
@@ -283,6 +296,7 @@ public sealed class TypedWidthLongFuzzTests
                 Assert.That(outside, Is.Not.Empty, $"{source}->{target} needs an overflowing witness.");
                 object[] Box(IEnumerable<BigInteger> values)
                 {
+                    System.ArgumentNullException.ThrowIfNull(values);
                     return values.Select(value => source == "long" ?
                         (object)(long)value : (ulong)value).ToArray();
                 }
@@ -314,6 +328,11 @@ public sealed class TypedWidthLongFuzzTests
     private static GeneratedCase CastCase(string name, string sourceType, string target, string requires, object[] values,
         bool violated)
     {
+        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(sourceType);
+        System.ArgumentNullException.ThrowIfNull(target);
         var source = $$"""
             #undef SHARPPROOF_CONTRACTS
             using SharpProof.Attributes;
@@ -325,11 +344,13 @@ public sealed class TypedWidthLongFuzzTests
                 }
             }
             """;
-        return new GeneratedCase(name, source, values.Select(value => new object[] { value }).ToArray(), true, violated);
+        return new GeneratedCase(name, source, values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new object[] { value })).ToArray(), true, violated);
     }
 
     private static string ShiftSource(string type, string shift, int count, int mask, bool identity)
     {
+        System.ArgumentNullException.ThrowIfNull(shift);
+        System.ArgumentNullException.ThrowIfNull(type);
         var shifted = $"unchecked(({type})(value {shift} count))";
         var predicate = identity ? shifted + " == value" :
             shifted + $" == unchecked(({type})(value {shift} (count & {mask})))";

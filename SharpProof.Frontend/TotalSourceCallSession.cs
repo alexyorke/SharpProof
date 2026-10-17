@@ -10,7 +10,7 @@ internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArr
     internal int ParameterCount { get; } = parameterCount;
     internal bool StringConcatenation { get; } = stringConcatenation;
     internal IrOpaqueCallEffects Effects { get; } = effects;
-    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return _apply(arguments); }
+    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } return _apply(arguments); }
 }
 
 // One compiler-owned expansion session covers the caller and every fresh frame.
@@ -50,7 +50,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // change them.
     internal bool PinElementReads { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
-    { return prepareMetadata?.Invoke(frame, body) ?? true; }
+    { if (body is null) { throw new System.ArgumentNullException(nameof(body)); } if (frame is null) { throw new System.ArgumentNullException(nameof(frame)); } return prepareMetadata?.Invoke(frame, body) ?? true; }
 
     internal TotalScalarCallModel? PrepareScalarCall(IInvocationOperation invocation)
     {
@@ -59,7 +59,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var method = invocation.TargetMethod;
         if (invocation.Instance != null || !method.IsStatic || method.Parameters.Length > 128 ||
             invocation.Arguments.Length != method.Parameters.Length ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
+            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)))
         { return null; }
         var ordinals = new HashSet<int>();
         foreach (var argument in invocation.Arguments)
@@ -99,6 +99,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal void Leave(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         _active.Remove(method);
     }
 
@@ -119,7 +123,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     }
 
     internal void LeaveIl(IMethodSymbol method)
-    { _activeIl.Remove(IlKey(method)); }
+    { if (method is null) { throw new System.ArgumentNullException(nameof(method)); } _activeIl.Remove(IlKey(method)); }
 
     internal static bool IsEmptyParamsArray(IArgumentOperation argument)
     {
@@ -139,10 +143,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!IsEmptyParamsArray(argument) || !Spend() || argument.Value.Type is not IArrayTypeSymbol array)
         { return null; }
         var emptyMethods = _compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Empty")
-            .OfType<IMethodSymbol>().Where(method => method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
+            .OfType<IMethodSymbol>().Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
                 method.Arity == 1 && method.Parameters.IsEmpty &&
                 method.ReturnType is IArrayTypeSymbol { IsSZArray: true } returned &&
-                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0])).ToArray();
+                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0]))).ToArray();
         if (emptyMethods.Length != 1 || !Spend(emptyMethods.Length))
         { return null; }
         var empty = emptyMethods[0].Construct(array.ElementType);
@@ -152,7 +156,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     }
 
     private static string IlKey(IMethodSymbol method)
-    { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
+    { if (method is null) { throw new System.ArgumentNullException(nameof(method)); } return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
     // An instance callee is a nonvirtual member on a reference receiver. Its
     // implicit `this` is never null and is the caller's receiver value.
@@ -188,11 +192,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
-                !CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type)).Any() ||
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (!CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type))).Any() ||
             !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
-                !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
@@ -239,8 +243,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         else
         {
-            foreach (var node in declaration.DescendantNodesAndSelf(node => ReferenceEquals(node, declaration) ||
-                node is not (LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax)))
+            foreach (var node in declaration.DescendantNodesAndSelf(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (ReferenceEquals(node, declaration) ||
+                node is not (LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))))
             {
                 if (!Spend())
                 { return false; }
@@ -312,8 +316,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 case LocalFunctionStatementSyntax local:
                     if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method, cancellationToken))
                     { return null; }
-                    var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
-                        IsBodyDeclaration(node));
+                    var owner = local.Ancestors().FirstOrDefault(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
+                        IsBodyDeclaration(node)));
                     var ownerSymbol = owner == null ? null : model.GetDeclaredSymbol(owner, cancellationToken) as IMethodSymbol ??
                         (owner.Parent?.Parent is BasePropertyDeclarationSyntax property
                             ? (model.GetDeclaredSymbol(property, cancellationToken) as IPropertySymbol)?.GetMethod : null);
@@ -334,8 +338,16 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken,
         HashSet<IMethodSymbol>? visited = null)
     {
+        if (body is null)
+        {
+            throw new System.ArgumentNullException(nameof(body));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         visited ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method };
-        return body.Descendants().Any(operation => operation switch
+        return body.Descendants().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
         {
             ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
             IParameterReferenceOperation parameter => !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, method),
@@ -343,12 +355,16 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             IInvocationOperation invocation => LocalFunctionCaptures(body, invocation.TargetMethod, visited, cancellationToken),
             IMethodReferenceOperation reference => LocalFunctionCaptures(body, reference.Method, visited, cancellationToken),
             _ => false
-        });
+        }));
     }
 
     private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, HashSet<IMethodSymbol> visited,
         CancellationToken cancellationToken)
     {
+        if (body is null)
+        {
+            throw new System.ArgumentNullException(nameof(body));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         target = target.OriginalDefinition;
         if (target.MethodKind != MethodKind.LocalFunction || !visited.Add(target))
@@ -371,6 +387,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     private bool TryCheckTypeInitialization(INamedTypeSymbol type, out bool eligible)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         eligible = false;
         for (var current = type; current != null; current = current.ContainingType)
         {

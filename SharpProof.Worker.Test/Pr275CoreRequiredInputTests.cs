@@ -115,16 +115,16 @@ public sealed class Pr275CoreRequiredInputTests
         var lowering = TotalBodyLowering.Lower(
             fixture.Compilation, fixture.Graph, context, CancellationToken.None);
         var variables = context.Parameters
-            .SelectMany(static parameter => new[]
+            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[]
             {
                 parameter.Entry,
                 parameter.Current,
                 parameter.PreState
-            })
+            }))
             .Concat(lowering.Program.Blocks
-                .SelectMany(static block => block.Instructions)
+                .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrAssignInstruction>()
-                .Select(static assignment => assignment.Target))
+                .Select(static assignment => assignment is null ? throw new System.ArgumentNullException(nameof(assignment)) : (assignment.Target)))
             .Append(context.Result!.Value)
             .Distinct()
             .ToImmutableArray();
@@ -164,6 +164,8 @@ public sealed class Pr275CoreRequiredInputTests
 
     private static void AssertArgumentNull(string parameterName, Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(parameterName);
         var exception = Assert.Throws<ArgumentNullException>(action);
         Assert.That(exception!.ParamName, Is.EqualTo(parameterName));
     }
@@ -173,5 +175,12 @@ public sealed class Pr275CoreRequiredInputTests
         MethodDeclarationSyntax Declaration,
         IMethodSymbol Method,
         SemanticModel Model,
-        ControlFlowGraph Graph);
+        ControlFlowGraph Graph)
+    {
+        public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public MethodDeclarationSyntax Declaration { get; init; } = Declaration ?? throw new System.ArgumentNullException(nameof(Declaration));
+        public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public SemanticModel Model { get; init; } = Model ?? throw new System.ArgumentNullException(nameof(Model));
+        public ControlFlowGraph Graph { get; init; } = Graph ?? throw new System.ArgumentNullException(nameof(Graph));
+    }
 }

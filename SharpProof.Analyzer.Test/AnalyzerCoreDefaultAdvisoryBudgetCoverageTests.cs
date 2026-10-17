@@ -20,19 +20,19 @@ public sealed class AnalyzerCoreDefaultAdvisoryBudgetCoverageTests
             "public static int Target(bool again) { bool b0 = true; " + declarations +
             " while (again) { " + propagation + " } return Need(0); } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0027"]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(factory.Session, Is.Not.Null);
         var actual = (CSharpCompilation)factory.Session!.Compilation;
         var root = await actual.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
-        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var caller = (IMethodSymbol)actual.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
         var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, CancellationToken.None);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Lowering.IsExact, Is.True);
-        Assert.That(body.Program.Blocks.Sum(block => block.Instructions.Length), Is.LessThanOrEqualTo(TotalBodyLowering.MaximumWork));
+        Assert.That(body.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.LessThanOrEqualTo(TotalBodyLowering.MaximumWork));
         var callPreconditionsProperty = body.Lowering.GetType().GetProperty(
             "CallPreconditions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.That(callPreconditionsProperty, Is.Not.Null);

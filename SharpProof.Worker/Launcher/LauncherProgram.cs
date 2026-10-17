@@ -22,6 +22,7 @@ internal static class Program
 
     internal static async Task<int> Main(string[] args)
     {
+        System.ArgumentNullException.ThrowIfNull(args, nameof(args));
         if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
         {
             Console.Error.WriteLine(
@@ -59,7 +60,7 @@ internal static class Program
         WorkerVersionSummary expectedVersions;
         try
         {
-            (validatePreflight ?? (static value => value.ValidatePreflight()))(arguments);
+            (validatePreflight ?? (static value => { System.ArgumentNullException.ThrowIfNull(value); value.ValidatePreflight(); }))(arguments);
             expectedVersions = ExpectedVersions();
             request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput);
             expectedInputHash = preparedInput.InputHash;
@@ -96,6 +97,7 @@ internal static class Program
             PosixSignal.SIGTERM,
             context =>
             {
+                System.ArgumentNullException.ThrowIfNull(context);
                 context.Cancel = true;
                 cancellation.Cancel();
             });
@@ -166,6 +168,7 @@ internal static class Program
 
     private static LauncherFailure ClassifyLauncherFailure(Exception exception)
     {
+        System.ArgumentNullException.ThrowIfNull(exception);
         return exception switch
         {
             OverflowException => new(3, WorkerRunStatus.Failed, WorkerRunFailureReason.InvalidRequest,
@@ -189,10 +192,16 @@ internal static class Program
 
     internal sealed record LauncherFailure(
         int ExitCode, WorkerRunStatus Status, WorkerRunFailureReason Reason,
-        string Code, string Message, string ConsoleMessage);
+        string Code, string Message, string ConsoleMessage)
+    {
+        public string Code { get; init; } = Code ?? throw new System.ArgumentNullException(nameof(Code));
+        public string Message { get; init; } = Message ?? throw new System.ArgumentNullException(nameof(Message));
+        public string ConsoleMessage { get; init; } = ConsoleMessage ?? throw new System.ArgumentNullException(nameof(ConsoleMessage));
+    }
 
     internal static string NormalizeAbsolutePath(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return Path.GetFullPath(path);
     }
 
@@ -200,6 +209,8 @@ internal static class Program
         WorkerVerifyRequest request,
         byte[] artifactBytes)
     {
+        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
+        System.ArgumentNullException.ThrowIfNull(request);
         var identity = WorkerCacheIdentity.Current;
         return CompilerArtifactInputHash.Compute(
             request, ArtifactDigest.Compute(artifactBytes), identity.ToolIdentity, identity.ToolVersion,
@@ -225,6 +236,7 @@ internal static class Program
         WorkerVersionSummary? expectedVersions,
         out bool validResponse, out WorkerVerifyResponse? validatedResponse)
     {
+        System.ArgumentNullException.ThrowIfNull(resultPath);
         validResponse = false;
         validatedResponse = null;
         WorkerVerifyResponse? response;
@@ -266,11 +278,11 @@ internal static class Program
         validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
         var hasProjectTimeoutCoverage = response.CallableResults.Any(
-            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
-                result.Reason == WorkerCallableCoverageReason.ProjectTimeout);
+            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.ProjectTimeout));
         var hasMethodTimeoutCoverage = response.CallableResults.Any(
-            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
-                result.Reason == WorkerCallableCoverageReason.MethodTimeout);
+            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.MethodTimeout));
         var projectTimedOut = hasProjectTimeoutCoverage ||
             response.CallableResults.Length == 0 &&
                 response.RunStatus == WorkerRunStatus.TimedOut &&
@@ -295,9 +307,9 @@ internal static class Program
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
         }
         var incompleteCount = response.CallableResults.Count(
-            static result => result.Coverage == WorkerCallableCoverage.Incomplete);
+            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete));
         var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable.CallableId, StringComparer.Ordinal);
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
         foreach (var result in response.CallableResults)
         {
             if (result.Coverage != WorkerCallableCoverage.Incomplete)
@@ -351,12 +363,14 @@ internal static class Program
     private static void ReportRefutedClaim(
         WorkerClaimManifestEntry claim, WorkerClaimResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
+        System.ArgumentNullException.ThrowIfNull(result);
         var message = "Refuted " + LauncherPresentation.ClaimKind(claim) +
             " claim " + result.ClaimId + " for " + claim.CallableId + "." +
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
                     ", ", result.Model.Select(static value =>
-                        value.Variable + " = " + value.Value)) + "."
+                        value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable + " = " + value.Value))) + "."
                 : string.Empty);
 
         // Keep this diagnostic on stderr so RunVerifier consumes it through
@@ -385,15 +399,16 @@ internal static class Program
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
         var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable.CallableId, StringComparer.Ordinal);
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
         var reported = false;
         foreach (var result in response.CallableResults)
         {
             var assumptions = result.Assumptions
                 .Where(static assumption =>
-                    assumption.Kind is WorkerAssumptionKind.UserAssume or
-                        WorkerAssumptionKind.TrustedBoundary)
+                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind is WorkerAssumptionKind.UserAssume or
+                        WorkerAssumptionKind.TrustedBoundary))
                 .ToArray();
             if (assumptions.Length == 0)
             {
@@ -414,6 +429,9 @@ internal static class Program
     private static void ReportDiagnostic(
         WorkerSourceLocation location, string severity, string id, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
+        System.ArgumentNullException.ThrowIfNull(location);
+        System.ArgumentNullException.ThrowIfNull(message);
         var prefix = string.IsNullOrWhiteSpace(location.Path)
             ? "SharpProof"
             : location.Path + FormattableString.Invariant(
@@ -445,6 +463,7 @@ internal static class Program
         WorkerVersionSummary expectedVersions,
         WorkerVerifyResponse response, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
         if (arguments.PublishRequestPath == null)
         {
             return;
@@ -497,6 +516,13 @@ internal static class Program
         WorkerRunStatus status,
         WorkerRunFailureReason reason, string code, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
+        System.ArgumentNullException.ThrowIfNull(code);
+        System.ArgumentNullException.ThrowIfNull(expectedInputHash);
+        System.ArgumentNullException.ThrowIfNull(expectedVersions);
+        System.ArgumentNullException.ThrowIfNull(message);
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(request);
         var timeout = status == WorkerRunStatus.TimedOut;
         var response = WorkerResultAssembler.CreateIncomplete(
             expectedInputHash,
@@ -516,6 +542,9 @@ internal static class Program
         string expectedInputHash,
         WorkerVersionSummary expectedVersions)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
+        System.ArgumentNullException.ThrowIfNull(expectedInputHash);
+        System.ArgumentNullException.ThrowIfNull(path);
         WorkerVerifyResponse? response;
         try
         {
@@ -586,6 +615,8 @@ internal static class Program
     private static void WriteErrors(
         IEnumerable<WorkerProtocolError> errors, string prefix)
     {
+        System.ArgumentNullException.ThrowIfNull(errors);
+        System.ArgumentNullException.ThrowIfNull(prefix);
         foreach (var error in errors)
         {
             Console.Error.WriteLine(prefix + error.Code + ": " + error.Message);
@@ -602,6 +633,7 @@ internal sealed partial class LauncherArguments
 
     private LauncherArguments(IReadOnlyDictionary<string, string> values)
     {
+        System.ArgumentNullException.ThrowIfNull(values);
         _values = values;
     }
 
@@ -634,12 +666,12 @@ internal sealed partial class LauncherArguments
                 return false;
             }
         }
-        if (s_required.Any(key => !values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)))
+        if (s_required.Any(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (!values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))))
         {
             return false;
         }
 
-        var publicationCount = s_publication.Count(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
+        var publicationCount = s_publication.Count(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)));
         if (publicationCount is not (0 or 3) ||
             values.TryGetValue("publish-sarif", out var sarif) &&
             (string.IsNullOrWhiteSpace(sarif) || publicationCount != 3))
@@ -728,6 +760,7 @@ internal sealed partial class LauncherArguments
 
     internal static byte[] ReadCompilerManifest(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return CompilerManifestArtifactFile.ReadAllBytes(path);
     }
 
@@ -738,6 +771,7 @@ internal sealed partial class LauncherArguments
 
     private string? OptionalFullPath(string key)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         return Optional(key) is { } value
             ? Program.NormalizeAbsolutePath(value)
             : null;
@@ -751,12 +785,14 @@ internal sealed partial class LauncherArguments
 
     private string? Optional(string key)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         return _values.TryGetValue(key, out var value) &&
         !string.IsNullOrWhiteSpace(value) ? value : null;
     }
 
-    private T Number<T>(string key, T fallback) where T : struct, INumberBase<T>
+    private T Number<T>(string key, T fallback /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */) where T : struct, INumberBase<T>
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         return _values.TryGetValue(key, out var value) ? T.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture) : fallback;
     }
 

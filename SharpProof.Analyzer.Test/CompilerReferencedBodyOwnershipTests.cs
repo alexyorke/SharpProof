@@ -33,7 +33,7 @@ public sealed class CompilerReferencedBodyOwnershipTests
         foreach (var compilation in new[] { dependency, referenced, owned })
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         }
         var dependencyImage = AnalyzerTestHost.EmitImage(dependency);
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("BodyOwnershipControl", isCollectible: true);

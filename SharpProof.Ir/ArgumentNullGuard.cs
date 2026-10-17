@@ -82,7 +82,7 @@ namespace SharpProof
         internal static T NotNull<T>(
             [System.Diagnostics.CodeAnalysis.NotNull] T? value,
             string parameterName,
-            [SharpProof.Internal.AllValuesValid("Optional exception text accepts every string and null.")] string? message = null)
+            /* SPINT001: all values valid - Optional exception text accepts every string and null. */ string? message = null)
         {
             RequireName(parameterName);
             if (value != null)

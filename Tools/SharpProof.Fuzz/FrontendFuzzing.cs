@@ -68,13 +68,18 @@ public sealed class GeneratedCSharpExpression
         ImmutableArray<GeneratedCSharpExpression> children,
         string? stringValue = null)
     {
+
+        if (children.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(children));
+        }
         Kind = kind;
         Type = type;
         IntegerValue = integerValue;
         BooleanValue = booleanValue;
         StringValue = stringValue;
         Children = children;
-        NodeCount = 1 + children.Sum(static child => child.NodeCount);
+        NodeCount = 1 + children.Sum(static child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.NodeCount));
     }
 
     public GeneratedExpressionKind Kind { get; }
@@ -485,6 +490,10 @@ public sealed class GeneratedCSharpExpression
 
     private void AppendTo(StringBuilder builder)
     {
+        if (builder is null)
+        {
+            throw new System.ArgumentNullException(nameof(builder));
+        }
         switch (Kind)
         {
             case GeneratedExpressionKind.BooleanLiteral:
@@ -646,6 +655,7 @@ public sealed record GeneratedCSharpCase(
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }
+    public GeneratedCSharpExpression Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
 }
 
 public sealed class SmallCSharpCaseGenerator(int seed)
@@ -871,7 +881,10 @@ public sealed class SmallCSharpCaseGenerator(int seed)
 public sealed record FrontendDifferentialResult(
     FuzzOracleStatus Status,
     string Detail,
-    IrExceptionKind? ExceptionKind = null);
+    IrExceptionKind? ExceptionKind = null)
+{
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public sealed record FrontendSemanticEdgeCase(
     string ReturnType,
@@ -879,14 +892,23 @@ public sealed record FrontendSemanticEdgeCase(
     string Expression,
     IReadOnlyList<object?> Arguments,
     FrontendSubsetDecision ExpectedDecision,
-    FrontendAbstention ExpectedAbstention);
+    FrontendAbstention ExpectedAbstention)
+{
+    public string ReturnType { get; init; } = ReturnType ?? throw new System.ArgumentNullException(nameof(ReturnType));
+    public string Parameters { get; init; } = Parameters ?? throw new System.ArgumentNullException(nameof(Parameters));
+    public string Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
+    public IReadOnlyList<object?> Arguments { get; init; } = Arguments ?? throw new System.ArgumentNullException(nameof(Arguments));
+}
 
 public sealed record FrontendSemanticEdgeResult(
     FuzzOracleStatus Status,
     FrontendSubsetDecision? ActualDecision,
     FrontendAbstention? ActualAbstention,
     string Detail,
-    IrExceptionKind? ExceptionKind = null);
+    IrExceptionKind? ExceptionKind = null)
+{
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public static class FrontendDifferentialOracle
 {
@@ -952,6 +974,10 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken = default)
     {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         if (!HasValidBatch(generatedCases))
         {
             return [];
@@ -1003,6 +1029,18 @@ public static class FrontendDifferentialOracle
         MemoryStream image,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (image is null)
+        {
+            throw new System.ArgumentNullException(nameof(image));
+        }
+        if (syntaxTree is null)
+        {
+            throw new System.ArgumentNullException(nameof(syntaxTree));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             compilation,
@@ -1011,8 +1049,8 @@ public static class FrontendDifferentialOracle
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .OrderBy(
-                static method => ParseMethodIndex(
-                    method.Identifier.ValueText))
+                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ParseMethodIndex(
+                    method.Identifier.ValueText)))
             .ToArray();
         if (methodSyntaxes.Length != generatedCases.Count)
         {
@@ -1146,8 +1184,8 @@ public static class FrontendDifferentialOracle
         var generatedTypes = compilationUnit
             .DescendantNodes()
             .OfType<ClassDeclarationSyntax>()
-            .Where(static type => type.Identifier.ValueText ==
-                "SharpProofGeneratedFrontendEdges")
+            .Where(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText ==
+                "SharpProofGeneratedFrontendEdges"))
             .ToArray();
         if (generatedTypes.Length != 1)
         {
@@ -1222,6 +1260,10 @@ public static class FrontendDifferentialOracle
             "SharpProofGeneratedFrontendEdges",
             runtimeType =>
             {
+                if (runtimeType is null)
+                {
+                    throw new System.ArgumentNullException(nameof(runtimeType));
+                }
                 var results =
                     ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
                         cases.Count);
@@ -1246,6 +1288,18 @@ public static class FrontendDifferentialOracle
         string typeName,
         Func<Type, TResult> callback)
     {
+        if (callback is null)
+        {
+            throw new System.ArgumentNullException(nameof(callback));
+        }
+        if (contextName is null)
+        {
+            throw new System.ArgumentNullException(nameof(contextName));
+        }
+        if (image is null)
+        {
+            throw new System.ArgumentNullException(nameof(image));
+        }
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
             contextName,
@@ -1270,6 +1324,10 @@ public static class FrontendDifferentialOracle
             string detail,
             CancellationToken cancellationToken)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         if (cases.Count == 1)
         {
             return RepeatSemanticFailure(1, detail);
@@ -1293,6 +1351,22 @@ public static class FrontendDifferentialOracle
         FrontendLoweringResult lowering,
         GeneratedCSharpCase generated)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (generated is null)
+        {
+            throw new System.ArgumentNullException(nameof(generated));
+        }
+        if (lowering is null)
+        {
+            throw new System.ArgumentNullException(nameof(lowering));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
@@ -1326,6 +1400,14 @@ public static class FrontendDifferentialOracle
 
         IrValue CreateSequenceValue(IrTypeId type, long[] values)
         {
+            if (values is null)
+            {
+                throw new System.ArgumentNullException(nameof(values));
+            }
+            if (type.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(type));
+            }
             var value = factory.CreateSequenceValue(
                 type,
                 values.Select(factory.CreateIntegerValue));
@@ -1342,6 +1424,14 @@ public static class FrontendDifferentialOracle
         int index,
         CancellationToken cancellationToken)
     {
+        if (methodSyntax is null)
+        {
+            throw new System.ArgumentNullException(nameof(methodSyntax));
+        }
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
         var method = (IMethodSymbol?)model.GetDeclaredSymbol(
             methodSyntax,
             cancellationToken);
@@ -1429,6 +1519,22 @@ public static class FrontendDifferentialOracle
             FrontendLoweringResult lowering,
             IReadOnlyList<object?> arguments)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (lowering is null)
+        {
+            throw new System.ArgumentNullException(nameof(lowering));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
             ReferenceEqualityComparer.Instance);
@@ -1453,6 +1559,14 @@ public static class FrontendDifferentialOracle
         IMethodSymbol method,
         FrontendLoweringResult lowering)
     {
+        if (lowering is null)
+        {
+            throw new System.ArgumentNullException(nameof(lowering));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is IParameterSymbol parameter &&
@@ -1472,6 +1586,22 @@ public static class FrontendDifferentialOracle
         Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues,
         Dictionary<IrValue, Array> sequenceOrigins)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (sequenceOrigins is null)
+        {
+            throw new System.ArgumentNullException(nameof(sequenceOrigins));
+        }
+        if (sequenceValues is null)
+        {
+            throw new System.ArgumentNullException(nameof(sequenceValues));
+        }
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
         {
@@ -1540,6 +1670,10 @@ public static class FrontendDifferentialOracle
         ExpressionSyntax? expression,
         CancellationToken cancellationToken)
     {
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
         if (expression == null)
         {
             return null;
@@ -1572,6 +1706,14 @@ public static class FrontendDifferentialOracle
         GeneratedCSharpCase generated,
         CancellationToken cancellationToken)
     {
+        if (generated is null)
+        {
+            throw new System.ArgumentNullException(nameof(generated));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return InvokeMethod(
             method,
             [
@@ -1590,6 +1732,14 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<object?> arguments,
         CancellationToken cancellationToken)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
@@ -1607,6 +1757,10 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         bool indexedMethods = true)
     {
+        if (generatedCases is null)
+        {
+            throw new System.ArgumentNullException(nameof(generatedCases));
+        }
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine("public static class SharpProofGeneratedFrontend {");
@@ -1630,6 +1784,10 @@ public static class FrontendDifferentialOracle
     private static string CreateSemanticEdgeSource(
         IReadOnlyList<FrontendSemanticEdgeCase> cases)
     {
+        if (cases is null)
+        {
+            throw new System.ArgumentNullException(nameof(cases));
+        }
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine(
@@ -1673,11 +1831,19 @@ public static class FrontendDifferentialOracle
 
     private static string FormatGeneratedMethodName(string prefix, int index)
     {
+        if (prefix is null)
+        {
+            throw new System.ArgumentNullException(nameof(prefix));
+        }
         return prefix + index.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int ParseMethodIndex(string name)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         return int.Parse(
             name.AsSpan("Target".Length),
             NumberStyles.None,
@@ -1693,6 +1859,14 @@ public static class FrontendDifferentialOracle
             string assemblyName,
             CancellationToken cancellationToken)
     {
+        if (assemblyName is null)
+        {
+            throw new System.ArgumentNullException(nameof(assemblyName));
+        }
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
@@ -1715,6 +1889,10 @@ public static class FrontendDifferentialOracle
         RuntimeOutcome actual,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
+        if (sequenceOrigins is null)
+        {
+            throw new System.ArgumentNullException(nameof(sequenceOrigins));
+        }
         if (actual.Exception != null)
         {
             var kind = IrExceptionKindFacts.FromException(actual.Exception);
@@ -1756,6 +1934,14 @@ public static class FrontendDifferentialOracle
         IrValue interpreted,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
+        if (interpreted is null)
+        {
+            throw new System.ArgumentNullException(nameof(interpreted));
+        }
+        if (sequenceOrigins is null)
+        {
+            throw new System.ArgumentNullException(nameof(sequenceOrigins));
+        }
         return interpreted.Kind switch
         {
             IrValueKind.Boolean =>
@@ -1806,6 +1992,10 @@ public static class FrontendDifferentialOracle
 
     private static FrontendDifferentialResult Mismatch(string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return new(FuzzOracleStatus.Mismatch, detail);
     }
 
@@ -1814,13 +2004,17 @@ public static class FrontendDifferentialOracle
             int count,
             string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return [.. Enumerable.Repeat(
             SemanticFailure(null, null, detail),
             count)];
     }
 
     private static FrontendSemanticEdgeResult SemanticAgreement(
-        FrontendSubsetClassification classification)
+        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
     {
         return new(
             FuzzOracleStatus.Agreement,
@@ -1834,6 +2028,10 @@ public static class FrontendDifferentialOracle
         FrontendAbstention? abstention,
         string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return new(
             FuzzOracleStatus.Mismatch,
             decision,
@@ -1850,6 +2048,10 @@ public static class FrontendDifferentialOracle
 
         internal static RuntimeOutcome Threw(Exception exception)
         {
+            if (exception is null)
+            {
+                throw new System.ArgumentNullException(nameof(exception));
+            }
             return new(null, exception);
         }
     }
@@ -1915,10 +2117,10 @@ public static class CSharpStructuralShrinker
 
         return StructuralShrinkCandidates.GetCandidates(
             expression,
-            static value => value.Children,
-            static (parent, child) => parent.Type == child.Type,
-            static value => value.NodeCount,
-            static value => value.Render(),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Children),
+            static (parent, child) => child is null ? throw new System.ArgumentNullException(nameof(child)) : parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Type == child.Type),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.NodeCount),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Render()),
             GetDomainCandidates,
             TryReplaceChild,
             StringComparer.Ordinal);
@@ -1927,6 +2129,10 @@ public static class CSharpStructuralShrinker
     private static IEnumerable<GeneratedCSharpExpression> GetDomainCandidates(
         GeneratedCSharpExpression expression)
     {
+        if (expression is null)
+        {
+            throw new System.ArgumentNullException(nameof(expression));
+        }
         return expression.Type switch
         {
             GeneratedExpressionType.Integer => [
@@ -1955,6 +2161,14 @@ public static class CSharpStructuralShrinker
         int childIndex,
         GeneratedCSharpExpression child)
     {
+        if (child is null)
+        {
+            throw new System.ArgumentNullException(nameof(child));
+        }
+        if (expression is null)
+        {
+            throw new System.ArgumentNullException(nameof(expression));
+        }
         return expression.Kind switch
         {
             GeneratedExpressionKind.Not or
@@ -1990,6 +2204,10 @@ internal static class GeneratedCompilationEmitter
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
         var image = new MemoryStream();
         try
         {

@@ -38,13 +38,13 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
                 public static int Target() => Guard.Need(1);
             }
             """, ["SP0027"]);
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(d => d.Id), Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
         using (var image = new MemoryStream())
         {
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.EqualTo(!missingBody));
-            Assert.That(emitted.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
+            Assert.That(emitted.Diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)),
                 Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
         }
 
@@ -53,8 +53,8 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(compilation.ContainsSyntaxTree(tree), Is.True);
         Assert.That(model.Compilation, Is.SameAs(compilation));
         var declarations = (await tree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-        var calleeSyntax = declarations.Single(d => d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard");
-        var callerSyntax = declarations.Single(d => d.Identifier.ValueText == "Target");
+        var calleeSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard"));
+        var callerSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
         var callee = (IMethodSymbol)model.GetDeclaredSymbol(calleeSyntax)!;
         var caller = (IMethodSymbol)model.GetDeclaredSymbol(callerSyntax)!;
         Assert.That(callee.IsStatic, Is.True);
@@ -84,7 +84,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(sessions.CreateCount, Is.EqualTo(1));
         var analyzed = sessions.Session!.Compilation;
         Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(tree));
-        Assert.That(analyzed.References, Is.EqualTo(compilation.References).Using<MetadataReference>((actual, expected) => ReferenceEquals(actual, expected)));
+        Assert.That(analyzed.References, Is.EqualTo(compilation.References).Using<MetadataReference>((actual, expected) => actual is null ? throw new System.ArgumentNullException(nameof(actual)) : expected is null ? throw new System.ArgumentNullException(nameof(expected)) : (ReferenceEquals(actual, expected))));
         Assert.That(analyzed.Assembly.Identity, Is.EqualTo(compilation.Assembly.Identity));
         var analyzedModel = CompilationModelProvider.GetSemanticModel(analyzed, tree);
         Assert.That(analyzedModel.Compilation, Is.SameAs(analyzed));

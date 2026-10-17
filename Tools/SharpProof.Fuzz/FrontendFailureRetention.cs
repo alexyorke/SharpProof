@@ -5,7 +5,14 @@ public sealed record RetainedFrontendFailure(
     GeneratedCSharpCase MinimizedCase,
     FrontendDifferentialResult OriginalResult,
     FrontendDifferentialResult MinimizedResult,
-    FuzzFailure Failure);
+    FuzzFailure Failure)
+{
+    public GeneratedCSharpCase OriginalCase { get; init; } = OriginalCase ?? throw new System.ArgumentNullException(nameof(OriginalCase));
+    public GeneratedCSharpCase MinimizedCase { get; init; } = MinimizedCase ?? throw new System.ArgumentNullException(nameof(MinimizedCase));
+    public FrontendDifferentialResult OriginalResult { get; init; } = OriginalResult ?? throw new System.ArgumentNullException(nameof(OriginalResult));
+    public FrontendDifferentialResult MinimizedResult { get; init; } = MinimizedResult ?? throw new System.ArgumentNullException(nameof(MinimizedResult));
+    public FuzzFailure Failure { get; init; } = Failure ?? throw new System.ArgumentNullException(nameof(Failure));
+}
 
 public static class FrontendFailureRetention
 {
@@ -33,8 +40,8 @@ public static class FrontendFailureRetention
             ? original
             : CSharpStructuralShrinker.Minimize(
                 original,
-                candidate => FuzzRunner.IsSemanticMismatch(
-                    FrontendDifferentialOracle.Compare(candidate, cancellationToken)),
+                candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (FuzzRunner.IsSemanticMismatch(
+                    FrontendDifferentialOracle.Compare(candidate, cancellationToken))),
                 cancellationToken);
         var minimizedResult = FrontendDifferentialOracle.Compare(
             minimized, cancellationToken);

@@ -81,7 +81,7 @@ public sealed class FuzzInputValidationTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, 12345);
         var scenario = generated.Scenarios[0];
-        var variable = scenario.Keys.OrderBy(item => item.Value).First();
+        var variable = scenario.Keys.OrderBy(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).First();
         var wrongValue = factory.GetVariableInfo(variable).Type == factory.BooleanType
             ? factory.CreateIntegerValue(factory.IntegerType, 1)
             : factory.CreateBooleanValue(true);
@@ -127,12 +127,14 @@ public sealed class FuzzInputValidationTests
     private static TException Throws<TException>(Action action)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         return Assert.Throws<TException>(action)!;
     }
 
     private static TException ThrowsAsync<TException>(Func<Task> action)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         return Assert.ThrowsAsync<TException>(action)!;
     }
 }

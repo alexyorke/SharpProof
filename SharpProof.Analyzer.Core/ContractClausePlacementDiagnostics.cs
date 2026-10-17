@@ -6,7 +6,7 @@ internal sealed class ContractClausePlacementDiagnostics(
     Compilation compilation,
     CancellationToken cancellationToken)
 {
-    private readonly Compilation _compilation = compilation;
+    private readonly Compilation _compilation = (compilation ?? throw new System.ArgumentNullException(nameof(compilation)));
     private readonly CancellationToken _cancellationToken = cancellationToken;
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _reportedAnonymousRequires =
@@ -14,6 +14,14 @@ internal sealed class ContractClausePlacementDiagnostics(
 
     internal void Report(ContractClauseInventory inventory, Action<Diagnostic> reportDiagnostic)
     {
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
         if (inventory.Callable.MethodKind == MethodKind.AnonymousFunction)
         {
@@ -31,6 +39,14 @@ internal sealed class ContractClausePlacementDiagnostics(
         ContractClauseInventory inventory,
         Action<Diagnostic> reportDiagnostic)
     {
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
         var method = inventory.Callable;
         if (method.MethodKind != MethodKind.AnonymousFunction ||
             !_reportedAnonymousRequires.TryAdd(
@@ -59,11 +75,19 @@ internal sealed class ContractClausePlacementDiagnostics(
         ContractClauseInventory inventory,
         Compilation compilation)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (inventory is null)
+        {
+            throw new System.ArgumentNullException(nameof(inventory));
+        }
         return inventory.Clauses
-            .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
-            .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
+            .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement == ContractClausePlacement.NestedCallable))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, clause.Invocation.Syntax.SyntaxTree)
-                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart))
+                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart)))
             .OfType<IMethodSymbol>()
             .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default);
     }
@@ -72,6 +96,15 @@ internal sealed class ContractClausePlacementDiagnostics(
         ImmutableArray<ContractClauseOccurrence> clauses,
         Action<Diagnostic> reportDiagnostic)
     {
+
+        if (clauses.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(clauses));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
         foreach (var clause in clauses)
         {
             if (clause.IsValid ||

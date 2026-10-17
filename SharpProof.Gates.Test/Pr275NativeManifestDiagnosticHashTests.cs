@@ -19,7 +19,7 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
     {
         const string source = "using SharpProof.Attributes; public static class DiagnosticHashSubject { [EnforcePure] public static int Identity(int value) => value; }";
         var compilation = AnalyzerGateHost.CreateCompilation(source, "Pr275NativeManifestDiagnosticHash", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var emitted = new MemoryStream();
         Assert.That(compilation.Emit(emitted).Success, Is.True);
         using var temporary = new TempDirectory("SharpProof-pr275-native-manifest-hash-");
@@ -44,7 +44,7 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
         await cancellation.CancelAsync();
         var response = await worker.VerifyAsync(request, cancellation.Token);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
-        Assert.That(response.Errors.Select(static error => error.Code), Does.Contain("worker.canceled"));
+        Assert.That(response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("worker.canceled"));
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var failure = Assert.Throws<InvalidOperationException>((Action)(() =>
             NativeCorpusVerifier.EnsureComplete(response, request.Budgets, hash)));
@@ -61,6 +61,7 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
 
     private static string ComputeSha256(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return string.Concat(SHA256.HashData(bytes).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
     }
 }

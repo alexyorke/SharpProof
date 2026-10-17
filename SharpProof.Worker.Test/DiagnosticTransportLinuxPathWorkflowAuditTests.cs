@@ -61,10 +61,11 @@ public sealed class DiagnosticTransportLinuxPathWorkflowAuditTests
         using var assemblyImage = new MemoryStream();
         var emitted = compilation.Emit(assemblyImage);
         Assert.That(emitted.Success, Is.True,
-            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item.ToString())));
+            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ToString()))));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("DiagnosticTransportLinuxPathAudit", assemblyImage,
             assembly =>
             {
+                System.ArgumentNullException.ThrowIfNull(assembly);
                 var target = assembly.GetType("Subject")!.GetMethod("Target")!
                     .CreateDelegate<Func<int, int>>();
                 Assert.That(target(-1), Is.EqualTo(-1), "CLR contradicts the positive return contract.");

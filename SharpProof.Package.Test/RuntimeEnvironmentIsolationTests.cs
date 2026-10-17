@@ -37,6 +37,7 @@ namespace SharpProof.Package.Test
         public async Task ProductRuntimeExecutablesDoNotLoadStartupHooks(
             string project)
         {
+            System.ArgumentNullException.ThrowIfNull(project);
             TestRepository.RequireCanonicalContainer();
 
             using var temporary = new TempDirectory("sharp-hook-");
@@ -122,7 +123,7 @@ namespace SharpProof.Package.Test
             TrustedChildEnvironment.Apply(
                 startInfo,
                 validatedDotNetHostPath: null,
-                name => inheritedEnvironment.GetValueOrDefault(name));
+                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.GetValueOrDefault(name)));
             using var process = System.Diagnostics.Process.Start(startInfo)!;
             Assert.That(process.WaitForExit(TimeSpan.FromSeconds(5)), Is.True);
             Assert.That(process.ExitCode, Is.Zero);
@@ -141,9 +142,9 @@ namespace SharpProof.Package.Test
             TrustedChildEnvironment.Apply(
                 startInfo,
                 "/trusted/dotnet/dotnet",
-                name => inheritedEnvironment.TryGetValue(name, out var value)
+                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.TryGetValue(name, out var value)
                     ? value
-                    : null);
+                    : null));
 
             using (Assert.EnterMultipleScope())
             {
@@ -158,6 +159,7 @@ namespace SharpProof.Package.Test
         [TestCase("/untrusted/other")]
         public void InvalidDotNetMuxerPathIsRejectedWithoutChangingChildEnvironment(string path)
         {
+            System.ArgumentNullException.ThrowIfNull(path);
             var startInfo = new System.Diagnostics.ProcessStartInfo();
             startInfo.Environment["MARKER"] = "unchanged";
 
@@ -176,9 +178,9 @@ namespace SharpProof.Package.Test
 
             Assert.That(
                 TrustedChildEnvironment.FindUnsafeRuntimeVariable(
-                    name => inheritedEnvironment.TryGetValue(name, out var value)
+                    name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.TryGetValue(name, out var value)
                         ? value
-                        : null),
+                        : null)),
                 Is.EqualTo("DOTNET_ROOT"));
         }
     }

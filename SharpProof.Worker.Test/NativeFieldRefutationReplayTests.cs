@@ -20,9 +20,9 @@ public sealed class NativeFieldRefutationReplayTests
         var site = factory.CreateOperation("field-refutation-write");
 
         IrTerm Read(IrVarId owner)
-        { return factory.PureOpaque(field, factory.Variable(owner)); }
+        { if (owner.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(owner)); } return factory.PureOpaque(field, factory.Variable(owner)); }
         IrTerm Equal(IrTerm left, IrTerm right)
-        { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+        { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
 
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");

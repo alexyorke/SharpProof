@@ -22,6 +22,7 @@ public sealed class OracleWorkflowInputTests
     [TestCase("larger-than-universe", 0)]
     public void OracleRejectsInvalidSelectedMethodIdentities(string selection, int universeCount)
     {
+        System.ArgumentNullException.ThrowIfNull(selection);
         ImmutableArray<string> methods = selection switch
         {
             "empty" => [],

@@ -32,7 +32,7 @@ public sealed class OrdinarySummaryCapturedSuffixReportTests
         var suffix = CSharpSyntaxTree.ParseText(suffixSource,
             (CSharpParseOptions)targetTree.Options, suffixPath);
         compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(originals[0], prefix, targetTree, suffix);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
@@ -70,6 +70,7 @@ public sealed class OrdinarySummaryCapturedSuffixReportTests
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
@@ -79,7 +80,7 @@ public sealed class OrdinarySummaryCapturedSuffixReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

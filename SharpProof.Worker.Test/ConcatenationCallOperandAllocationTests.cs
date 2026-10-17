@@ -46,6 +46,9 @@ public sealed class ConcatenationCallOperandAllocationTests
     [TestCase(7)]
     public async Task SplicedConcatCallOperandCannotProveZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_spliced[index]);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
         {
@@ -62,6 +65,9 @@ public sealed class ConcatenationCallOperandAllocationTests
     [TestCase(3)]
     public async Task SeparateConcatenationsStillProveZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_separate[index]);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
         {
@@ -83,11 +89,13 @@ public sealed class ConcatenationCallOperandAllocationTests
 
     private static string Source(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         return "using SharpProof.Attributes; public static class C { [ZeroAllocations] public static int Target(int x) { " + body + " } }";
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
         return preparations.Single();
@@ -95,6 +103,7 @@ public sealed class ConcatenationCallOperandAllocationTests
 
     private static long AllocatedBytes(string source, OptimizationLevel optimization, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("ConcatCallOperandRuntime", source);
         using var image = new MemoryStream();
         var emission = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization)).Emit(image);

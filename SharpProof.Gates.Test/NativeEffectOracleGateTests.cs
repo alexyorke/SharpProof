@@ -37,6 +37,8 @@ public sealed class NativeEffectOracleGateTests
     [TestCase("int[] x", "return x.Length;")]
     public async Task SourceProbeRoundTripAndCompiledRuntimeConfirmConcreteWitnesses(string parameter, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(parameter);
         var document = Document("public static class C { public static int Target(" + parameter + ") { " + body + " } }");
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
@@ -69,10 +71,10 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
-        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
+        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
-        Assert.That(report.Rows.Single(row => row.MethodId == "OSS0199").NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == "OSS0199")).NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         await TestContext.Progress.WriteLineAsync($"Exception oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; " +
             $"{report.NativeRefuted} refuted; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
     }
@@ -114,6 +116,7 @@ public sealed class NativeEffectOracleGateTests
 
     private static NativeEffectOracleRow Row(string id, WorkerClaimOutcome native)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
         return new(id, id, native,
             native == WorkerClaimOutcome.Unknown ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None,
             native != WorkerClaimOutcome.Unknown, false, null, "NotRun");
@@ -121,9 +124,10 @@ public sealed class NativeEffectOracleGateTests
 
     private static OpenSourceCorpusDocument Document(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var span = method.GetLocation().GetLineSpan();
         return new(2, [], [new("test", "sample.cs", "test", source)],
             [new("sample", "test", "sample.cs", span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
@@ -148,6 +152,8 @@ public sealed class NativeEffectOracleGateTests
     public async Task AllocationOracleMeasuresDecodedArtifactsAndKeepsOracleGapsVisible(string body, WorkerClaimOutcome outcome,
         string allocationIlOracle = "NoReachableAllocationOpcode")
     {
+        System.ArgumentNullException.ThrowIfNull(allocationIlOracle);
+        System.ArgumentNullException.ThrowIfNull(body);
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
@@ -178,9 +184,9 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
-        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
+        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.Passed, Is.True);
-        var retained = report.Rows.Single(row => row.MethodId == "OSS0199");
+        var retained = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == "OSS0199"));
         Assert.That(retained.RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(retained.RuntimeChecks, Is.EqualTo(2));
         Assert.That(retained.AllocatedBytes, Is.Zero);
@@ -196,6 +202,10 @@ public sealed class NativeEffectOracleGateTests
     public async Task AllocationOracleDistinguishesEmptyModelsFromVacuousEntries(string owner, string generic, string requires,
         string expected, int checks)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(generic);
+        System.ArgumentNullException.ThrowIfNull(owner);
+        System.ArgumentNullException.ThrowIfNull(requires);
         var document = Document(owner + " { public static int Target" + generic + "() { " + requires + " return 1; } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
@@ -208,6 +218,7 @@ public sealed class NativeEffectOracleGateTests
     [TestCase(nameof(FilteredHandlerAllocation), true)]
     public void IlOracleIncludesExceptionFilterHandlers(string name, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var method = typeof(NativeEffectOracleGateTests).GetMethod(name,
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.EqualTo(expected));
@@ -228,6 +239,7 @@ public sealed class NativeEffectOracleGateTests
     [TestCase("bool")]
     public async Task AllocationOracleInvokesExactScalarArgumentTypesWithoutHarnessAllocations(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var document = Document("public static class C { public static " + type + " Target(" + type + " x) { return x; } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
@@ -278,6 +290,7 @@ public sealed class NativeEffectOracleGateTests
     [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Proven)]
     public async Task PurityOracleUsesProductionArtifactRoundTrip(string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
             CancellationToken.None, purity: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, purity: true);
@@ -293,7 +306,7 @@ public sealed class NativeEffectOracleGateTests
         var report = await NativeEffectOracleGate.RunAsync(root, purity: true);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
+        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.UniverseSha256, Is.EqualTo("4101D2D2E1A698008C9146B74AD1C83625519E78D0E3A4F3732FA586E0160042"));
         Assert.That(report.Passed, Is.True);
         await TestContext.Progress.WriteLineAsync($"Purity oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; {report.NativeRefuted} refuted.");

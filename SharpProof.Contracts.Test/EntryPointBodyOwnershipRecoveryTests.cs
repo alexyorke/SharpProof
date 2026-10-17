@@ -24,7 +24,7 @@ public sealed class EntryPointBodyOwnershipRecoveryTests
             compilation = compilation.WithOptions(compilation.Options.WithMainTypeName("Other"));
         }
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         if (selectNamedMain)
         {
             Assert.That(errors, Has.Length.EqualTo(1));

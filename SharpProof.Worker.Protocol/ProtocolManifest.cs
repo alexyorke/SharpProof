@@ -4,6 +4,10 @@ public static partial class WorkerProtocolJson
 {
     public static void Canonicalize(WorkerClaimManifest manifest)
     {
+        if (manifest is null)
+        {
+            throw new System.ArgumentNullException(nameof(manifest));
+        }
         _ = CanonicalizeManifest(manifest);
     }
 
@@ -14,18 +18,18 @@ public static partial class WorkerProtocolJson
         manifest.Claims = [
             .. (manifest.Claims ?? [])
                 .OrderBy(
-                    static value => value?.CallableId,
+                    static (WorkerClaimManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) => value?.CallableId,
                     StringComparer.Ordinal)
-                .ThenBy(static value =>
+                .ThenBy(static (WorkerClaimManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) =>
                     value?.Ordinal ?? int.MinValue)
                 .ThenBy(
-                    static value => value?.ClaimId,
+                    static (WorkerClaimManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) => value?.ClaimId,
                     StringComparer.Ordinal)
         ];
         var claimsById = CreateClaimIndex(manifest);
         manifest.Callables = SortOrdinal(
             manifest.Callables,
-            static value => value?.CallableId);
+            static (WorkerCallableManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) => value?.CallableId);
         foreach (var callable in manifest.Callables.Where(
                      static value => value != null))
         {
@@ -36,9 +40,9 @@ public static partial class WorkerProtocolJson
             callable.ClaimIds = [
                 .. (callable.ClaimIds ?? [])
                     .OrderBy(id =>
-                        FindClaimOrdinal(claimsById, id))
+                        id is null ? throw new System.ArgumentNullException(nameof(id)) : (FindClaimOrdinal(claimsById, id)))
                     .ThenBy(
-                        static id => id,
+                        static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
                         StringComparer.Ordinal)
             ];
             callable.Assumptions =

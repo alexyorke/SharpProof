@@ -17,6 +17,8 @@ public sealed class ExpressionBodiedGetterWorkflowTests
     [TestCase("return new Grid()[0, 1];", "return new Grid()[1];", 2, WorkerClaimOutcome.Refuted)]
     public async Task ExpressionBodiedGetterMatchesAccessorGetter(string arrow, string accessor, int result, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(accessor);
+        System.ArgumentNullException.ThrowIfNull(arrow);
         var actual = await Verify(arrow, result);
         var expected = await Verify(accessor, result);
         Assert.That(expected.Outcome, Is.EqualTo(outcome), expected.Reason);
@@ -25,6 +27,7 @@ public sealed class ExpressionBodiedGetterWorkflowTests
 
     private static async Task<(WorkerClaimOutcome Outcome, string Reason)> Verify(string body, int result)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "private static int Arrow => 0; " +
             "private static int Accessor { get => 0; } " +

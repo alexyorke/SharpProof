@@ -62,6 +62,8 @@ public sealed class NativeInstanceCallTests
     [TestCase("return counter.Twice(value);", typeof(RefutedOutcome))]
     public async Task ReceiversFaultOnlyWhenNull(string body, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var preparation = Prepare("public static class C { [DoesNotThrow] public static int Target(Counter counter, int value) { " +
             "Contract.Requires(value > -1000 && value < 1000); " + body + " } }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
@@ -78,7 +80,7 @@ public sealed class NativeInstanceCallTests
             "Contract.Ensures(Contract.Result<int>() == value + value); return counter.Twice(value); } }", effects: false);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, CancellationToken.None);
+            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, CancellationToken.None);
         Assert.That(results[^1].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), results[^1].Reason.ToString());
     }
 
@@ -86,6 +88,8 @@ public sealed class NativeInstanceCallTests
     [TestCase("return counter.Peek();", typeof(ProvenOutcome))]
     public async Task CalleeFieldWritesAreNonlocal(string body, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var preparation = Prepare("public static class C { [EnforcePure] public static int Target(Counter counter) { " +
             "Contract.Requires(counter != null); " + body + " } }");
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
@@ -99,12 +103,14 @@ public sealed class NativeInstanceCallTests
     [TestCase("counter[value] = 3; return counter[value];", "value * 2")]
     public async Task SettersAndIndexersInline(string body, string result)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(result);
         var preparation = Prepare("public static class C { public static int Target(Counter counter, int value) { " +
             "Contract.Requires(counter != null && value > -1000 && value < 1000); " +
             "Contract.Ensures(Contract.Result<int>() == " + result + "); " + body + " } }", effects: false);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, CancellationToken.None);
+            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, CancellationToken.None);
         Assert.That(results[^1].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), results[^1].Reason.ToString());
     }
 
@@ -130,9 +136,10 @@ public sealed class NativeInstanceCallTests
 
     private static CompilerCallablePreparation Prepare(string types, bool effects = true)
     {
+        System.ArgumentNullException.ThrowIfNull(types);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + Nodes + types);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => effects ? preparation.EffectClaims.Length != 0
-            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (effects ? preparation.EffectClaims.Length != 0
+            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 }

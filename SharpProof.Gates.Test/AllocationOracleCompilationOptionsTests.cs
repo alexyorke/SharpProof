@@ -104,8 +104,8 @@ public sealed class AllocationOracleCompilationOptionsTests
         Assert.That(measured.Bytes, Is.Zero);
         Assert.That(measured.Throws, Is.Zero);
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["a", "b"], RepositoryLayout.FindRoot(), "test", 2, allocations: true);
-        var positive = report.Rows.Single(row => row.MethodId == (positiveFirst ? "a" : "b"));
-        var negative = report.Rows.Single(row => row.MethodId == (positiveFirst ? "b" : "a"));
+        var positive = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == (positiveFirst ? "a" : "b")));
+        var negative = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == (positiveFirst ? "b" : "a")));
         await LogAsync($"nullReceiver={nullReceiver}; positiveFirst={positiveFirst}", measured.Bytes, measured.Il, positive);
         await TestContext.Progress.WriteLineAsync($"negative native={negative.NativeOutcome}; oracle={negative.RuntimeOracle}; bytes32={negative.AllocatedBytes}; ILOracle={negative.AllocationIlOracle}");
         Assert.That(positive.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -123,15 +123,17 @@ public sealed class AllocationOracleCompilationOptionsTests
 
     private static CSharpCompilation Prepare(string source, bool allocations, bool release)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None, allocations);
         return compilation.WithOptions(compilation.Options.WithOptimizationLevel(release ? OptimizationLevel.Release : OptimizationLevel.Debug));
     }
 
     private static OpenSourceCorpusDocument Document(string source, bool positiveFirst = true)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source);
         var methods = ImmutableArray.CreateBuilder<OpenSourceCorpusMethod>();
-        foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method => method.Identifier.ValueText == "Target"))
+        foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target")))
         {
             var owner = ((ClassDeclarationSyntax)method.Parent!).Identifier.ValueText;
             var id = owner == "C" ? "sample" : (owner == "Positive") == positiveFirst ? "a" : "b";
@@ -144,6 +146,8 @@ public sealed class AllocationOracleCompilationOptionsTests
 
     private static (long Bytes, TResult Result, int Throws, Type? FailureType, string Il) Measure<TResult>(CSharpCompilation compilation, string owner)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(owner);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         image.Position = 0;
@@ -185,6 +189,9 @@ public sealed class AllocationOracleCompilationOptionsTests
 
     private static Task LogAsync(string shape, long bytes, string il, NativeEffectOracleRow row)
     {
+        System.ArgumentNullException.ThrowIfNull(il);
+        System.ArgumentNullException.ThrowIfNull(row);
+        System.ArgumentNullException.ThrowIfNull(shape);
         return TestContext.Progress.WriteLineAsync($"{shape}; directBytes32={bytes}; directIL={il}; native={row.NativeOutcome}; oracle={row.RuntimeOracle}; oracleBytes32={row.AllocatedBytes}; ILOracle={row.AllocationIlOracle}");
     }
 }

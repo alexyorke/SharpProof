@@ -23,6 +23,8 @@ internal static class TestCompilation
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary,
         bool includeSharpProofReference = true)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyPrefix);
+        System.ArgumentNullException.ThrowIfNull(source);
         return CreateCore(
             assemblyPrefix,
             [(string.Empty, source)],
@@ -39,6 +41,8 @@ internal static class TestCompilation
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary,
         bool includeSharpProofReference = true)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyPrefix);
+        System.ArgumentNullException.ThrowIfNull(sources);
         return CreateCore(
             assemblyPrefix,
             sources,
@@ -52,6 +56,8 @@ internal static class TestCompilation
         string assemblyName,
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
         return CreateCore(
             assemblyName,
             sources,
@@ -63,6 +69,8 @@ internal static class TestCompilation
         OutputKind outputKind,
         IEnumerable<(string FileName, string Source)> sources)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(sources);
         return CreateCore(
             assemblyName,
             sources,
@@ -72,16 +80,17 @@ internal static class TestCompilation
 
     internal static void AssertNoErrors(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
+                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     private static CSharpCompilation CreateCore(
@@ -93,6 +102,8 @@ internal static class TestCompilation
         bool includeSharpProofReference = true,
         bool appendUniqueAssemblySuffix = true)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(sources);
         var parseOptions = new CSharpParseOptions(
             languageVersion,
             preprocessorSymbols: [Contract.ConditionalSymbol]);

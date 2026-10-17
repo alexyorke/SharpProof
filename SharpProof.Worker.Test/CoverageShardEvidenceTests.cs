@@ -27,6 +27,7 @@ public sealed class CoverageShardEvidenceTests
     [TestCase("skipped-only-project", false)]
     public async Task RequiresCompleteSuccessfulCohortsAndUnmodifiedEvidence(string scenario, bool accepted)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         const string script = """
             $ErrorActionPreference = 'Stop'
             . $env:SHARPPROOF_SHARD_EVIDENCE_SCRIPT

@@ -32,6 +32,7 @@ public sealed class AdvisoryInstructionDeltaTests
         string shape, int may, int unknown, int exceptions,
         bool unknownExceptions, bool mayDiverge, bool completionUnknown)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var (factory, instruction) = BuildInstruction(shape);
         var actual = EffectSummaryFixpoint.InstructionDelta(factory, instruction);
 
@@ -47,6 +48,7 @@ public sealed class AdvisoryInstructionDeltaTests
     public void CompilerProducedSpecialHavocRetainsOnlyItsDeclaredDelta(
         string method, int effect, int expectedUnknown)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { [ZeroAllocations] public static " + method + " }");
         var prepared = CompilerManifestArtifactJson.DeserializePrepared(
@@ -56,9 +58,9 @@ public sealed class AdvisoryInstructionDeltaTests
         var decoded = PortableIrGraphCodec.Decode(body.Graph!);
         Assert.That(decoded.Program, Is.Not.Null);
         var markers = decoded.Instructions.OfType<IrHavocInstruction>().Where(instruction =>
-            instruction.Origin == IrHavocOrigin.Approximation &&
+            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation &&
             instruction.HavocKind == IrHavocKind.Variables &&
-            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect).ToArray();
+            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect)).ToArray();
         Assert.That(markers, Is.Not.Empty, "The unchanged compiler producer must supply the declared marker.");
         foreach (var marker in markers)
         {
@@ -180,7 +182,7 @@ public sealed class AdvisoryInstructionDeltaTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(program.Factory, Is.SameAs(factory));
-            Assert.That(program.Blocks.SelectMany(block => block.Instructions), Does.Contain(instruction));
+            Assert.That(program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)), Does.Contain(instruction));
         }
         return (factory, instruction);
     }

@@ -82,8 +82,8 @@ public sealed class BulkFrontendIlNullOperandOrderTests
 
             var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
-            var captured = references.SelectMany(reference => reference.Modules).Single(reference =>
-                Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath));
+            var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
             Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
             Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
@@ -97,11 +97,12 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(body.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(body.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(body.Module, Is.EqualTo(captured.Name));
-            Assert.That(body.Instructions.Select(instruction => instruction.Code).ToArray(),
+            Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToArray(),
                 Is.EqualTo(nullOnLeft ? ExpectedLeft : ExpectedRight));
-            Assert.That(body.Instructions.Single(instruction => instruction.Code == "Ldarg").Operand, Is.Zero);
+            Assert.That(body.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Ldarg")).Operand, Is.Zero);
             bool PrepareSourceCallee(TotalLoweringContext frame)
             {
+                System.ArgumentNullException.ThrowIfNull(frame);
                 Assert.That(frame.Target.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
                 var sourceDeclaration = frame.Target.DeclaringSyntaxReferences.Single().GetSyntax();
                 Assert.That(sourceDeclaration, Is.InstanceOf<MethodDeclarationSyntax>());

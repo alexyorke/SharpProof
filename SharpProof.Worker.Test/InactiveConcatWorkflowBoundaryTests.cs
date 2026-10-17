@@ -11,6 +11,7 @@ public sealed class InactiveConcatWorkflowBoundaryTests
     [TestCase("Contract.Result<bool>() == false", WorkerClaimOutcome.Refuted)]
     public async Task UntakenConcatenationCannotProveAnEntryLengthSumBound(string postcondition, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(postcondition);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public static bool Target(bool flag, string a, string b, string c) { " +
             "Contract.Requires(a != null && b != null && c != null); Contract.Ensures(" + postcondition + "); " +

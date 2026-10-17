@@ -40,7 +40,7 @@ public sealed class BulkFrontendIlWorkBoundaryTests
         }, out var shapes), Is.True, "Stack validation must fit the unchanged default work limit.");
         Assert.That(session.ConstructionLimitExceeded, Is.False);
         TestContext.WriteLine($"terms={termCount}; emittedInstructions={body!.Instructions.Length}; " +
-            $"validationWork={validationWork}; shapeAllocationWork={shapes.Sum(shape => shape!.Value.Length + 1)}");
+            $"validationWork={validationWork}; shapeAllocationWork={shapes.Sum(shape => shape.HasValue ? shape.Value.Length + 1 : throw new ArgumentException("A validated stack shape is required.", nameof(shape)))}");
 
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);

@@ -12,7 +12,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
     public void EmittedValidDeclaredBoundsHaveIndependentPredicateTruth()
     {
         var (compilation, target) = Import("Valid");
-        Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => argument.Value),
+        Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
             Is.EqualTo(new object[] { -2L, 2L }));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
@@ -41,10 +41,11 @@ public sealed class MetadataRequiresDeclaredBoundsTests
     [TestCase("LateInvalid", 2)]
     public void EmittedInvalidDeclaredBoundsRejectWithoutPublishingPrefix(string methodName, int parameterCount)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var (compilation, target) = Import(methodName);
         Assert.That(target.Parameters.Length, Is.EqualTo(parameterCount));
         var invalid = target.Parameters.Last().GetAttributes().Single();
-        Assert.That(invalid.ConstructorArguments.Select(argument => argument.Value),
+        Assert.That(invalid.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
             Is.EqualTo(new object[] { 2L, 1L }));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
@@ -53,7 +54,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         Assert.That(result.Clauses, Is.Empty);
         if (parameterCount == 2)
         {
-            Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => argument.Value),
+            Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
                 Is.EqualTo(new object[] { -2L, 2L }));
         }
     }
@@ -82,8 +83,8 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var target = compilation.GetTypeByMetadataName("DeclaredBounds")!.GetMembers(methodName).OfType<IMethodSymbol>().Single();
         Assert.That(target.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(target.IsStatic, Is.True);
-        Assert.That(target.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
-            parameter.Type.SpecialType == SpecialType.System_Int32), Is.True);
+        Assert.That(target.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
+            parameter.Type.SpecialType == SpecialType.System_Int32)), Is.True);
         return (compilation, target);
     }
 }

@@ -14,14 +14,14 @@ public sealed class AnalyzerCoreSourceOwnershipCoverageTests
     {
         var owner = AnalyzerTestHost.CreateCompilation(
             "public static class Fixture { public static int Target() => 1; }", []);
-        Assert.That(owner.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(owner.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = owner.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)owner.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         var suppliedCompilation = foreign
             ? AnalyzerTestHost.CreateCompilation("public static class Other { public static int Value() => 2; }", [])
             : owner;
-        Assert.That(suppliedCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(suppliedCompilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(suppliedCompilation.ContainsSyntaxTree(tree), Is.EqualTo(!foreign));
         var (body, gap) = AdvisoryLowering.Lower(suppliedCompilation, method, declaration, CancellationToken.None);
         if (foreign)

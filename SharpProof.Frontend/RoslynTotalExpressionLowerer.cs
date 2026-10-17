@@ -1,10 +1,10 @@
 namespace SharpProof.Frontend;
 
 internal readonly struct TotalBodyValue(IrTerm value, IrBlockId continuation,
-    FrontendSubsetClassification classification, ImmutableArray<IrTerm> concatenationOperands = default)
+    FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */, ImmutableArray<IrTerm> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ concatenationOperands = default)
 {
-    internal IrTerm Value { get; } = value;
-    internal IrBlockId Continuation { get; } = continuation;
+    internal IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
+    internal IrBlockId Continuation { get; } = (continuation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(continuation)) : continuation);
     internal FrontendSubsetClassification Classification { get; } = classification;
     internal ImmutableArray<IrTerm> ConcatenationOperands { get; } = concatenationOperands;
 }
@@ -12,7 +12,7 @@ internal readonly struct TotalBodyValue(IrTerm value, IrBlockId continuation,
 // Pure clauses compose safety; body evaluation emits the same local faults as
 // ordered edges, materializing operands before later source effects.
 internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
-    IrProgramBuilder? builder = null, IrBlockId exceptionalExit = default)
+    IrProgramBuilder? builder = null, IrBlockId /* SPINT001: all values valid - default means no exceptional exit in pure lowering */ exceptionalExit = default)
 {
     private readonly TotalLoweringContext _context = ArgumentNullGuard.NotNull(context, nameof(context));
     private readonly IrFactory _factory = context.Factory;
@@ -51,6 +51,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // else through a receiver that must not be null.
     private GuardedExpression? FieldClause(IOperation operation, IrMemberId member, IOperation owner, TotalParameterState state, int depth)
     {
+        if (member.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(member));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         if (IsImplicitThis(owner))
         {
             return _context.ReceiverValue(state) is { } self
@@ -67,7 +75,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     // An instance call checks its receiver after evaluating the arguments.
     internal IrBlockId CheckReceiver(IOperation operation, IrTerm receiver, IrBlockId block)
-    { return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
+    { if (operation is null) { throw new System.ArgumentNullException(nameof(operation)); } if (receiver is null) { throw new System.ArgumentNullException(nameof(receiver)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Boolean(true), receiver), block).Continuation; }
 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
@@ -174,7 +182,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.IsSupportedConstantArrayCollection(collection))
         {
             var initial = collection.Elements.Select(element =>
-                CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
+                element is null ? throw new System.ArgumentNullException(nameof(element)) : (CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value))).ToImmutableArray();
             var allocatedType = _context.Type(collection.Type);
             var allocatedTarget = _context.Temporary(allocatedType);
             _builder!.Allocate(block, _context.Site(collection), allocatedType, allocatedTarget, _factory.Integer(initial.Length), initial);
@@ -194,7 +202,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             var target = _context.Temporary(type);
             var initialValues = arrayCreation.Initializer == null ? ImmutableArray<IrTerm>.Empty
                 : arrayCreation.Initializer.ElementValues.Select(element =>
-                    CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
+                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value))).ToImmutableArray();
             var length = arrayCreation.Initializer == null ? dimension.Value : _factory.Integer(initialValues.Length);
             _builder!.Allocate(block, _context.Site(operation), type, target, length, initialValues);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
@@ -253,7 +261,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
             CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
         {
-            foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
+            foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
             {
                 var lowered = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!lowered.Classification.IsExact)
@@ -582,6 +590,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // Evaluates value here: a later element store must not change it.
     private TotalBodyValue Pin(IOperation operation, TotalBodyValue value)
     {
+        if (value.Value is null || value.Continuation.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(value)); }
+
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var pinned = _context.Temporary(value.Value.Type);
         _builder!.Assign(value.Continuation, _context.Site(operation), pinned, value.Value);
         return new(_factory.Variable(pinned), value.Continuation, value.Classification);
@@ -589,6 +604,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     internal TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var type = _context.Type(operation.Type);
         var target = _context.Temporary(type);
         _builder!.Allocate(block, _context.Site(operation), type, target);
@@ -597,6 +620,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue LowerStringConcatenation(IOperation operation, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         { return Approximate(operation, block, rejected); }
@@ -675,6 +702,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
         void Collect(IOperation current, int nesting)
         {
+            if (current is null)
+            {
+                throw new System.ArgumentNullException(nameof(current));
+            }
             Spend?.Invoke();
             if (nesting < 256 && CSharpOperationSemantics.IsStringConcatenation(current) && !current.ConstantValue.HasValue)
             {
@@ -692,6 +723,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private TotalBodyValue CaptureStringConcatenation(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block,
         bool deferred = false)
     {
+
+        if (operands.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(operands));
+        }
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var site = _context.Site(operation);
         var allocation = _builder!.CreateBlock("concat:allocate");
         var join = _builder.CreateBlock("concat:join");
@@ -721,6 +765,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         // Each prefix total stays within the limit until one operand exceeds
         // the remainder, so the subtraction cannot wrap before that disjunct.
+
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (operands.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(operands));
+        }
         IrTerm remaining = _factory.Integer(MaximumStringLength);
         IrTerm exceeds = _factory.Boolean(false);
         foreach (var operand in operands)
@@ -735,6 +792,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     internal TotalBodyValue LowerDiscardedInstanceFieldMutation(IIncrementOrDecrementOperation operation, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var field = (IFieldReferenceOperation)operation.Target;
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(field.Instance);
@@ -774,9 +839,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
             instance != null && !CSharpOperationSemantics.IsValueDomain(instance.Type) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
-            arguments.Any(argument => argument.Parameter == null ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
+            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
+            arguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))) ||
             assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
         { return null; }
         IrTerm? receiver = null;
@@ -789,7 +854,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             block = lowered.Continuation;
         }
         var values = new IrTerm[arguments.Length + (assigned != null ? 1 : 0)];
-        foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
+        foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -818,11 +883,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private IrMemberId OpaqueCallMember(IMethodSymbol method, IEnumerable<IrTerm> arguments,
         IrTypeId? resultType, out string display)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         display = CompilerIdentityBridge.CreateSymbolDisplay(method);
         return _factory.GetOrCreateMember(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + display, resultType ?? _context.Type(method.ReturnType), true,
-            [.. arguments.Select(value => value.Type)]);
+            [.. arguments.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type))]);
     }
 
     // The call itself is only an effect site; its result and whether it
@@ -831,6 +904,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal TotalBodyValue EmitOpaqueCall(IOperation operation, IMethodSymbol method, IrTerm[] values, IrBlockId block,
         IrTerm? assigned, IrOpaqueCallEffects effects)
     {
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
         var member = OpaqueCallMember(method, values, resultType, out var display);
@@ -857,16 +946,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // may throw. Its value is the fresh object.
     private TotalBodyValue? OpaqueConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
         if (!AllowOpaqueCalls || creation.Constructor is not { } constructor || !constructor.DeclaringSyntaxReferences.IsEmpty ||
             creation.Initializer != null || creation.Type is not { IsReferenceType: true } type ||
             !CSharpOperationSemantics.IsValueDomain(type) || _factory.GetTypeInfo(_context.Type(type)).Kind != IrTypeKind.Reference ||
             IsSharpProofApi(constructor.ContainingNamespace) ||
-            constructor.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
-            creation.Arguments.Any(argument => argument.Parameter == null ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
+            constructor.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
+            creation.Arguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))))
         { return null; }
         var values = new IrTerm[creation.Arguments.Length];
-        foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
+        foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -896,6 +989,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (access is null)
+        {
+            throw new System.ArgumentNullException(nameof(access));
+        }
         var receiver = LowerBodyValue(access.Instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
         { return Approximate(access, receiver.Continuation, receiver.Classification.Abstention); }
@@ -914,6 +1015,14 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // element read is an approximation, and every store is an Element write.
     private TotalBodyValue ElementAccess(IArrayElementReferenceOperation access, IOperation? mutation, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (access is null)
+        {
+            throw new System.ArgumentNullException(nameof(access));
+        }
         var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
         if (!array.Classification.IsExact)
         { return Approximate(mutation ?? access, array.Continuation, array.Classification.Abstention); }
@@ -1023,11 +1132,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured = false)
-    { return FieldRead(operation, field, instance, block, depth, captured, out _); }
+    { if (field is null) { throw new System.ArgumentNullException(nameof(field)); } if (operation is null) { throw new System.ArgumentNullException(nameof(operation)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } return FieldRead(operation, field, instance, block, depth, captured, out _); }
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured, out IrTerm? receiver)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         receiver = null;
         var implicitThis = IsImplicitThis(instance);
         if (!implicitThis && !field.IsStatic)
@@ -1070,16 +1187,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     }
 
     private IrTerm AsObject(IrTerm receiver)
-    { return receiver.Type == _factory.ObjectType ? receiver : _factory.Cast(_factory.ObjectType, receiver); }
+    { if (receiver is null) { throw new System.ArgumentNullException(nameof(receiver)); } return receiver.Type == _factory.ObjectType ? receiver : _factory.Cast(_factory.ObjectType, receiver); }
 
     // A field increment or compound assignment on `this`, a parameter or a
     // local reads the field (faulting on a null receiver), computes from that
     // approximated value, and writes it back.
     private bool IsMutableField(IFieldReferenceOperation field)
-    { return IsMutableField(field.Field, field.Instance); }
+    { if (field is null) { throw new System.ArgumentNullException(nameof(field)); } return IsMutableField(field.Field, field.Instance); }
 
     private bool IsMutableField(IFieldSymbol field, IOperation? instance)
     {
+        if (field is null)
+        {
+            throw new System.ArgumentNullException(nameof(field));
+        }
         return CSharpOperationSemantics.IsSupportedFieldRead(field) &&
             CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) &&
             (IsImplicitThis(instance) || instance is IParameterReferenceOperation or ILocalReferenceOperation);
@@ -1087,12 +1208,28 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth,
         bool captured = false)
-    { return FieldMutation(operation, field, field.Field, field.Instance, block, depth, captured); }
+    { if (field is null) { throw new System.ArgumentNullException(nameof(field)); } if (operation is null) { throw new System.ArgumentNullException(nameof(operation)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } return FieldMutation(operation, field, field.Field, field.Instance, block, depth, captured); }
 
     // `access` is the field or auto-property reference being mutated.
     private TotalBodyValue FieldMutation(IOperation operation, IOperation access, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured = false)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (access is null)
+        {
+            throw new System.ArgumentNullException(nameof(access));
+        }
+        if (field is null)
+        {
+            throw new System.ArgumentNullException(nameof(field));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var old = FieldRead(access, field, instance, block, depth, captured, out var receiver);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
@@ -1126,11 +1263,23 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldReferenceOperation field, IrBlockId block, int depth, bool captured = false)
-    { return FieldWrite(assignment, field.Field, field.Instance, block, depth, captured); }
+    { if (assignment is null) { throw new System.ArgumentNullException(nameof(assignment)); } if (field is null) { throw new System.ArgumentNullException(nameof(field)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } return FieldWrite(assignment, field.Field, field.Instance, block, depth, captured); }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldSymbol field, IOperation? instance, IrBlockId block, int depth, bool captured = false)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (assignment is null)
+        {
+            throw new System.ArgumentNullException(nameof(assignment));
+        }
+        if (field is null)
+        {
+            throw new System.ArgumentNullException(nameof(field));
+        }
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(instance);
         if (!field.IsStatic && !implicitThis)
@@ -1166,6 +1315,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // write is an effect site only.
     private void Store(IrBlockId block, OperationId site, IrWriteRegion region, IFieldSymbol field, IrTerm? receiver, IrTerm value)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
+        if (field is null)
+        {
+            throw new System.ArgumentNullException(nameof(field));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         if (receiver != null && region is IrWriteRegion.Field or IrWriteRegion.Parameter && FieldMember(field) is { } member &&
             _factory.GetMemberInfo(member).ReturnType == value.Type)
         { _builder!.FieldStore(block, site, region, AsObject(receiver), member, value); }
@@ -1175,6 +1340,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         return _context.FreshReceiver && IsImplicitThis(instance) ||
             instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
             ? _context.FreshWriteSite(operation) : _context.Site(operation);
@@ -1207,6 +1376,21 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private GuardedExpression Compose(IOperation operation, GuardedExpression receiver, GuardedExpression argument, TotalScalarRule rule)
     {
+        if (rule.Value is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+
+        if (argument is null)
+        {
+            throw new System.ArgumentNullException(nameof(argument));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (receiver is null)
+        {
+            throw new System.ArgumentNullException(nameof(receiver));
+        }
         var classification = First(receiver.Classification, argument.Classification);
         if (!classification.IsExact)
         { return Failed(operation, classification.Abstention); }
@@ -1218,12 +1402,17 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)
     {
-        var classification = First([.. children.Select(value => value.Classification)]);
+
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        var classification = First([.. children.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Classification))]);
         if (!classification.IsExact)
         {
             return Failed(operation, classification.Abstention);
         }
-        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
+        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Value))]);
         if (!rule.Classification.IsExact)
         {
             return Failed(operation, rule.Classification.Abstention);
@@ -1242,6 +1431,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue ApplyBody(IOperation operation, ImmutableArray<TotalBodyValue> children)
     {
+
         var block = children[children.Length - 1].Continuation;
         var classification = First([.. children.Select(value => value.Classification)]);
         if (!classification.IsExact)
@@ -1265,6 +1455,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         // The compiler splices this call's arguments into an enclosing `+`
         // chain, whose operand count then decides its overload and allocation.
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
         if (model.StringConcatenation && CSharpOperationSemantics.IsConcatenationOperand(invocation.Syntax))
         { return Approximate(invocation, block, FrontendAbstention.UnsupportedOperationKind); }
         var arguments = new IrTerm[model.ParameterCount];
@@ -1289,6 +1483,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     internal void RecordScalarEffects(IOperation operation, IMethodSymbol method, TotalScalarCallModel model,
         ImmutableArray<IrTerm> arguments, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         if (model.Effects == IrOpaqueCallEffects.None)
         { return; }
         if (ShadowCallSkeleton)
@@ -1299,6 +1505,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder!.Havoc(block, _context.OpaqueCallSite(operation, model.Effects, CompilerIdentityBridge.CreateSymbolDisplay(method)), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
             return;
         }
+        if (arguments.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(arguments));
+        }
+
         var member = OpaqueCallMember(method, arguments, null, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
     }
@@ -1313,6 +1524,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private IrBlockId ExceedsMaximumArrayLength(IOperation operation, IOperation size, IrTerm length, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (length is null)
+        {
+            throw new System.ArgumentNullException(nameof(length));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         if (size.ConstantValue is { HasValue: true, Value: <= SmallestMaximumArrayLength })
         { return block; }
         return MayFault(operation, _factory.Binary(IrBinaryOperator.GreaterThan, length,
@@ -1325,6 +1548,22 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // the source effect summary's other facets known.
     private IrBlockId MayFault(IOperation operation, IrTerm beyond, string label, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (beyond is null)
+        {
+            throw new System.ArgumentNullException(nameof(beyond));
+        }
+        if (label is null)
+        {
+            throw new System.ArgumentNullException(nameof(label));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var site = _context.Site(operation);
         var uncertain = _builder!.CreateBlock(label);
         var thrown = _builder.CreateBlock("throw");
@@ -1342,12 +1581,34 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private TotalBodyValue ApplyClassifiedRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
         IOperation? abstentionOperation = null)
     {
+        if (rule.Value is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         return rule.Classification.IsExact ? ApplyRule(operation, rule, block)
             : Approximate(abstentionOperation ?? operation, block, rule.Classification.Abstention);
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
     {
+        if (rule.Value is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         foreach (var fault in rule.Throws)
         {
             var thrown = _builder!.CreateBlock("throw");
@@ -1362,6 +1623,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Lazy(IBinaryOperation operation, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
         if (operation.OperatorMethod != null || operation.IsLifted)
         {
             return Approximate(operation, block, FrontendAbstention.UserDefinedOperator);
@@ -1389,6 +1654,26 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private TotalBodyValue Conditional(IOperation operation, IOperation conditionOperation, IOperation whenTrue,
         IOperation whenFalse, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (conditionOperation is null)
+        {
+            throw new System.ArgumentNullException(nameof(conditionOperation));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (whenFalse is null)
+        {
+            throw new System.ArgumentNullException(nameof(whenFalse));
+        }
+        if (whenTrue is null)
+        {
+            throw new System.ArgumentNullException(nameof(whenTrue));
+        }
         var condition = LowerBodyValue(conditionOperation, block, depth + 1);
         if (!condition.Classification.IsExact)
         {
@@ -1411,6 +1696,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Increment(IIncrementOrDecrementOperation operation, IrVarId target, IrBlockId block)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
         var rule = CSharpOperationSemantics.Increment(_factory, operation, old.Value);
         if (!rule.Classification.IsExact)
@@ -1423,6 +1720,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Compound(ICompoundAssignmentOperation operation, IrVarId target, IrBlockId block, int depth)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
         var right = LowerBodyValue(operation.Value, old.Continuation, depth + 1);
         if (!right.Classification.IsExact)
@@ -1440,6 +1749,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue Capture(IOperation operation, TotalBodyValue value, OperationId? site = null)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         if (value.Value is IrNullTerm)
         { return value; }
         var target = _context.Temporary(value.Value.Type);
@@ -1477,6 +1790,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private bool TryStorage(IOperation operation, out IrVarId target)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         target = operation switch
         {
             IParameterReferenceOperation parameter when _context.OwnsParameter(parameter.Parameter) => _context.Variable(parameter.Parameter),
@@ -1520,14 +1837,30 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private GuardedExpression Failed(IOperation operation, FrontendAbstention reason)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         return new(Default(operation.Type), _factory.Boolean(false), FrontendSubsetClassification.Abstain(reason));
     }
     private GuardedExpression Exact(IrTerm value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return new(value, _factory.Boolean(true), FrontendSubsetClassification.Exact);
     }
     private TotalBodyValue Approximate(IOperation operation, IrBlockId block, FrontendAbstention reason)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var target = _context.Temporary(_context.Type(operation.Type));
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Abstain(reason));
@@ -1590,18 +1923,42 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     }
     private IrTerm And(IrTerm first, IrTerm second)
     {
+        if (first is null)
+        {
+            throw new System.ArgumentNullException(nameof(first));
+        }
+        if (second is null)
+        {
+            throw new System.ArgumentNullException(nameof(second));
+        }
         return _factory.Binary(IrBinaryOperator.AndAlso, first, second);
     }
     private IrTerm Or(IrTerm first, IrTerm second)
     {
+        if (first is null)
+        {
+            throw new System.ArgumentNullException(nameof(first));
+        }
+        if (second is null)
+        {
+            throw new System.ArgumentNullException(nameof(second));
+        }
         return _factory.Binary(IrBinaryOperator.OrElse, first, second);
     }
     private IrTerm Not(IrTerm value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return _factory.Unary(IrUnaryOperator.Not, value);
     }
     private static FrontendSubsetClassification First(params FrontendSubsetClassification[] classifications)
     {
+        if (classifications is null)
+        {
+            throw new System.ArgumentNullException(nameof(classifications));
+        }
         return classifications.FirstOrDefault(value => !value.IsExact).Decision == FrontendSubsetDecision.ClosedAbstention
             ? classifications.First(value => !value.IsExact) : FrontendSubsetClassification.Exact;
     }

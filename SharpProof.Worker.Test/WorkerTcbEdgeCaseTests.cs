@@ -53,22 +53,22 @@ public sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:
-                instructions.First(instruction => instruction.Kind == IrInstructionKind.Assign).B = -1;
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)).B = -1;
                 break;
             case MalformedBodyKind.UnboundCall:
-                var call = instructions.First(instruction => instruction.Kind == IrInstructionKind.Return);
+                var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
                 call.Kind = IrInstructionKind.Call;
                 call.B = int.MaxValue;
                 break;
             case MalformedBodyKind.MissingBranchCondition:
-                instructions.First(instruction => instruction.Kind == IrInstructionKind.Branch).A = -1;
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)).A = -1;
                 break;
             case MalformedBodyKind.MissingReturnValue:
-                instructions.First(instruction => instruction.Kind == IrInstructionKind.Return).A = -1;
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)).A = -1;
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
                 instructions[0].Kind = (IrInstructionKind)int.MaxValue;
@@ -204,7 +204,7 @@ public sealed class WorkerTcbEdgeCaseTests
         var result = await VerifyNativeSourceAsync(project);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
-        Assert.That(result.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).Used, Is.True);
     }
 
     [TestCase(true, WorkerClaimOutcome.Proven)]
@@ -287,6 +287,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
     private static async Task<WorkerClaimResult> VerifyNativeSourceAsync(ShadowTestProject project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
@@ -303,6 +304,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
     private static void RejectMalformedArtifact(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         Assert.Throws<JsonException>(new Action(() =>
         {
             var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
@@ -447,6 +449,10 @@ public sealed class WorkerTcbEdgeCaseTests
         WorkerCallableResult[]? callableResults,
         WorkerClaimResult[] claimResults)
     {
+        System.ArgumentNullException.ThrowIfNull(claimResults, nameof(claimResults));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(inputHash);
+        System.ArgumentNullException.ThrowIfNull(manifestHash);
         var entry = JsonSerializer.Serialize(
             new
             {
@@ -475,6 +481,9 @@ public sealed class WorkerTcbEdgeCaseTests
         CompilerCallablePreparation target, ISmtBackend backend, WorkerBudgets budgets,
         Func<long>? readConsumedResources = null)
     {
+        System.ArgumentNullException.ThrowIfNull(backend);
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(target);
         using var projectBoundary = new CancellationTokenSource();
         var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, budgets,
             readConsumedResources, WorkerBudgets.DefaultMethodWallTimeMilliseconds,
@@ -503,12 +512,13 @@ public sealed class WorkerTcbEdgeCaseTests
     private sealed class FixedBackend(BackendCheckResult result)
         : ISmtBackend
     {
-        private readonly BackendCheckResult _result = result;
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
         }
@@ -518,8 +528,8 @@ public sealed class WorkerTcbEdgeCaseTests
         Action consume,
         BackendCheckResult result) : ISmtBackend
     {
-        private readonly Action _consume = consume;
-        private readonly BackendCheckResult _result = result;
+        private readonly Action _consume = (consume ?? throw new System.ArgumentNullException(nameof(consume)));
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
@@ -528,6 +538,7 @@ public sealed class WorkerTcbEdgeCaseTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             _consume();
@@ -538,7 +549,7 @@ public sealed class WorkerTcbEdgeCaseTests
     private sealed class ScriptedBackend(
         params BackendCheckResult[] results) : ISmtBackend
     {
-        private readonly Queue<BackendCheckResult> _results = new(results);
+        private readonly Queue<BackendCheckResult> _results = new((results ?? throw new System.ArgumentNullException(nameof(results))));
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
@@ -547,6 +558,7 @@ public sealed class WorkerTcbEdgeCaseTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(_results.Dequeue());

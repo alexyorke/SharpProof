@@ -17,7 +17,7 @@ public sealed class VisualBasicDefaultLocalRegressionTests
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "uninitialized-local.vb");
         var compilation = VisualBasicCompilation.Create("DefaultLocalSubject", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("DefaultLocalSubject", isCollectible: true);
@@ -53,9 +53,9 @@ public sealed class VisualBasicDefaultLocalRegressionTests
                 clrResult = actual,
                 actualIl = Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!),
                 initLocals = method.GetMethodBody()!.InitLocals,
-                compilerOperations = graph.Blocks.SelectMany(block => block.Operations).Select(operation => operation.Kind.ToString()).ToArray(),
-                branchValues = graph.Blocks.Where(block => block.BranchValue != null).Select(block => block.BranchValue!.Kind.ToString()).ToArray(),
-                locals = regions.SelectMany(region => region.Locals).Select(local => new { local.Name, type = local.Type.ToDisplayString(), local.IsStatic, local.IsConst }).ToArray(),
+                compilerOperations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Kind.ToString())).ToArray(),
+                branchValues = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue != null)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue!.Kind.ToString())).ToArray(),
+                locals = regions.SelectMany(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals)).Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (new { local.Name, type = local.Type.ToDisplayString(), local.IsStatic, local.IsConst })).ToArray(),
                 lowered.IsExact,
                 abstention = lowered.Classification.Abstention.ToString(),
                 lowered.ConstructionLimitExceeded,

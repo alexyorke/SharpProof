@@ -53,7 +53,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = await tree.GetRootAsync();
         var declarations = syntax.DescendantNodes().OfType<EventFieldDeclarationSyntax>()
-            .SelectMany(static declaration => declaration.Declaration.Variables).ToArray();
+            .SelectMany(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Declaration.Variables)).ToArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
         var model = compilation.GetSemanticModel(tree);
         foreach (var declaration in declarations)
@@ -123,7 +123,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         await AssertEventInitializerOwnerAsync(compilation, declaration);
         var model = compilation.GetSemanticModel(tree);
         var intrinsics = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(invocation => model.GetSymbolInfo(invocation).Symbol is IMethodSymbol { Name: "Result" or "Old" })
+            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol { Name: "Result" or "Old" }))
             .ToArray();
         Assert.That(intrinsics, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsics)
@@ -163,6 +163,8 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
     private static async Task AssertEventInitializerOwnerAsync(
         CSharpCompilation compilation, VariableDeclaratorSyntax declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(declaration);
         var tree = declaration.SyntaxTree;
         var model = compilation.GetSemanticModel(tree);
         var declaredEvent = model.GetDeclaredSymbol(declaration) as IEventSymbol;
@@ -200,14 +202,16 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
 
     private static void AssertNoCompilationErrors(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
     }
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(static diagnostic =>
-            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
-            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
+            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
     }
 }

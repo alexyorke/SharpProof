@@ -13,6 +13,7 @@ public sealed class AggregateExceptionConstructorTests
     [TestCase("innerException: (System.Exception)null, message: \"outer\"")]
     public async Task NullInnerExceptionCannotProveOnlyAggregateExceptionEscapes(string arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments);
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { " +
             "throw new System.AggregateException(" + arguments + "); } }";
@@ -40,6 +41,7 @@ public sealed class AggregateExceptionConstructorTests
     [TestCase("new System.AggregateException(innerException: new System.Exception(), message: \"outer\")")]
     public async Task KnownSafeAggregateConstructionRetainsExactExceptionProof(string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw " + expression + "; } }";
         AssertRuntimeException<AggregateException>(source);
@@ -69,6 +71,7 @@ public sealed class AggregateExceptionConstructorTests
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         return preparations.Single();
@@ -76,8 +79,10 @@ public sealed class AggregateExceptionConstructorTests
 
     private static void AssertRuntimeException<TException>(string source, object?[]? arguments = null) where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         WithRuntimeTarget(source, target =>
         {
+            System.ArgumentNullException.ThrowIfNull(target);
             var error = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => target.Invoke(null, arguments)));
             Assert.That(error!.InnerException, Is.TypeOf<TException>());
         });
@@ -85,11 +90,14 @@ public sealed class AggregateExceptionConstructorTests
 
     private static void AssertRuntimeReturnsException(string source)
     {
-        WithRuntimeTarget(source, target => Assert.That(target.Invoke(null, null), Is.TypeOf<Exception>()));
+        System.ArgumentNullException.ThrowIfNull(source);
+        WithRuntimeTarget(source, target => { System.ArgumentNullException.ThrowIfNull(target); Assert.That(target.Invoke(null, null), Is.TypeOf<Exception>()); });
     }
 
     private static void WithRuntimeTarget(string source, Action<System.Reflection.MethodInfo> check)
     {
+        System.ArgumentNullException.ThrowIfNull(check);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         var emission = TestCompilation.Create("AggregateExceptionConstructorOracle", source).Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));

@@ -12,6 +12,9 @@ public sealed class FuzzStructuralInputsTests
     [TestCase(3)]
     public void IrCandidatesRebuildNestedCastLengthSequenceAndConditionalInputs(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var condition = factory.Variable(factory.CreateVariable("condition", factory.BooleanType));
         var otherCondition = factory.Variable(factory.CreateVariable("other", factory.BooleanType));
@@ -38,7 +41,7 @@ public sealed class FuzzStructuralInputsTests
 
         Assert.That(candidates, Is.Not.Empty);
         Assert.That(IrStructuralShrinker.GetCandidates(factory, parent), Is.EqualTo(candidates));
-        Assert.That(candidates.Select(candidate => candidate.Id), Is.Unique);
+        Assert.That(candidates.Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id)), Is.Unique);
         foreach (var candidate in candidates)
         {
             Assert.That(candidate.Type, Is.EqualTo(parent.Type));

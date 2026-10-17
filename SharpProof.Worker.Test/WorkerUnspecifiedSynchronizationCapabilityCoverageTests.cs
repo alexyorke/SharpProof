@@ -34,11 +34,11 @@ public sealed partial class WorkerTests
             Assert.That(total.IsBodyAbstraction, Is.False);
             Assert.That(total.EffectsCompleteAtEntry, Is.True);
         }
-        var instructions = total.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         var call = instructions.OfType<IrCallInstruction>().Single();
         Assert.That(IrOpaqueCallSite.Effects(total.Program.Factory, call.Operation), Is.EqualTo(IrOpaqueCallEffects.All));
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
-            instruction.Origin == IrHavocOrigin.Approximation), Is.True);
+            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.True);
         var native = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets());
         using (Assert.EnterMultipleScope())
         {

@@ -15,6 +15,9 @@ public sealed class NativeModuleExceptionEvidenceTests
     [TestCase("overflow", "argument", "Refuted")]
     public async Task GenericExplicitEvidenceCannotAssertANarrowRuntimeType(string thrown, string allowed, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(thrown);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

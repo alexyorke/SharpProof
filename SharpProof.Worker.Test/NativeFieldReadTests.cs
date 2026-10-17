@@ -23,6 +23,7 @@ public sealed class NativeFieldReadTests
     [TestCase("return cell.Count;", false)]
     public async Task NullReceiverIsTheOnlyFault(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " + body + " }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
@@ -64,6 +65,7 @@ public sealed class NativeFieldReadTests
     [TestCase("return cell.Virtual;", WorkerClaimReason.CounterexampleNotReplayable)]
     public async Task VolatileAndDispatchedReadsStayUnknown(string body, WorkerClaimReason reason)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); " + body + " }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
@@ -77,6 +79,8 @@ public sealed class NativeFieldReadTests
     [TestCase("cell.Value *= 3; return 0;", typeof(RefutedOutcome))]
     public async Task FieldMutationsFaultOnlyOnNull(string body, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             body + " }"), new WorkerBudgets());
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
@@ -93,13 +97,15 @@ public sealed class NativeFieldReadTests
 
     private static CompilerCallablePreparation Prepare(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         return Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; " + Cell + " public static class C { " + method + " }"));
     }
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

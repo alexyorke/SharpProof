@@ -13,7 +13,7 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
     public override IntervalValue Bottom => IntervalValue.Bottom;
     public override IntervalValue Top { get; } = new(null, null, 1, 0);
 
-    protected override bool IsCanonical(IntervalValue value)
+    protected override bool IsCanonical(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         // The value constructor is internal and every public factory creates
         // the canonical representation, so every externally supplied value is
@@ -191,7 +191,7 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
     }
 
     private static (BigInteger Modulus, BigInteger Remainder) GetCongruenceHull(
-        IntervalValue left, IntervalValue right)
+        IntervalValue left /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, IntervalValue right /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         var difference = BigInteger.Abs(left.Remainder - right.Remainder);
         var modulus = BigInteger.GreatestCommonDivisor(
@@ -200,17 +200,17 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
         return (modulus, remainder);
     }
 
-    public override IntervalValue Havoc(IntervalValue value)
+    public override IntervalValue Havoc(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         return value.IsBottom ? Bottom : Top;
     }
 
-    public IntervalValue AssumeAtLeast(IntervalValue value, long lowerBound)
+    public IntervalValue AssumeAtLeast(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, long lowerBound)
     {
         return RestrictBound(value, lowerBound, atLeast: true);
     }
 
-    public IntervalValue AssumeAtMost(IntervalValue value, long upperBound)
+    public IntervalValue AssumeAtMost(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, long upperBound)
     {
         return RestrictBound(value, upperBound, atLeast: false);
     }
@@ -238,6 +238,11 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
 
     internal static BigInteger Normalize(BigInteger value, BigInteger modulus)
     {
+        if (modulus <= BigInteger.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(modulus));
+        }
+
         var normalized = value % modulus;
         return normalized.Sign < 0 ? normalized + modulus : normalized;
     }

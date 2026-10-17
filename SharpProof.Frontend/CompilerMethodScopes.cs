@@ -4,6 +4,10 @@ internal static class CompilerMethodScopes
 {
     internal static IEnumerable<ISymbol> Enumerate(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         yield return method;
         if (method.AssociatedSymbol is IPropertySymbol property)
         {

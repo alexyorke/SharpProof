@@ -137,6 +137,8 @@ public sealed class FuzzRunnerTests
             GeneratedCSharpExpression expression,
             ISet<GeneratedExpressionKind> observed)
         {
+            System.ArgumentNullException.ThrowIfNull(expression);
+            System.ArgumentNullException.ThrowIfNull(observed);
             observed.Add(expression.Kind);
             foreach (var child in expression.Children)
             {
@@ -157,7 +159,7 @@ public sealed class FuzzRunnerTests
             serial.Passed,
             Is.True,
             string.Join(Environment.NewLine, serial.Failures.Select(
-                static failure => failure.ToString())));
+                static failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.ToString()))));
         Assert.That(parallel.Passed, Is.True);
         Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
         Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
@@ -368,10 +370,10 @@ public sealed class FuzzRunnerTests
         var results = FrontendDifferentialOracle.CompareBatch(cases);
 
         Assert.That(
-            results.Select(static result => result.Status),
+            results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)),
             Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(
-                static result => result.Detail)));
+                static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
         Assert.That(
             results[0].ExceptionKind,
             Is.EqualTo(IrExceptionKind.NullReference));
@@ -477,6 +479,7 @@ public sealed class FuzzRunnerTests
             FiniteDomainSatisfiability expected,
             int assumptions)
         {
+            System.ArgumentNullException.ThrowIfNull(result);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
@@ -567,6 +570,11 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task GuardedPartialTermCampaignMatchesCSharpAcrossEveryControlBit([Range(0, 31)] int seed)
     {
+        if (seed is < 0 or > 31)
+        {
+            throw new ArgumentOutOfRangeException(nameof(seed));
+        }
+
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
@@ -615,11 +623,13 @@ public sealed class FuzzRunnerTests
 
     private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
     {
+        private BackendCheckResult _guarded_result = result ?? throw new System.ArgumentNullException(nameof(result));
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(result);
+            System.ArgumentNullException.ThrowIfNull(query);
+            return Task.FromResult(_guarded_result);
         }
     }
 
@@ -640,6 +650,7 @@ public sealed class FuzzRunnerTests
             Condition: true);
         static bool Preserves(GeneratedCSharpCase candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             return candidate.Expression.Render().Contains(
                 "left",
                 StringComparison.Ordinal);
@@ -676,6 +687,7 @@ public sealed class FuzzRunnerTests
                 factory.Integer(2)));
         Task<bool> Preserves(IrTerm candidate, CancellationToken _)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             return Task.FromResult(
                 IrTermAnalysis.CollectVariables(candidate).Contains(variable));
         }
@@ -704,6 +716,8 @@ public sealed class FuzzRunnerTests
     [TestCase("--unknown", "1")]
     public void InvalidOptionsFailClosed(string option, string value)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
+        System.ArgumentNullException.ThrowIfNull(value);
         Action parse = () => FuzzOptions.Parse([option, value]);
         Assert.Throws<FuzzUsageException>(parse);
     }

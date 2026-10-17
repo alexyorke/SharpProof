@@ -32,7 +32,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(analysis.Sites.Single().Region, Is.EqualTo(region));
         var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
         var contract = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, CancellationToken.None)
-            .Single(claim => claim.Kind == EffectEvaluationContractKind.EffectContract);
+            .Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.EffectContract));
         var violation = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
         Assert.That(violation.HasValue, Is.EqualTo(violates));
         if (violates)
@@ -52,6 +52,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
     [TestCase(SpecEffect.None, "None")]
     public void ValidatedLegacyApiFacetsRetainTheirReachableCapabilityBounds(SpecEffect effect, string capability)
     {
+        System.ArgumentNullException.ThrowIfNull(capability);
         var (compilation, callee, caller, declaration, invocation) = Caller();
         var facets = ResolveFacets(compilation, callee, effect);
         var flags = TotalBodyLowering.ApiSpecEffects(facets);
@@ -62,7 +63,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         var (program, site) = CallProgram(factory, callee, invocation, flags, sourceSpan: true);
         Assert.That(IrOpaqueCallSite.Effects(factory, site), Is.EqualTo(flags));
         var analysis = AdvisoryEffectSites.Analyze(program,
-            operation => factory.GetOperationInfo(operation).SourceSpan != null ? invocation.GetLocation() : null,
+            operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (factory.GetOperationInfo(operation).SourceSpan != null ? invocation.GetLocation() : null),
             declaration.Identifier.GetLocation(), CancellationToken.None);
         Assert.That(analysis.Gap, Is.Null);
         var call = analysis.Sites.Single();
@@ -72,7 +73,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(call.Location.SourceTree, Is.SameAs(invocation.SyntaxTree));
         var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
         var claims = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, CancellationToken.None);
-        var permission = claims.Single(claim => claim.Kind == EffectEvaluationContractKind.AllowedCapabilities);
+        var permission = claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.AllowedCapabilities));
         var violation = AdvisoryEffectClaims.FindViolation(permission.Kind, permission.Constraint, analysis.Sites, compilation);
         if (capability == "None")
         {
@@ -83,7 +84,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
             Assert.That(violation, Is.Not.Null);
             Assert.That(violation!.Value.Detail, Does.Contain(capability));
         }
-        var contract = claims.Single(claim => claim.Kind == EffectEvaluationContractKind.EffectContract);
+        var contract = claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.EffectContract));
         var undeclared = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
         Assert.That(undeclared.HasValue, Is.EqualTo(effect != SpecEffect.None));
     }
@@ -129,14 +130,14 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, CancellationToken.None);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
-        var call = body!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>()
-            .Single(instruction => instruction.Receiver == null && instruction.Target == null);
+        var call = body!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>()
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Receiver == null && instruction.Target == null));
         var flags = IrOpaqueCallSite.Effects(body.Program.Factory, call.Operation);
         Assert.That(IrOpaqueCallSite.Capabilities(flags), Is.EqualTo((int)projected.Capabilities));
         var ordinary = AdvisoryEffectSites.Analyze(compilation, method, declaration, CancellationToken.None);
         Assert.That(ordinary.Gap, Is.Null);
         Assert.That(ordinary.Sites, Has.Length.EqualTo(1));
-        var ordinaryCall = ordinary.Sites.Single(site => site.Kind == AdvisoryEffectSiteKind.Call);
+        var ordinaryCall = ordinary.Sites.Single(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : (site.Kind == AdvisoryEffectSiteKind.Call));
         Assert.That(ordinaryCall.Effects, Is.EqualTo(flags));
         var loweredLocation = body.Locate(call.Operation);
         Assert.That(loweredLocation, Is.Not.Null);
@@ -164,6 +165,8 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
 
     private static ApiSpecFacets ResolveFacets(CSharpCompilation compilation, IMethodSymbol callee, SpecEffect effect)
     {
+        System.ArgumentNullException.ThrowIfNull(callee);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "Declared may-effect bound for the component control.");
         var table = ApiSpecTable.Create([new ApiSpecDeclaration(
             new ApiSpecTarget("analyzer.legacy.effect", callee.GetDocumentationCommentId()!, "Api",
@@ -184,6 +187,9 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
     private static (IrProgram Program, OperationId Site) CallProgram(IrFactory factory, IMethodSymbol callee,
         InvocationExpressionSyntax invocation, IrOpaqueCallEffects flags, bool sourceSpan)
     {
+        System.ArgumentNullException.ThrowIfNull(callee);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(invocation);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var unreachable = builder.CreateBlock();

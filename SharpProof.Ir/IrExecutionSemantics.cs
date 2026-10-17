@@ -40,7 +40,7 @@ internal static class IrCallPreconditionMarker
     private static readonly System.Text.UTF8Encoding Encoding = new(false, true);
 
     internal static bool IsReservedName(string name)
-    { return name.StartsWith(Prefix, StringComparison.Ordinal); }
+    { if (name is null) { throw new System.ArgumentNullException(nameof(name)); } return name.StartsWith(Prefix, StringComparison.Ordinal); }
 
     internal static bool TryCreateName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)
@@ -105,9 +105,9 @@ public sealed class IrHavocRequest(
     IrInstructionId instruction, OperationId site, IrVarId variable,
     int occurrence, IrHavocOrigin origin)
 {
-    public IrInstructionId Instruction { get; } = instruction;
-    public OperationId Site { get; } = site;
-    public IrVarId Variable { get; } = variable;
+    public IrInstructionId Instruction { get; } = (instruction.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(instruction)) : instruction);
+    public OperationId Site { get; } = (site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : site);
+    public IrVarId Variable { get; } = (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : variable);
     public int Occurrence { get; } = occurrence;
     public IrHavocOrigin Origin { get; } = origin;
 }

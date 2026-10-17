@@ -19,12 +19,12 @@ public sealed class PointerArrayTypeTestApiCoverageTests
         var compilation = CSharpCompilation.Create("PointerArrayTypeTestApi", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, allowUnsafe: true));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(syntax => syntax.Identifier.ValueText == "Helper");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Helper"));
         var operation = compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression);
         Assert.That(operation, Is.AssignableTo<IIsTypeOperation>());
         var test = (IIsTypeOperation)operation!;

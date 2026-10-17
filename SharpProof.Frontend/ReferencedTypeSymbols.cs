@@ -7,7 +7,7 @@ internal static class ReferencedTypeSymbols
     private sealed class TypeSnapshot(
         ImmutableArray<INamedTypeSymbol> types)
     {
-        internal ImmutableArray<INamedTypeSymbol> Types { get; } = types;
+        internal ImmutableArray<INamedTypeSymbol> Types { get; } = (types.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(types)) : types);
     }
 
     private static readonly ConditionalWeakTable<
@@ -81,11 +81,15 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         CancellationToken cancellationToken)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         var snapshot = CachedSnapshots.GetValue(
             assembly,
-            value => new TypeSnapshot(
+            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new TypeSnapshot(
                 GetAll(value.GlobalNamespace, cancellationToken)
-                    .ToImmutableArray()));
+                    .ToImmutableArray())));
         foreach (var type in snapshot.Types)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -96,6 +100,10 @@ internal static class ReferencedTypeSymbols
     private static IEnumerable<IAssemblySymbol> GetAssemblies(
         Compilation compilation)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
         yield return compilation.Assembly;
         foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
         {
@@ -107,6 +115,10 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         IAssemblySymbol referencedAssembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         foreach (var module in assembly.Modules)
         {
             foreach (var reference in module.ReferencedAssemblySymbols)
@@ -126,6 +138,10 @@ internal static class ReferencedTypeSymbols
         INamespaceOrTypeSymbol container,
         CancellationToken cancellationToken)
     {
+        if (container is null)
+        {
+            throw new System.ArgumentNullException(nameof(container));
+        }
         var pending = new Stack<INamespaceOrTypeSymbol>();
         pending.Push(container);
 

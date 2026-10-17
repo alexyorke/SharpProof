@@ -66,7 +66,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -102,8 +102,8 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             var returnedField = getter.Module.ResolveField(fieldToken)!;
             var flags = getter.GetMethodImplementationFlags();
             var receivers = s_inputValues.Select(input => constructor.Invoke([input])).ToArray();
-            var executions = receivers.Select(receiver => target.CreateDelegate<Func<int>>(receiver)).ToArray();
-            var closedReceiversMatch = executions.Select((execute, index) => ReferenceEquals(execute.Target, receivers[index])).ToArray();
+            var executions = receivers.Select(receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (target.CreateDelegate<Func<int>>(receiver))).ToArray();
+            var closedReceiversMatch = executions.Select((execute, index) => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (ReferenceEquals(execute.Target, receivers[index]))).ToArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(calledGetter.DeclaringType, Is.EqualTo(subject));
@@ -149,13 +149,13 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 getter.IsStatic,
                 getter.ReturnType == typeof(int),
-                getter.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToArray(),
+                getter.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 field.IsInitOnly,
                 field.IsStatic,
                 field.FieldType == typeof(int),
                 subject.TypeInitializer != null,
-                executions.Select(static execute => execute()).ToArray(),
+                executions.Select(static execute => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (execute())).ToArray(),
                 Convert.ToHexStringLower(getterIl),
                 subject.Module.ModuleVersionId.ToString("D"));
             await Save(evidenceDirectory, "runtime-observations.json", new
@@ -247,7 +247,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             BoundReceiverMatchesTargetParameter = SymbolEqualityComparer.Default.Equals(receiverParameter, targetSymbol.Parameters.Single()),
             GetterReturnedField = getterFieldRead.Field.ToDisplayString(),
             GetterFieldReadonly = getterFieldRead.Field.IsReadOnly,
-            GetterSourceAttributes = getterSymbol.GetAttributes().Select(attribute => attribute.AttributeClass!.ToDisplayString()).ToArray(),
+            GetterSourceAttributes = getterSymbol.GetAttributes().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString())).ToArray(),
             SelectedSourceIsTarget = SymbolEqualityComparer.Default.Equals(selectedTarget.Method, targetSymbol),
             SelectedSourceIsGetter = SymbolEqualityComparer.Default.Equals(selectedTarget.Method, getterSymbol)
         });
@@ -288,20 +288,20 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The caller of the synchronized bodied getter cannot be Proven EnforcePure."
                 : "The caller of the NoInlining-only bodied getter remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -343,15 +343,26 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
         bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount, bool FieldReadonly, bool FieldStatic, bool FieldInt32,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId);
+        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+    {
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
+        public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
+        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+    }
 }

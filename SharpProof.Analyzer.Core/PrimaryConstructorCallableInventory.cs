@@ -22,11 +22,11 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(candidate =>
-                candidate.DeclaringSyntaxReferences.Any(reference =>
-                    reference.SyntaxTree == declaration.SyntaxTree &&
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.DeclaringSyntaxReferences.Any(reference =>
+                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == declaration.SyntaxTree &&
                     reference.GetSyntax(cancellationToken) is
                         TypeDeclarationSyntax owner &&
-                    owner.Span == declaration.Span))
+                    owner.Span == declaration.Span))))
             .ToArray();
         return TrySingle(matches, out constructor);
     }
@@ -53,8 +53,8 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(static candidate =>
-                candidate.IsImplicitlyDeclared &&
-                candidate.Parameters.IsEmpty)
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsImplicitlyDeclared &&
+                candidate.Parameters.IsEmpty))
             .ToArray();
         return TrySingle(matches, out constructor);
     }
@@ -63,6 +63,10 @@ internal static class PrimaryConstructorCallableInventory
         IMethodSymbol[] matches,
         out IMethodSymbol constructor)
     {
+        if (matches is null)
+        {
+            throw new System.ArgumentNullException(nameof(matches));
+        }
         constructor = matches.Length == 1
             ? ContractClauseInventoryBuilder.NormalizeCallable(matches[0])
             : null!;

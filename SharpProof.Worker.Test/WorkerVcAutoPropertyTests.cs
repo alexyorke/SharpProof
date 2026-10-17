@@ -171,6 +171,7 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase("MaskCount")]
     public void PostconditionIsProven(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
@@ -230,19 +231,21 @@ public sealed class WorkerVcAutoPropertyTests
     [TestCase(".MakeKeyed(")]
     public void UnknownCallKeepsItsPrecondition(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         using var project = new ShadowTestProject(Source);
-        var caller = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(method, StringComparison.Ordinal));
+        var caller = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains(method, StringComparison.Ordinal)));
         Assert.That(caller.Total, Is.Not.Null);
         Assert.That(caller.Total!.CallPreconditions, Is.Not.Empty);
     }
 
     private static WorkerClaimResult Claim(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var name = "M:Holder." + method;
-        var callable = response.Manifest.Callables.Single(callable => callable.CallableId == name ||
+        var callable = response.Manifest.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == name ||
             callable.CallableId.StartsWith(name + "(", StringComparison.Ordinal) ||
-            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal));
-        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

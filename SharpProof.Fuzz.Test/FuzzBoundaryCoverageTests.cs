@@ -26,6 +26,7 @@ public sealed class FuzzBoundaryCoverageTests
     [TestCase("--max-parallelism")]
     public void OptionsRejectMissingValues(string option)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
         Action parse = () => FuzzOptions.Parse([option]);
         var error = Assert.Throws<FuzzUsageException>(parse);
         Assert.That(error!.Message, Does.Contain("Missing value"));
@@ -38,6 +39,8 @@ public sealed class FuzzBoundaryCoverageTests
     [TestCase("--max-parallelism", "abc")]
     public void OptionsRejectInvalidNumbers(string option, string value)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
+        System.ArgumentNullException.ThrowIfNull(value);
         Action parse = () => FuzzOptions.Parse([option, value]);
         Assert.Throws<FuzzUsageException>(parse);
     }

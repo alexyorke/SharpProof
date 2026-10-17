@@ -6,6 +6,8 @@ internal static class DomainLawAssertions
         CanonicalAbstractDomain<T> domain,
         IReadOnlyList<T> samples)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(samples);
         foreach (var sample in samples)
         {
             Assert.That(
@@ -19,6 +21,8 @@ internal static class DomainLawAssertions
         IAbstractDomain<T> domain,
         IReadOnlyList<T> samples)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(samples);
         foreach (var value in samples)
         {
             Assert.That(
@@ -126,6 +130,9 @@ internal static class DomainLawAssertions
         IReadOnlyList<T> samples,
         Func<T, T> transfer)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(samples);
+        System.ArgumentNullException.ThrowIfNull(transfer);
         foreach (var left in samples)
         {
             foreach (var right in samples)
@@ -145,6 +152,8 @@ internal static class DomainLawAssertions
         IAbstractDomain<T> domain,
         IReadOnlyList<T> samples)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(samples);
         foreach (var value in samples)
         {
             var havoced = domain.Havoc(value);

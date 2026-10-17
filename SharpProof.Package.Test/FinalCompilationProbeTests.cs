@@ -264,9 +264,9 @@ public sealed class FinalCompilationProbeTests
         {
             Assert.That(
                 secondResponse.ClaimResults.Select(static result =>
-                    (result.ClaimId, result.Outcome, result.Reason)),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ((result.ClaimId, result.Outcome, result.Reason))),
                 Is.EqualTo(firstResponse.ClaimResults.Select(static result =>
-                    (result.ClaimId, result.Outcome, result.Reason))));
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ((result.ClaimId, result.Outcome, result.Reason)))));
             Assert.That(
                 secondResponse.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
@@ -297,6 +297,7 @@ public sealed class FinalCompilationProbeTests
 
     private static void AssertPackedBuildOutcome(ProcessResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         if (IsSupportedWorkerHost)
         {
             Assert.That(result.ExitCode, Is.Zero, result.Output);
@@ -329,6 +330,12 @@ public sealed class FinalCompilationProbeTests
             string[] portableReferences,
             string[] additionalFiles)
         {
+            System.ArgumentNullException.ThrowIfNull(additionalFiles, nameof(additionalFiles));
+            System.ArgumentNullException.ThrowIfNull(portableReferences, nameof(portableReferences));
+            System.ArgumentNullException.ThrowIfNull(syntaxTreeRows, nameof(syntaxTreeRows));
+            System.ArgumentNullException.ThrowIfNull(syntaxTrees, nameof(syntaxTrees));
+            System.ArgumentNullException.ThrowIfNull(options);
+            System.ArgumentNullException.ThrowIfNull(targetFramework);
             TargetFramework = targetFramework;
             Options = options;
             SyntaxTrees = syntaxTrees;
@@ -358,12 +365,12 @@ public sealed class FinalCompilationProbeTests
             get;
         }
         internal string[] SyntaxTreePaths =>
-            [.. _syntaxTreeRows.Select(static tree => tree.Path)];
+            [.. _syntaxTreeRows.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))];
         internal string[] FrameworkReferences =>
             [.. PortableReferences.Where(static reference =>
-                    !reference.Contains(
+                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (!reference.Contains(
                         "SharpProof.Attributes.dll",
-                        StringComparison.OrdinalIgnoreCase))];
+                        StringComparison.OrdinalIgnoreCase)))];
 
         internal static async Task<ProbeArtifact> ReadAsync(string path)
         {
@@ -411,7 +418,7 @@ public sealed class FinalCompilationProbeTests
             return new ProbeArtifact(
                 targetFramework!,
                 root.GetProperty("options").GetRawText(),
-                [.. syntaxTreeRows.Select(static tree => tree.Raw)],
+                [.. syntaxTreeRows.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Raw))],
                 syntaxTreeRows,
                 GetCanonicalRawRows(
                     root,
@@ -422,10 +429,11 @@ public sealed class FinalCompilationProbeTests
 
         internal string GetTreeChecksum(string pathSuffix)
         {
+            System.ArgumentNullException.ThrowIfNull(pathSuffix);
             var matches = _syntaxTreeRows
-                .Where(tree => tree.Path.EndsWith(
+                .Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path.EndsWith(
                     pathSuffix,
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase)))
                 .ToArray();
             Assert.That(
                 matches,
@@ -438,23 +446,27 @@ public sealed class FinalCompilationProbeTests
             JsonElement root,
             string path)
         {
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(root)); }
+
+            System.ArgumentNullException.ThrowIfNull(path);
             var trees = root.GetProperty("syntaxTrees")
                 .EnumerateArray()
-                .Select(tree => new SyntaxTreeRow(
+                .Select(tree => ((tree.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(tree)) : (new SyntaxTreeRow(
                     tree.GetProperty("path").GetString() ?? "",
                     tree.GetProperty("ordinal").GetInt32(),
                     tree.GetProperty("textSha256").GetString() ?? string.Empty,
-                    tree.GetRawText()))
+                    tree.GetRawText()))))
                 .ToArray();
             Assert.That(
-                trees.Select(static tree => (tree.Path, tree.Ordinal)),
+                trees.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree.Path, tree.Ordinal))),
                 Is.EqualTo(trees
-                    .OrderBy(static tree => tree.Path, StringComparer.Ordinal)
-                    .ThenBy(static tree => tree.Ordinal)
-                    .Select(static tree => (tree.Path, tree.Ordinal))),
+                    .OrderBy(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path), StringComparer.Ordinal)
+                    .ThenBy(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Ordinal))
+                    .Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree.Path, tree.Ordinal)))),
                 path + ": syntaxTrees");
             Assert.That(
-                trees.Select(static tree => tree.Raw)
+                trees.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Raw))
                     .Distinct(StringComparer.Ordinal)
                     .Count(),
                 Is.EqualTo(trees.Length),
@@ -467,9 +479,14 @@ public sealed class FinalCompilationProbeTests
             string propertyName,
             string path)
         {
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(root)); }
+
+            System.ArgumentNullException.ThrowIfNull(path);
+            System.ArgumentNullException.ThrowIfNull(propertyName);
             var rows = root.GetProperty(propertyName)
                 .EnumerateArray()
-                .Select(static row => row.GetRawText())
+                .Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetRawText())))
                 .ToArray();
             Assert.That(
                 rows,
@@ -486,7 +503,12 @@ public sealed class FinalCompilationProbeTests
             string Path,
             int Ordinal,
             string TextSha256,
-            string Raw);
+            string Raw)
+        {
+            public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+            public string TextSha256 { get; init; } = TextSha256 ?? throw new System.ArgumentNullException(nameof(TextSha256));
+            public string Raw { get; init; } = Raw ?? throw new System.ArgumentNullException(nameof(Raw));
+        }
     }
 
     private sealed record CompilerManifestArtifact(
@@ -497,6 +519,7 @@ public sealed class FinalCompilationProbeTests
         internal static async Task<CompilerManifestArtifact> ReadAsync(
             string path)
         {
+            System.ArgumentNullException.ThrowIfNull(path);
             Assert.That(File.Exists(path), Is.True, path);
             var bytes = await File.ReadAllBytesAsync(path);
             var text = Encoding.UTF8.GetString(bytes);
@@ -508,8 +531,8 @@ public sealed class FinalCompilationProbeTests
             var claimPaths = root.GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()
-                .Select(static claim => claim.GetProperty("location")
-                    .GetProperty("path").GetString() ?? string.Empty)
+                .Select(static claim => ((claim.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(claim)) : (claim.GetProperty("location")
+                    .GetProperty("path").GetString() ?? string.Empty)))
                 .ToArray();
             using (Assert.EnterMultipleScope())
             {
@@ -532,6 +555,9 @@ public sealed class FinalCompilationProbeTests
                 claimPaths);
         }
 
+        public byte[] Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
+        public string ArtifactSha256 { get; init; } = ArtifactSha256 ?? throw new System.ArgumentNullException(nameof(ArtifactSha256));
+        public string[] ClaimPaths { get; init; } = ClaimPaths ?? throw new System.ArgumentNullException(nameof(ClaimPaths));
     }
 
     private sealed class ProbeWorkspace : IDisposable
@@ -547,6 +573,7 @@ public sealed class FinalCompilationProbeTests
 
         private ProbeWorkspace(TempDirectory temporary)
         {
+            System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             _root = temporary.FullName;
             var root = _root;
@@ -639,6 +666,8 @@ public sealed class FinalCompilationProbeTests
             string profile = "advisory",
             bool designTimeBuild = false)
         {
+            System.ArgumentNullException.ThrowIfNull(profile);
+            System.ArgumentNullException.ThrowIfNull(targetFrameworks);
             _sharedCompilationServerId = CreateSharedCompilationServerId(
                 "direct");
             WriteUtf8(
@@ -665,6 +694,7 @@ public sealed class FinalCompilationProbeTests
 
         internal void WritePackedConsumer(string packageVersion)
         {
+            System.ArgumentNullException.ThrowIfNull(packageVersion);
             _sharedCompilationServerId = CreateSharedCompilationServerId(
                 "packed");
             WriteUtf8(
@@ -683,6 +713,7 @@ public sealed class FinalCompilationProbeTests
 
         internal void WriteProbeInput(string value)
         {
+            System.ArgumentNullException.ThrowIfNull(value);
             WriteUtf8(
                 Path.Combine(
                     _root,
@@ -764,6 +795,7 @@ public sealed class FinalCompilationProbeTests
 
         internal Task<ProcessResult> RestoreAsync(string packageSource)
         {
+            System.ArgumentNullException.ThrowIfNull(packageSource);
             var nugetConfig = IsolatedPackageFeedConfiguration.Write(
                 _root,
                 packageSource);
@@ -784,6 +816,7 @@ public sealed class FinalCompilationProbeTests
         private async Task<ProcessResult> RunDotNetAsync(
             string[] arguments)
         {
+            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
             var startInfo = ProcessRunner.CreateStartInfo(
                 _root,
                 "dotnet",
@@ -801,6 +834,7 @@ public sealed class FinalCompilationProbeTests
 
         private static string CreateSharedCompilationServerId(string role)
         {
+            System.ArgumentNullException.ThrowIfNull(role);
             return "sharpproof-final-probe-" + role + "-" +
                 Guid.NewGuid().ToString("N");
         }
@@ -826,6 +860,8 @@ public sealed class FinalCompilationProbeTests
             string profile,
             bool designTimeBuild)
         {
+            System.ArgumentNullException.ThrowIfNull(profile);
+            System.ArgumentNullException.ThrowIfNull(targetFrameworks);
             var targetFrameworkProperty =
                 targetFrameworks.Contains(';', StringComparison.Ordinal)
                     ? "TargetFrameworks"
@@ -881,6 +917,7 @@ public sealed class FinalCompilationProbeTests
 
         private string CreatePackedProjectXml(string packageVersion)
         {
+            System.ArgumentNullException.ThrowIfNull(packageVersion);
             var analyzerPath = Escape(
                 ProductBuildOutputs.CompilerProbeAssemblyPath());
             var additionalFile = Escape(
@@ -930,6 +967,7 @@ public sealed class FinalCompilationProbeTests
 
         private static string Escape(string value)
         {
+            System.ArgumentNullException.ThrowIfNull(value);
             return PackageTestXml.EscapeOrThrow(
                 value,
                 "Failed to escape an MSBuild value.");
@@ -937,9 +975,14 @@ public sealed class FinalCompilationProbeTests
 
         private static void WriteUtf8(string path, string contents)
         {
+            System.ArgumentNullException.ThrowIfNull(contents);
+            System.ArgumentNullException.ThrowIfNull(path);
             File.WriteAllText(path, contents, new UTF8Encoding(false));
         }
     }
 
-    private sealed record ProcessResult(int ExitCode, string Output);
+    private sealed record ProcessResult(int ExitCode, string Output)
+    {
+        public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    }
 }

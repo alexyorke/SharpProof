@@ -54,7 +54,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
+        var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(easyControl ? 8 : 7));
         var evidence = preparation.EffectClaims.Single();
@@ -95,8 +95,8 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
                 .Select(ordinal => "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .ToHashSet(StringComparer.Ordinal);
             Assert.That(entry.ProofCore.All(ownedLabels.Contains), Is.True);
-            var expectedUsed = entry.ProofCore.Select(label => preparation.TotalEntry.Clauses[
-                int.Parse(label.AsSpan("requires:".Length), System.Globalization.CultureInfo.InvariantCulture)].AssumptionId!);
+            var expectedUsed = entry.ProofCore.Select(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (preparation.TotalEntry.Clauses[
+                int.Parse(label.AsSpan("requires:".Length), System.Globalization.CultureInfo.InvariantCulture)].AssumptionId!));
             Assert.That(entry.UsedAssumptionIds.SetEquals(expectedUsed), Is.True);
             Assert.That(projected.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(projected.Reason, Is.EqualTo(WorkerClaimReason.None));

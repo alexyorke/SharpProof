@@ -19,6 +19,9 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
             GeneratedCodeAnalysisFlags.ReportDiagnostics);
         context.RegisterCompilationAction(static compilationContext =>
         {
+            if (compilationContext.Compilation is null)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext)); }
+
             var configuration =
                 AnalyzerConfiguration.FromOptions(compilationContext.Options);
             if (configuration.Profile == SharpProofProfile.Off)

@@ -18,6 +18,8 @@ public sealed class TotalClaimResultTests
     [TestCase("\ud83d\ude00", "\"\\ud83d\\ude00\"")]
     public void StringDisplayPreservesEveryValueThroughTheWire(string value, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(value);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var formatted = WorkerProjections.FormatTotalValue(factory.CreateStringValue(value));
         Assert.That(formatted.Kind, Is.EqualTo("String"));
@@ -37,6 +39,7 @@ public sealed class TotalClaimResultTests
     [TestCase("bounded-search")]
     public async Task KernelEvidenceProjectsIntoAValidatedWorkerResponse(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var source = scenario switch
         {
             "full-ulong" => """
@@ -101,7 +104,7 @@ public sealed class TotalClaimResultTests
             runStatus, failureReason, [callable],
             [result], project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var json = WorkerProtocolJson.SerializeResponse(response);
         Assert.That(json, Is.Not.Empty);
     }
@@ -111,9 +114,10 @@ public sealed class TotalClaimResultTests
     [TestCase("wrong-type")]
     public async Task MalformedProjectionCannotPublishRefutation(string fault)
     {
+        System.ArgumentNullException.ThrowIfNull(fault);
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
         var checks = await Checks(project);
-        var check = checks.Values.Single(item => !item.Evidence.EntryModel.IsEmpty);
+        var check = checks.Values.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.Evidence.EntryModel.IsEmpty));
         var total = project.Snapshot.Callables.Single().Total!;
         var malformed = fault switch
         {
@@ -132,6 +136,7 @@ public sealed class TotalClaimResultTests
     [TestCase("bad-reason")]
     public async Task IncompletePublicationCannotPublishAProof(string fault)
     {
+        System.ArgumentNullException.ThrowIfNull(fault);
         using var project = new ShadowTestProject(ShadowTestProject.IdentitySource);
         var check = (await Checks(project)).Values.Single();
         var malformed = fault switch
@@ -142,7 +147,7 @@ public sealed class TotalClaimResultTests
         };
         var result = CallableClaimResultAssembler.FromTotal(project.Snapshot.Callables.Single(), malformed);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.Assumptions.Any(assumption => assumption.Used), Is.False);
+        Assert.That(result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
     }
 
     [Test]
@@ -156,9 +161,10 @@ public sealed class TotalClaimResultTests
 
     private static async Task<Dictionary<string, TotalCallableClaimCheck>> Checks(ShadowTestProject project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => checks[check.ClaimId] = check, CancellationToken.None);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, CancellationToken.None);
         return checks;
     }
 }

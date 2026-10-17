@@ -38,6 +38,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
     [TestCaseSource(nameof(Bodies))]
     public void ActualPeStackAdmissionAgreesWithRuntime(string name, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         using var directory = new TempDirectory("sharpproof-stack-input-");
         var image = CreateImage(Code(name));
         var path = Path.Combine(directory.FullName, "StackBoundary.dll");
@@ -117,6 +118,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
 
     private static byte[] CreateImage(byte[] code)
     {
+        System.ArgumentNullException.ThrowIfNull(code, nameof(code));
         var metadata = new MetadataBuilder();
         metadata.AddModule(0, metadata.GetOrAddString("StackBoundary.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
         metadata.AddAssembly(metadata.GetOrAddString("StackBoundary"), new Version(1, 0, 0, 0), default, default,

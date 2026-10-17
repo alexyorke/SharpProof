@@ -49,7 +49,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         var analysisOptions = (CSharpParseOptions)tree.Options;
         Assert.That(analysisOptions.PreprocessorSymbolNames, Does.Contain(Contract.ConditionalSymbol));
         var runtimeOptions = analysisOptions.WithPreprocessorSymbols(
-            analysisOptions.PreprocessorSymbolNames.Where(symbol => symbol != Contract.ConditionalSymbol));
+            analysisOptions.PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol)));
         Assert.That(runtimeOptions.PreprocessorSymbolNames, Does.Not.Contain(Contract.ConditionalSymbol));
         var runtimeCompilation = compilation.RemoveAllSyntaxTrees()
             .AddSyntaxTrees(tree.WithRootAndOptions(tree.GetRoot(), runtimeOptions));
@@ -59,7 +59,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         var runtimeEmitted = runtimeCompilation.Emit(runtimeImage);
         Assert.That(runtimeEmitted.Success, Is.True, string.Join("\n", runtimeEmitted.Diagnostics));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("OwnedSpecTermDepthRuntimeControl", runtimeImage, assembly =>
-            Assert.That(assembly.GetType("Subject")!.GetMethod("Target")!.Invoke(null, []), Is.True));
+            { System.ArgumentNullException.ThrowIfNull(assembly); Assert.That(assembly.GetType("Subject")!.GetMethod("Target")!.Invoke(null, []), Is.True); });
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         using var project = new ShadowTestProject(artifact);

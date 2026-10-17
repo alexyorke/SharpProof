@@ -22,11 +22,13 @@ public sealed class BulkVisualBasicWholeStatementBoundaryTests
     [TestCase("erase-uninitialized-array", "Dim values() As Integer\nErase values\nReturn If(values Is Nothing, 17, 0)", 17, false)]
     public void WholePublicCfgMatchesSupportedClrBehaviorOrClosesUnsupportedStatements(string name, string body, int expected, bool exact)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(name);
         var source = "Public Class Subject\nPublic Shared Function Target() As Integer\n" + body + "\nEnd Function\nEnd Class";
         var tree = VisualBasicSyntaxTree.ParseText(source, path: name + ".vb");
         var compilation = VisualBasicCompilation.Create("WholeStatement_" + name, [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext(name, isCollectible: true);

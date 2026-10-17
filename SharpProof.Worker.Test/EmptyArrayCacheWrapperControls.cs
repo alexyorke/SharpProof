@@ -11,6 +11,7 @@ public sealed class EmptyArrayCacheWrapperControls
     [TestCase("return Count();")]
     public async Task SourceWrapperCannotLosePossibleCacheAllocation(string helperBody)
     {
+        System.ArgumentNullException.ThrowIfNull(helperBody);
         var source = "using SharpProof.Attributes; public sealed class Cell {} public static class Subject { " +
             "[ZeroAllocations] public static int Target(int x) => Helper(); private static int Helper() { " + helperBody +
             " } private static int Count(params Cell[] values) => values.Length; }";

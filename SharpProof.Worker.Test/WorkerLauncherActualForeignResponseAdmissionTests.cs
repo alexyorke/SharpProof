@@ -70,6 +70,7 @@ public sealed partial class WorkerTests
 
         Launcher.LauncherArguments Arguments(string prefix)
         {
+            System.ArgumentNullException.ThrowIfNull(prefix);
             Assert.That(Launcher.LauncherArguments.TryParse([
                 "verify", "--request", privateRequest, "--result", privateResult,
                 "--compiler-manifest", originalManifestPath, "--verify-policy", "advisory", "--assumption-policy", "allow",

@@ -9,18 +9,26 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         ContractApiIdentityResolver.ForCompilation(compilation);
     private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
     private readonly Dictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
-        .Select(static (tree, ordinal) => (tree, ordinal))
+        .Select(static (tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
         .ToDictionary(static item => item.tree, static item => item.ordinal);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractClauseInventory> _cache =
         new(SymbolEqualityComparer.IncludeNullability);
 
     internal static ContractClauseInventoryBuilder ForCompilation(Compilation compilation)
     {
-        return Cache.GetValue(compilation, static value => new(value));
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        return Cache.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     internal int GetTreeOrdinal(SyntaxTree tree)
     {
+        if (tree is null)
+        {
+            throw new System.ArgumentNullException(nameof(tree));
+        }
         return _treeOrdinals.TryGetValue(tree, out var ordinal) ? ordinal : int.MaxValue;
     }
 
@@ -28,6 +36,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
         return Create(callable, implementationBody, CancellationToken.None);
     }
 
@@ -45,7 +57,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             callable = NormalizeCallable(callable);
         }
         if ((callable.DeclaringSyntaxReferences.Any(reference =>
-                 _treeOrdinals.ContainsKey(reference.SyntaxTree)) &&
+                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (_treeOrdinals.ContainsKey(reference.SyntaxTree))) &&
              !SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, _compilation.Assembly)) ||
             (implementationBody != null &&
              (!ReferenceEquals(implementationBody.SemanticModel?.Compilation, _compilation) ||
@@ -64,7 +76,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         return implementationBody == null
             ? _cache.GetOrAdd(
                 callable,
-                value => CreateUncached(value, cancellationToken))
+                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (CreateUncached(value, cancellationToken)))
             : CreateCore(callable, implementationBody, cancellationToken);
     }
 
@@ -72,6 +84,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
         return CreateCore(callable, null, cancellationToken);
     }
 
@@ -80,10 +96,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation implementationBody,
         CancellationToken cancellationToken)
     {
+        if (implementationBody is null)
+        {
+            throw new System.ArgumentNullException(nameof(implementationBody));
+        }
         var candidate = GetBody(implementationBody.Syntax) ??
             implementationBody.Syntax;
         if (GetDeclaredBodies(callable, cancellationToken).Any(body =>
-                HasSameSite(body, candidate)))
+                body is null ? throw new System.ArgumentNullException(nameof(body)) : (HasSameSite(body, candidate))))
         {
             return true;
         }
@@ -92,8 +112,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             _compilation.GetEntryPoint(cancellationToken) is { } entryPoint &&
             HaveSameDefinition(callable, entryPoint) &&
             entryPoint.DeclaringSyntaxReferences.Any(reference =>
-                reference.SyntaxTree == candidate.SyntaxTree &&
-                reference.Span == candidate.Span);
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == candidate.SyntaxTree &&
+                reference.Span == candidate.Span));
     }
 
     private ContractClauseInventory CreateCore(
@@ -101,6 +121,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
         var found = new List<(
             ContractClauseClassification Classification,
             ContractClausePlacement Placement,
@@ -187,6 +211,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxTree tree,
         out SemanticModel model)
     {
+        if (tree is null)
+        {
+            throw new System.ArgumentNullException(nameof(tree));
+        }
         try
         {
             model = SharpProof.Frontend.Host.CompilationModelProvider
@@ -231,7 +259,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         }
 
         return invocation.Syntax.Ancestors()
-            .TakeWhile(ancestor => !HasSameSite(ancestor, body))
+            .TakeWhile(ancestor => ancestor is null ? throw new System.ArgumentNullException(nameof(ancestor)) : (!HasSameSite(ancestor, body)))
             .Any(IsConditional)
             ? ContractClausePlacement.Conditional
             : ContractClausePlacement.Misplaced;
@@ -243,6 +271,18 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
+        if (invocation is null)
+        {
+            throw new System.ArgumentNullException(nameof(invocation));
+        }
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
         return model.GetEnclosingSymbol(
                 invocation.Syntax.SpanStart,
                 cancellationToken) is
@@ -310,7 +350,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             HasSameSite(globalParent, unit))
         {
             statements = unit.Members.OfType<GlobalStatementSyntax>()
-                .Select(static member => member.Statement);
+                .Select(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.Statement));
             return true;
         }
         statements = [];
@@ -324,6 +364,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             directClauseCache,
         CancellationToken cancellationToken)
     {
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         if (statement is not ExpressionStatementSyntax expression)
         {
@@ -352,6 +396,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
+        if (syntax is null)
+        {
+            throw new System.ArgumentNullException(nameof(syntax));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var statement = syntax.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
         if (statement == null)
@@ -367,6 +419,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool IsConditional(SyntaxNode syntax)
     {
+        if (syntax is null)
+        {
+            throw new System.ArgumentNullException(nameof(syntax));
+        }
         return syntax is
         IfStatementSyntax or ConditionalExpressionSyntax or
         SwitchStatementSyntax or SwitchExpressionSyntax or
@@ -409,6 +465,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
         var bodies = ImmutableArray.CreateBuilder<SyntaxNode>();
         foreach (var reference in callable.DeclaringSyntaxReferences)
         {
@@ -424,6 +484,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)
     {
+        if (syntax is null)
+        {
+            throw new System.ArgumentNullException(nameof(syntax));
+        }
         return syntax switch
         {
             BaseMethodDeclarationSyntax { Body: { } body } => body,
@@ -455,6 +519,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         // These syntax wrappers have no IOperation of their own. The inner
         // operation retains Roslyn's checked arithmetic flags and body owner.
+        if (expression is null)
+        {
+            throw new System.ArgumentNullException(nameof(expression));
+        }
         while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
         {
             expression = expression is ParenthesizedExpressionSyntax parenthesized
@@ -468,6 +536,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         return SyntaxSite.IsSame(left, right);
     }
 
@@ -495,6 +571,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static IMethodSymbol GetPartialDefinition(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         var definition = method.OriginalDefinition;
         if (definition.AssociatedSymbol is IPropertySymbol property &&
             property.PartialDefinitionPart != null)
@@ -512,6 +592,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IPropertySymbol property,
         bool useImplementation)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (property is null)
+        {
+            throw new System.ArgumentNullException(nameof(property));
+        }
         var part = useImplementation
             ? property.PartialImplementationPart
             : property.PartialDefinitionPart;

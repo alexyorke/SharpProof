@@ -4,12 +4,21 @@ internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerC
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
     OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null,
-    OperationId? LockWitness = null, OperationId? CallPreconditionWitness = null, bool ReceiverWriteWitness = false);
+    OperationId? LockWitness = null, OperationId? CallPreconditionWitness = null, bool ReceiverWriteWitness = false)
+{
+    public ImmutableDictionary<IrVarId, IrValue> EntryModel { get; init; } = EntryModel ?? throw new System.ArgumentNullException(nameof(EntryModel));
+    public ImmutableArray<string> Core { get; init; } = Core.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Core)) : Core;
+    public ImmutableArray<OperationId> BodyAssumptions { get; init; } = BodyAssumptions.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(BodyAssumptions)) : BodyAssumptions;
+}
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
 internal sealed record PassiveCallableFeasibility(PassiveCallableFeasibilityKind Kind,
-    PassiveCallableCheckResult Evidence, PassiveCallableCheckResult EntryEvidence);
+    PassiveCallableCheckResult Evidence, PassiveCallableCheckResult EntryEvidence)
+{
+    public PassiveCallableCheckResult Evidence { get; init; } = Evidence ?? throw new System.ArgumentNullException(nameof(Evidence));
+    public PassiveCallableCheckResult EntryEvidence { get; init; } = EntryEvidence ?? throw new System.ArgumentNullException(nameof(EntryEvidence));
+}
 
 // One session per owned plan; the existing method meter reads the actual solver
 // consumption.
@@ -77,12 +86,12 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(search.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken, search).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan.CapabilityQuery(synchronizationAllowed, callViolates), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.CapabilityQuery(synchronizationAllowed, callViolates)), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? site = null;
         _plan.ReplayEffects(witness.EntryModel, cancellationToken, lockPrefixObserver: (instruction, approximation) =>
-        { if (!approximation) { site ??= instruction.Operation; } });
+        { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (!approximation) { site ??= instruction.Operation; } });
         cancellationToken.ThrowIfCancellationRequested();
         return site != null ? witness with { LockWitness = site } :
             new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
@@ -107,7 +116,7 @@ internal sealed class PassiveCallableSolver : IDisposable
                 .ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates),
+            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates)),
                 cancellationToken).ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? write = null;
@@ -116,6 +125,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
             writePrefixObserver: (instruction, approximation) =>
             {
+                System.ArgumentNullException.ThrowIfNull(instruction);
                 if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) &&
                     writeViolates(instruction.Region, _plan.IsReceiverWrite(instruction.Id)))
                 {
@@ -128,6 +138,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             },
             lockPrefixObserver: locksViolate ? (instruction, approximation) =>
             {
+                System.ArgumentNullException.ThrowIfNull(instruction);
                 if (!approximation)
                 { synchronization ??= instruction.Operation; }
             }
@@ -150,7 +161,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => allocations ? plan.AllocationQuery() : plan.PurityQuery(), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (allocations ? plan.AllocationQuery() : plan.PurityQuery()), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? site = null;
@@ -160,6 +171,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             _plan.ReplayEffects(witness.EntryModel, cancellationToken,
                 allocationPrefixObserver: (allocation, approximation) =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(allocation);
                     if (!approximation)
                     { site ??= allocation.Operation; }
                 });
@@ -169,11 +181,13 @@ internal sealed class PassiveCallableSolver : IDisposable
             _plan.ReplayPurityEffects(witness.EntryModel,
                 (write, approximation) =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(write);
                     if (!approximation && IrWriteSites.IsObservable(_plan.Factory, write))
                     { site ??= write.Operation; }
                 },
                 (synchronization, approximation) =>
                 {
+                    System.ArgumentNullException.ThrowIfNull(synchronization);
                     if (!approximation)
                     { synchronizationSite ??= synchronization.Operation; }
                 }, cancellationToken);
@@ -206,7 +220,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(encoding.ExceptionQuery(allowed, allowedSite), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan.ExceptionQuery(allowed, allowedSite), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.ExceptionQuery(allowed, allowedSite)), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         if (!_plan.HasBodyAbstraction)
@@ -254,8 +268,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         {
             return proven with
             {
-                Core = [.. cores.OrderBy(value => value, StringComparer.Ordinal)],
-                BodyAssumptions = [.. assumptions.OrderBy(value => value.Value)]
+                Core = [.. cores.OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+                BodyAssumptions = [.. assumptions.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
             };
         }
         if (_plan.LoopSearch is { } search)
@@ -286,7 +300,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
         var witness = await VerifyAsync(search.EnsuresQuery(ordinal), search.Replay(ordinal), cancellationToken, search).ConfigureAwait(false);
-        if (await ProveWithInvariantsAsync(witness, plan => plan.EnsuresQuery(ordinal), cancellationToken).ConfigureAwait(false) is { } proven)
+        if (await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.EnsuresQuery(ordinal)), cancellationToken).ConfigureAwait(false) is { } proven)
         { return proven; }
         // A cut model is never a refutation; finite search is never a proof.
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
@@ -298,6 +312,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private async Task<PassiveCallableCheckResult?> ProveWithInvariantsAsync(PassiveCallableCheckResult witness,
         Func<PassiveCallableVcPlan, VerificationQuery> query, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(query);
         if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit)
         { return null; }
         var invariants = await InvariantPlanAsync(cancellationToken).ConfigureAwait(false);
@@ -320,15 +335,23 @@ internal sealed class PassiveCallableSolver : IDisposable
     // A proof over assumed invariants also rests on the premises that proved them.
     private static PassiveCallableCheckResult WithInvariantPremises(PassiveCallableCheckResult proven, InvariantSet invariants)
     {
+        System.ArgumentNullException.ThrowIfNull(invariants);
+        System.ArgumentNullException.ThrowIfNull(proven);
         return proven with
         {
-            Core = [.. proven.Core.Union(invariants.Core, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
-            BodyAssumptions = [.. proven.BodyAssumptions.Union(invariants.Assumptions).OrderBy(value => value.Value)]
+            Core = [.. proven.Core.Union(invariants.Core, StringComparer.Ordinal).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            BodyAssumptions = [.. proven.BodyAssumptions.Union(invariants.Assumptions).OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
         };
     }
 
     private sealed record InvariantSet(PassiveCallableVcPlan Plan, ImmutableArray<PassiveLoopCutter.Invariant> Invariants,
-        ImmutableArray<string> Core, ImmutableArray<OperationId> Assumptions);
+        ImmutableArray<string> Core, ImmutableArray<OperationId> Assumptions)
+    {
+        public PassiveCallableVcPlan Plan { get; init; } = Plan ?? throw new System.ArgumentNullException(nameof(Plan));
+        public ImmutableArray<PassiveLoopCutter.Invariant> Invariants { get; init; } = Invariants.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Invariants)) : Invariants;
+        public ImmutableArray<string> Core { get; init; } = Core.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Core)) : Core;
+        public ImmutableArray<OperationId> Assumptions { get; init; } = Assumptions.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Assumptions)) : Assumptions;
+    }
 
     private ImmutableArray<PassiveLoopCutter.Invariant> Templates(CancellationToken cancellationToken)
     {
@@ -350,12 +373,13 @@ internal sealed class PassiveCallableSolver : IDisposable
     // prove is dropped and the rest are checked again.
     private async Task<InvariantSet?> HoudiniAsync(ImmutableArray<PassiveLoopCutter.Invariant> active, CancellationToken cancellationToken)
     {
+
         var candidate = _plan.Candidate;
         // A candidate the encoding cannot state (it reads a value undefined on
         // an entry edge) is dropped before any check.
         var initialPlan = active.IsEmpty ? null : PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
         if (!active.IsEmpty && initialPlan == null)
-        { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
+        { active = [.. active.Where(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null))]; }
         var rechecking = false;
         while (!active.IsEmpty)
         {
@@ -405,6 +429,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private ImmutableArray<PassiveLoopCutter.Invariant> HornProposals(Func<PassiveCallableVcPlan, VerificationQuery> query,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(query);
         var candidate = _plan.Candidate;
         var factory = candidate.Factory;
         var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>();
@@ -412,8 +437,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         foreach (var loop in PassiveLoopCutter.Loops(candidate, cancellationToken))
         {
             var (tracked, anchors) = LoopInvariantCandidates.State(candidate, loop, cancellationToken);
-            ImmutableArray<IrTerm> state = [.. tracked.Concat(anchors.Where(anchor => anchor is not IrIntegerTerm)).Distinct()
-                .Where(term => factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 })];
+            ImmutableArray<IrTerm> state = [.. tracked.Concat(anchors.Where(anchor => anchor is null ? throw new System.ArgumentNullException(nameof(anchor)) : (anchor is not IrIntegerTerm))).Distinct()
+                .Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 }))];
             if (state.IsEmpty)
             { continue; }
             var relation = IrInvariantRelations.Create(factory, relations.Count, state);
@@ -425,12 +450,13 @@ internal sealed class PassiveCallableSolver : IDisposable
         { return []; }
         var proposals = HornInvariantSearch.Propose(factory, [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)],
             states, WorkerBudgets.DefaultQueryRlimit, cancellationToken);
-        return [.. relations.SelectMany(relation => proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
-            ? Conjuncts(invariant).Select(conjunct => new PassiveLoopCutter.Invariant(relation.Header, conjunct))
-            : [])];
+        return [.. relations.SelectMany(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
+            ? Conjuncts(invariant).Select(conjunct => conjunct is null ? throw new System.ArgumentNullException(nameof(conjunct)) : (new PassiveLoopCutter.Invariant(relation.Header, conjunct)))
+            : []))];
 
         static IEnumerable<IrTerm> Conjuncts(IrTerm term)
         {
+            System.ArgumentNullException.ThrowIfNull(term);
             return term is IrBinaryTerm { Operator: IrBinaryOperator.AndAlso } conjunction
                 ? Conjuncts(conjunction.Left).Concat(Conjuncts(conjunction.Right))
                 : term is IrBooleanTerm { Value: true } ? [] : [term];
@@ -456,6 +482,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     private async Task<PassiveCallableCheckResult> VerifyBodyAsync(VerificationQuery query,
         CallableReplayContext replay, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(query);
+        System.ArgumentNullException.ThrowIfNull(replay);
         var evidence = await VerifyAsync(query, _plan.HasBodyAbstraction ? null : replay, cancellationToken).ConfigureAwait(false);
         return _plan.HasBodyAbstraction && evidence.Outcome is RefutedOutcome
             ? new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true)
@@ -492,6 +520,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private async Task<PassiveCallableCheckResult> VerifyAsync(VerificationQuery query,
         CallableReplayContext? replay, CancellationToken cancellationToken, PassiveCallableVcPlan? encoding = null)
     {
+        System.ArgumentNullException.ThrowIfNull(query);
         cancellationToken.ThrowIfCancellationRequested();
         if (!_budget.TryStartQuery())
         { return new(null, WorkerClaimReason.ResourceLimit, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }

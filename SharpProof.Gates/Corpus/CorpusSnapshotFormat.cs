@@ -16,6 +16,7 @@ internal static class CorpusSnapshotFormat
 
     internal static string Render(IEnumerable<string> dataLines)
     {
+        System.ArgumentNullException.ThrowIfNull(dataLines);
         var lines = dataLines.ToArray();
         ValidateCanonicalData(lines);
         return string.Join("\n", Header.Concat(lines)) + "\n";
@@ -23,12 +24,14 @@ internal static class CorpusSnapshotFormat
 
     internal static string[] ReadDataLines(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return ParseDocument(File.ReadAllBytes(path)).DataLines;
     }
 
     internal static ImmutableArray<CorpusObservation> ReadObservations(
         string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return ParseDocument(File.ReadAllBytes(path)).Observations;
     }
 
@@ -84,6 +87,7 @@ internal static class CorpusSnapshotFormat
 
     private static void ValidateCanonicalData(string[] lines)
     {
+        System.ArgumentNullException.ThrowIfNull(lines, nameof(lines));
         _ = ParseCanonicalData(lines);
     }
 
@@ -150,7 +154,7 @@ internal static class CorpusSnapshotFormat
             ? []
             : [.. parts[3].Split(',')
                 .OrderBy(static diagnostic =>
-                    diagnostic,
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic),
                     StringComparer.Ordinal)
             ];
         expectation = new CorpusObservation(
@@ -169,5 +173,9 @@ internal static class CorpusSnapshotFormat
 
     private sealed record ParsedSnapshot(
         string[] DataLines,
-        ImmutableArray<CorpusObservation> Observations);
+        ImmutableArray<CorpusObservation> Observations)
+    {
+        public string[] DataLines { get; init; } = DataLines ?? throw new System.ArgumentNullException(nameof(DataLines));
+        public ImmutableArray<CorpusObservation> Observations { get; init; } = Observations.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Observations)) : Observations;
+    }
 }

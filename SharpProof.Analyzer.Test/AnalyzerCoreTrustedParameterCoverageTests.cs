@@ -26,7 +26,7 @@ public sealed class AnalyzerCoreTrustedParameterCoverageTests
             "using SharpProof.Attributes; public static class Fixture { " +
             "[EnforcePure] public static int Selected() => 1; public static int Target() => Api.Value(1); }",
             ["SP0002"], additionalReferences: [reference]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
@@ -43,14 +43,14 @@ public sealed class AnalyzerCoreTrustedParameterCoverageTests
         Assert.That(resolution.Kind, Is.EqualTo(EffectContractResolutionKind.Incomplete));
         Assert.That(resolution.Summary.AnalysisIncompleteReason, Is.EqualTo(EffectAnalysisIncompleteReason.CallPreconditionNotProven));
         var root = await actual.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
-        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var caller = (IMethodSymbol)actual.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
         var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, CancellationToken.None);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
         var analysis = AdvisoryEffectSites.Analyze(body!.Program, body.Locate, caller.Locations.Single(), CancellationToken.None);
         Assert.That(analysis.Gap, Is.Null);
-        var call = analysis.Sites.Single(site => site.Kind == AdvisoryEffectSiteKind.Call);
+        var call = analysis.Sites.Single(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : (site.Kind == AdvisoryEffectSiteKind.Call));
         Assert.That(call.Effects, Is.EqualTo(positiveParameter
             ? IrOpaqueCallEffects.All
             : IrOpaqueCallSite.WithCapabilities(IrOpaqueCallEffects.None, 0)));

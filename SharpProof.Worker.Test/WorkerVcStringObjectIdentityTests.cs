@@ -13,6 +13,7 @@ public sealed class WorkerVcStringObjectIdentityTests
     public async Task WideningPreservesInputStringIdentity(string body, bool contractResult,
         bool runtimeResult, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         const string prefix = "public static class Subject { public static bool Target(string value, string other) { ";
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("StringObjectRuntime", prefix + body + " } }").Emit(image).Success, Is.True);

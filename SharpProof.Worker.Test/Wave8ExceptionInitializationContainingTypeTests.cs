@@ -13,6 +13,7 @@ public sealed class Wave8ExceptionInitializationContainingTypeTests
     [TestCase("unused-containing-initializer", WorkerClaimOutcome.Proven)]
     public async Task NoFaultInitializationAndExistingCalleeBoundariesStayDistinct(string scenario, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var artifact = CreateAndRun(scenario);
         var preparation = Prepare(artifact);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
@@ -26,11 +27,13 @@ public sealed class Wave8ExceptionInitializationContainingTypeTests
 
     private static string Source(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         Assert.That(scenario, Is.EqualTo("unused-containing-initializer"));
         return "using SharpProof.Attributes; public class Outer { static Outer() { throw new System.InvalidOperationException(\"unused outer\"); } public static class Subject { [DoesNotThrow] public static int Target() { return 7; } } }";
     }
     private static CompilerManifestArtifact CreateAndRun(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var compilation = TestCompilation.Create("Wave8InitializationContainingType", ("Subject.cs", Source(scenario)));
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
@@ -74,12 +77,14 @@ public sealed class Wave8ExceptionInitializationContainingTypeTests
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(item => item.EffectClaims.Length != 0);
+        return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
     }
 
     private static async Task<WorkerClaimOutcome> Publish(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

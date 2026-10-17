@@ -72,6 +72,7 @@ public sealed class Pr275AdvisoryArgumentListTests
 
     private static void AssertValid(BuiltProgram built)
     {
+        System.ArgumentNullException.ThrowIfNull(built);
         var result = Interpreter(built).Run(Initial(built), markers: [built.BooleanMarker]);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -88,6 +89,8 @@ public sealed class Pr275AdvisoryArgumentListTests
 
     private static void AssertIncomplete(CoreIrAdvisoryResult result, string reason)
     {
+        System.ArgumentNullException.ThrowIfNull(reason);
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.Accepted, Is.False);
         Assert.That(result.Gaps.Length, Is.EqualTo(1));
         Assert.That(result.Gaps[0], Is.EqualTo(reason));
@@ -99,11 +102,13 @@ public sealed class Pr275AdvisoryArgumentListTests
 
     private static CoreIrAdvisoryInterpreter Interpreter(BuiltProgram built)
     {
+        System.ArgumentNullException.ThrowIfNull(built);
         return new(built.Program, [built.Input, built.IntegerTarget, built.BooleanTarget]);
     }
 
     private static ImmutableDictionary<IrVarId, IntervalValue> Initial(BuiltProgram built)
     {
+        System.ArgumentNullException.ThrowIfNull(built);
         return ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(3));
     }
 
@@ -126,5 +131,13 @@ public sealed class Pr275AdvisoryArgumentListTests
     }
 
     private sealed record BuiltProgram(IrProgram Program, IrVarId Input, IrVarId IntegerTarget,
-        IrVarId BooleanTarget, IrAssignInstruction IntegerMarker, IrAssignInstruction BooleanMarker);
+        IrVarId BooleanTarget, IrAssignInstruction IntegerMarker, IrAssignInstruction BooleanMarker)
+    {
+        public IrVarId BooleanTarget { get; init; } = BooleanTarget.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(BooleanTarget)) : BooleanTarget;
+        public IrVarId IntegerTarget { get; init; } = IntegerTarget.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(IntegerTarget)) : IntegerTarget;
+        public IrVarId Input { get; init; } = Input.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Input)) : Input;
+        public IrProgram Program { get; init; } = Program ?? throw new System.ArgumentNullException(nameof(Program));
+        public IrAssignInstruction IntegerMarker { get; init; } = IntegerMarker ?? throw new System.ArgumentNullException(nameof(IntegerMarker));
+        public IrAssignInstruction BooleanMarker { get; init; } = BooleanMarker ?? throw new System.ArgumentNullException(nameof(BooleanMarker));
+    }
 }

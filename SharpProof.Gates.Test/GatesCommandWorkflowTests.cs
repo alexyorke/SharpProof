@@ -72,6 +72,8 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [TestCase("effectcontract-oracle", "EffectContract")]
     public async Task LimitedOrdinaryOracleCommandReportsItsActualSelectedUniverse(string command, string contract)
     {
+        System.ArgumentNullException.ThrowIfNull(command);
+        System.ArgumentNullException.ThrowIfNull(contract);
         var result = await RunAsync(command, "--limit", "1");
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         Assert.That(result.Error, Is.Empty);
@@ -119,6 +121,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
 
     private Task<GateProcessResult> RunAsync(params string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         var start = GateProcess.CreateCaptured("dotnet", repository!.FullName);
         start.ArgumentList.Add("exec");
         start.ArgumentList.Add("--runtimeconfig");
@@ -136,6 +139,8 @@ public sealed class GatesCommandWorkflowTests : IDisposable
 
     private static void CopyDirectory(string source, string destination)
     {
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(source);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var target = Path.Combine(destination, Path.GetRelativePath(source, file));

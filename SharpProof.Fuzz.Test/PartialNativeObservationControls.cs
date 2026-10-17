@@ -30,7 +30,7 @@ public sealed class PartialNativeObservationControls
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method.Identifier.ValueText, StringComparer.Ordinal);
+            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal);
         Assert.That(methods, Has.Count.EqualTo(3));
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -98,12 +98,14 @@ public sealed class PartialNativeObservationControls
 
         VerificationQuery Query(IrTerm term, int index)
         {
+            System.ArgumentNullException.ThrowIfNull(term);
             return new(factory, [], new Goal(factory, term,
                 ProofDiagnosticKind.InternalConsistency, new SourceLocationId(index)));
         }
 
         FrontendLoweringResult LowerActual(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             var syntax = methods[name];
             var symbol = model.GetDeclaredSymbol(syntax);
             Assert.That(symbol, Is.Not.Null);

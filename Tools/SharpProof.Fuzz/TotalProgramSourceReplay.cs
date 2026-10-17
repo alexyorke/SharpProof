@@ -14,10 +14,17 @@ using SharpProof.Worker;
 
 namespace SharpProof.Fuzz;
 
-internal sealed record TotalProgramSourceCase(string Member, object?[] Arguments, bool IsLoop);
+internal sealed record TotalProgramSourceCase(string Member, object?[] Arguments, bool IsLoop)
+{
+    public string Member { get; init; } = Member ?? throw new System.ArgumentNullException(nameof(Member));
+    public object?[] Arguments { get; init; } = Arguments ?? throw new System.ArgumentNullException(nameof(Arguments));
+}
 
 internal sealed record TotalProgramSourceResult(int Cases, int Agreements, int NativeProofs,
-    int NativeRefutations, int ExceptionalExits, ImmutableArray<FuzzFailure> Failures);
+    int NativeRefutations, int ExceptionalExits, ImmutableArray<FuzzFailure> Failures)
+{
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
+}
 
 internal sealed class TotalProgramSourceReplay
 {
@@ -41,10 +48,14 @@ internal sealed class TotalProgramSourceReplay
     internal async Task CompareBatchAsync(IReadOnlyList<TotalProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken = default)
     {
+        if (cases is null)
+        {
+            throw new System.ArgumentNullException(nameof(cases));
+        }
         var count = cases.Count;
-        var members = cases.Select(item => item.Member).ToArray();
-        var inputs = cases.Select(item => item.Arguments).ToArray();
-        var loops = cases.Select(item => item.IsLoop).ToArray();
+        var members = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Member)).ToArray();
+        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Arguments)).ToArray();
+        var loops = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsLoop)).ToArray();
         totalCases += count;
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " + string.Join("\n", members) + " }",
             new CSharpParseOptions(LanguageVersion.CSharp12), "total-fuzz.cs", cancellationToken: cancellationToken);
@@ -53,7 +64,7 @@ internal sealed class TotalProgramSourceReplay
         var (image, emit) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
         using var imageScope = image;
         if (!emit.Success)
-        { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))); }
+        { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))); }
         var assemblyContext = new AssemblyLoadContext("TotalProgramFuzz", isCollectible: true);
         try
         {
@@ -62,7 +73,7 @@ internal sealed class TotalProgramSourceReplay
                 ?? throw new InvalidOperationException("Generated Total type is missing from the emitted assembly.");
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
             var methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Where(method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)).ToArray();
+                .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))).ToArray();
             if (methods.Length != count)
             { throw new InvalidOperationException("Generated Total method count does not match its case universe."); }
             for (var index = 0; index < methods.Length; index++)
@@ -71,6 +82,10 @@ internal sealed class TotalProgramSourceReplay
                 var method = methods[index];
                 void Fail(string detail)
                 {
+                    if (detail is null)
+                    {
+                        throw new System.ArgumentNullException(nameof(detail));
+                    }
                     if (failures.Count < FuzzRunner.MaximumRetainedFailures)
                     {
                         var reproducer = members[index] + "\n// inputs: " + JsonSerializer.Serialize(inputs[index]);
@@ -95,8 +110,8 @@ internal sealed class TotalProgramSourceReplay
                 if (!lower.IsExact)
                 { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
                 var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-                var entries = context.Parameters.ToDictionary(parameter => parameter.Entry,
-                    parameter => TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases));
+                var entries = context.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+                    parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases)));
                 var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
                 var original = new IrProgramInterpreter(factory).Execute(lower.Program,
                     entries, cancellationToken: cancellationToken);
@@ -110,7 +125,7 @@ internal sealed class TotalProgramSourceReplay
                     factory.Variable(context.Result!.Value), loops[index] ? factory.Variable(context.Parameters[0].Current) : TotalProgramDifferentialOracle.Term(factory, observed));
                 var requirements = entries.Select(entry => new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, entry.Key, entry.Value), factory.Boolean(true), site)).ToList();
                 var referenceParameters = context.Parameters.Where(parameter =>
-                    factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType).ToArray();
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType)).ToArray();
                 for (var left = 0; left < referenceParameters.Length; left++)
                 {
                     for (var right = left + 1; right < referenceParameters.Length; right++)
@@ -124,7 +139,7 @@ internal sealed class TotalProgramSourceReplay
                     }
                 }
                 var candidate = new PassiveCallableCandidate(method.Identifier.ValueText, lower.Program,
-                    [.. context.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState))], context.Result,
+                    [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState)))], context.Result,
                     [.. requirements],
                     [new(trueGoal, factory.Boolean(true), site), new(factory.Unary(IrUnaryOperator.Not, trueGoal), factory.Boolean(true), site)]);
                 if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken))
@@ -137,7 +152,7 @@ internal sealed class TotalProgramSourceReplay
                 if (refuted.Outcome is RefutedOutcome)
                 { nativeRefutations++; }
                 var nativeMatches = expectedException == null
-                    ? refuted.Outcome is RefutedOutcome && refuted.EntryModel.Count == context.Parameters.Length && context.Parameters.All(parameter => refuted.EntryModel.ContainsKey(parameter.Entry))
+                    ? refuted.Outcome is RefutedOutcome && refuted.EntryModel.Count == context.Parameters.Length && context.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (refuted.EntryModel.ContainsKey(parameter.Entry)))
                     : refuted.Outcome is ProvenOutcome && (await solver.VerifyFeasibilityAsync(cancellationToken)).Kind == PassiveCallableFeasibilityKind.NoModeledNormalReturn;
                 if (proven.Outcome is not ProvenOutcome || !nativeMatches)
                 { Fail(method.Identifier.ValueText + ": native agreement " + proven.Reason + "/" + refuted.Reason); continue; }

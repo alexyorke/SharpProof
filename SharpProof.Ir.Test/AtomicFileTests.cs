@@ -38,6 +38,8 @@ public sealed class AtomicFileTests : IDisposable
     {
         AssertWriteUtf8ReplacementAsync(static (path, content) =>
         {
+            System.ArgumentNullException.ThrowIfNull(content);
+            System.ArgumentNullException.ThrowIfNull(path);
             AtomicFile.WriteUtf8(path, content);
             return Task.CompletedTask;
         }).GetAwaiter().GetResult();
@@ -47,9 +49,9 @@ public sealed class AtomicFileTests : IDisposable
     public async Task WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination()
     {
         await AssertWriteUtf8ReplacementAsync(
-            static (path, content) => AtomicFile.WriteUtf8Async(
+            static (path, content) => content is null ? throw new System.ArgumentNullException(nameof(content)) : path is null ? throw new System.ArgumentNullException(nameof(path)) : (AtomicFile.WriteUtf8Async(
                 path,
-                content));
+                content)));
     }
 
     [Test]
@@ -57,6 +59,8 @@ public sealed class AtomicFileTests : IDisposable
     {
         AssertWriteUtf8LongDestinationAsync(static (path, content) =>
         {
+            System.ArgumentNullException.ThrowIfNull(content);
+            System.ArgumentNullException.ThrowIfNull(path);
             AtomicFile.WriteUtf8(path, content);
             return Task.CompletedTask;
         }).GetAwaiter().GetResult();
@@ -66,9 +70,9 @@ public sealed class AtomicFileTests : IDisposable
     public async Task WriteUtf8AsyncSupportsValidLongDestinationBasename()
     {
         await AssertWriteUtf8LongDestinationAsync(
-            static (path, content) => AtomicFile.WriteUtf8Async(
+            static (path, content) => content is null ? throw new System.ArgumentNullException(nameof(content)) : path is null ? throw new System.ArgumentNullException(nameof(path)) : (AtomicFile.WriteUtf8Async(
                 path,
-                content));
+                content)));
     }
 
     [Test]
@@ -86,7 +90,7 @@ public sealed class AtomicFileTests : IDisposable
         }
 
         using var start = new Barrier(publicationCount + 1);
-        var publications = staged.Select(temporary => Task.Factory.StartNew(() =>
+        var publications = staged.Select(temporary => temporary is null ? throw new System.ArgumentNullException(nameof(temporary)) : (Task.Factory.StartNew(() =>
         {
             start.SignalAndWait();
             try
@@ -98,7 +102,7 @@ public sealed class AtomicFileTests : IDisposable
                 AtomicFile.TryDeleteStaged(temporary);
             }
         }, CancellationToken.None, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
-            TaskScheduler.Default)).ToArray();
+            TaskScheduler.Default))).ToArray();
 
         start.SignalAndWait();
         await Task.WhenAll(publications);
@@ -155,12 +159,14 @@ public sealed class AtomicFileTests : IDisposable
 
     private static string[] TemporaryFiles(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
     }
 
     private async Task AssertWriteUtf8ReplacementAsync(
         Func<string, string, Task> write)
     {
+        System.ArgumentNullException.ThrowIfNull(write);
         var path = Path.Combine(_root, "nested", "result.txt");
         await write(path, "first\n");
         await write(path, "second\n");
@@ -171,6 +177,7 @@ public sealed class AtomicFileTests : IDisposable
     private async Task AssertWriteUtf8LongDestinationAsync(
         Func<string, string, Task> write)
     {
+        System.ArgumentNullException.ThrowIfNull(write);
         var path = Path.Combine(_root, new string('s', 220) + ".sarif");
         await write(path, "content\n");
 
@@ -179,6 +186,8 @@ public sealed class AtomicFileTests : IDisposable
 
     private static void AssertPublished(string path, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(path);
         Assert.That(
             File.ReadAllBytes(path),
             Is.EqualTo(Encoding.UTF8.GetBytes(expected)));

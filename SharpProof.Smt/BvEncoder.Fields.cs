@@ -9,6 +9,10 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeFieldRead(IrOpaqueTerm read, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
         var receiver = Encode(read.Receiver ?? throw new System.IO.InvalidDataException("An instance field read has no receiver."), meter);
         if (!_fields.TryGetValue(read.Member, out var field))
         {
@@ -31,6 +35,26 @@ internal sealed partial class BvEncoder
     private void FillObjectState(IrObjectState state, Expr reference, Model model, SmtQueryResourceMeter meter,
         Func<IrTypeId, Expr, IrValue?> decode)
     {
+        if (decode is null)
+        {
+            throw new System.ArgumentNullException(nameof(decode));
+        }
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
+        if (reference is null)
+        {
+            throw new System.ArgumentNullException(nameof(reference));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         foreach (var field in _fields.ToArray())
         {
             meter.Consume();

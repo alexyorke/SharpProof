@@ -14,6 +14,7 @@ public sealed class SourceVariableBindingCoverageTests
     [TestCase("long Target(long input) { long value = input; return checked(value + 1L); }", 9L, 10L)]
     public void SourceSymbolBindingsReplayTheCompiledExpression(string members, long input, long expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
         var operation = TargetExpression(subject);
@@ -23,14 +24,14 @@ public sealed class SourceVariableBindingCoverageTests
         Assert.That(result.IsExact, Is.True);
         Assert.That(result.Variables, Has.Length.EqualTo(1));
         var reference = operation.DescendantsAndSelf().Single(candidate =>
-            candidate is IParameterReferenceOperation or ILocalReferenceOperation);
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate is IParameterReferenceOperation or ILocalReferenceOperation));
         var variable = lowerer.GetReferencedVariable(reference);
         Assert.That(variable, Is.EqualTo(result.Variables[0].Variable));
         var ids = lowerer.CreateVariableIds();
         Assert.That(ids, Has.Length.EqualTo(1));
         var bare = lowerer.LowerTerm(operation);
         Assert.That(bare.Classification.IsExact, Is.True);
-        var environment = ids.ToDictionary(id => id, _ => factory.CreateIntegerValue(input));
+        var environment = ids.ToDictionary(id => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (id), _ => factory.CreateIntegerValue(input));
         var evaluated = new IrInterpreter(factory).Evaluate(bare.Term, environment);
         Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(evaluated.Value!.Integer, Is.EqualTo(expected));
@@ -49,7 +50,7 @@ public sealed class SourceVariableBindingCoverageTests
         Assert.That(result.IsExact, Is.True);
         Assert.That(result.Variables, Has.Length.EqualTo(2));
         var inputs = result.Variables.ToDictionary(binding => binding.Variable,
-            binding => factory.CreateIntegerValue(binding.Symbol.Name == "left" ? 3L : 7L));
+            binding => ((binding.Variable.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : (factory.CreateIntegerValue(binding.Symbol.Name == "left" ? 3L : 7L))));
         var ids = lowerer.CreateVariableIds();
         Assert.That(ids, Is.EquivalentTo(inputs.Keys));
         var bare = lowerer.LowerTerm(operation);
@@ -81,13 +82,13 @@ public sealed class SourceVariableBindingCoverageTests
         using var subject = TypedProgramSubject.Create(
             "long Target(bool select, long left, long right) => select ? left : right;");
         var lowerer = new RoslynOperationLowerer(new IrFactory());
-        var roots = subject.Graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue])).ToArray();
+        var roots = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
         foreach (var operation in roots)
         {
             Assert.That(lowerer.Lower(operation).IsExact, Is.True);
         }
-        var captures = roots.SelectMany(operation => operation.DescendantsAndSelf())
+        var captures = roots.SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf()))
             .OfType<IFlowCaptureReferenceOperation>().ToArray();
         Assert.That(captures, Is.Not.Empty);
         foreach (var capture in captures)
@@ -102,9 +103,10 @@ public sealed class SourceVariableBindingCoverageTests
 
     private static IOperation TargetExpression(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration.Identifier.ValueText == "Target");
+            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var expression = method.ExpressionBody?.Expression ??
             method.Body!.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!;
         return FrontendTestHelpers.TryGetExpressionOperation(subject.Compilation.GetSemanticModel(tree), expression)!;

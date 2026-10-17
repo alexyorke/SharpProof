@@ -43,7 +43,7 @@ public sealed class CompilerProbeSnapshotTests
         using var document = JsonDocument.Parse(output);
         var kinds = document.RootElement.GetProperty("syntaxTrees")
             .EnumerateArray()
-            .Select(static tree => tree.GetProperty("generatedKind").GetString())
+            .Select(static tree => ((tree.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(tree)) : (tree.GetProperty("generatedKind").GetString())))
             .ToArray();
 
         Assert.That(kinds, Is.EqualTo(["Unknown", "Unknown"]));
@@ -135,6 +135,8 @@ public sealed class CompilerProbeSnapshotTests
         string outputPath,
         string referencedAssemblyName)
     {
+        System.ArgumentNullException.ThrowIfNull(outputPath);
+        System.ArgumentNullException.ThrowIfNull(referencedAssemblyName);
         var referencedCompilation = CSharpCompilation.Create(
             referencedAssemblyName);
         var compilation = CSharpCompilation.Create(
@@ -146,6 +148,7 @@ public sealed class CompilerProbeSnapshotTests
     private static async Task<string> CaptureSnapshotAsync(
         CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var directory = new TempDirectory("sharpproof-probe-snapshot-");
         return await CaptureSnapshotAsync(
             Path.Combine(directory.FullName, "probe.json"),
@@ -156,6 +159,8 @@ public sealed class CompilerProbeSnapshotTests
         string outputPath,
         CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(outputPath);
         var analyzerOptions = new AnalyzerOptions(
             [],
             new DictionaryAnalyzerConfigOptionsProvider(

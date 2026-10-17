@@ -89,6 +89,7 @@ public sealed class PartialDeclarationValidationControlTests
     private static async Task AssertValidation(CSharpCompilation compilation, bool expected,
         bool attributeOnDefinition)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,
             profile: "advisory", features: "effects");
         if (!expected)
@@ -97,8 +98,8 @@ public sealed class PartialDeclarationValidationControlTests
             return;
         }
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
-        var expectedTree = compilation.SyntaxTrees.Single(tree => tree.FilePath.Contains(
-            attributeOnDefinition ? "Definition" : "Implementation", StringComparison.Ordinal));
+        var expectedTree = compilation.SyntaxTrees.Single(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath.Contains(
+            attributeOnDefinition ? "Definition" : "Implementation", StringComparison.Ordinal)));
         Assert.That(diagnostics.Single().Location.SourceTree, Is.SameAs(expectedTree));
     }
 
@@ -107,6 +108,7 @@ public sealed class PartialDeclarationValidationControlTests
     {
         public override GeneratedKind IsGenerated(SyntaxTree tree, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return tree.FilePath.Contains("Definition", StringComparison.Ordinal)
                 ? definitionKind : implementationKind;
         }
@@ -114,6 +116,8 @@ public sealed class PartialDeclarationValidationControlTests
         public override bool TryGetDiagnosticValue(SyntaxTree tree, string diagnosticId,
             CancellationToken cancellationToken, out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(diagnosticId);
+            System.ArgumentNullException.ThrowIfNull(tree);
             severity = ReportDiagnostic.Default;
             return false;
         }
@@ -121,6 +125,7 @@ public sealed class PartialDeclarationValidationControlTests
         public override bool TryGetGlobalDiagnosticValue(string diagnosticId,
             CancellationToken cancellationToken, out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(diagnosticId);
             severity = ReportDiagnostic.Default;
             return false;
         }

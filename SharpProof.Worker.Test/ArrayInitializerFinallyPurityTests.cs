@@ -40,6 +40,8 @@ public sealed class ArrayInitializerFinallyPurityTests
     public async Task ConstantInitializerControlsKeepPurityVerdict(string expression, string cleanup,
         WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(cleanup);
+        System.ArgumentNullException.ThrowIfNull(expression);
         var source = Source(expression, cleanup);
         var observation = RunClr(source, 0);
         Assert.That(observation.Writes, Is.EqualTo(cleanup == "Mark(y);" ? 1 : 0));
@@ -103,6 +105,10 @@ public sealed class ArrayInitializerFinallyPurityTests
     private static string Source(string expression, string cleanup, string claim = "[EnforcePure]",
         string prefix = "int y = x;")
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
+        System.ArgumentNullException.ThrowIfNull(cleanup);
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(prefix);
         return "using System; using SharpProof.Attributes; public static class C { " +
             "public static int State; public static int Writes; " +
             "private static void Mark(int value) { State = value; Writes++; } " +
@@ -115,6 +121,7 @@ public sealed class ArrayInitializerFinallyPurityTests
 
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols),
@@ -128,8 +135,9 @@ public sealed class ArrayInitializerFinallyPurityTests
 
     private static Observation RunClr(string source, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(" | ", emit.Diagnostics));
@@ -161,8 +169,9 @@ public sealed class ArrayInitializerFinallyPurityTests
 
     private static async Task<WorkerClaimResult> Verify(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: true);
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth,
@@ -172,7 +181,7 @@ public sealed class ArrayInitializerFinallyPurityTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-        return response.ClaimResults.Single(result => artifact.Manifest.Claims.Any(item =>
-            item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal)))));
     }
 }

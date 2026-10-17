@@ -301,6 +301,10 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
 
     private static int ParsePositive(string value, string option)
     {
+        if (option is null)
+        {
+            throw new System.ArgumentNullException(nameof(option));
+        }
         if (!int.TryParse(
                 value,
                 NumberStyles.Integer,
@@ -324,11 +328,14 @@ public sealed class FuzzUsageException : Exception
     public FuzzUsageException(string message)
         : base(message)
     {
+        System.ArgumentNullException.ThrowIfNull(message, nameof(message));
     }
 
     public FuzzUsageException(string message, Exception innerException)
         : base(message, innerException)
     {
+        System.ArgumentNullException.ThrowIfNull(innerException, nameof(innerException));
+        System.ArgumentNullException.ThrowIfNull(message, nameof(message));
     }
 }
 ```

@@ -10,7 +10,10 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Corpus;
 
-internal sealed record NativeCorpusVerdict(SyntaxNode? Declaration, IMethodSymbol Method, WorkerClaimOutcome Outcome);
+internal sealed record NativeCorpusVerdict(SyntaxNode? Declaration, IMethodSymbol Method, WorkerClaimOutcome Outcome)
+{
+    public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+}
 
 // Z3 decides the corpus's claims as it does in a build: the compiler collector
 // declares them and the worker verifies the artifact in process.
@@ -41,13 +44,13 @@ internal static class NativeCorpusVerifier
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
-            var results = response.ClaimResults.ToDictionary(static result => result.ClaimId, StringComparer.Ordinal);
-            var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
+            var results = response.ClaimResults.ToDictionary(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
+            var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal);
             return [.. discovery.Targets.Values
-                .Where(target => claimsByCallable[target.Entry.CallableId].Any())
-                .Select(target => new NativeCorpusVerdict(target.Declaration, target.Method,
+                .Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (claimsByCallable[target.Entry.CallableId].Any()))
+                .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (new NativeCorpusVerdict(target.Declaration, target.Method,
                     Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results.TryGetValue(claim.ClaimId, out var result)
-                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + "."))))),
+                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + ".")))))),
                 .. await VerifyCallPreconditionsAsync(compilation, cancellationToken).ConfigureAwait(false)];
         }
         finally
@@ -56,11 +59,12 @@ internal static class NativeCorpusVerifier
 
     internal static void EnsureComplete(WorkerVerifyResponse response, WorkerBudgets budgets, string? compilerManifestSha256 = null)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
         if (response.RunStatus != WorkerRunStatus.Complete)
         {
             var failure = new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
                 response.FailureReason + "): " +
-                string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
+                string.Join("; ", response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
             failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, budgets);
             if (compilerManifestSha256 != null)
             { failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = compilerManifestSha256; }
@@ -71,6 +75,8 @@ internal static class NativeCorpusVerifier
     // Capture actual native state for diagnostics; the caller decides whether it is a failure.
     internal static string CaptureWorkerDiagnostics(WorkerVerifyResponse response, WorkerBudgets budgets)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(response);
         return JsonSerializer.Serialize(new
         {
             RunStatus = response.RunStatus.ToString(),
@@ -78,17 +84,17 @@ internal static class NativeCorpusVerifier
             response.Summary.ElapsedMilliseconds,
             Budgets = budgets,
             CallableCount = response.CallableResults.Length,
-            IncompleteCallableCount = response.CallableResults.Count(static result => result.Coverage != WorkerCallableCoverage.Complete),
-            IncompleteCallables = response.CallableResults.Where(static result => result.Coverage != WorkerCallableCoverage.Complete)
-                .OrderByDescending(static result => result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout)
-                .ThenBy(static result => result.CallableId, StringComparer.Ordinal).Take(8)
-                .Select(static result => new { CallableId = result.CallableId[..Math.Min(512, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() }),
+            IncompleteCallableCount = response.CallableResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete)),
+            IncompleteCallables = response.CallableResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete))
+                .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout))
+                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId), StringComparer.Ordinal).Take(8)
+                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { CallableId = result.CallableId[..Math.Min(512, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() })),
             ClaimCount = response.ClaimResults.Length,
-            ClaimsWithReasonCount = response.ClaimResults.Count(static result => result.Reason != WorkerClaimReason.None),
-            ClaimsWithReasons = response.ClaimResults.Where(static result => result.Reason != WorkerClaimReason.None)
-                .OrderByDescending(static result => result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout)
-                .ThenBy(static result => result.ClaimId, StringComparer.Ordinal).Take(8)
-                .Select(static result => new { ClaimId = result.ClaimId[..Math.Min(512, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() })
+            ClaimsWithReasonCount = response.ClaimResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None)),
+            ClaimsWithReasons = response.ClaimResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None))
+                .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout))
+                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal).Take(8)
+                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { ClaimId = result.ClaimId[..Math.Min(512, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() }))
         });
     }
 
@@ -97,6 +103,7 @@ internal static class NativeCorpusVerifier
     private static async Task<ImmutableArray<NativeCorpusVerdict>> VerifyCallPreconditionsAsync(CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), cancellationToken);
@@ -145,6 +152,7 @@ internal static class NativeCorpusVerifier
     // claim is proven.
     private static WorkerClaimOutcome Combine(IEnumerable<WorkerClaimOutcome> outcomes)
     {
+        System.ArgumentNullException.ThrowIfNull(outcomes);
         var all = outcomes.ToArray();
         return all.Contains(WorkerClaimOutcome.Refuted) ? WorkerClaimOutcome.Refuted
             : all.All(static outcome => outcome == WorkerClaimOutcome.Proven) ? WorkerClaimOutcome.Proven

@@ -7,16 +7,19 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        if (context.Equals(default(IncrementalGeneratorInitializationContext)))
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
         var globalValue = context.AnalyzerConfigOptionsProvider.Select(
-            static (provider, _) => GetOption(
+            static (provider, _) => provider is null ? throw new System.ArgumentNullException(nameof(provider)) : (GetOption(
                 provider.GlobalOptions,
-                CompilerProbeContract.GlobalValueOptionKey));
+                CompilerProbeContract.GlobalValueOptionKey)));
         var inputs = context.AdditionalTextsProvider
             .Where(static file =>
-                string.Equals(
+                file is null ? throw new System.ArgumentNullException(nameof(file)) : (string.Equals(
                     Path.GetFileName(file.Path),
                     CompilerProbeContract.AdditionalFileName,
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase)))
             .Collect()
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select(static (pair, cancellationToken) =>
@@ -59,7 +62,7 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             globalValue.Combine(inputs),
             static (productionContext, input) =>
-                Generate(productionContext, input.Left, input.Right));
+                { if ((productionContext.Equals(default(SourceProductionContext)))) { throw new System.ArgumentException("Value must be initialized.", nameof(productionContext)); } Generate(productionContext, input.Left, input.Right); });
     }
 
     private static void Generate(
@@ -67,6 +70,13 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         string globalValue,
         ImmutableArray<(string Path, string Text, string Metadata)> inputs)
     {
+        if (context.Equals(default(SourceProductionContext)))
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (globalValue is null)
+        {
+            throw new System.ArgumentNullException(nameof(globalValue));
+        }
         if (inputs.IsDefaultOrEmpty)
         {
             return;
@@ -102,6 +112,26 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         string globalValue,
         string fingerprint)
     {
+        if (fingerprint is null)
+        {
+            throw new System.ArgumentNullException(nameof(fingerprint));
+        }
+        if (globalValue is null)
+        {
+            throw new System.ArgumentNullException(nameof(globalValue));
+        }
+        if (metadata is null)
+        {
+            throw new System.ArgumentNullException(nameof(metadata));
+        }
+        if (path is null)
+        {
+            throw new System.ArgumentNullException(nameof(path));
+        }
+        if (text is null)
+        {
+            throw new System.ArgumentNullException(nameof(text));
+        }
         var postconditionOperator = text.StartsWith(
             "refute:",
             StringComparison.Ordinal)
@@ -131,6 +161,10 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
 
     private static string Literal(string value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
             value,
             quote: true);

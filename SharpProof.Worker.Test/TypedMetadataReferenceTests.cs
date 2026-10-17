@@ -29,6 +29,9 @@ public sealed class TypedMetadataReferenceTests
     public void MetadataRequiresUseTypedEntryValuesWithoutSourceSyntax(string type, string attribute,
         string input, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ [return: Positive] public static int Target([{attribute}] {type} value) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }");
@@ -64,6 +67,7 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("string", true)]
     public void MetadataRequiresNotNullPreservesReferenceDomain(string type, bool nonnull)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target([NotNull] {type} value) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }");
@@ -86,6 +90,7 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("[System.Runtime.InteropServices.In] int value", true, 0)]
     public void MetadataRequiresBindingIsTransactional(string parameters, bool success, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(parameters);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target({parameters}) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }");
@@ -120,8 +125,8 @@ public sealed class TypedMetadataReferenceTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrAssignInstruction>().Any(assign => assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrAssignInstruction>().Any(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat })), Is.True);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out _, out _), Is.False);
@@ -145,6 +150,9 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("string", "string", "string local = value; if (local != null) local = null; return local;")]
     public void ReferenceTransfersMatchCompiledIdentity(string type, string resultType, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(resultType);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"public static class Library {{ public static {resultType} Target({type} value) {{ {body} }} private static {type} Again({type} value) {{ return value; }} }}",
             $$"""
@@ -194,6 +202,7 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("Bgt_un")]
     public void ReferenceArithmeticAndOrderingRemainClosed(string opcode)
     {
+        System.ArgumentNullException.ThrowIfNull(opcode);
         var result = opcode == "Conv_i4" ? "int" : opcode is "Cgt" or "Cgt_un" ? "bool" : "object";
         var compilation = TestCompilation.Create("Shape", $"public static class Subject {{ public static {result} Target(object value) {{ throw null; }} }}");
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
@@ -212,6 +221,9 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("string", "bool", "return value == \"x\";")]
     public void ReferenceConversionsAndContentCallsRemainClosed(string parameter, string result, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(parameter);
+        System.ArgumentNullException.ThrowIfNull(result);
         using var subject = new MetadataTestSubject($"public static class Library {{ public static {result} Target({parameter} value) {{ {body} }} }}",
             $"using SharpProof.Attributes; public static class Subject {{ public static {result} Target({parameter} value) {{ Contract.Ensures(true); return Library.Target(value); }} }}");
         var total = subject.CreateArtifact().Callables.Single().Total;
@@ -224,6 +236,7 @@ public sealed class TypedMetadataReferenceTests
     [TestCase("string", false)]
     public async Task NativeNullGoalsProveAndRefuteThroughOwnedMetadataReplay(string type, bool equal)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var comparison = equal ? "==" : "!=";
         using var subject = new MetadataTestSubject(
@@ -280,7 +293,7 @@ public sealed class TypedMetadataReferenceTests
         var goal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(total.Result!.Value), expected);
         var site = factory.CreateOperation("metadata-string-identity");
         var candidate = new PassiveCallableCandidate("identity", total.Program,
-            [.. total.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))], total.Result,
+            [.. total.Parameters.Select(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))))], total.Result,
             [new(factory.Binary(IrBinaryOperator.NotEqual, x, factory.Null(x.Type)), factory.Boolean(true), site),
                 new(factory.Binary(IrBinaryOperator.NotEqual, y, factory.Null(y.Type)), factory.Boolean(true), site),
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Length(x), factory.Integer(3)), factory.Boolean(true), site),
@@ -308,6 +321,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
     [TestCase("reversed-range", 0)]
     public void CapturesOwnedRowsFromAuthenticatedImage(string mode, int expectedCount)
     {
+        System.ArgumentNullException.ThrowIfNull(mode);
         using var directory = new TempDirectory("sharpproof-evidence-prototype-");
         var bytes = CreateImage(mode);
         var path = Path.Combine(directory.FullName, "MetadataTarget.dll");
@@ -337,7 +351,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         using var pe = new PEReader(new MemoryStream(bytes, writable: false));
         var reader = pe.GetMetadataReader();
         Assert.That(body.ModuleMvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
-        Assert.That(body.ParameterAttributes.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(expectedCount));
+        Assert.That(body.ParameterAttributes.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AttributeToken)).Distinct().Count(), Is.EqualTo(expectedCount));
         foreach (var row in body.ParameterAttributes)
         {
             Assert.That(row.MethodToken, Is.EqualTo(method.MetadataToken));
@@ -359,6 +373,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
 
     internal static byte[] CreateImage(string mode)
     {
+        System.ArgumentNullException.ThrowIfNull(mode);
         var metadata = new MetadataBuilder();
         metadata.AddModule(0, metadata.GetOrAddString("MetadataTarget.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
         metadata.AddAssembly(metadata.GetOrAddString("MetadataTarget"), new Version(1, 0, 0, 0), default, default, (AssemblyFlags)0, System.Reflection.AssemblyHashAlgorithm.None);
@@ -449,7 +464,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var reversed = binding.Clauses.Reverse().ToImmutableArray();
         Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(reversed, body.ParameterAttributes,
             CancellationToken.None, out var paired), Is.True);
-        Assert.That(paired.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(2));
+        Assert.That(paired.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AttributeToken)).Distinct().Count(), Is.EqualTo(2));
         for (var ordinal = 0; ordinal < reversed.Length; ordinal++)
         {
             Assert.That(paired[ordinal].ClauseOrdinal, Is.EqualTo(ordinal));
@@ -459,7 +474,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
             Assert.That(paired[ordinal].Kind, Is.EqualTo(reversed[ordinal].Validation.Kind.ToString()));
             Assert.That(paired[ordinal].Minimum, Is.EqualTo(reversed[ordinal].Validation.Minimum));
             Assert.That(paired[ordinal].Maximum, Is.EqualTo(reversed[ordinal].Validation.Maximum));
-            Assert.That(paired[ordinal].AttributeToken, Is.EqualTo(body.ParameterAttributes.Single(row => row.Kind == paired[ordinal].Kind).AttributeToken));
+            Assert.That(paired[ordinal].AttributeToken, Is.EqualTo(body.ParameterAttributes.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == paired[ordinal].Kind)).AttributeToken));
         }
         Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(
             [binding.Clauses[0], binding.Clauses[0]], body.ParameterAttributes, CancellationToken.None, out _), Is.False, "A metadata token cannot be consumed twice.");
@@ -482,6 +497,8 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
 
     private static (CSharpCompilation Compilation, IMethodSymbol Method, byte[] Image) CreateSubject(string directory, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(source);
         var library = TestCompilation.Create("EvidencePairingLibrary", source);
         using var image = new MemoryStream();
         var emitted = library.Emit(image);
@@ -511,6 +528,7 @@ public sealed class MetadataClosedAttributeEvidenceIdentityTests
     [TestCase("empty-public-key", false)]
     public void AssemblyReferenceFlagsAndKeyLengthsAreCheckedBeforeCopy(string mode, bool accepted)
     {
+        System.ArgumentNullException.ThrowIfNull(mode);
         var compilation = TestCompilation.Create("AssemblyIdentityProbe", "public static class Subject { }");
         var expected = compilation.GetTypeByMetadataName("SharpProof.Attributes.PositiveAttribute")!.ContainingAssembly.Identity;
         var metadata = new MetadataBuilder();

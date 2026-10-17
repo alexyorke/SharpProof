@@ -12,6 +12,7 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerVerifyResponse response,
         string projectDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
         var projectDirectoryUri = DirectoryUri(projectDirectory);
@@ -25,23 +26,23 @@ internal static class SarifProjection
         var callableResults = response.CallableResults;
         var errors = response.Errors;
         var claims = manifest.Claims.ToDictionary(
-            static claim => claim.ClaimId, StringComparer.Ordinal);
+            static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
         var callables = manifest.Callables.ToDictionary(
-            static callable => callable.CallableId, StringComparer.Ordinal);
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
         var results = claimResults
             .Select(result => ClaimResult(
                 request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory))
             .ToList();
         results.AddRange(callableResults
-            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
+            .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete))
             .Select(result => IncompleteResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         results.AddRange(callableResults
-            .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
+            .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(IsPolicyAssumption)))
             .Select(result => AssumptionResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         var notifications = errors.Select(
-            static error => Notification(error.Code, error.Message)).ToList();
+            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))).ToList();
 
         if (runStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
@@ -92,6 +93,7 @@ internal static class SarifProjection
         Dictionary<string, TEntry> entries, string id, string kind)
         where TEntry : class
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         return entries.TryGetValue(id, out var entry)
             ? entry
             : throw new InvalidDataException(
@@ -102,6 +104,10 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerClaimResult result,
         WorkerClaimManifestEntry claim, string projectDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(result);
         var outcome = result.Outcome;
         var reasonValue = result.Reason;
         var effectWitness = result.EffectWitness;
@@ -110,8 +116,8 @@ internal static class SarifProjection
             ? string.Empty
             : " [vacuous: " + result.Vacuity + "]";
         var implementationIlAssumption = result.ProofCore.Any(
-            static item => item.StartsWith(
-                "il-summary:", StringComparison.Ordinal))
+            static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
+                "il-summary:", StringComparison.Ordinal)))
             ? " [implementation-IL proof assumes the compile-time referenced binary is the runtime binary]"
             : string.Empty;
         var witness = effectWitness == null
@@ -140,6 +146,10 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable, string projectDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(callable);
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(result);
         var callableId = result.CallableId;
         var reason = result.Reason;
         var presentation = UnknownPresentation(request.VerifyPolicy);
@@ -161,6 +171,10 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable, string projectDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(callable);
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(result);
         var assumptions = result.Assumptions
             .Where(IsPolicyAssumption)
             .ToArray();
@@ -183,6 +197,7 @@ internal static class SarifProjection
     private static bool IsPolicyAssumption(
         WorkerAssumptionEvidence assumption)
     {
+        System.ArgumentNullException.ThrowIfNull(assumption);
         return assumption.Kind is WorkerAssumptionKind.UserAssume or
             WorkerAssumptionKind.TrustedBoundary;
     }
@@ -219,6 +234,14 @@ internal static class SarifProjection
         WorkerSourceLocation location, string semanticId, object properties,
         string projectDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
+        System.ArgumentNullException.ThrowIfNull(level);
+        System.ArgumentNullException.ThrowIfNull(location);
+        System.ArgumentNullException.ThrowIfNull(message);
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
+        System.ArgumentNullException.ThrowIfNull(properties);
+        System.ArgumentNullException.ThrowIfNull(ruleId);
+        System.ArgumentNullException.ThrowIfNull(semanticId);
         return new
         {
             ruleId,
@@ -246,6 +269,9 @@ internal static class SarifProjection
     private static object Notification(
         string id, string message, string level = "error")
     {
+        System.ArgumentNullException.ThrowIfNull(id);
+        System.ArgumentNullException.ThrowIfNull(level);
+        System.ArgumentNullException.ThrowIfNull(message);
         return new
         {
             descriptor = new
@@ -321,12 +347,14 @@ internal static class SarifProjection
 
     private static bool IsUnixAbsolute(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return path.Length != 0 && path[0] == '/';
     }
 
     private static string NormalizeAbsolutePath(
         string path, bool windowsPath)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
             '/', StringSplitOptions.RemoveEmptyEntries);
@@ -393,6 +421,7 @@ internal static class SarifProjection
 
     private static bool IsWindowsDriveAbsolute(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return path.Length >= 3 &&
             char.IsAsciiLetter(path[0]) &&
             path[1] == ':' &&
@@ -401,9 +430,10 @@ internal static class SarifProjection
 
     private static string EscapePath(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return string.Join(
             "/",
             path.Split('/').Select(
-                static segment => Uri.EscapeDataString(segment)));
+                static segment => segment is null ? throw new System.ArgumentNullException(nameof(segment)) : (Uri.EscapeDataString(segment))));
     }
 }

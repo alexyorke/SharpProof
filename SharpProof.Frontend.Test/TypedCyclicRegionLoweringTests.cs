@@ -16,6 +16,7 @@ public sealed class TypedCyclicRegionLoweringTests
     [TestCase("int Target(int x) { while (x < 0) { try { x = checked(x + 1); } catch (System.OverflowException) { x = 1; } finally { x++; } } return x; }", 1, 1)]
     public void CyclicRegionMatchesCompiledOracle(string members, int argument, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([argument]), Is.EqualTo(expected));
         var lowered = subject.Lower();
@@ -88,6 +89,7 @@ public sealed class TypedCyclicRegionLoweringTests
     [TestCase("finally", 1, 3)]
     public void ConditionalRegionTerminalEdgesEvaluateTheirGuardsExactlyOnce(string kind, int input, int current)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         using var subject = TypedProgramSubject.Create(kind == "rethrow"
             ? "int Target(int x) { try { return 10 / (x - x); } catch (System.DivideByZeroException) { if (++x > 1) throw; return x; } }"
             : "int Target(int x) { try { x++; } finally { if (x++ == 1) x = 7; } return x; }");

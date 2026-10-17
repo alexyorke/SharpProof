@@ -32,12 +32,12 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         Assert.That(source.Length, Is.LessThan(65536));
         Assert.That(syntax.DescendantNodesAndSelf().Count(), Is.LessThan(65536));
         var model = compilation.GetSemanticModel(tree);
-        var rootDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node.Identifier.ValueText == "Root");
-        var helperDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node.Identifier.ValueText == "Helper");
+        var rootDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Root"));
+        var helperDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Helper"));
         var root = (IMethodSymbol)model.GetDeclaredSymbol(rootDeclaration)!;
         var helper = (IMethodSymbol)model.GetDeclaredSymbol(helperDeclaration)!;
         Assert.That(root.Parameters, Has.Length.EqualTo(parameterCount));
-        Assert.That(root.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None), Is.True);
+        Assert.That(root.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)), Is.True);
         Assert.That(model.GetOperation(rootDeclaration), Is.InstanceOf<IMethodBodyOperation>());
         var invocation = (IInvocationOperation)model.GetOperation(rootDeclaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
         Assert.That(SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, helper), Is.True);
@@ -46,7 +46,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var inventory = builder.BuildPotentialCallShadow();
         Assert.That(inventory.Gaps, Is.Empty);
         Assert.That(inventory.Owners, Has.Length.EqualTo(2));
-        var owned = inventory.Owners.Single(owner => SymbolEqualityComparer.Default.Equals(owner.Method, root));
+        var owned = inventory.Owners.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (SymbolEqualityComparer.Default.Equals(owner.Method, root)));
         Assert.That(owned.DiscoveryComplete, Is.True);
         Assert.That(owned.Declaration.Span, Is.EqualTo(rootDeclaration.Span));
         Assert.That(ReferenceEquals(owned.SemanticModel.Compilation, compilation), Is.True);
@@ -91,7 +91,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var compilation = TestCompilation.Create("TreeBoundary", sources);
         EmitAndCheck(compilation);
         Assert.That(compilation.SyntaxTrees.Length, Is.EqualTo(treeCount));
-        Assert.That(compilation.SyntaxTrees.Select(tree => tree.FilePath).Distinct().Count(), Is.EqualTo(treeCount));
+        Assert.That(compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath)).Distinct().Count(), Is.EqualTo(treeCount));
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         var batch = Prepare(compilation);
         if (expectedComplete)
@@ -127,7 +127,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         Assert.That(model.GetOperation(declarations[declarations.Length - 1]), Is.InstanceOf<IMethodBodyOperation>());
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         Assert.That(inventory.Owners, Has.Length.EqualTo(4096));
-        Assert.That(inventory.Owners.All(owner => owner.DiscoveryComplete && owner.Method.IsStatic && owner.Method.Parameters.IsEmpty), Is.True);
+        Assert.That(inventory.Owners.All(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.DiscoveryComplete && owner.Method.IsStatic && owner.Method.Parameters.IsEmpty)), Is.True);
         if (expectedComplete)
         { Assert.That(inventory.Gaps, Is.Empty); }
         else
@@ -153,7 +153,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var declaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         Assert.That(method.GetAttributes(), Has.Length.EqualTo(attributeCount));
-        Assert.That(method.GetAttributes().All(attribute => attribute.AttributeClass?.Name == "TagAttribute"), Is.True);
+        Assert.That(method.GetAttributes().All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.Name == "TagAttribute")), Is.True);
         Assert.That(syntax.DescendantNodesAndSelf().Count() < 65536, Is.EqualTo(expectedComplete));
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         if (expectedComplete)
@@ -173,6 +173,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
 
     private static void EmitAndCheck(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -182,6 +183,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);

@@ -93,7 +93,7 @@ public sealed class AnalyzerArchitectureTests
         var expected = Snapshot(results[0]);
 
         Assert.That(
-            results.Select(static result => Snapshot(result)),
+            results.Select(static result => result.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(result)) : (Snapshot(result))),
             Is.All.EqualTo(expected));
     }
 
@@ -102,7 +102,7 @@ public sealed class AnalyzerArchitectureTests
     {
         var references = typeof(SharpProofAnalyzer).Assembly
             .GetReferencedAssemblies()
-            .Select(static name => name.Name)
+            .Select(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Name))
             .Where(static name => name != null &&
                                   name.StartsWith(
                                       "SharpProof.",
@@ -126,7 +126,7 @@ public sealed class AnalyzerArchitectureTests
         {
             Assert.That(
                 assembly.GetReferencedAssemblies()
-                    .Select(static reference => reference.Name),
+                    .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Name)),
                 Does.Not.Contain("SharpProof.Attributes"),
                 assembly.GetName().Name);
         }
@@ -146,11 +146,16 @@ public sealed class AnalyzerArchitectureTests
             typeof(AnalyzerArchitectureTests).Assembly.GetName().Name;
         var sharpProofNames = names
             .Where(static name =>
-                name.StartsWith("SharpProof.", StringComparison.Ordinal))
-            .Where(name => !string.Equals(
+                name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith("SharpProof.", StringComparison.Ordinal)))
+            .Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!string.Equals(
                 name,
                 testAssembly,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)))
+            // The test project references this repository-only analyzer directly.
+            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!string.Equals(
+                name,
+                "SharpProof.DefensiveCodingAnalyzer",
+                StringComparison.Ordinal)))
             .ToArray();
 
         using (Assert.EnterMultipleScope())
@@ -206,11 +211,11 @@ public sealed class AnalyzerArchitectureTests
             "New Rules");
         var descriptors = new SharpProofAnalyzer()
             .SupportedDiagnostics
-            .Where(static descriptor => !descriptor.Id.StartsWith(
+            .Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (!descriptor.Id.StartsWith(
                 "SPCF",
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)))
             .ToDictionary(
-                static descriptor => descriptor.Id,
+                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
                 StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
@@ -247,7 +252,7 @@ public sealed class AnalyzerArchitectureTests
         var descriptors = new SharpProofAnalyzer()
             .SupportedDiagnostics
             .ToDictionary(
-                static descriptor => descriptor.Id,
+                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
                 StringComparer.Ordinal);
         var expected = new[]
         {
@@ -279,6 +284,8 @@ public sealed class AnalyzerArchitectureTests
             string path,
             string section)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(section);
         var result = new Dictionary<string, ReleaseRule>(
             StringComparer.Ordinal);
         var inSection = false;
@@ -299,7 +306,7 @@ public sealed class AnalyzerArchitectureTests
 
             var columns = line
                 .Split('|')
-                .Select(static column => column.Trim())
+                .Select(static column => column is null ? throw new System.ArgumentNullException(nameof(column)) : (column.Trim()))
                 .ToArray();
             if (columns.Length < 4 ||
                 columns[0].Length != 6 ||
@@ -324,6 +331,7 @@ public sealed class AnalyzerArchitectureTests
     private static string ReleaseSeverity(
         DiagnosticDescriptor descriptor)
     {
+        System.ArgumentNullException.ThrowIfNull(descriptor);
         return descriptor.IsEnabledByDefault
             ? descriptor.DefaultSeverity.ToString()
             : "Disabled";
@@ -331,16 +339,22 @@ public sealed class AnalyzerArchitectureTests
 
     private static string Snapshot(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join(
             "\n",
             diagnostics.Select(diagnostic =>
-                diagnostic.Id + "|" +
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + "|" +
                 diagnostic.Location.SourceSpan.Start + "|" +
-                diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 
     private sealed record ReleaseRule(
         string Id,
         string Category,
-        string Severity);
+        string Severity)
+    {
+        public string Id { get; init; } = Id ?? throw new System.ArgumentNullException(nameof(Id));
+        public string Category { get; init; } = Category ?? throw new System.ArgumentNullException(nameof(Category));
+        public string Severity { get; init; } = Severity ?? throw new System.ArgumentNullException(nameof(Severity));
+    }
 }

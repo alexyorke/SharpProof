@@ -16,6 +16,8 @@ public sealed class NativeMutationBoundaryTests
     [TestCase("Holder<object>.Producer", true, "public class Holder<T> { public delegate T Producer(); }")]
     public async Task DelegateArrayStoreRetainsRuntimeCovariance(string element, bool exact, string additionalSource)
     {
+        System.ArgumentNullException.ThrowIfNull(additionalSource);
+        System.ArgumentNullException.ThrowIfNull(element);
         var preparation = Prepare("[DoesNotThrow] public static void Target(" + element + "[] values, " + element +
             " item) { Contract.Requires(values != null && values.Length > 0); values[0] = item; }", additionalSource);
         Assert.That(preparation.Total, Is.Not.Null);
@@ -44,10 +46,12 @@ public sealed class NativeMutationBoundaryTests
 
     private static CompilerCallablePreparation Prepare(string method, string additionalSource = "")
     {
+        System.ArgumentNullException.ThrowIfNull(additionalSource);
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " } " + additionalSource);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
     [Test]
@@ -66,6 +70,7 @@ public sealed class NativeMutationBoundaryTests
     [TestCase("public int Value { get; set; }", 38, WorkerClaimOutcome.Refuted)]
     public async Task WorkerUsesCapturedCompoundReceiver(string member, int expected, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         var source = $$"""
             using SharpProof.Attributes;
             public sealed class Box { {{member}} }
@@ -95,6 +100,8 @@ public sealed class NativeMutationBoundaryTests
     [TestCase("string", "[null]", WorkerClaimOutcome.Proven)]
     public async Task WorkerHandlesNullableInitializerWithoutManifestFailure(string element, string initializer, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(element);
+        System.ArgumentNullException.ThrowIfNull(initializer);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class C { " +
             "public static int Target() { Contract.Ensures(Contract.Result<int>() == 1); " + element +
             "[] values = " + initializer + "; return values.Length; } }");

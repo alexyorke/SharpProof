@@ -37,6 +37,7 @@ public sealed class NativeSourceEmissionWorkflowTests
     [TestCase("The allocation oracle source did not compile: ")]
     public void OrdinaryCompilerErrorKeepsTheExistingOracleDiagnostic(string prefix)
     {
+        System.ArgumentNullException.ThrowIfNull(prefix);
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static int Value() => MissingValue; }",
             "OrdinarySourceEmissionError", includeExternalEffectsFixture: false);

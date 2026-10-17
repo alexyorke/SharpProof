@@ -20,7 +20,7 @@ public sealed class FieldCompoundChildAdmissionCoverageTests
         Assert.That(rejected.Invoke([2]), Is.EqualTo(expected));
         var tree = rejected.Compilation.SyntaxTrees.Single();
         var assignment = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>()
-            .Single(node => node.OperatorToken.ValueText is "+=" or "/=");
+            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.OperatorToken.ValueText is "+=" or "/="));
         var operation = rejected.Compilation.GetSemanticModel(tree).GetOperation(assignment)!;
         var builder = new IrProgramBuilder(rejected.Factory);
         var entry = builder.CreateBlock("entry");

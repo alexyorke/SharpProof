@@ -68,6 +68,7 @@ public sealed partial class WorkerTests
     [TestCase("cancellation", WorkerClaimReason.InfrastructureFailure)]
     public async Task BackendQueryExceptionsProduceTypedFailure(string kind, WorkerClaimReason expected)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
         Exception failure = kind switch
@@ -107,10 +108,12 @@ public sealed partial class WorkerTests
 
     private sealed class QueryExceptionBackend(Exception failure) : ISmtBackend
     {
+        private Exception _guarded_failure = failure ?? throw new System.ArgumentNullException(nameof(failure));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromException<BackendCheckResult>(failure);
+            return Task.FromException<BackendCheckResult>(_guarded_failure);
         }
     }
 }

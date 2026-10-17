@@ -35,6 +35,18 @@ internal static class WorkerResultAssembler
         WorkerBudgets budgets, WorkerCacheStatus cacheStatus, long elapsedMilliseconds,
         IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null)
     {
+        if (budgets is null)
+        {
+            throw new System.ArgumentNullException(nameof(budgets));
+        }
+        if (inputHash is null)
+        {
+            throw new System.ArgumentNullException(nameof(inputHash));
+        }
+        if (manifest is null)
+        {
+            throw new System.ArgumentNullException(nameof(manifest));
+        }
         ArgumentNullGuard.NotNull(callableResults, nameof(callableResults));
         ArgumentNullGuard.NotNull(claimResults, nameof(claimResults));
         var callables = callableResults.ToArray();
@@ -67,6 +79,26 @@ internal static class WorkerResultAssembler
         string inputHash, WorkerClaimManifest manifest,
         WorkerCallableResult[] callableResults, WorkerClaimResult[] claimResults, WorkerBudgets budgets)
     {
+        if (callableResults is null)
+        {
+            throw new System.ArgumentNullException(nameof(callableResults));
+        }
+        if (claimResults is null)
+        {
+            throw new System.ArgumentNullException(nameof(claimResults));
+        }
+        if (budgets is null)
+        {
+            throw new System.ArgumentNullException(nameof(budgets));
+        }
+        if (inputHash is null)
+        {
+            throw new System.ArgumentNullException(nameof(inputHash));
+        }
+        if (manifest is null)
+        {
+            throw new System.ArgumentNullException(nameof(manifest));
+        }
         return new WorkerVerifyResponse
         {
             RequestHash = EmptyInputHash,
@@ -107,6 +139,18 @@ internal static class WorkerResultAssembler
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
+        if (budgets is null)
+        {
+            throw new System.ArgumentNullException(nameof(budgets));
+        }
+        if (inputHash is null)
+        {
+            throw new System.ArgumentNullException(nameof(inputHash));
+        }
+        if (requestHash is null)
+        {
+            throw new System.ArgumentNullException(nameof(requestHash));
+        }
         ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         var callables = (manifest.Callables ?? [])
             .OfType<WorkerCallableManifestEntry>()
@@ -142,14 +186,14 @@ internal static class WorkerResultAssembler
             }
         }
         return Create(inputHash, manifest, status, failureReason,
-            callables.Select(callable => new WorkerCallableResult
+            callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
             {
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Incomplete,
                 Reason = callableReason,
                 Assumptions = callable.Assumptions ?? []
-            }),
-            claims.Select(claim => new WorkerClaimResult
+            })),
+            claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new WorkerClaimResult
             {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Unknown,
@@ -166,7 +210,7 @@ internal static class WorkerResultAssembler
                         out var assumptions)
                     ? []
                     : assumptions
-            }),
+            })),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, runErrors, requestHash, versions);
     }
 
@@ -176,8 +220,8 @@ internal static class WorkerResultAssembler
         ArgumentNullGuard.NotNull(callables, nameof(callables));
         ArgumentNullGuard.NotNull(claims, nameof(claims));
         var kinds = new Dictionary<string, WorkerAssumptionKind>(StringComparer.Ordinal);
-        foreach (var assumption in callables.SelectMany(static value => value?.Assumptions ?? [])
-            .Concat(claims.SelectMany(static value => value?.Assumptions ?? [])))
+        foreach (var assumption in callables.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Assumptions ?? []))
+            .Concat(claims.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Assumptions ?? []))))
         {
             if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
             {
@@ -396,9 +440,9 @@ internal static class WorkerResultAssembler
         var directInfrastructureFailure =
             owned.Length != 0 &&
             owned.All(static claim =>
-                claim?.Outcome == WorkerClaimOutcome.Unknown &&
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim?.Outcome == WorkerClaimOutcome.Unknown &&
                 claim?.Reason is WorkerClaimReason.InfrastructureFailure or
-                    WorkerClaimReason.BackendUnavailable) &&
+                    WorkerClaimReason.BackendUnavailable)) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
         var compatibleSemanticFallback =
@@ -518,6 +562,14 @@ internal static class WorkerResultAssembler
 
     private static bool HasPrefix(string value, string prefix)
     {
+        if (prefix is null)
+        {
+            throw new System.ArgumentNullException(nameof(prefix));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return value.StartsWith(prefix, StringComparison.Ordinal);
     }
 

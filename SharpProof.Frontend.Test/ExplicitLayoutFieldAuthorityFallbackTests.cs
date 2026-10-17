@@ -167,8 +167,8 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<AttributeSyntax>().Single();
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Has.Length.EqualTo(1), string.Join("\n", errors.Select(static diagnostic => diagnostic.ToString())));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Has.Length.EqualTo(1), string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         var error = errors.Single();
         using (Assert.EnterMultipleScope())
         {
@@ -252,6 +252,13 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
 
     private static CSharpCompilation CreateCompilation(string name, string source, ImmutableArray<MetadataReference> references)
     {
+
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(source);
+        if (references.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(references));
+        }
         return CSharpCompilation.Create(name,
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "Subject.cs")],
             references,
@@ -261,12 +268,14 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
 
     private static void AssertNoErrors(Compilation compilation)
     {
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic.ToString())));
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     private static string EvidenceDirectory(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT");
         Assert.That(repositoryRoot, Is.Not.Null.And.Not.Empty);
         var directory = Path.Combine(repositoryRoot!, "artifacts", "correctness", "explicit-layout-field-authority-fallback-audit",
@@ -277,11 +286,15 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
 
     private static string Hash(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value));
     }
 }

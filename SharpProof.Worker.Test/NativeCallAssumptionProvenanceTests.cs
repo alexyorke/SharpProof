@@ -15,6 +15,7 @@ public sealed class NativeCallAssumptionProvenanceTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         PassiveParameterBinding Parameter(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return new(factory.CreateVariable(name + "-entry", factory.BooleanType),
                 factory.CreateVariable(name + "-current", factory.BooleanType), factory.CreateVariable(name + "-old", factory.BooleanType));
         }
@@ -71,7 +72,7 @@ public sealed class NativeCallAssumptionProvenanceTests
         Assert.That(proof.Outcome, assumed ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.BodyAssumptions, Is.EqualTo(assumed ? new[] { firstSite, secondSite } : []));
-        Assert.That(proof.Core.Any(label => label.StartsWith("assume:", StringComparison.Ordinal)), Is.EqualTo(assumed));
+        Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.EqualTo(assumed));
         Assert.That(proof.CallPreconditionWitness, assumed ? Is.Null : Is.EqualTo(site));
         if (!assumed)
         {

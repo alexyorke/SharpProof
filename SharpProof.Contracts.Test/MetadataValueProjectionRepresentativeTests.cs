@@ -28,11 +28,11 @@ public sealed class MetadataValueProjectionRepresentativeTests
             [new ContractMetadataValueSite(parameter, () => value)]);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(result.Clauses.Select(clause => clause.Attribute.AttributeClass!.Name),
+        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Attribute.AttributeClass!.Name)),
             Is.EqualTo(SingleAttributeNames));
-        Assert.That(result.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(SingleParameterOrdinals));
-        Assert.That(publicResult.Clauses.Select(clause => clause.Validation.Kind),
-            Is.EqualTo(result.Clauses.Select(clause => clause.Validation.Kind)));
+        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)), Is.EqualTo(SingleParameterOrdinals));
+        Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Validation.Kind)),
+            Is.EqualTo(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Validation.Kind))));
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -3, -2, 0, 1, 2, 3 })
         {
@@ -79,7 +79,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(publicResult.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(PairParameterOrdinals));
+        Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)), Is.EqualTo(PairParameterOrdinals));
         var prefix = new ContractMetadataValueSite(target.Parameters[0],
             () => factory.Variable(context.Parameters[0].Entry));
         var validPrefix = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, [prefix]);
@@ -113,8 +113,8 @@ public sealed class MetadataValueProjectionRepresentativeTests
         Assert.That(consumerEmit.Success, Is.True, string.Join(Environment.NewLine, consumerEmit.Diagnostics));
         var target = compilation.GetTypeByMetadataName("MetadataValueSource")!.GetMembers(methodName).OfType<IMethodSymbol>().Single();
         Assert.That(target.DeclaringSyntaxReferences, Is.Empty);
-        Assert.That(target.Parameters.Select(parameter => parameter.Ordinal), Is.EqualTo(Enumerable.Range(0, target.Parameters.Length)));
-        Assert.That(target.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None), Is.True);
+        Assert.That(target.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Ordinal)), Is.EqualTo(Enumerable.Range(0, target.Parameters.Length)));
+        Assert.That(target.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)), Is.True);
         return (compilation, target);
     }
 }

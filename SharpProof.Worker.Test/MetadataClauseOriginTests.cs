@@ -25,8 +25,8 @@ public sealed class MetadataClauseOriginTests
         var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, detached,
             CancellationToken.None, references);
         var row = decoded.CallPreconditions.Single();
-        Assert.That(decoded.Program.Factory.GetOperationInfo(decoded.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == row.Instruction).Operation).SourceSpan!.Document,
+        Assert.That(decoded.Program.Factory.GetOperationInfo(decoded.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrAssignInstruction>().Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == row.Instruction)).Operation).SourceSpan!.Document,
             Is.EqualTo("Caller.cs"));
         Assert.That(decoded.Program.Factory.GetOperationInfo(row.ClauseSite).SourceSpan == null, Is.EqualTo(metadata));
         Assert.That(row.MetadataClause == null, Is.EqualTo(!metadata));
@@ -78,6 +78,7 @@ public sealed class MetadataClauseOriginTests
     [TestCase("wrong-table")]
     public void CorruptOrDetachedMetadataTransportRejects(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var (body, references, origin) = Create(true);
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
         _ = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, CancellationToken.None, references);

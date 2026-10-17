@@ -15,15 +15,18 @@ public sealed class MethodReferenceThrowClassificationTests
     public void MethodGroupNullCheckingFollowsTheActualReceiverDomain(
         string declaration, string parameters, string expression, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var tree = CSharpSyntaxTree.ParseText(declaration +
             " public static class Subject { public static System.Func<int> Target(" +
             parameters + ") => " + expression + "; }");
         var compilation = CSharpCompilation.Create("MethodReferenceClassification", [tree],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var operation = compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         var reference = operation.DescendantsAndSelf().OfType<IMethodReferenceOperation>().Single();
         Assert.That(CSharpOperationSemantics.OperationMayThrow(reference), Is.EqualTo(expected));
@@ -35,12 +38,14 @@ public sealed class MethodReferenceThrowClassificationTests
     public void NonDecimalUnaryAndCompoundArithmeticHaveNoDecimalFault(
         string parameters, string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(" +
             parameters + ") => " + expression + "; }");
         var compilation = CSharpCompilation.Create("NonDecimalClassification", [tree],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var operation = compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         Assert.That(CSharpOperationSemantics.OperationMayThrow(operation), Is.False);

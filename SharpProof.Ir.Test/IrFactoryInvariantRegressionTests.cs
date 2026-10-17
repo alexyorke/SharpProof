@@ -259,6 +259,7 @@ public sealed class IrFactoryInvariantRegressionTests
     private static void AssertFactoryCanMakeProgressFromAnotherThread(
         IrFactory factory)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         var worker = new Thread(() => factory.CreateIdentity())
         {
             IsBackground = true
@@ -276,11 +277,12 @@ public sealed class IrFactoryInvariantRegressionTests
         bool checkEquality) :
         IEqualityComparer<object>
     {
+        private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         public new bool Equals(object? left, object? right)
         {
             if (checkEquality)
             {
-                AssertFactoryCanMakeProgressFromAnotherThread(factory);
+                AssertFactoryCanMakeProgressFromAnotherThread(_guarded_factory);
                 return true;
             }
             return ReferenceEquals(left, right);
@@ -288,9 +290,10 @@ public sealed class IrFactoryInvariantRegressionTests
 
         public int GetHashCode(object value)
         {
+            System.ArgumentNullException.ThrowIfNull(value);
             if (!checkEquality)
             {
-                AssertFactoryCanMakeProgressFromAnotherThread(factory);
+                AssertFactoryCanMakeProgressFromAnotherThread(_guarded_factory);
             }
             return 0;
         }

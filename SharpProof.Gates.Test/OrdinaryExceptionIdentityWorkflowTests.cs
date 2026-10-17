@@ -25,7 +25,7 @@ public sealed class OrdinaryExceptionIdentityWorkflowTests
         using var image = new MemoryStream();
         var emitted = runtimeCompilation.Emit(image);
         Assert.That(emitted.Success, Is.True,
-            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
+            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         image.Position = 0;
         var context = new AssemblyLoadContext("ordinary-exception-identity-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try

@@ -14,6 +14,7 @@ public sealed class CacheNullEvidenceBoundaryTests
     [TestCase("valid")]
     public async Task CacheDoesNotRepairNullEvidenceIntoAHit(string shape)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         using var directory = new TempDirectory("cache-null-evidence-");
         var location = new WorkerSourceLocation
         {

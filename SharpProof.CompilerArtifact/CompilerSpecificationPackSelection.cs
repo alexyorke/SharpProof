@@ -31,6 +31,10 @@ internal static class CompilerSpecificationPackSelection
     internal static bool Matches(
         CompilerManifestArtifact artifact)
     {
+        if (artifact is null)
+        {
+            throw new System.ArgumentNullException(nameof(artifact));
+        }
         return artifact != null && artifact.Compilation != null &&
             IsValid(artifact.SpecificationPackIds, artifact.SpecificationPackCatalogVersion,
                 artifact.SpecificationPackCatalogSha256);
@@ -45,8 +49,12 @@ internal static class CompilerSpecificationPackSelection
 
     private static bool IsCanonical(string[] values)
     {
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return values.Zip(values.Skip(1), static (left, right) =>
-            StringComparer.Ordinal.Compare(left, right) < 0).All(
+            left is null ? throw new System.ArgumentNullException(nameof(left)) : right is null ? throw new System.ArgumentNullException(nameof(right)) : (StringComparer.Ordinal.Compare(left, right) < 0)).All(
                 static ordered => ordered);
     }
 }

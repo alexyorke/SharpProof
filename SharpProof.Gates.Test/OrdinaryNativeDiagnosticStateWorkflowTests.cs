@@ -44,7 +44,7 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         source.Append('}');
         var compilation = AnalyzerGateHost.CreateCompilation(source.ToString(),
             "OrdinaryNativeDiagnosticState", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -90,9 +90,9 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.CallableResults, Has.Length.EqualTo(mutationCount + 1));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(mutationCount + 1));
-        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
-        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Unknown), Is.EqualTo(mutationCount));
-        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Refuted), Is.Zero);
+        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
+        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown)), Is.EqualTo(mutationCount));
+        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)), Is.Zero);
 
         using var diagnostics = JsonDocument.Parse(NativeCorpusVerifier.CaptureWorkerDiagnostics(response, request.Budgets));
         var root = diagnostics.RootElement;
@@ -106,10 +106,10 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         var claims = root.GetProperty("ClaimsWithReasons").EnumerateArray().ToArray();
         Assert.That(incomplete, Has.Length.EqualTo(Math.Min(8, mutationCount)));
         Assert.That(claims, Has.Length.EqualTo(Math.Min(8, mutationCount)));
-        Assert.That(incomplete.Select(static row => row.GetProperty("CallableId").GetString()!), Is.Ordered.Using<string>(StringComparer.Ordinal));
-        Assert.That(claims.Select(static row => row.GetProperty("ClaimId").GetString()!), Is.Ordered.Using<string>(StringComparer.Ordinal));
-        Assert.That(incomplete.Select(static row => row.GetProperty("Coverage").GetString()), Is.All.EqualTo("Incomplete"));
-        Assert.That(claims.Select(static row => row.GetProperty("Outcome").GetString()), Is.All.EqualTo("Unknown"));
+        Assert.That(incomplete.Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetProperty("CallableId").GetString()!))), Is.Ordered.Using<string>(StringComparer.Ordinal));
+        Assert.That(claims.Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetProperty("ClaimId").GetString()!))), Is.Ordered.Using<string>(StringComparer.Ordinal));
+        Assert.That(incomplete.Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetProperty("Coverage").GetString()))), Is.All.EqualTo("Incomplete"));
+        Assert.That(claims.Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetProperty("Outcome").GetString()))), Is.All.EqualTo("Unknown"));
         Assert.That(root.GetProperty("Budgets").GetProperty("MethodWallTimeMilliseconds").GetInt32(), Is.EqualTo(10000));
     }
 }
