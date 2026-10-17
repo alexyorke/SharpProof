@@ -180,6 +180,93 @@ public sealed partial class NativeSpecifiedCallTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
+    [TestCase("System.ArgumentOutOfRangeException", false)]
+    [TestCase("System.ArgumentException", false)]
+    [TestCase("System.Exception", true)]
+    [TestCase("System.IndexOutOfRangeException", false)]
+    [TestCase("System.ArgumentNullException", false)]
+    public async Task InterfaceArrayBoundsRetainResourceCallbackExceptionUncertainty(string allowed, bool expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        foreach (var access in new[] { "return ((System.Collections.Generic.IList<int>)values)[index];", "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;" })
+        {
+            var preparation = Prepare("[AllowedExceptions(typeof(" + allowed + "))] public static int Target(int[] values, int index) { Contract.Requires(values != null); " + access + " }");
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(expected), result.Reason.ToString());
+        }
+        Assert.That(ExplicitThrowSites.TypeName(SharpProof.Ir.IrExceptionKind.ArgumentOutOfRange), Is.EqualTo("System.ArgumentOutOfRangeException"));
+    }
+
+    [Test]
+    public async Task ExactArrayInterfaceBoundsRetainIndependentNullReceiverFaults()
+    {
+        var preparation = Prepare("[AllowedExceptions(typeof(System.Exception))] public static int Target(int[] values, int index) { return ((System.Collections.Generic.IList<int>)values)[index]; }");
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        var missingNull = Prepare("[AllowedExceptions(typeof(System.ArgumentOutOfRangeException))] public static int Target(int[] values, int index) { return ((System.Collections.Generic.IList<int>)values)[index]; }");
+        var rejected = await NativeExceptionEffectVerifier.VerifyAsync(missingNull, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(rejected.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+    }
+
+    [TestCase("System.ArgumentOutOfRangeException")]
+    [TestCase("System.ArgumentException")]
+    [TestCase("System.Exception")]
+    public async Task ExactArrayInterfaceBoundsDispatchToTheirRuntimeCatchHierarchy(string exception)
+    {
+        System.ArgumentNullException.ThrowIfNull(exception);
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null); Contract.Ensures(Contract.Result<int>() == 37); try { return ((System.Collections.Generic.IList<int>)values)[-1]; } catch (" + exception + ") { return 37; }",
+            WorkerClaimOutcome.Proven);
+    }
+    [Test]
+    public async Task OpaqueMutationsPreserveEarlierScalarSnapshots()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null); " +
+            "Contract.Ensures(Contract.Result<int>() == Contract.Old(values[0])); int before = values[0]; " +
+            "mutate(values); return before;", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task UntakenOpaqueMutationsPreserveArrayContents()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate, bool change",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null && !change); " +
+            "Contract.Ensures(Contract.Result<int>() == Contract.Old(values[0])); " +
+            "if (change) mutate(values); return values[0];", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task ExplicitStoresRestoreCellsAfterOpaqueMutations()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate, int replacement",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null); " +
+            "Contract.Ensures(Contract.Result<int>() == replacement); " +
+            "mutate(values); values[0] = replacement; return values[0];", WorkerClaimOutcome.Proven);
+    }
+    [Test]
+    public async Task BoundsCallbackFailuresCanReachDifferentCatchHandlers()
+    {
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null); Contract.Ensures(Contract.Result<int>() == 37); " +
+            "try { return ((System.Collections.Generic.IList<int>)values)[-1]; } " +
+            "catch (System.ArgumentOutOfRangeException) { return 37; } catch (System.Exception) { return 0; }",
+            WorkerClaimOutcome.Unknown);
+    }
+
+    [TestCase("int before = cell.Value; mutate(cell); return before;", true)]
+    [TestCase("int before = cell.Value; mutate(cell); return cell.Value;", false)]
+    [TestCase("if (change) mutate(cell); return cell.Value;", true)]
+    [TestCase("mutate(cell); cell.Value = 17; return cell.Value;", true)]
+    public async Task OpaqueFieldMutationsRespectProgramOrderAndBranchReach(string body, bool proven)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        await CheckInterfaceArrayContract("Cell cell, System.Action<Cell> mutate, bool change",
+            "Contract.Requires(cell != null && cell.Value == 17 && mutate != null && !change); " +
+            "Contract.Ensures(Contract.Result<int>() == 17); " + body,
+            proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown,
+            members: "public sealed class Cell { public int Value; }");
+    }
     private static async Task CheckInterfaceArrayContract(string parameters, string body, WorkerClaimOutcome expected, string result = "int", string members = "")
     {
         System.ArgumentNullException.ThrowIfNull(parameters);

@@ -99,21 +99,24 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var invalid = _builder!.CreateBlock("interface-array:invalid-index");
         var continuation = _builder.CreateBlock("interface-array:checked-index");
         _builder.Branch(block, site, outside, invalid, continuation);
-        // ThrowHelper may allocate and use ambient resources. It receives no
-        // array or element references, so it cannot mutate caller array cells.
-        // Its framework cache write is represented separately as ambient state.
-        var effects = IrOpaqueCallSite.WithCapabilities((IrOpaqueCallEffects.All | IrOpaqueCallEffects.ReadsAmbient) & ~IrOpaqueCallEffects.Writes, int.MaxValue);
+        // Resource lookup can invoke user CultureInfo callbacks. Those callbacks
+        // may mutate reachable state or throw before the intended bounds fault.
+        var effects = IrOpaqueCallSite.WithCapabilities(IrOpaqueCallEffects.All | IrOpaqueCallEffects.ReadsAmbient, int.MaxValue);
         if (ShadowCallSkeleton)
         {
             var marker = _context.Temporary(_factory.BooleanType);
             _builder.Havoc(invalid, _context.OpaqueCallSite(operation, effects, "interface-array:bounds"),
-                IrHavocKind.Variables, IrHavocOrigin.Approximation, marker);
+                IrHavocKind.VariablesAndMemory, IrHavocOrigin.Approximation, marker);
         }
         else
         {
             var member = OpaqueCallMember(property.Property.GetMethod!, [index], _context.Type(property.Type), out var display);
             _builder.Call(invalid, _context.OpaqueCallSite(operation, effects, display + ":bounds"), null, member, null, index);
         }
+        var mayThrow = _context.Temporary(_factory.BooleanType);
+        _builder.Havoc(invalid, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mayThrow);
+        invalid = ApplyRule(operation, new TotalScalarRule(_factory.Boolean(true),
+            [new(IrExceptionKind.Unknown, _factory.Variable(mayThrow))], FrontendSubsetClassification.Exact), invalid).Continuation;
         // Cache initialization is possible, not a guaranteed observable write.
         // An approximation guards it so replay cannot invent an exact impurity.
         var mayWrite = _context.Temporary(_factory.BooleanType);

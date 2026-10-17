@@ -8,6 +8,47 @@ namespace SharpProof.Effects.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ArrayInterfaceBoundsResourceLookupCanInvokeUserCultureCode(bool throwFromCulture)
+    {
+        var saved = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = new BoundsProbeCulture();
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+            culture.Armed = true;
+            culture.ThrowFromName = throwFromCulture;
+            var exception = Assert.Catch((Action)(() => _ = ((System.Collections.Generic.IList<int>)Array.Empty<int>())[-1]));
+            Assert.That(exception, Is.TypeOf(throwFromCulture ? typeof(InvalidOperationException) : typeof(ArgumentOutOfRangeException)));
+            Assert.That(culture.Values[0], Is.EqualTo(37));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = saved;
+        }
+    }
+
+    private sealed class BoundsProbeCulture : System.Globalization.CultureInfo
+    {
+        public BoundsProbeCulture() : base("en-US") { }
+        public bool Armed;
+        public bool ThrowFromName;
+        public int[] Values { get; } = [17];
+        public override string Name
+        {
+            get
+            {
+                if (Armed)
+                {
+                    Values[0] = 37;
+                    if (ThrowFromName)
+                    { throw new InvalidOperationException("culture callback"); }
+                }
+                return base.Name;
+            }
+        }
+    }
     [Test]
     public void InterfaceArrayAdmissionRejectsDerivedInterfacesAliasesAndReferenceCovariance()
     {
@@ -150,7 +191,7 @@ public sealed partial class DotnetApiInventoryTests
             "aliased-count"
         }
 
-        : ["read", "write", "aliased-read", "aliased-write"];
+        : ["read", "write", "aliased-read", "aliased-write", "caught-read", "caught-write", "wrong-catch"];
         foreach (var action in actions)
         {
             var body = action switch
@@ -161,6 +202,9 @@ public sealed partial class DotnetApiInventoryTests
                 "aliased-count" => "System.Collections.Generic.IList<int> list = values; System.Collections.Generic.ICollection<int> collection = list; return collection.Count;",
                 "aliased-read" => "System.Collections.Generic.IList<int> list = values; return list[index];",
                 "aliased-write" => "System.Collections.Generic.IList<int> list = values; list[index] = replacement; return values[index];",
+                "caught-read" => "try { return ((System.Collections.Generic.IList<int>)values)[index]; } catch (System.ArgumentOutOfRangeException) { return 37; }",
+                "caught-write" => "try { ((System.Collections.Generic.IList<int>)values)[index] = replacement; return values[index]; } catch (System.ArgumentException) { return 37; }",
+                "wrong-catch" => "try { return ((System.Collections.Generic.IList<int>)values)[index]; } catch (System.IndexOutOfRangeException) { return 37; }",
                 _ => "((System.Collections.Generic.IList<int>)values)[index] = replacement; return values[index];"
             };
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, int index, int replacement) { " + body + " } }");
@@ -207,6 +251,7 @@ public sealed partial class DotnetApiInventoryTests
                     var runtime = values?.ToArray();
                     int expected = 0;
                     Exception? fault = null;
+                    var handledBounds = false;
                     try
                     {
                         switch (action)
@@ -217,6 +262,21 @@ public sealed partial class DotnetApiInventoryTests
                                 break;
                             case "inherited-count":
                                 expected = ((IList<int>)runtime!).Count;
+                                break;
+                            case "caught-read":
+                                try
+                                { expected = ((IList<int>)runtime!)[index]; }
+                                catch (ArgumentOutOfRangeException) { expected = 37; handledBounds = true; }
+                                break;
+                            case "caught-write":
+                                try
+                                { ((IList<int>)runtime!)[index] = replacement; expected = runtime![index]; }
+                                catch (ArgumentException) { expected = 37; handledBounds = true; }
+                                break;
+                            case "wrong-catch":
+                                try
+                                { expected = ((IList<int>)runtime!)[index]; }
+                                catch (IndexOutOfRangeException) { expected = 37; }
                                 break;
                             case "aliased-read":
                             case "read":
@@ -237,7 +297,7 @@ public sealed partial class DotnetApiInventoryTests
                     var arrayType = factory.GetVariableInfo(parameters[0].Entry).Type;
                     var arrayValue = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType, values.Select(value => factory.CreateIntegerValue(value)));
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue> { [parameters[0].Entry] = arrayValue, [parameters[1].Entry] = factory.CreateIntegerValue(index), [parameters[2].Entry] = factory.CreateIntegerValue(replacement) }, 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
-                    if (replay.ConsumedApproximation && fault is not ArgumentOutOfRangeException)
+                    if (replay.ConsumedApproximation && !handledBounds && fault is not ArgumentOutOfRangeException)
                     {
                         return false;
                     }
@@ -249,7 +309,7 @@ public sealed partial class DotnetApiInventoryTests
                             return false;
                         }
 
-                        if (replay.Status != IrProgramExecutionStatus.Exception || replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.Unknown))
+                        if (replay.Status != IrProgramExecutionStatus.Exception || replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.ArgumentOutOfRange))
                         {
                             return false;
                         }

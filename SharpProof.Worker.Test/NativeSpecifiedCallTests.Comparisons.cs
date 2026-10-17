@@ -157,11 +157,11 @@ public sealed partial class NativeSpecifiedCallTests
             members: "private static int Compare<T>(System.Collections.Generic.IList<T> values) { " + body + " }");
     }
     [Test]
-    public async Task GenericDefaultInitializationRetainsGlobalHeapFallback()
+    public async Task GenericDefaultInitializationPreservesEarlierScalarSnapshots()
     {
         await CheckInterfaceArrayContract("int[] values",
             "Contract.Requires(values != null && values.Length == 2 && values[0] == 17 && values[1] == 37); Contract.Ensures(Contract.Result<int>() == -1); return Compare<int>(values);",
-            WorkerClaimOutcome.Unknown,
+            WorkerClaimOutcome.Proven,
             members: "private static int Compare<T>(System.Collections.Generic.IList<T> values) { var left = values[0]; var right = values[1]; return System.Collections.Generic.Comparer<T>.Default.Compare(left, right); }");
     }
     [Test]

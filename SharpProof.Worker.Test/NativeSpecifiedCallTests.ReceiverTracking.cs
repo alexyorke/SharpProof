@@ -156,7 +156,7 @@ public sealed partial class NativeSpecifiedCallTests
                             else
                             {
                                 Assert.That(replay.Exception!.Kind, Is.EqualTo(fault is NullReferenceException ? IrExceptionKind.NullReference :
-                                    fault is IndexOutOfRangeException ? IrExceptionKind.IndexOutOfRange : IrExceptionKind.Unknown));
+                                    fault is IndexOutOfRangeException ? IrExceptionKind.IndexOutOfRange : IrExceptionKind.ArgumentOutOfRange));
                             }
                         }
                     }

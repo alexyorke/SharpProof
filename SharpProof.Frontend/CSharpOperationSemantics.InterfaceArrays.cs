@@ -51,9 +51,8 @@ internal static partial class CSharpOperationSemantics
         receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         index = RepositoryParameterGuard.NotNull(index, nameof(index));
         var guard = ElementGuard(factory, receiver, index, null);
-        // Array's IList<T> implementation throws ArgumentOutOfRangeException.
-        // Until native IR has that exact kind, retain an unknown bounds fault;
-        // never label it IndexOutOfRangeException or erase it.
-        return new(guard.Value, [guard.Throws[0], new(IrExceptionKind.Unknown, guard.Throws[1].Condition)], guard.Classification);
+        // The array interface differs from direct array indexing. Keep the exact
+        // framework fault so catch dispatch and AllowedExceptions agree with .NET.
+        return new(guard.Value, [guard.Throws[0], new(IrExceptionKind.ArgumentOutOfRange, guard.Throws[1].Condition)], guard.Classification);
     }
 }

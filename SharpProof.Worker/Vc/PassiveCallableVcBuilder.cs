@@ -27,10 +27,11 @@ internal sealed class PassiveCallableVcBuilder
     // Element contents can be forgotten alone: an element store never
     // changes a field.
     // A store with no value represents a fresh object's scalar field defaults.
-    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value)> Stores,
-        bool Forgotten, bool ElementsForgotten = false)
+    // A missing target represents a heap invalidation at its exact reach and
+    // program position; untaken branches cannot erase another path's contents.
+    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly)> Stores)
     {
-        public ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value)> Stores { get; init; } = Stores.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Stores)) : Stores;
+        public ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly)> Stores { get; init; } = Stores.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Stores)) : Stores;
     }
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
@@ -71,7 +72,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly Dictionary<IrVarId, IrVarId> _inputBindings = [];
     private int _fresh;
     private bool _hasStringConcat;
-    private Heap _heap = new([], false);
+    private Heap _heap = new([]);
     private bool _hasUnmodeledStringAllocations;
     private readonly CancellationToken _cancellationToken;
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
@@ -308,7 +309,7 @@ internal sealed class PassiveCallableVcBuilder
                             {
                                 Spend(_heap.Stores.Length);
                                 var owner = allocated.Type == _factory.ObjectType ? allocated : _factory.Cast(_factory.ObjectType, allocated);
-                                _heap = _heap with { Stores = _heap.Stores.Add((reach, owner, null, null, null)) };
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, owner, null, null, null, false)) };
                             }
                             if (arrayLength != null)
                             { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
@@ -324,7 +325,7 @@ internal sealed class PassiveCallableVcBuilder
                                 if (zero != null)
                                 {
                                     Spend(_heap.Stores.Length);
-                                    _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, null, null, zero)) };
+                                    _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, null, null, zero, false)) };
                                 }
                             }
                             // The sequence encoder observes only scalar elements.
@@ -338,7 +339,7 @@ internal sealed class PassiveCallableVcBuilder
                                 // Initialization occurs after earlier heap invalidations.
                                 // Keep it in the ordered overlay, like an element store.
                                 Spend(_heap.Stores.Length);
-                                _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index])) };
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index], false)) };
                             }
                             var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence;
                             if (referenceObject)
@@ -378,12 +379,12 @@ internal sealed class PassiveCallableVcBuilder
                                 receiverWrite = storedTarget.Id == _factory.Cast(_factory.ObjectType, receiver).Id;
                             }
                             Spend(_heap.Stores.Length);
-                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement)) };
+                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement, false)) };
                         }
                         else if (write.Region == IrWriteRegion.Element)
-                        { _heap = new([.. _heap.Stores.Where(store => store.Field != null || store.Value == null)], _heap.Forgotten, true); }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, true)) }; }
                         else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
-                        { _heap = new([], true); }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
                         if (!IrWriteSites.IsLoopCell(_factory, write))
                         {
                             _writes.Add((reach, write.Id,
@@ -402,7 +403,7 @@ internal sealed class PassiveCallableVcBuilder
                         var effects = IrOpaqueCallSite.Effects(_factory, call.Operation);
                         _opaqueCalls.Add((reach, effects));
                         if ((effects & IrOpaqueCallEffects.Writes) != 0)
-                        { _heap = new([], true); }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
                         break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
@@ -452,7 +453,7 @@ internal sealed class PassiveCallableVcBuilder
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory &&
                             havoc.Origin == IrHavocOrigin.Approximation)
-                        { _heap = new([], true); }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
                         else if (havoc.HavocKind != IrHavocKind.Variables ||
                             havoc.Origin is not (IrHavocOrigin.Input or IrHavocOrigin.Approximation))
                         { return null; }
@@ -702,9 +703,15 @@ internal sealed class PassiveCallableVcBuilder
             var snapshot = Snapshot(field.Receiver!, rewritten);
             if (snapshot is IrBooleanTerm { Value: true })
             { return entry; }
-            IrTerm read = heap.Forgotten ? Fresh(original.Type) : entry;
+            IrTerm read = entry;
             foreach (var store in heap.Stores)
             {
+                if (store.Target == null)
+                {
+                    if (!store.ElementsOnly)
+                    { read = _factory.Conditional(store.Reach, Fresh(original.Type), read); }
+                    continue;
+                }
                 if (store.Field != field.Member && store.Value != null)
                 { continue; }
                 var stored = store.Value;
@@ -731,9 +738,14 @@ internal sealed class PassiveCallableVcBuilder
             // An old value reads the arrays as the callable entered.
             if (snapshot is IrBooleanTerm { Value: true })
             { return _factory.SequenceAccess(sequence, index); }
-            IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
+            IrTerm read = _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
+                if (store.Target == null)
+                {
+                    read = _factory.Conditional(store.Reach, Fresh(original.Type), read);
+                    continue;
+                }
                 if (store.Value == null || store.Field != null)
                 { continue; }
                 var storedValue = store.Value;
