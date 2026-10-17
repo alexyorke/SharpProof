@@ -3,8 +3,8 @@
 This is a hand-maintained reference to [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The C# declarations are the runtime authority. The filename is retained for existing references; there is no active Markdown generator or JSON review source.
 
 - Table identity: `SharpProof.ApiSpec.Default`
-- Table version: `6`
-- Declarations: 24
+- Table version: `7`
+- Declarations: 29
 
 ## Matching and evidence
 
@@ -18,6 +18,11 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 
 | Catalog ID | Exact member target |
 | --- | --- |
+| `bcl.dictionary.count` | <code>P:System.Collections.Generic.Dictionary&#96;2.Count</code> |
+| `bcl.list.count` | <code>P:System.Collections.Generic.List&#96;1.Count</code> |
+| `bcl.list.item.int32` | <code>M:System.Collections.Generic.List&#96;1.get_Item(System.Int32)</code> |
+| `bcl.queue.count` | <code>P:System.Collections.Generic.Queue&#96;1.Count</code> |
+| `bcl.stack.count` | <code>P:System.Collections.Generic.Stack&#96;1.Count</code> |
 | `bcl.array.empty` | <code>M:System.Array.Empty&#96;&#96;1</code> |
 | `bcl.enumerable.empty` | <code>M:System.Linq.Enumerable.Empty&#96;&#96;1</code> |
 | `bcl.exception.ctor` | <code>M:System.Exception.#ctor</code> |
@@ -54,3 +59,17 @@ The default table above is distinct from the opt-in [relational pack catalog](..
 Enable the pack with the consumer property `SharpProofSpecificationPacks` set to `dotnet.scalar`; the version is catalog evidence rather than part of the property value. Multiple enabled IDs are separated by semicolons. Unknown IDs, duplicate IDs, and empty entries in a nonempty list are rejected. The compiler binds exact member/assembly shapes and carries the resolved evidence into the closed artifact; a same-named source method cannot acquire the relation.
 
 See [configuration](configuration.md), [compiler pack parsing](../SharpProof.CompilerCollector/FinalCompilationCollector.cs), [pack-provider tests](../SharpProof.Worker.Test/CompilerSpecificationPackProviderTests.cs), and [coverage and limits](coverage-and-limits.md). The catalog's member, pack, and catalog versions are separate from the compiler artifact's specification-pack wire schema; use [release constants](release-constants.md) when changing them.
+
+## Concrete collection getters
+
+The Count getters on List, Dictionary, Queue, and Stack read receiver state,
+allocate nothing, terminate, and do not throw for a non-null receiver in the
+supported runtime model. They do not invoke collection comparers. The catalog
+also approves the signed System.Collections runtime family and the .NET Framework System reference family required by these getters.
+
+List.get_Item may throw ArgumentOutOfRangeException and may allocate an exception.
+Its effects remain Unknown because exceptional helpers may initialize ambient
+resources. Setter behavior, element identity/content relations, and numeric Count
+relations are not supplied by these entries. Interface dispatch and comparer-driven
+collection methods retain conservative behavior. See the usage-driven backlog in
+[API coverage](../eng/api-coverage/README.md).

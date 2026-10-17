@@ -215,11 +215,12 @@ public sealed class ApiSpecTemplate
 public sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "6";
+    public const string DefaultTableVersion = "7";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
         ImmutableArray<ApiSpecAssemblyIdentity> assemblySetFramework = [
+            new("System", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
             new("System.Private.CoreLib", "7cec85d7bea7798e", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
             new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
             new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
@@ -231,6 +232,7 @@ public sealed partial class ApiSpecTable
             new("netstandard", "cc7b13ffcd2ddd51", ApiSpecReferenceFamily.NetStandardReferencePack),
             new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
             new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
             new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetStandardReferencePack),
             new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
             new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
@@ -248,6 +250,22 @@ public sealed partial class ApiSpecTable
         var evidenceObserved = new SpecEvidence(SpecEvidenceKind.Observed, "supported-runtime-observation");
         var evidenceTypeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
         return [
+            CollectionCountDeclaration("bcl.dictionary.count", "System.Collections.Generic.Dictionary`2", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.queue.count", "System.Collections.Generic.Queue`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.stack.count", "System.Collections.Generic.Stack`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget("bcl.list.item.int32", "M:System.Collections.Generic.List`1.get_Item(System.Int32)",
+                    "System.Collections.Generic.List`1", SpecTargetMemberKind.Method, "get_Item",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.Integer], IrTypeKind.Reference, assemblySetFramework),
+                new ApiSpecFacets(
+                    // Exceptional paths can initialize ambient resource caches.
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceDocumented),
+                    // ThrowHelper allocates the exception for an invalid index.
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.ArgumentOutOfRangeException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.Unknown, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)), []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
                     "bcl.array.empty",
@@ -641,5 +659,21 @@ public sealed partial class ApiSpecTable
                     null),
                 []),
         ];
+    }
+
+    private static ApiSpecDeclaration CollectionCountDeclaration(string identifier, string type,
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget(identifier, "P:" + type + ".Count", type, SpecTargetMemberKind.PropertyGet, "Count",
+                false, 0, IrTypeKind.Reference, [], IrTypeKind.Integer, assemblies),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.ReadsReceiverState, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.NotApplicable, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
     }
 }

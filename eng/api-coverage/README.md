@@ -107,3 +107,71 @@ For an SDK/reference-pack upgrade, change the inventory's explicit pack pin as w
 never select the highest installed pack or silently fall back to runtime assemblies.
 New support evidence still needs semantic tests; this inventory measures registrations
 and drift, not behavioral correctness for every runtime input or proof pipeline stage.
+
+## Act on observed API usage
+
+[The checked-in usage snapshot](usage-ranking.generated.md) ranks exact API overloads
+in 200 original OSS targets, 28 synthetic baseline targets, and the 10 checked-in sample
+source files. CI regenerates `usage-ranking.md` and `usage-ranking.json`, publishing
+both with the inventory artifact and the Markdown report in its job summary. Reproduce:
+
+```sh
+docker compose run --rm tooling test \
+  -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj \
+  -TestFilter FullyQualifiedName~ApiUsageRankingTests
+```
+
+The unit is a static source use site, not runtime execution frequency. The scanner
+binds against the pinned reference pack, normalizes constructed generics and reduced
+extension methods, and separates property reads, writes, and read/write uses. It scans
+selected OSS declarations only, original synthetic Focus methods only, and sample
+sources together with their implicit usings. Dependency bodies, synthetic helper
+scaffolding, metamorphic duplicates, compile-time nameof, delegate construction, and
+implicit compiler calls are excluded. Source content hashes and every resolved site
+are retained in the JSON report. Compilation errors or unresolved sites fail the gate.
+Getter evidence never credits a setter. Unknown result relations remain unknown.
+
+### First implementation batch
+
+The scan found 636 framework uses with zero unresolved sites. The following five
+previously unmodeled getters account for 41 read sites in the fixed universe:
+
+| API | Read sites | Added evidence |
+| --- | ---: | --- |
+| `List<T>.Count` | 18 | Reads receiver; no allocation; no throw on non-null receiver; terminates |
+| `List<T>.get_Item(int)` | 16 | May allocate; may throw ArgumentOutOfRangeException |
+| `Queue<T>.Count` | 5 | Same Count facets |
+| `Dictionary<TKey,TValue>.Count` | 1 | Same Count facets; comparer callbacks are not invoked |
+| `Stack<T>.Count` | 1 | Same Count facets |
+
+Runtime witnesses cover empty, singleton, grown-and-reduced collections; dictionary
+comparer callback observation; null/non-null indexed elements; and negative, Count,
+empty-list, and extreme integer indexes. Count fixtures check receiver fields remain
+unchanged. Indexer effects remain Unknown because exception helpers can initialize
+ambient resources. Native worker tests prove the Count allocation/exception claims
+and retain conservative results for abstract getters, comparator-driven dictionary
+lookups, invalid indexes, setters, and unmodeled count/value relationships. These are
+partial API models, not collection-content or full heap models.
+
+### Highest remaining priorities
+
+| Gap | Source sites | Required work before adding stronger models |
+| --- | ---: | --- |
+| `IList<T>.Item` | 56 reads, 13 writes | Closed dispatch evidence or modeled implementation; bounds and element-store semantics |
+| `Dictionary<TKey,TValue>.Item` | 40 reads, 1 write | Key/value state plus arbitrary comparer callback effects and exceptions |
+| `ICollection<T>.Count` | 40 reads | Resolve concrete implementation; an interface getter may run arbitrary user code |
+| `Array.Length` | 32 reads | Existing contextual array lowering; the absence of a blanket catalog row is not absence of all support |
+| `Comparer<T>.Compare` | 26 calls | Resolve comparer implementation and its callback behavior |
+| `Dictionary.Add / ContainsKey` | 22 calls each | Comparer callbacks, dictionary state, allocation, and exception conditions |
+| `HashSet<T>.Contains` | 16 calls | Comparer callbacks and set membership state |
+
+Prioritize by real call sites, then choose a sound semantic slice. Add or extend the
+model, runtime and native regression tests, then update the reviewed inventory. Do
+not assign interface or comparer-driven calls the effects of a convenient concrete
+implementation. Refresh the snapshot only after reviewing source/baseline changes.
+
+The List indexer's named exception set reaches the portable effect summary even
+while its other effects remain Unknown. Native opaque-call IR currently retains only
+a may-throw bit, so a native AllowedExceptions claim for this getter remains Unknown;
+a regression test records that boundary. Importing exact exception types into native
+opaque calls is separate follow-up work, not a guarantee supplied by this batch.
