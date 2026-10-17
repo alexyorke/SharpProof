@@ -324,7 +324,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Caller = callerPe
         });
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
         var artifactBytes = Encoding.UTF8.GetBytes(artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "compiler-artifact.json"), artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "worker-request.json"),
@@ -356,12 +356,12 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         PassiveCallableVcPlan? plan = null;
         PassiveCallableCheckResult? entry = null;
         var failure = WorkerClaimReason.None;
-        if (enrolled != null && PassiveCallableVcBuilder.TryBuild(enrolled, out plan, out failure))
+        if (enrolled != null && PassiveCallableVcBuilder.TryBuild(enrolled, out plan, out failure, cancellationToken: CancellationToken.None))
         {
             using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
-            entry = await solver.VerifyEntryAsync();
+            entry = await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None);
         }
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets, cancellationToken: CancellationToken.None);
         var nativeSpan = native.ExceptionWitness?.Site is { } site && plan != null
             ? plan.Factory.GetOperationInfo(site).SourceSpan : null;
         ReplayObservation? replayObservation = null;

@@ -47,11 +47,11 @@ public sealed class NativeAcyclicLoopAdmissionTests
             Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [], CancellationToken.None), Is.Null);
         }
 
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var verified = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         foreach (var value in new[] { false, true })

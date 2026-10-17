@@ -19,9 +19,9 @@ public sealed class NativeTypeParameterTests
     public async Task GenericDefaultsNeitherThrowNorAllocateNorWrite(string constraint)
     {
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static T Target<T>() " + constraint + " { return default(T); }");
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.TypeOf<ProvenOutcome>(), exceptions.Reason.ToString());
@@ -39,9 +39,9 @@ public sealed class NativeTypeParameterTests
         var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
         Assert.That(instructions.Any(instruction => instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction), Is.False);
-        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase(false)]
@@ -52,7 +52,7 @@ public sealed class NativeTypeParameterTests
         var allocation = "var items = new int[1]; ";
         var preparation = Prepare("[ZeroAllocations] public static int Target<T>() { " +
             (defaultFirst ? approximation + allocation : allocation + approximation) + "return items.Length; }");
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         if (defaultFirst)
         {
             Assert.That(result.Outcome, Is.Null);
@@ -80,9 +80,9 @@ public sealed class NativeTypeParameterTests
     public async Task TypeTestsNeitherThrowNorAllocateNorWrite()
     {
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] " + IsNumber);
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.TypeOf<ProvenOutcome>(), exceptions.Reason.ToString());
@@ -131,7 +131,7 @@ public sealed class NativeTypeParameterTests
     public async Task OpaqueValuesFlowButOperatorsAbstain(string body, bool supported)
     {
         var preparation = Prepare("[DoesNotThrow] public static T Target<T>(T value) { " + body + " }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         if (supported)
         { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         else
@@ -145,7 +145,7 @@ public sealed class NativeTypeParameterTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 
@@ -165,9 +165,9 @@ public sealed class NativeTypeParameterTests
         Assert.That(candidate, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(candidate!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
             .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, dependent ? Is.TypeOf<UnknownOutcome>() : Is.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(dependent ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
     }
@@ -178,9 +178,9 @@ public sealed class NativeTypeParameterTests
         var preparation = Prepare("public static int Target<T>(int value) { " +
             "Contract.Ensures(Contract.Result<int>() != value); _ = default(T); return value; }");
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
     }
@@ -195,12 +195,12 @@ public sealed class NativeTypeParameterTests
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
             .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -214,9 +214,9 @@ public sealed class NativeTypeParameterTests
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
             .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]

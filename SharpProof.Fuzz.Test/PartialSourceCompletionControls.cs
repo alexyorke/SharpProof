@@ -97,7 +97,7 @@ public sealed class PartialSourceCompletionControls
             Assert.That(completionResult.Value!.Boolean, Is.EqualTo(actualCompletion));
         }
         var generated = new PartialTermSmtCase(formula.Term, completion.Term, [bindings], [reference]);
-        Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
         var admissionException = Assert.ThrowsAsync<ArgumentException>(compare);
         Assert.That(admissionException!.ParamName, Is.EqualTo("factory"));
         Assert.That(admissionException.Message, Does.StartWith("A callable bitvector session requires Total IR semantics."));

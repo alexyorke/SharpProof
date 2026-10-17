@@ -34,7 +34,7 @@ public sealed class OrdinaryExceptionBatchWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation,
-            methods.Select(static method => method.Id).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2);
+            methods.Select(static method => method.Id).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {

@@ -47,7 +47,7 @@ public sealed class NativeSnapshotOwnerShapeTests
         var result = factory.CreateVariable("result", factory.IntegerType);
         var candidate = new PassiveCallableCandidate("snapshot-owner-shape", builder.Build(),
             [first, second], result, [], []);
-        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(built, Is.EqualTo(!concatenated));

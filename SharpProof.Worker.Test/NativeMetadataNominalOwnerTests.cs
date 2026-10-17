@@ -72,9 +72,9 @@ public sealed class NativeMetadataNominalOwnerTests
         Assert.That(JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest), Is.EqualTo(originalManifest));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var checkedCall = await solver.VerifyCallPreconditionAsync(0);
+        var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(checkedCall.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(checkedCall.EntryModel[entry].Kind, Is.EqualTo(IrValueKind.Null));
         Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, CancellationToken.None), Is.EqualTo(checkedCall.CallPreconditionWitness));
@@ -128,9 +128,9 @@ public sealed class NativeMetadataNominalOwnerTests
             Assert.That(subject.RootMethod.Invoke(null, [token, other]), Is.EqualTo(aliases ? 7 : 0));
         }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(decoded), out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(decoded), out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyCallPreconditionAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]

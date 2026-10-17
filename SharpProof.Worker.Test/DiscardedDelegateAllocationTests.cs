@@ -73,8 +73,8 @@ public sealed class DiscardedDelegateAllocationTests
         finally { runtime.Unload(); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(native.Outcome, erased ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(),
             $"release={release}; shape={shape}; measured32={measured}; reason={native.Reason}");
     }

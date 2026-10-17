@@ -32,7 +32,7 @@ public sealed class CachedReferenceObjectViewTests
             [new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))],
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [view]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());
         var model = ((RefutedOutcome)outcome).Model.Assignments;
         Assert.That(model[view].Reference, Is.SameAs(identity));

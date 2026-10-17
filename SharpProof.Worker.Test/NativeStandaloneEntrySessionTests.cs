@@ -95,7 +95,7 @@ public sealed class NativeStandaloneEntrySessionTests
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);

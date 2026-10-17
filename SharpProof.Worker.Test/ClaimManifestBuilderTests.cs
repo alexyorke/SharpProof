@@ -2465,7 +2465,7 @@ public sealed class ClaimManifestBuilderTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var prepared, cancellationToken: CancellationToken.None);
         Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
             Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
         Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),

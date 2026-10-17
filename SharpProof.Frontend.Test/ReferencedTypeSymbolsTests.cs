@@ -84,7 +84,7 @@ public sealed class ReferencedTypeSymbolsTests
             "DeepNamespaces",
             "namespace " + namespaceName + " { }");
 
-        var types = ReferencedTypeSymbols.GetAll(compilation).ToArray();
+        var types = ReferencedTypeSymbols.GetAll(compilation, CancellationToken.None).ToArray();
 
         Assert.That(types, Is.Empty);
     }
@@ -146,7 +146,7 @@ public sealed class ReferencedTypeSymbolsTests
             """,
             referenced.ToMetadataReference());
 
-        var identities = ReferencedTypeSymbols.GetAll(compilation)
+        var identities = ReferencedTypeSymbols.GetAll(compilation, CancellationToken.None)
             .Select(static type =>
                 type.ContainingAssembly.Name + ":" + type.ToDisplayString())
             .ToArray();
@@ -171,7 +171,7 @@ public sealed class ReferencedTypeSymbolsTests
         Assert.That(contractFor, Is.Not.Null);
         var types = ReferencedTypeSymbols.GetAllCached(
                 compilation,
-                contractFor!.ContainingAssembly)
+                contractFor!.ContainingAssembly, CancellationToken.None)
             .Select(static type => type.ToDisplayString())
             .ToArray();
 

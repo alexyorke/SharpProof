@@ -24,7 +24,7 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
                 Values = [2L, 3L],
                 Reference = "proof"
             }).ToArray();
-        var results = FrontendDifferentialOracle.CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: CancellationToken.None);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)
         {

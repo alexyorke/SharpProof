@@ -80,7 +80,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var error = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
             await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
-                "public static class C { public static int Value() => MissingValue; }", "effects")));
+                "public static class C { public static int Value() => MissingValue; }", "effects", CancellationToken.None)));
         Assert.That(error!.Message, Does.Contain("CS0103"));
         Assert.That(error.Message, Does.Contain("MissingValue"));
     }
@@ -91,7 +91,7 @@ public sealed class CompilerDiagnosticWorkflowTests
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static int Value() => 1; }");
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
-            compilation, new SharpProofAnalyzer(), mode: null, concurrentAnalysis: false);
+            compilation, new SharpProofAnalyzer(), mode: null, concurrentAnalysis: false, cancellationToken: CancellationToken.None);
         Assert.That(diagnostics, Is.Empty);
     }
 }

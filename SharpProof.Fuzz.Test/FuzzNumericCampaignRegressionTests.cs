@@ -13,7 +13,7 @@ public sealed class FuzzNumericCampaignRegressionTests
     [Test]
     public async Task NumericCampaignRetainsItsFixedSeedResults()
     {
-        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4));
+        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4), cancellationToken: CancellationToken.None);
         Assert.That(summary.Passed, Is.True, string.Join(Environment.NewLine, summary.Failures));
         var serialized = JsonSerializer.Serialize(summary);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(serialized)));

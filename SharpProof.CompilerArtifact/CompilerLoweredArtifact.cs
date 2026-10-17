@@ -23,7 +23,7 @@ internal static class CompilerLoweredArtifact
         CompilerCallableArtifact[] artifacts,
         WorkerClaimManifest manifest,
         CompilerCompilationSnapshot compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));

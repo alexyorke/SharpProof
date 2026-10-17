@@ -111,7 +111,7 @@ internal static class CompilerSourceCoordinates
     internal static bool HasValidLocationGeometry(
         WorkerSourceLocation? location,
         CompilerSyntaxTreeSnapshot? tree,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (location == null || tree == null ||
             string.IsNullOrEmpty(location.Path) || location.Start < 0 || location.Length < 0 || location.Line <= 0 || location.Column <= 0 ||
@@ -137,7 +137,7 @@ internal static class CompilerSourceCoordinates
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
         CompilerCompilationSnapshot? compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         return FindUniqueTree(
             location,
@@ -148,7 +148,7 @@ internal static class CompilerSourceCoordinates
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
         CompilerSyntaxTreeSnapshot[]? syntaxTrees,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (location == null || syntaxTrees == null)
         {
@@ -197,7 +197,7 @@ internal static class CompilerSourceCoordinates
         out string sourceLineMapSha256)
     {
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        var ordinal = FindUniqueTree(location, compilation);
+        var ordinal = FindUniqueTree(location, compilation, CancellationToken.None);
         if (ordinal < 0)
         {
             throw new InvalidDataException(

@@ -22,7 +22,7 @@ public sealed class FuzzSourceBooleanInputControls
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
             [new(positive, Finite, [false, false], Partial,
-                [[false, false], [false, true], [true, false], [true, true]])]);
+                [[false, false], [false, true], [true, false], [true, true]])], cancellationToken: CancellationToken.None);
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.Failures, Is.Empty);
         var observed = result.PartialResults.Single();
@@ -45,7 +45,7 @@ public sealed class FuzzSourceBooleanInputControls
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
             [new(positive, finite, inputs.Select(input => (object?)input).ToArray(),
-                Partial, [[false, false]])]);
+                Partial, [[false, false]])], cancellationToken: CancellationToken.None);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo(
             "The finite source safety condition is not defined and true for every bounded assignment."));

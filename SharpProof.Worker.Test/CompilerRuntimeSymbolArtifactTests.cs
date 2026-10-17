@@ -17,7 +17,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
     {
         var artifact = CreateArtifact();
         var tree = artifact.Compilation.SyntaxTrees.Single();
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         using var temporary = new TempDirectory(
             "runtime-symbol-artifact-",
             TestContext.CurrentContext.WorkDirectory);

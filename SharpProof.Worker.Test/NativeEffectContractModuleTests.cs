@@ -38,7 +38,7 @@ public sealed class NativeEffectContractModuleTests
         builder.Return(block, factory.CreateOperation("module-return"));
         var candidate = new PassiveCallableCandidate("effect-contract-module", builder.Build(), [], null, [], []);
         Assert.That(IrOpaqueCallSite.Effects(factory, site), Is.EqualTo(effects));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var admission), Is.True, admission.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var admission, cancellationToken: CancellationToken.None), Is.True, admission.ToString());
         // These ordinary module bounds carry no compiler claim or preparation.
         // A forbidden may-call has no invented concrete witness; a real lock does.
         var constraint = new CompilerEffectConstraintArtifact
@@ -53,7 +53,7 @@ public sealed class NativeEffectContractModuleTests
         }
         Assert.That(WorkerProtocolJson.HasKnownEffects(constraint.AllowedEffects, constraint.AllowedCapabilities), Is.True);
         Assert.That(constraint.AllowedExceptionTypes, Is.Empty);
-        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [], new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [], new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Reason, Is.EqualTo(expected == "Unreplayable"
             ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
         Assert.That(result.Outcome, expected == "Proven" ? Is.TypeOf<ProvenOutcome>() :
@@ -64,7 +64,7 @@ public sealed class NativeEffectContractModuleTests
         Assert.That(result.ExceptionWitness, Is.Null);
         if (expected == "Refuted")
         {
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _), Is.True);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
             OperationId? replayed = null;
             plan!.ReplayEffects(result.EntryModel, CancellationToken.None,
                 lockPrefixObserver: (instruction, approximation) => { if (!approximation) { replayed ??= instruction.Operation; } });
@@ -108,14 +108,14 @@ public sealed class NativeEffectContractModuleTests
         builder.Return(block, factory.CreateOperation("module-return"));
         var candidate = new PassiveCallableCandidate("effect-contract-module", builder.Build(), [], null, [], []);
         Assert.That(IrOpaqueCallSite.Effects(factory, site), Is.EqualTo(facet));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var admission), Is.True, admission.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var admission, cancellationToken: CancellationToken.None), Is.True, admission.ToString());
         var constraint = new CompilerEffectConstraintArtifact
         {
             AllowedEffects = allowed ? bound : WorkerEffectSet.None,
             AllowedCapabilities = capabilities
         };
         Assert.That(WorkerProtocolJson.HasKnownEffects(constraint.AllowedEffects, constraint.AllowedCapabilities), Is.True);
-        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [], new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [], new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, allowed ? Is.TypeOf<ProvenOutcome>() : Is.Null);
         Assert.That(result.Reason, Is.EqualTo(allowed ? WorkerClaimReason.None : WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(result.LockWitness, Is.Null);

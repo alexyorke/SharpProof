@@ -29,14 +29,31 @@ internal static class Program
                 variable + ".");
             return 125;
         }
-        return await RunMain(args).ConfigureAwait(false);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler onCancel = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            cancellation.Cancel();
+        };
+        Console.CancelKeyPress += onCancel;
+        try
+        {
+            return await RunMain(args, verify: null, validatePreflight: null,
+                cancellation.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= onCancel;
+        }
     }
 
     internal static async Task<int> RunMain(
         string[] args,
-        Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify = null,
-        Action<LauncherArguments>? validatePreflight = null)
+        Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify,
+        Action<LauncherArguments>? validatePreflight,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         args = ArgumentNullGuard.NotNull(args, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
@@ -70,7 +87,7 @@ internal static class Program
                 return 2;
             }
             await AtomicFile.WriteUtf8Async(arguments.RequestPath,
-                WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
+                WorkerProtocolJson.SerializeRequest(request), cancellationToken).ConfigureAwait(false);
             DeleteIfExists(arguments.ResultPath);
         }
         catch (PlatformNotSupportedException exception)
@@ -91,7 +108,7 @@ internal static class Program
             return 2;
         }
 
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var terminate = PosixSignalRegistration.Create(
             PosixSignal.SIGTERM,
             context =>
@@ -105,10 +122,14 @@ internal static class Program
                     ? verify(request, cancellation.Token)
                     : WorkerHost.VerifyAsync(request, cancellation.Token, preparedInput, operationStarted))
                 .ConfigureAwait(false);
+            // The response may itself report cancellation; publish it after the
+            // run token is canceled so the caller receives the typed result.
+#pragma warning disable SPINT003
             await AtomicFile.WriteUtf8Async(
                     arguments.ResultPath,
-                    WorkerProtocolJson.SerializeCanonicalResponse(response))
+                    WorkerProtocolJson.SerializeCanonicalResponse(response), CancellationToken.None)
                 .ConfigureAwait(false);
+#pragma warning restore SPINT003
         }
         catch (AggregateException)
         {
@@ -491,6 +512,8 @@ internal static class Program
             WorkerProtocolJson.SerializeCanonicalResponse(response), publicationDeadline.Token).ConfigureAwait(false);
     }
 
+    // A failed run must still publish a typed failure result after cancellation.
+#pragma warning disable SPINT002
     private static Task WriteLauncherFailureAsync(
         string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
         string expectedInputHash, WorkerVersionSummary expectedVersions,
@@ -506,9 +529,12 @@ internal static class Program
             timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
-        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response));
+        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response), CancellationToken.None);
     }
+#pragma warning restore SPINT002
 
+    // A timed out run must still promote its project timeout result.
+#pragma warning disable SPINT002
     internal static async Task PromotePreManifestProjectTimeoutAsync(
         string path,
         WorkerVerifyRequest request,
@@ -571,9 +597,10 @@ internal static class Program
             response.Summary.ElapsedMilliseconds);
         await AtomicFile.WriteUtf8Async(
                 path,
-                WorkerProtocolJson.SerializeCanonicalResponse(promoted))
+                WorkerProtocolJson.SerializeCanonicalResponse(promoted), CancellationToken.None)
             .ConfigureAwait(false);
     }
+#pragma warning restore SPINT002
 
     private static void DeleteIfExists(string? path)
     {
@@ -722,13 +749,13 @@ internal sealed partial class LauncherArguments
     {
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path);
-        artifact = ArtifactValidator.Decode(bytes);
+        artifact = ArtifactValidator.Decode(bytes, expectedDigest: null, CancellationToken.None);
         return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
     internal static byte[] ReadCompilerManifest(string path)
     {
-        return CompilerManifestArtifactFile.ReadAllBytes(path);
+        return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, CancellationToken.None);
     }
 
     private string FullPath(string key)

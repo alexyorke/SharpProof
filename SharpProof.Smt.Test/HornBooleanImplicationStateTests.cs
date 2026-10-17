@@ -36,11 +36,11 @@ public sealed class HornBooleanImplicationStateTests
             IrSubstitution.Substitute(factory, invariant, readyVariable, nextReady), committedVariable, nextCommitted);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        var established = await kernel.VerifyAsync(Query(factory, [safety], invariant));
+        var established = await kernel.VerifyAsync(Query(factory, [safety], invariant), CancellationToken.None);
         Assert.That(established, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(established));
-        var preservedOutcome = await kernel.VerifyAsync(Query(factory, [invariant], preserved));
+        var preservedOutcome = await kernel.VerifyAsync(Query(factory, [invariant], preserved), CancellationToken.None);
         Assert.That(preservedOutcome, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(preservedOutcome));
-        var safe = await kernel.VerifyAsync(Query(factory, [invariant], safety));
+        var safe = await kernel.VerifyAsync(Query(factory, [invariant], safety), CancellationToken.None);
         Assert.That(safe, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(safe));
     }
 

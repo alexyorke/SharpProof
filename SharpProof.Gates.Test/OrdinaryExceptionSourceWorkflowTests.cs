@@ -74,6 +74,6 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
 
         return await NativeEffectOracleGate.ObserveAsync(
-            compilation, ["sample"], RepositoryLayout.FindRoot(), "ordinary-source", 1);
+            compilation, ["sample"], RepositoryLayout.FindRoot(), "ordinary-source", 1, cancellationToken: CancellationToken.None);
     }
 }

@@ -64,7 +64,7 @@ public sealed class ObservedDelegateAllocationTests
         finally { runtime.Unload(); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         // Closures and mutable ref calls do not enroll a complete native body.
         // Exercise the same expression lowerer directly to ensure their observed
@@ -85,7 +85,7 @@ public sealed class ObservedDelegateAllocationTests
         Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAllocationInstruction>(), Has.Exactly(1).Items,
             "Keep the observed delegate's allocation in the lowered program.");
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), native.Reason.ToString());
         if (shape is "assignment-value" or "field-store" or "argument")
         { Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>(), native.Reason.ToString()); }

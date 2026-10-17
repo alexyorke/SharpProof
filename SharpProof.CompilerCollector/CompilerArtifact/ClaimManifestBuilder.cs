@@ -5,9 +5,15 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed partial class ClaimManifestBuilder(
     CSharpCompilation compilation,
-    WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
-    CancellationToken cancellationToken = default)
+    WorkerFeatureSet enabledFeatures,
+    CancellationToken cancellationToken)
 {
+    internal ClaimManifestBuilder(CSharpCompilation compilation,
+        WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All)
+        : this(compilation, enabledFeatures, CancellationToken.None)
+    {
+    }
+
     private const string TopLevelMainCallableId =
         "M:Program.<Main>$(System.String[])";
 
@@ -21,7 +27,7 @@ internal sealed partial class ClaimManifestBuilder(
     private readonly Lazy<ContractApiSymbols?> _lazyIntrinsics =
         new(() => ContractApiSymbols.TryCreate(compilation));
     private readonly Lazy<EffectiveContractSourceResolver> _lazyContractSources =
-        new(() => EffectiveContractSourceResolver.ForCompilation(compilation));
+        new(() => EffectiveContractSourceResolver.ForCompilation(compilation, cancellationToken));
     private readonly Lazy<AnalyzerSession> _lazyEffectSession =
         new(() => new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken));
     private ContractClauseInventoryBuilder _clauses => _lazyClauses.Value;
@@ -304,7 +310,7 @@ internal sealed partial class ClaimManifestBuilder(
             static _ => { },
             cancellationToken);
 
-        var resolution = _contractSources.Resolve(target);
+        var resolution = _contractSources.Resolve(target, implementationBody: null, cancellationToken);
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;
@@ -1010,7 +1016,7 @@ internal sealed partial class ClaimManifestBuilder(
 
         bool HasManifestIdentity(CallableSeed seed)
         {
-            var resolution = _contractSources.Resolve(seed.Method);
+            var resolution = _contractSources.Resolve(seed.Method, implementationBody: null, cancellationToken);
             var selection = _attributes.Select(
                 seed.Method,
                 resolution.HasSelectedContractIntent);

@@ -39,12 +39,12 @@ public sealed class HornClauseBoundaryTests
         Assert.That(proposals, Does.ContainKey(relation));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [zero], proposals[relation])), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [proposals[relation]], nonnegative)), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [zero], proposals[relation]), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [proposals[relation]], nonnegative), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
         var preserved = IrSubstitution.Substitute(factory, proposals[relation], variable, next);
         Assert.That(await kernel.VerifyAsync(Query(factory,
             [proposals[relation], factory.Binary(IrBinaryOperator.LessThan, current, factory.Integer(3))],
-            preserved)), Is.TypeOf<ProvenOutcome>());
+            preserved), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -119,9 +119,9 @@ public sealed class HornClauseBoundaryTests
             new Dictionary<IrVarId, IrTerm> { [index] = nextIndex, [value] = nextValue });
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [initialIndex, initialValue], invariant)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], preserved)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], affine)), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [initialIndex, initialValue], invariant), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], preserved), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], affine), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<IrTerm> assumptions, IrTerm goal)

@@ -67,7 +67,7 @@ public sealed class TotalSourceIrreducibleControl
             context.Unload();
         }
         var replay = new TotalProgramSourceReplay(12360);
-        await replay.CompareBatchAsync([new(Member, [input], false)], 0);
+        await replay.CompareBatchAsync([new(Member, [input], false)], 0, cancellationToken: CancellationToken.None);
         var result = replay.Result;
         await TestContext.Out.WriteLineAsync("input=" + input + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +

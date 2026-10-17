@@ -24,7 +24,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         var root = CompileActual(cases);
         Assert.That(root.DescendantNodes().OfType<ClassDeclarationSyntax>().Count(type =>
             type.Identifier.ValueText == "SharpProofGeneratedFrontendEdges"), Is.EqualTo(2));
-        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases).Single();
+        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge type shape."));
     }
@@ -45,7 +45,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(methods.Select(method => method.Identifier.ValueText),
             Is.EqualTo(OverloadedNames));
         Assert.That(methods.Select(method => method.ParameterList.Parameters.Count), Is.EqualTo(OverloadedParameterCounts));
-        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases);
+        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None);
         Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(result => result.Detail)));
     }
@@ -59,7 +59,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.OfType<MethodDeclarationSyntax>().Single().Identifier.ValueText,
             Is.EqualTo("EdgeTarget1"));
-        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases).Single();
+        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge method shape."));
     }

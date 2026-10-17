@@ -25,7 +25,7 @@ public sealed class FuzzSourceProducerGuardControls
         Assert.That(produced.Term, Is.TypeOf<IrVariableTerm>());
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [true], Partial, [[true]])]);
+            [new(positive, finite, [true], Partial, [[true]])], cancellationToken: CancellationToken.None);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo(
             "An incomplete Total clause has no authentic opaque expression for rejection."));
@@ -41,7 +41,7 @@ public sealed class FuzzSourceProducerGuardControls
         Assert.That(produced.Variables.Any(binding => binding.Symbol is ILocalSymbol), Is.True);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, Finite, [true], partial, [[true]])]);
+            [new(positive, Finite, [true], partial, [[true]])], cancellationToken: CancellationToken.None);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo("Source replay requires actual method parameter bindings."));
     }

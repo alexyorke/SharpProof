@@ -650,10 +650,10 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
                 WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
                 WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-            var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+            var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
             observation["artifactSha256"] = Hash(Encoding.UTF8.GetBytes(artifactJson));
             await File.WriteAllTextAsync(Path.Combine(output, "artifact.json"), artifactJson, new UTF8Encoding(false));
-            CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations);
+            CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations, cancellationToken: CancellationToken.None);
             var preparation = preparations.Single();
             var expectedId = "M:Subject.Target(" + string.Join(",", Enumerable.Repeat("System.Int32", 16)) + ")~System.Int32";
             Assert.That(preparation.Entry.CallableId, Is.EqualTo(expectedId));
@@ -713,7 +713,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 condition = printer.Print(invariant.Condition)
             }).ToArray();
             observation["generatedCount"] = generated.Length;
-            var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+            var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
             observation["ordinaryBuilt"] = ordinaryBuilt;
             observation["ordinaryFailure"] = failure.ToString();
             observation["finitePlanAvailable"] = plan?.LoopSearch != null;

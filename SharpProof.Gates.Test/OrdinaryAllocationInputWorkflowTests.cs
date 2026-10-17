@@ -126,6 +126,6 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         var document = new OpenSourceCorpusDocument(2, [], [file], methods);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
         return NativeEffectOracleGate.ObserveAsync(compilation, methods.Select(static method => method.Id).ToImmutableArray(),
-            RepositoryLayout.FindRoot(), "ordinary-allocation-inputs", methods.Length, allocations: true);
+            RepositoryLayout.FindRoot(), "ordinary-allocation-inputs", methods.Length, allocations: true, cancellationToken: CancellationToken.None);
     }
 }

@@ -38,10 +38,10 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
             _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(
-                missingFactory ? null! : factory, missingFactory ? formula : null!);
+                missingFactory ? null! : factory, missingFactory ? formula : null!, cancellationToken: CancellationToken.None);
         }));
         Assert.That(error!.ParamName, Is.EqualTo(missingFactory ? "factory" : "formula"));
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.True);
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None), Is.True);
     }
 
     [Test]
@@ -50,7 +50,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var error = Assert.Throws<ArgumentException>((Action)(() =>
         {
-            _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1));
+            _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1), cancellationToken: CancellationToken.None);
         }));
         Assert.That(error!.ParamName, Is.EqualTo("formula"));
         Assert.That(error.Message, Does.Contain("must be Boolean"));
@@ -62,11 +62,11 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var text = factory.CreateVariable("text", factory.StringType);
         var formula = factory.Binary(IrBinaryOperator.Equal, factory.Variable(text), factory.String("sample"));
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.False);
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula).ConfigureAwait(false);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None).ConfigureAwait(false);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
         Assert.That(result.Actual, Is.Null);
         Assert.That(result.FiniteDomainAssumptions, Is.Zero);
@@ -80,7 +80,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var value = factory.CreateVariable("value", factory.IntegerType);
         var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
         var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.True);
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.True);
         Assert.That(prepared, Is.Not.Null);
@@ -100,7 +100,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var value = factory.CreateVariable("value", factory.IntegerType);
         var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
         var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.False);
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
@@ -116,7 +116,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         var nonzero = factory.Binary(IrBinaryOperator.NotEqual, variable, factory.Integer(0));
         var positive = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
         var formula = factory.Binary(IrBinaryOperator.AndAlso, nonzero, positive);
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.True);
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.True);
         Assert.That(prepared, Is.Not.Null);
@@ -124,8 +124,8 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
         Assert.That(prepared.Variables, Is.EqualTo(new[] { value }));
         Assert.That(prepared.AssignmentCount, Is.EqualTo(FiniteDomainSmtDifferentialOracle.IntegerDomain.Length));
         Assert.That(prepared.AnyTrue, Is.True);
-        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula).ConfigureAwait(false);
-        var projected = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared).ConfigureAwait(false);
+        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None).ConfigureAwait(false);
+        var projected = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared, cancellationToken: CancellationToken.None).ConfigureAwait(false);
         Assert.That(direct.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
         Assert.That(direct.Expected, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
         Assert.That(direct.Actual, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));

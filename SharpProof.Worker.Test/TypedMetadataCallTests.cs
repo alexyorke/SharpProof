@@ -86,7 +86,7 @@ public sealed class TypedMetadataCallTests
         else
         { Assert.That(runtime, Is.EqualTo(expected)); }
         var artifact = subject.CreateArtifact();
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var factory = total.Program.Factory;
@@ -118,7 +118,7 @@ public sealed class TypedMetadataCallTests
             """);
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
         Assert.That(subject.InvokeRoot(0), Is.EqualTo(1));
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;

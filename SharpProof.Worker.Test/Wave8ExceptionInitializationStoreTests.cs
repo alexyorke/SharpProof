@@ -29,8 +29,8 @@ public sealed class Wave8ExceptionInitializationStoreTests
         RunCompiledInvocation(compilation, scenario);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item.EffectClaims.Length != 0), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         await TestContext.Out.WriteLineAsync($"{scenario}: native={native.Outcome?.GetType().Name}/{native.Reason}");
         if (expected == WorkerClaimOutcome.Proven)
         { Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>()); }

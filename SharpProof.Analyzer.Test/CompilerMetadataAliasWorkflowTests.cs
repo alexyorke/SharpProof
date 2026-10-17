@@ -236,7 +236,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 """;
             var single = await PublishAsync(source, directory, "single", [first]);
             var aliased = await PublishAsync(source, directory, "aliased", [first, second]);
-            var artifact = CompilerManifestArtifactJson.Deserialize(aliased);
+            var artifact = CompilerManifestArtifactJson.Deserialize(aliased, cancellationToken: CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));

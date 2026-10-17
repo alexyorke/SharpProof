@@ -24,7 +24,7 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
@@ -47,7 +47,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         var expectedOutcome = validAllowance ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown;
         var expectedReason = validAllowance ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedContract;
         var expectedVacuity = validAllowance ? WorkerVacuityKind.ContradictoryPreconditions : WorkerVacuityKind.None;

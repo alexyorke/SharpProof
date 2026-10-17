@@ -37,14 +37,14 @@ public sealed class OrdinaryNativeModuleWorkflowTests
                 Assert.Throws<BadImageFormatException>((Action)(() => context.LoadFromStream(image)));
                 Assert.ThrowsAsync<BadImageFormatException>((Func<Task>)(async () =>
                     await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                        "ordinary-sdk-module", 1, allocations: true)));
+                        "ordinary-sdk-module", 1, allocations: true, cancellationToken: CancellationToken.None)));
             }
             else
             {
                 var callable = context.LoadFromStream(image).GetType("OrdinaryModule", throwOnError: true)!.GetMethod("Target")!;
                 Assert.That(callable.Invoke(null, [23]), Is.EqualTo(23));
                 var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                    "ordinary-sdk-module", 1, allocations: true);
+                    "ordinary-sdk-module", 1, allocations: true, cancellationToken: CancellationToken.None);
                 Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
                 Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
                 Assert.That(report.Passed, Is.True);

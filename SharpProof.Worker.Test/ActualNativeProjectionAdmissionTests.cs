@@ -21,7 +21,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         using var project = CreateProject(source, "EffectProjectionAdmission");
         var target = project.Snapshot.Callables.Single();
         var claim = target.EffectClaims.Single();
-        var actualEffect = await NativeEffectSiteVerifier.VerifyPurityAsync(target, project.Request.Budgets);
+        var actualEffect = await NativeEffectSiteVerifier.VerifyPurityAsync(target, project.Request.Budgets, cancellationToken: CancellationToken.None);
         Assert.That(actualEffect.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualEffect.Reason, Is.EqualTo(WorkerClaimReason.None));
         var valid = NativeEffectClaims.Project(target, claim.ClaimId, actualEffect);
@@ -31,10 +31,10 @@ public sealed class ActualNativeProjectionAdmissionTests
 
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, project.Request.Budgets.QueryRlimit,
             project.Request.Budgets.MethodRlimit);
-        var actualEntry = await solver.VerifyEntryAsync();
+        var actualEntry = await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actualEntry.ExceptionWitness, Is.Null);
@@ -60,10 +60,10 @@ public sealed class ActualNativeProjectionAdmissionTests
         var target = project.Snapshot.Callables.Single();
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, project.Request.Budgets.QueryRlimit,
             project.Request.Budgets.MethodRlimit);
-        var actualEntry = await solver.VerifyEntryAsync();
+        var actualEntry = await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
         var requires = target.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)
@@ -72,7 +72,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var valid = TotalCallableVerifier.ProjectEntry(actualEntry, requires);
         Assert.That(valid.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(valid.Reason, Is.EqualTo(WorkerClaimReason.None));
-        var actualBody = await solver.VerifyEnsuresAsync(0);
+        var actualBody = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(actualBody.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualBody.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actualBody.Core.Any(label => label.StartsWith("input:disjoint:", StringComparison.Ordinal)), Is.True);

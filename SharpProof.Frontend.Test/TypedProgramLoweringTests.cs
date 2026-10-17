@@ -346,15 +346,24 @@ internal sealed class TypedProgramSubject : IDisposable
     {
         return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context);
     }
-    internal FrontendProgramLoweringResult LowerSourceCalls(CancellationToken cancellationToken = default)
+    internal FrontendProgramLoweringResult LowerSourceCalls()
+    { return LowerSourceCalls(CancellationToken.None); }
+
+    internal FrontendProgramLoweringResult LowerSourceCalls(CancellationToken cancellationToken)
     { return LowerSourceCalls(false, cancellationToken: cancellationToken); }
 
-    internal FrontendProgramLoweringResult LowerShadowSourceCalls(CancellationToken cancellationToken = default)
+    internal FrontendProgramLoweringResult LowerShadowSourceCalls()
+    { return LowerShadowSourceCalls(CancellationToken.None); }
+
+    internal FrontendProgramLoweringResult LowerShadowSourceCalls(CancellationToken cancellationToken)
     {
         return new RoslynProgramLowerer(Factory).LowerShadowSourceBody(Graph, Context, static _ => true, cancellationToken);
     }
 
-    internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, bool opaqueCalls = false, CancellationToken cancellationToken = default)
+    internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, bool opaqueCalls = false)
+    { return LowerSourceCalls(arrayModels, CancellationToken.None, opaqueCalls); }
+
+    internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, CancellationToken cancellationToken, bool opaqueCalls = false)
     {
         return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, null, cancellationToken,
             arrayModels ? ResolveArrayEmpty : null, opaqueCalls: opaqueCalls);

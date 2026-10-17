@@ -178,7 +178,15 @@ internal sealed class CoreIrAdvisoryInterpreter
         _domain = new(_factory, variables);
         _variables = variables;
     }
-    internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, int maxIterations = 1000, int maximumTermWork = 65536, int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default, CancellationToken token = default)
+    internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial,
+        int maxIterations = 1000, int maximumTermWork = 65536,
+        int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default)
+    {
+        return Run(initial, CancellationToken.None, maxIterations,
+            maximumTermWork, maximumSyntheticEdges, markers);
+    }
+
+    internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, CancellationToken token, int maxIterations = 1000, int maximumTermWork = 65536, int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default)
     {
         if (initial is null)
         {

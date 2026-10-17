@@ -26,7 +26,7 @@ public sealed class NativeOpaqueTermAdmissionTests
         builder.Return(whenTrue, site);
         builder.Return(whenFalse, site);
         var candidate = new PassiveCallableCandidate("opaque-term-admission", builder.Build(), [], null, [], []);
-        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(accepted, Is.EqualTo(!opaque));
@@ -34,14 +34,14 @@ public sealed class NativeOpaqueTermAdmissionTests
             Assert.That(failure, Is.EqualTo(opaque ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         }
         var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.None, new WorkerBudgets());
+            WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, opaque ? Is.Null : Is.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(opaque ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         // The maintained native backend independently rejects unsupported opaque
         // goals; this is a module admission test, not a source proof claim.
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.Precondition, new SourceLocationId(site.Value))));
+            new Goal(factory, predicate, ProofDiagnosticKind.Precondition, new SourceLocationId(site.Value))), cancellationToken: CancellationToken.None);
         if (opaque)
         {
             Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
@@ -130,7 +130,7 @@ public sealed class NativeOpaqueTermAdmissionTests
                 factory.Boolean(true), site) }
             : [];
         var candidate = new PassiveCallableCandidate("external-operand-admission", builder.Build(), [], resultVariable, [], [.. ensures]);
-        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(accepted, Is.EqualTo(!opaque));
@@ -138,7 +138,7 @@ public sealed class NativeOpaqueTermAdmissionTests
             Assert.That(failure, Is.EqualTo(opaque ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         }
         var projection = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.AllKnown, new WorkerBudgets());
+            WorkerEffectCapabilitySet.AllKnown, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(projection.Outcome, opaque ? Is.Null : Is.TypeOf<ProvenOutcome>());
         Assert.That(projection.Reason, Is.EqualTo(opaque ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         IrTerm goal = opaque ? termType == factory.BooleanType ? unsupported
@@ -148,7 +148,7 @@ public sealed class NativeOpaqueTermAdmissionTests
             : factory.Boolean(true);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(new VerificationQuery(factory, [],
-            new Goal(factory, goal, ProofDiagnosticKind.Precondition, new SourceLocationId(site.Value))));
+            new Goal(factory, goal, ProofDiagnosticKind.Precondition, new SourceLocationId(site.Value))), cancellationToken: CancellationToken.None);
         if (opaque)
         {
             Assert.That(outcome, Is.TypeOf<UnknownOutcome>());

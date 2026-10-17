@@ -81,8 +81,8 @@ public sealed class CompilerBodyAbstractionTests
                 instructions[1].A = total.Parameters[0].Current;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: CancellationToken.None)));
     }
 
     [TestCase("object")]

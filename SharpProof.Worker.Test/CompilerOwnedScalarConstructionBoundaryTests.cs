@@ -73,7 +73,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         Assert.That(reachable.CollectionComplete, Is.EqualTo(expectedComplete));
         Assert.That(body.Graph != null, Is.EqualTo(expectedComplete));
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single().Total;
         if (expectedComplete)
         {

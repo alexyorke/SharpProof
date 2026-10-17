@@ -58,7 +58,7 @@ public sealed class UnsupportedScalarBoundaryTests
         var predicate = factory.Binary(IrBinaryOperator.Equal, remainder, factory.Integer(0));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var outcome = await new ProofKernel(backend).VerifyAsync(Query(factory, predicate));
+        var outcome = await new ProofKernel(backend).VerifyAsync(Query(factory, predicate), CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }

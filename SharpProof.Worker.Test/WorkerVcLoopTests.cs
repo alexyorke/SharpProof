@@ -26,7 +26,7 @@ public sealed class WorkerVcLoopTests
     internal static bool PrologueReentryRejected(bool initialization, string source = AssumeLoopSource)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
         var blocks = total.Program.Blocks.ToDictionary(block => block.Id, block => builder.CreateBlock());
@@ -78,7 +78,7 @@ public sealed class WorkerVcLoopTests
         artifact.Callables.Single().Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() });
         try
         {
-            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out _, cancellationToken: CancellationToken.None);
             return false;
         }
         catch (System.Text.Json.JsonException) { return true; }
@@ -132,7 +132,7 @@ public sealed class WorkerVcLoopTests
             """, cacheEnabled: true);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, kind);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableSolver(plan.LoopSearch!)));
         using (var boundedBackend = new NativeCallableBackend(new SharpProof.Smt.IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit)))
@@ -145,9 +145,9 @@ public sealed class WorkerVcLoopTests
         }
         Assert.That(plan.EnsuresQuery(0).Assumptions.All(assumption => assumption.Justification is not UserAssumedJustification), Is.True);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible), kind);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>(), kind);
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible), kind);
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>(), kind);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), kind + ": " + refuted.Reason);
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
@@ -170,9 +170,9 @@ public sealed class WorkerVcLoopTests
     {
         using var project = new ShadowTestProject(BeyondSearchSource);
         var preparation = project.Snapshot.Callables.Single();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         var posts = Postconditions(response);
@@ -209,11 +209,11 @@ public sealed class WorkerVcLoopTests
         using var project = new ShadowTestProject(LoopSource);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);

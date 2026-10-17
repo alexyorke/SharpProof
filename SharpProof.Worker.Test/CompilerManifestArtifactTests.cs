@@ -71,7 +71,7 @@ public sealed class CompilerManifestArtifactTests
             "\"; }\n";
         var artifact = CreateArtifact(parse, source);
         var tree = artifact.Compilation.SyntaxTrees.Single();
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -126,9 +126,9 @@ public sealed class CompilerManifestArtifactTests
             Guid.NewGuid().ToString("D");
 
         var roundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
         var callables =
-            CompilerManifestArtifactJson.DecodeCallables(roundTrip);
+            CompilerManifestArtifactJson.DecodeCallables(roundTrip, cancellationToken: CancellationToken.None);
 
         Assert.That(callables, Is.Empty);
     }
@@ -168,7 +168,7 @@ public sealed class CompilerManifestArtifactTests
         {
             artifact.Callables.Single().FailureReason = reason;
             Assert.That(
-                CompilerManifestArtifactJson.DecodeCallables(artifact)
+                CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)
                     .Single().FailureReason,
                 Is.EqualTo(reason),
                 reason.ToString());
@@ -179,7 +179,7 @@ public sealed class CompilerManifestArtifactTests
             artifact.Callables.Single().FailureReason = reason;
             Assert.Throws<JsonException>(
                 (Action)(() =>
-                    CompilerManifestArtifactJson.DecodeCallables(artifact)),
+                    CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)),
                 reason.ToString());
         }
     }
@@ -208,11 +208,11 @@ public sealed class CompilerManifestArtifactTests
                 Is.All.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
 
         artifact.Callables[0].FailureReason = WorkerClaimReason.UnsupportedBody;
         Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -279,9 +279,9 @@ public sealed class CompilerManifestArtifactTests
             """);
 
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)));
         Assert.That(
             artifact.Callables.Single(item => item.CallableId.Contains(".B(", StringComparison.Ordinal)).Total?.Graph,
             Is.Not.Null);
@@ -295,7 +295,7 @@ public sealed class CompilerManifestArtifactTests
             "valid", length: 0, line: 1, column: 1)];
         BindDiagnostics(valid);
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(valid)));
+            CompilerManifestArtifactJson.Serialize(valid, cancellationToken: CancellationToken.None)));
 
         var none = CreateArtifact();
         none.CompilerDiagnostics = [new CompilerDiagnosticArtifact
@@ -305,7 +305,7 @@ public sealed class CompilerManifestArtifactTests
             Location = new WorkerSourceLocation()
         }];
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(none)));
+            CompilerManifestArtifactJson.Serialize(none, cancellationToken: CancellationToken.None)));
 
         foreach (var location in new[]
                  {
@@ -339,7 +339,7 @@ public sealed class CompilerManifestArtifactTests
                 Location = location
             }];
             Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Serialize(malformed)));
+                CompilerManifestArtifactJson.Serialize(malformed, cancellationToken: CancellationToken.None)));
         }
     }
 
@@ -363,7 +363,7 @@ public sealed class CompilerManifestArtifactTests
         artifact.CompilerDiagnostics[0].Code = code;
 
         Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -376,7 +376,7 @@ public sealed class CompilerManifestArtifactTests
         artifact.CompilerDiagnostics[0].Code = "compiler.CS" + (char)1;
 
         Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [TestCase("compiler.CS1001")]
@@ -393,7 +393,7 @@ public sealed class CompilerManifestArtifactTests
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -415,14 +415,14 @@ public sealed class CompilerManifestArtifactTests
             corrupt(artifact);
 
             Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Serialize(artifact)));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
         }
     }
 
     [Test]
     public void SpecificationPackAuthorityFieldsCannotSilentlyDefaultOnWire()
     {
-        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact());
+        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact(), cancellationToken: CancellationToken.None);
         var catalogVersionProperty =
             "\"specificationPackCatalogVersion\":" +
             CompilerSpecificationPackCatalogVersions.Current.ToString(
@@ -434,7 +434,7 @@ public sealed class CompilerManifestArtifactTests
             StringComparison.Ordinal);
 
         Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(withoutCatalogVersion)));
+            CompilerManifestArtifactJson.Deserialize(withoutCatalogVersion, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -449,7 +449,7 @@ public sealed class CompilerManifestArtifactTests
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -458,7 +458,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
         BindDiagnostics(artifact);
-        var initial = CompilerManifestArtifactJson.Serialize(artifact);
+        var initial = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         var padding =
             WorkerProtocolJson.MaximumJsonBytes + 1 -
             Encoding.UTF8.GetByteCount(initial);
@@ -466,7 +466,7 @@ public sealed class CompilerManifestArtifactTests
 
         artifact.CompilerDiagnostics[0].Message += new string('x', padding);
 
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -477,7 +477,7 @@ public sealed class CompilerManifestArtifactTests
                 Encoding.UTF8.GetByteCount(json),
                 Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
             Assert.DoesNotThrow((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(json)));
+                CompilerManifestArtifactJson.Deserialize(json, cancellationToken: CancellationToken.None)));
         }
     }
 
@@ -487,20 +487,20 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
         BindDiagnostics(artifact);
-        var initial = CompilerManifestArtifactJson.Serialize(artifact);
+        var initial = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         var padding = CompilerManifestArtifactFile.MaximumBytes -
             Encoding.UTF8.GetByteCount(initial);
         Assert.That(padding, Is.GreaterThan(0));
 
         artifact.CompilerDiagnostics[0].Message += new string('x', padding);
-        var exact = CompilerManifestArtifactJson.Serialize(artifact);
+        var exact = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         Assert.That(
             Encoding.UTF8.GetByteCount(exact),
             Is.EqualTo(CompilerManifestArtifactFile.MaximumBytes));
 
         artifact.CompilerDiagnostics[0].Message += "x";
         Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -520,7 +520,7 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(evidence.Certainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
-            Assert.That(CompilerManifestArtifactJson.DecodeCallables(valid).Single()
+            Assert.That(CompilerManifestArtifactJson.DecodeCallables(valid, cancellationToken: CancellationToken.None).Single()
                 .EffectClaims, Has.Length.EqualTo(1));
         }
 
@@ -539,7 +539,7 @@ public sealed class CompilerManifestArtifactTests
             var artifact = CloneArtifact(valid);
             corrupt(artifact.Callables[0]);
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+                CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)));
         }
     }
 
@@ -588,7 +588,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var valid = CreateEffectArtifact();
         Assert.That(CompilerLoweredArtifact.Decode(
-            valid.Callables, valid.Manifest, valid.Compilation).Length, Is.EqualTo(1));
+            valid.Callables, valid.Manifest, valid.Compilation, cancellationToken: CancellationToken.None).Length, Is.EqualTo(1));
 
         foreach (var mutation in new[]
         {
@@ -624,7 +624,7 @@ public sealed class CompilerManifestArtifactTests
 
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerLoweredArtifact.Decode(
-                    artifact.Callables, artifact.Manifest, artifact.Compilation)),
+                    artifact.Callables, artifact.Manifest, artifact.Compilation, cancellationToken: CancellationToken.None)),
                 mutation);
         }
     }
@@ -643,13 +643,13 @@ public sealed class CompilerManifestArtifactTests
         var effects = artifact.Callables.Single().EffectClaims;
         Assert.That(effects, Has.Length.EqualTo(2));
         Assert.That(CompilerLoweredArtifact.Decode(
-            artifact.Callables, artifact.Manifest, artifact.Compilation).Length,
+            artifact.Callables, artifact.Manifest, artifact.Compilation, cancellationToken: CancellationToken.None).Length,
             Is.EqualTo(1));
 
         effects[1].ClaimId = effects[0].ClaimId;
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerLoweredArtifact.Decode(
-                artifact.Callables, artifact.Manifest, artifact.Compilation)));
+                artifact.Callables, artifact.Manifest, artifact.Compilation, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -657,11 +657,11 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateContractArtifact();
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
 
         artifact.Callables.Single().Total!.Graph.Roots = null!;
         var failure = Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Serialize(artifact)));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
         Assert.That(failure!.Message,
             Is.EqualTo("The compiler manifest callable payload is invalid."));
     }
@@ -692,7 +692,7 @@ public sealed class CompilerManifestArtifactTests
         {
             var artifact = CloneArtifact(valid);
             corrupt(artifact.Callables[0]);
-            Assert.Throws<InvalidDataException>(new Action(() => CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            Assert.Throws<InvalidDataException>(new Action(() => CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)));
         }
     }
 
@@ -738,7 +738,7 @@ public sealed class CompilerManifestArtifactTests
                 break;
         }
 
-        Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -746,7 +746,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateContractArtifact();
         var decoded = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
 
         Assert.That(decoded.Callables.Select(item => item.CallableId),
             Is.EqualTo(artifact.Callables.Select(item => item.CallableId)));
@@ -774,13 +774,13 @@ public sealed class CompilerManifestArtifactTests
         }
         if (mutation == "valid")
         {
-            var decoded = CompilerManifestArtifactJson.Deserialize(CompilerManifestArtifactJson.Serialize(artifact));
+            var decoded = CompilerManifestArtifactJson.Deserialize(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
             Assert.That(decoded.Manifest.Callables.Single().CallableId, Is.EqualTo(callable.CallableId));
         }
         else
         {
-            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Validate(artifact)));
-            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact)));
+            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: CancellationToken.None)));
+            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
         }
     }
 
@@ -864,7 +864,7 @@ public sealed class CompilerManifestArtifactTests
         CompilerManifestArtifact artifact)
     {
         return CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
     }
 
     private static CompilerAdditionalFileSnapshot AdditionalFile(
@@ -957,7 +957,7 @@ public sealed class CompilerManifestArtifactTests
     {
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))),
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None)),
             message ?? string.Empty);
     }
 

@@ -27,7 +27,7 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
         await File.WriteAllBytesAsync(path, bytes);
         var request = new WorkerVerifyRequest

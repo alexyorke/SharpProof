@@ -79,7 +79,7 @@ public sealed class FrontendTypeInitializationControls
         {
             context.Unload();
         }
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [Input]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [Input], cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(fault ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ExceptionKind, Is.Null);
         if (fault)

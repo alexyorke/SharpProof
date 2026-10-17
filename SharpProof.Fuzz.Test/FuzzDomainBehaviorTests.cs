@@ -27,7 +27,7 @@ public sealed class FuzzDomainBehaviorTests
         Assert.That(atZero.Status, Is.EqualTo(expectedDefined
             ? IrEvaluationStatus.Value : IrEvaluationStatus.Exception));
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(
-            factory, formula), Is.EqualTo(expectedDefined));
+            factory, formula, cancellationToken: CancellationToken.None), Is.EqualTo(expectedDefined));
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
             factory, formula, CancellationToken.None, out var prepared),
             Is.EqualTo(expectedDefined));
@@ -50,11 +50,11 @@ public sealed class FuzzDomainBehaviorTests
         foreach (var incomplete in incompleteCases)
         {
             var exception = Assert.Throws<ArgumentException>((Action)(() =>
-                FrontendDifferentialOracle.CompareSemanticEdges([incomplete])));
+                FrontendDifferentialOracle.CompareSemanticEdges([incomplete], cancellationToken: CancellationToken.None)));
             Assert.That(exception!.ParamName, Is.EqualTo("cases"));
             Assert.That(exception.Message, Does.Contain("incomplete"));
         }
 
-        Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([]), Is.Empty);
+        Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([], cancellationToken: CancellationToken.None), Is.Empty);
     }
 }

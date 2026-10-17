@@ -39,11 +39,11 @@ public sealed class NativeConstructionAdmissionTests
             Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(enlarged, [], CancellationToken.None), Is.Null);
             Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(enlarged, [], CancellationToken.None), Is.Null);
         }
-        Assert.That(PassiveCallableVcBuilder.TryBuild(bounded, out var plan, out var failure), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(bounded, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var verified = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
@@ -100,7 +100,7 @@ public sealed class NativeConstructionAdmissionTests
             Assert.That(search == null, Is.EqualTo(!supported));
             Assert.That(reason, Is.EqualTo(supported ? WorkerClaimReason.None : WorkerClaimReason.ResourceLimit));
         }
-        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(built, Is.EqualTo(supported));
@@ -110,8 +110,8 @@ public sealed class NativeConstructionAdmissionTests
         if (supported)
         {
             using var solver = new PassiveCallableSolver(plan!);
-            Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-            var verified = await solver.VerifyEnsuresAsync(0);
+            Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+            var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
             Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
             Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         }

@@ -203,7 +203,7 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");

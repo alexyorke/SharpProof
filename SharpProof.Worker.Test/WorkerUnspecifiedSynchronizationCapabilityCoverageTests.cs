@@ -20,7 +20,7 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
@@ -39,7 +39,7 @@ public sealed partial class WorkerTests
         Assert.That(IrOpaqueCallSite.Effects(total.Program.Factory, call.Operation), Is.EqualTo(IrOpaqueCallEffects.All));
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
             instruction.Origin == IrHavocOrigin.Approximation), Is.True);
-        var native = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(native.Outcome, Is.Null);
@@ -51,7 +51,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         var result = AssertClaimVerdict(response, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody,
             WorkerVacuityKind.None);
         using (Assert.EnterMultipleScope())

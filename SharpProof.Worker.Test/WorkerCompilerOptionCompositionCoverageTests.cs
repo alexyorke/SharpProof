@@ -16,7 +16,7 @@ public sealed partial class WorkerTests
         var originalDepth = request.Budgets.MaximumExpressionDepth;
         Assert.That(originalDepth, Is.EqualTo(64));
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var admitted = await worker.VerifyAsync(request);
+        var admitted = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         AssertClaimVerdict(admitted, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(admitted).IsValid, Is.True);
 
@@ -31,11 +31,11 @@ public sealed partial class WorkerTests
             Assert.That(differentOptions.MaximumExpressionDepth, Is.EqualTo(65));
             Assert.That(differentOptions.MaximumExpressionDepth, Is.Not.EqualTo(originalDepth));
         }
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(differentOptions));
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(differentOptions, cancellationToken: CancellationToken.None));
         var path = Path.Combine(project.DirectoryPath, "different-compiler-options.json");
         await File.WriteAllBytesAsync(path, bytes);
         request.CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
-        var rejected = await worker.VerifyAsync(request);
+        var rejected = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(request.Budgets.MaximumExpressionDepth, Is.EqualTo(originalDepth));
@@ -46,7 +46,7 @@ public sealed partial class WorkerTests
             Assert.That(WorkerProtocolJson.Validate(rejected).IsValid, Is.True);
         }
         request.CompilerManifest = originalReference;
-        var restored = await worker.VerifyAsync(request);
+        var restored = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         AssertClaimVerdict(restored, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(restored).IsValid, Is.True);
         Assert.That(request.Budgets.MaximumExpressionDepth, Is.EqualTo(originalDepth));

@@ -26,7 +26,7 @@ internal sealed class ShadowTestProject : IDisposable
         try
         {
             artifact.Compilation.ProjectDirectory = _directory.FullName;
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");
             File.WriteAllBytes(path, bytes);
             Request = new WorkerVerifyRequest

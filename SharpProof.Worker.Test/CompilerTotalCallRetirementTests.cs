@@ -43,7 +43,7 @@ public sealed class CompilerTotalCallRetirementTests
     {
         foreach (var target in new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values)
         {
-            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
             await AssertProvesAsync(preparation);
         }
     }
@@ -76,7 +76,7 @@ public sealed class CompilerTotalCallRetirementTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary, NullableContextOptions.Enable));
         TestCompilation.AssertNoErrors(compilation);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(target => target.Method.Name == "Verify");
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
         await AssertProvesAsync(preparation, emitted && resultPlaceholder ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven);
     }
 
@@ -97,7 +97,7 @@ public sealed class CompilerTotalCallRetirementTests
             }
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
             check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), CancellationToken.None);
@@ -198,7 +198,7 @@ public sealed class CompilerTotalCallRetirementTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
 
-        foreach (var preparation in CompilerManifestArtifactJson.DecodeCallables(artifact))
+        foreach (var preparation in CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None))
         {
             Assert.That(preparation.Total, Is.Not.Null);
             await AssertProvesAsync(preparation);

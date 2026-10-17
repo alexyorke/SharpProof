@@ -466,8 +466,11 @@ SOFTWARE.
         {
             GateProcess.KillTree(process);
 
+            // Reap the killed process even when the caller canceled.
+#pragma warning disable SPINT003
             await process.WaitForExitAsync(CancellationToken.None)
                 .ConfigureAwait(false);
+#pragma warning restore SPINT003
             throw;
         }
 

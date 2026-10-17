@@ -49,7 +49,7 @@ public sealed class AtomicFileTests : IDisposable
         await AssertWriteUtf8ReplacementAsync(
             static (path, content) => AtomicFile.WriteUtf8Async(
                 path,
-                content));
+                content, CancellationToken.None));
     }
 
     [Test]
@@ -68,7 +68,7 @@ public sealed class AtomicFileTests : IDisposable
         await AssertWriteUtf8LongDestinationAsync(
             static (path, content) => AtomicFile.WriteUtf8Async(
                 path,
-                content));
+                content, CancellationToken.None));
     }
 
     [Test]

@@ -101,7 +101,7 @@ public sealed class FuzzTotalSourceCompletionControls
         Assert.That(bindings.Count, Is.EqualTo(fault ? 0 : 1));
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         const string finite = "public static bool Target(bool value) => value;";
-        var campaign = await FuzzRunner.ReplaySourceCasesAsync([new(positive, finite, [true], members, [[true]])]);
+        var campaign = await FuzzRunner.ReplaySourceCasesAsync([new(positive, finite, [true], members, [[true]])], cancellationToken: CancellationToken.None);
         Assert.That(campaign.Cases, Is.EqualTo(1));
         Assert.That(campaign.FrontendAgreements, Is.EqualTo(1));
         Assert.That(campaign.SmtAgreements, Is.EqualTo(1));

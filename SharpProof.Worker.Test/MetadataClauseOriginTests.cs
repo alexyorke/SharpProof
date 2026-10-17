@@ -178,7 +178,7 @@ public sealed class MetadataClauseOriginTests
         builder.Assign(block, prologue, current, factory.Variable(entry));
         builder.Assign(block, prologue, old, factory.Variable(entry));
         var context = new TotalLoweringContext(factory, method);
-        var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context).Clauses.Single();
+        var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: CancellationToken.None).Clauses.Single();
         var value = IrSubstitution.Substitute(factory, bound.Value,
             new Dictionary<IrVarId, IrTerm> { [context.Parameters[0].Entry] = factory.Variable(entry) });
         string name;

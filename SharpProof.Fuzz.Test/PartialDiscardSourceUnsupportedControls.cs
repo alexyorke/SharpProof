@@ -101,7 +101,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         using var session = FuzzSmtSession.Create(factory);
         var query = new VerificationQuery(factory, [],
             new Goal(factory, lowering.Term, ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
-        var proof = await new ProofKernel(session).VerifyAsync(query);
+        var proof = await new ProofKernel(session).VerifyAsync(query, cancellationToken: CancellationToken.None);
         if (unsupported)
         {
             Assert.That(proof, Is.TypeOf<UnknownOutcome>());
@@ -117,7 +117,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         }
         var generated = new PartialTermSmtCase(lowering.Term, factory.Boolean(completed), [scenario],
             [reference ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse]);
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
         Assert.That(result.Status,
             Is.EqualTo(unsupported ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement));
         Assert.That(result.ScenarioCount, Is.EqualTo(1));

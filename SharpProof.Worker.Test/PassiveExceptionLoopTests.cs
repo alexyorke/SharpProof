@@ -19,12 +19,12 @@ public sealed class PassiveExceptionLoopTests
         var replacementSite = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>().Last().Operation;
         Assert.That(actual.Exception.Site, Is.EqualTo(replacementSite));
         Assert.That(actual.ConsumedApproximation, Is.False);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var allowed = System.Collections.Immutable.ImmutableHashSet.Create(IrExceptionKind.Overflow);
         if (allowDivision)
         { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
-        var result = await solver.VerifyExceptionsAsync(allowed);
+        var result = await solver.VerifyExceptionsAsync(allowed, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, allowDivision ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         if (!allowDivision)
         {
@@ -45,10 +45,10 @@ public sealed class PassiveExceptionLoopTests
         Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
         Assert.That(actual.Exception.Site, Is.EqualTo(sites[1]));
         Assert.That(actual.ConsumedApproximation, Is.False);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var result = await solver.VerifyExceptionsAsync(System.Collections.Immutable.ImmutableHashSet<IrExceptionKind>.Empty,
-            allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true);
+            allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, allowReplacement ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         if (!allowReplacement)
         { Assert.That(result.ExceptionWitness!.Site, Is.EqualTo(sites[1])); }
@@ -152,15 +152,15 @@ public sealed class PassiveExceptionLoopTests
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.One));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         if (feasibility)
         {
-            Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+            Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
         }
         else
         {
-            Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<RefutedOutcome>());
         }
     }
 
@@ -180,12 +180,12 @@ public sealed class PassiveExceptionLoopTests
         Assert.That(havocs.SelectMany(havoc => havoc.Variables).Intersect(candidate.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Old })), Is.Empty);
         Assert.That(proof.Program.Blocks.SelectMany(block => block.Instructions).Select(instruction => instruction.Operation),
             Is.All.EqualTo(candidate.Ensures[0].Operation));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         var query = plan!.EnsuresQuery(0);
         Assert.That(query.Assumptions.Select(assumption => assumption.Justification), Is.All.TypeOf<LoweredJustification>());
         Assert.That(query.Assumptions.Select(assumption => assumption.Justification).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
         using var solver = new PassiveCallableSolver(plan);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.EntryModel.Keys, Is.EqualTo(new[] { candidate.Parameters[0].Entry }));
         Assert.That(result.EntryModel.Values.Single().IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(3)));
@@ -216,7 +216,7 @@ public sealed class PassiveExceptionLoopTests
         else
         { builder.Return(end, site, factory.Variable(kind == "old" ? parameter.Old : unbound)); }
         var candidate = new PassiveCallableCandidate("malformed", builder.Build(), [parameter], result, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
@@ -250,10 +250,10 @@ public sealed class PassiveExceptionLoopTests
             new Dictionary<IrVarId, IrValue> { [subject.Parameter.Entry] = value, [subject.Parameter.Current] = value });
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase("assume")]
@@ -268,7 +268,7 @@ public sealed class PassiveExceptionLoopTests
         else
         { subject.Builder.Assign(block, subject.Site, kind == "entry" ? subject.Parameter.Entry : subject.Parameter.Old, subject.Factory.Integer(0)); }
         subject.Builder.Throw(block, subject.Site, IrExceptionKind.Overflow, block);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(subject.Candidate(subject.Factory.Boolean(false)), out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(subject.Candidate(subject.Factory.Boolean(false)), out _, out var reason, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
@@ -289,7 +289,7 @@ public sealed class PassiveExceptionLoopTests
         builder.Throw(second, site, IrExceptionKind.Overflow, first);
         builder.Return(end, site);
         var candidate = new PassiveCallableCandidate("bounded", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

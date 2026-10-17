@@ -17,10 +17,10 @@ public sealed class ReachableGraphBoundaryControlTests
     public void ValidReachableBodiesRetainCanonicalPayload()
     {
         var artifact = CreateArtifact();
-        var payload = CompilerManifestArtifactJson.Serialize(artifact);
-        var decoded = CompilerManifestArtifactJson.Deserialize(payload);
+        var payload = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
+        var decoded = CompilerManifestArtifactJson.Deserialize(payload, cancellationToken: CancellationToken.None);
         Assert.That(decoded.ReachableSource!.Bodies, Has.Length.EqualTo(2));
-        Assert.That(CompilerManifestArtifactJson.Serialize(decoded), Is.EqualTo(payload));
+        Assert.That(CompilerManifestArtifactJson.Serialize(decoded, cancellationToken: CancellationToken.None), Is.EqualTo(payload));
     }
 
     [Test]
@@ -39,7 +39,7 @@ public sealed class ReachableGraphBoundaryControlTests
     {
         var artifact = CreateArtifact();
         artifact.ReachableSource!.Bodies.First(body => body.Graph != null).Graph!.Types = null!;
-        var exception = Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact)));
+        var exception = Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: CancellationToken.None)));
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidDataException>());
     }
 }

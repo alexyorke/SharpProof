@@ -28,7 +28,7 @@ public sealed class MetadataSourceNativeBoundaryControls
         MetadataProgramSourceCase[] cases = [new(Library, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync();
+            await actual.CompileAsync(cancellationToken: CancellationToken.None);
             Assert.That(actual.Premises, Has.Length.EqualTo(1));
             Assert.That(actual.Premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
             Assert.That(actual.Premises[0].HasTotal, Is.True);
@@ -41,7 +41,7 @@ public sealed class MetadataSourceNativeBoundaryControls
             }
         }
         var replay = new MetadataProgramSourceReplay(12370);
-        await replay.CompareBatchAsync(cases, 0);
+        await replay.CompareBatchAsync(cases, 0, cancellationToken: CancellationToken.None);
         var result = replay.Result;
         await TestContext.Out.WriteLineAsync("family=" + family + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +

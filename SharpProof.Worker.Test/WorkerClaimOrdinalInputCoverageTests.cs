@@ -45,7 +45,7 @@ public sealed class WorkerClaimOrdinalInputCoverageTests
             }
             """);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var target = preparations.Single();
         Assert.That(target.Entry.ClaimIds, Has.Length.EqualTo(1));
         return target;

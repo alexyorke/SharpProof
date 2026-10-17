@@ -20,12 +20,12 @@ public sealed class FuzzClosedDomainTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var formula = factory.Boolean(value);
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula),
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None),
             Is.True);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.True);
-        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula);
-        var cached = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared!);
+        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None);
+        var cached = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared!, cancellationToken: CancellationToken.None);
 
         Assert.That(cached, Is.EqualTo(direct));
         Assert.That(direct.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
@@ -46,8 +46,8 @@ public sealed class FuzzClosedDomainTests
             factory.Binary(IrBinaryOperator.Equal, factory.Variable(value), factory.Integer(-2)));
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.True);
-        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula);
-        var cached = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared!);
+        var direct = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None);
+        var cached = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory, prepared!, cancellationToken: CancellationToken.None);
 
         Assert.That(cached, Is.EqualTo(direct));
         Assert.That(direct.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
@@ -57,7 +57,7 @@ public sealed class FuzzClosedDomainTests
         Assert.That(prepared.Domain.Factory, Is.SameAs(factory));
         Func<Task> wrongFactory = async () =>
             await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
-                new IrFactory(IrExecutionSemantics.Total), prepared);
+                new IrFactory(IrExecutionSemantics.Total), prepared, cancellationToken: CancellationToken.None);
         var exception = Assert.ThrowsAsync<ArgumentException>(wrongFactory);
         Assert.That(exception!.ParamName, Is.EqualTo("formula"));
     }
@@ -101,7 +101,7 @@ public sealed class FuzzClosedDomainTests
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Term, Is.InstanceOf<IrOpaqueTerm>());
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory,
-            lowering.Term), Is.False);
+            lowering.Term, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             lowering.Term, CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
@@ -111,19 +111,19 @@ public sealed class FuzzClosedDomainTests
         Assert.That(rejection!.Message,
             Is.EqualTo("The generated total finite-domain formula could not be prepared."));
         var comparison = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory,
-            lowering.Term);
+            lowering.Term, cancellationToken: CancellationToken.None);
         Assert.That(comparison.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
         Assert.That(comparison.Actual, Is.Null);
         Assert.That(comparison.Detail, Is.EqualTo("SMT abstained: UnsupportedEncoding."));
         var candidates = IrStructuralShrinker.GetCandidates(factory, lowering.Term);
         Assert.That(candidates, Is.Not.Empty);
         var retained = await SmtFailureRetention.RetainFiniteDomainAsync(
-            factory, lowering.Term, 7, 12345);
+            factory, lowering.Term, 7, 12345, cancellationToken: CancellationToken.None);
         var printed = new IrPrinter(factory).Print(lowering.Term);
         Assert.That(retained, Is.EqualTo(new FuzzFailure(7, 12345,
             "finite-domain-smt", printed, printed, comparison.Detail)));
         var replay = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory,
-            lowering.Term);
+            lowering.Term, cancellationToken: CancellationToken.None);
         Assert.That(replay, Is.EqualTo(comparison));
         foreach (var candidate in candidates)
         {
@@ -132,7 +132,7 @@ public sealed class FuzzClosedDomainTests
             Assert.That(IrStructuralShrinker.StructuralSize(candidate),
                 Is.LessThan(IrStructuralShrinker.StructuralSize(lowering.Term)));
             var smaller = await FiniteDomainSmtDifferentialOracle.CompareAsync(
-                factory, candidate);
+                factory, candidate, cancellationToken: CancellationToken.None);
             Assert.That(smaller.Status, Is.EqualTo(FuzzOracleStatus.Agreement), smaller.Detail);
         }
 
@@ -172,7 +172,7 @@ public sealed class FuzzClosedDomainTests
                 ? PartialTermSemanticOutcome.DefinedTrue
                 : PartialTermSemanticOutcome.DefinedFalse;
             var partial = await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-                new PartialTermSmtCase(lowering.Term, factory.Boolean(runtimeCompleted), [scenario], [reference]));
+                new PartialTermSmtCase(lowering.Term, factory.Boolean(runtimeCompleted), [scenario], [reference]), cancellationToken: CancellationToken.None);
             Assert.That(partial.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
             Assert.That(partial.ScenarioCount, Is.EqualTo(1));
             Assert.That(partial.Detail,

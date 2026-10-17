@@ -310,7 +310,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.Term, Is.TypeOf<IrOpaqueTerm>());
-        var results = FrontendDifferentialOracle.CompareBatch([positive, negative]);
+        var results = FrontendDifferentialOracle.CompareBatch([positive, negative], cancellationToken: CancellationToken.None);
         Assert.That(results.Length, Is.EqualTo(2));
         Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement), results[0].Detail);
         Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
@@ -530,7 +530,7 @@ public sealed class FuzzEmissionLifecycleTests
             new LoweredJustification(factory.CreateOperation("boolean-depth-reference-guard")));
         var proof = await new ProofKernel(native).VerifyAsync(new VerificationQuery(factory,
             [valueAssumption, guardAssumption], new Goal(factory, completion,
-                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0))));
+                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0))), cancellationToken: CancellationToken.None);
         if (unaryCount == 2)
         {
             Assert.That(proof, Is.TypeOf<ProvenOutcome>());
@@ -543,7 +543,7 @@ public sealed class FuzzEmissionLifecycleTests
         }
         var generated = new PartialTermSmtCase(formula, completion,
             scenarios.ToImmutable(), references.ToImmutable());
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
         Assert.That(result.DefinedTrueCount, Is.EqualTo(1));
 
         if (unaryCount == 2)
@@ -563,11 +563,11 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(result.Detail,
                 Is.EqualTo("The backend returned Unknown(UnsupportedEncoding) for partial-term scenario 0."));
             var retained = await SmtFailureRetention.RetainPartialTermAsync(
-                factory, generated, 8, 12346);
+                factory, generated, 8, 12346, cancellationToken: CancellationToken.None);
             var printed = new IrPrinter(factory).Print(generated.Formula);
             Assert.That(retained, Is.EqualTo(new FuzzFailure(8, 12346,
                 "partial-term-smt", printed, printed, result.Detail)));
-            var replay = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+            var replay = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
             Assert.That(replay, Is.EqualTo(result));
         }
     }

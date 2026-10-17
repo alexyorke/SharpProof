@@ -219,9 +219,9 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var decodedShadow = CompilerDecodedShadowBody.Decode(body.CallableId, detached, CancellationToken.None, references);
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decodedShadow);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
             using var solver = new PassiveCallableSolver(plan!);
-            var checkedCall = await solver.VerifyCallPreconditionAsync(0);
+            var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
             Assert.That(checkedCall.Outcome, Is.InstanceOf<ProvenOutcome>(), checkedCall.Reason.ToString());
         }
         finally

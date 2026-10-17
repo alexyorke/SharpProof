@@ -63,21 +63,21 @@ public sealed class FuzzBoundaryCoverageTests
         var formula = factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(text), factory.String("a"));
 
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula),
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: CancellationToken.None),
             Is.False);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
             CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
         Assert.That(result.Detail, Does.Contain("outside"));
 
         Action nonBoolean = () =>
-            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1));
+            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1), cancellationToken: CancellationToken.None);
         Action nullFactory = () =>
-            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(null!, formula);
+            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(null!, formula, cancellationToken: CancellationToken.None);
         Action nullFormula = () =>
-            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, null!);
+            FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, null!, cancellationToken: CancellationToken.None);
         Assert.Throws<ArgumentException>(nonBoolean);
         Assert.Throws<ArgumentNullException>(nullFactory);
         Assert.Throws<ArgumentNullException>(nullFormula);
@@ -92,7 +92,7 @@ public sealed class FuzzBoundaryCoverageTests
             factory.Variable(x), factory.Integer(1));
 
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory,
-            defined), Is.True);
+            defined, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             defined, CancellationToken.None, out var prepared), Is.True);
         Assert.That(prepared, Is.Not.Null);
@@ -112,11 +112,11 @@ public sealed class FuzzBoundaryCoverageTests
         }
 
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(
-            factory, formula), Is.False);
+            factory, formula, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             formula, CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
         Assert.That(result.Actual, Is.Null);
         Assert.That(result.FiniteDomainAssumptions, Is.Zero);

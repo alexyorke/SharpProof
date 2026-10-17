@@ -53,7 +53,7 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(easyControl ? 8 : 7));

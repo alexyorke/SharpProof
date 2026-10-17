@@ -149,7 +149,7 @@ public sealed class WorkerVcAutoPropertyTests
         using var project = WorkerTests.TestProject.Create(Source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        s_response = await worker.VerifyAsync(request);
+        s_response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         Assert.That(s_response.Errors, Is.Empty);
     }
 

@@ -16,7 +16,7 @@ internal static class ReferencedTypeSymbols
 
     internal static IEnumerable<INamedTypeSymbol> GetAll(
         Compilation compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (compilation is null)
         { throw new ArgumentNullException(nameof(compilation)); }
@@ -40,7 +40,7 @@ internal static class ReferencedTypeSymbols
 
     internal static IEnumerable<INamedTypeSymbol> GetAllCached(
         Compilation compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (compilation is null)
         { throw new ArgumentNullException(nameof(compilation)); }
@@ -57,7 +57,7 @@ internal static class ReferencedTypeSymbols
     internal static IEnumerable<INamedTypeSymbol> GetAllCached(
         Compilation compilation,
         IAssemblySymbol referencedAssembly,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (compilation is null)
         { throw new ArgumentNullException(nameof(compilation)); }

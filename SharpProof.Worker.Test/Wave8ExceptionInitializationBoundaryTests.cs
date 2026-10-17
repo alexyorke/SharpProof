@@ -24,7 +24,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
         { Assert.That(await Publish(artifact), Is.EqualTo(WorkerClaimOutcome.Unknown)); }
         else
         {
-            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
             await TestContext.Out.WriteLineAsync($"{scenario}: entryComplete={preparation.Total?.EffectsCompleteAtEntry}; native={result.Outcome?.GetType().Name}/{result.Reason}");
             Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         }
@@ -43,7 +43,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
     {
         var artifact = CreateAndRun(scenario);
         var preparation = Prepare(artifact);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         await TestContext.Out.WriteLineAsync($"{scenario}: entryComplete={preparation.Total?.EffectsCompleteAtEntry}; native={result.Outcome?.GetType().Name}/{result.Reason}");
         Assert.That(await Publish(artifact), Is.EqualTo(expected));
         if (expected == WorkerClaimOutcome.Proven)
@@ -116,7 +116,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single(item => item.EffectClaims.Length != 0);
     }
 

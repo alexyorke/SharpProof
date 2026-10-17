@@ -65,8 +65,8 @@ public sealed class CompilerCaptureInputWorkflowTests
             Assert.That(captured.LineMap.Any(line => line.CharacterOffset == 11), Is.True);
             Assert.That(location.Path, Is.EqualTo("template.dsl"));
             Assert.That(location.Line, Is.EqualTo(5));
-            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, captured), Is.True);
-            Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [captured]), Is.Zero);
+            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, captured, cancellationToken: CancellationToken.None), Is.True);
+            Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [captured], CancellationToken.None), Is.Zero);
         }
     }
 

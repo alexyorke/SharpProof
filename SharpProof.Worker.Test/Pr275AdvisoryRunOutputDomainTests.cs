@@ -17,9 +17,9 @@ public sealed class Pr275AdvisoryRunOutputDomainTests
         var reachableProgram = Build(factory, value, false);
         var unreachableProgram = Build(factory, value, true);
         var reachableResult = new CoreIrAdvisoryInterpreter(reachableProgram, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: CancellationToken.None);
         var unreachableResult = new CoreIrAdvisoryInterpreter(unreachableProgram, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: CancellationToken.None);
         Assert.That(reachableResult.Accepted, Is.True);
         Assert.That(unreachableResult.Accepted, Is.True);
         Assert.That(reachableResult.Gaps, Is.Empty);
@@ -48,9 +48,9 @@ public sealed class Pr275AdvisoryRunOutputDomainTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var reachableResult = new CoreIrAdvisoryInterpreter(Build(factory, value, false), [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: CancellationToken.None);
         var unreachableResult = new CoreIrAdvisoryInterpreter(Build(factory, value, true), [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: CancellationToken.None);
         Assert.That(reachableResult.Accepted, Is.True);
         Assert.That(unreachableResult.Accepted, Is.True);
         Assert.That(reachableResult.Gaps, Is.Empty);
@@ -82,13 +82,13 @@ public sealed class Pr275AdvisoryRunOutputDomainTests
         nonNullBuilder.Assign(nonNullEntry, factory.CreateOperation(), text, factory.String("owned"));
         nonNullBuilder.Return(nonNullEntry, factory.CreateOperation(), factory.Variable(text));
         var nonNullResult = new CoreIrAdvisoryInterpreter(nonNullBuilder.Build(), [text])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: CancellationToken.None);
         var nullBuilder = new IrProgramBuilder(factory);
         var nullEntry = nullBuilder.CreateBlock();
         nullBuilder.Assign(nullEntry, factory.CreateOperation(), text, factory.Null(factory.StringType));
         nullBuilder.Return(nullEntry, factory.CreateOperation(), factory.Variable(text));
         var nullResult = new CoreIrAdvisoryInterpreter(nullBuilder.Build(), [text])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: CancellationToken.None);
         Assert.That(nonNullResult.Accepted, Is.True);
         Assert.That(nullResult.Accepted, Is.True);
         Assert.That(nonNullResult.Gaps, Is.Empty);

@@ -30,10 +30,10 @@ public sealed class TypedPortableIntegerTests
                 roots.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
             }
         }
-        var encoded = PortableIrGraphCodec.Encode(factory, null, roots);
+        var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: CancellationToken.None);
         var json = JsonSerializer.Serialize(encoded.Graph, WorkerProtocolJson.SharedOptions);
         var decoded = PortableIrGraphCodec.Decode(JsonSerializer.Deserialize<PortableIrGraph>(
-            json, WorkerProtocolJson.SharedOptions)!);
+            json, WorkerProtocolJson.SharedOptions)!, externalVariableIndices: null, cancellationToken: CancellationToken.None);
         var decodedValues = encoded.VariableIndices.ToDictionary(
             pair => decoded.Variables[pair.Value],
             pair => decoded.Factory.CreateIntegerValueFromBits(
@@ -56,7 +56,7 @@ public sealed class TypedPortableIntegerTests
             }
         }
         Assert.That(JsonSerializer.Serialize(PortableIrGraphCodec.Encode(
-                decoded.Factory, null, decoded.Roots).Graph, WorkerProtocolJson.SharedOptions),
+                decoded.Factory, null, decoded.Roots, variables: null, cancellationToken: CancellationToken.None).Graph, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(json));
     }
 
@@ -81,7 +81,7 @@ public sealed class TypedPortableIntegerTests
     {
         var graph = CreateLiteralGraph(64);
         graph.Types.Single(type => type.Width == 64).Width = width;
-        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph)));
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -89,10 +89,10 @@ public sealed class TypedPortableIntegerTests
     {
         var graph = CreateLiteralGraph(64);
         graph.Types.Single(type => type.Width == 64).Signed = true;
-        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph)));
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: CancellationToken.None)));
         graph = CreateLiteralGraph(8);
         graph.Terms[0].Bits = 256;
-        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph)));
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: CancellationToken.None)));
     }
 
     private static PortableIrGraph CreateLiteralGraph(int width)
@@ -100,6 +100,6 @@ public sealed class TypedPortableIntegerTests
         var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, false);
         return PortableIrGraphCodec.Encode(factory, null,
-            [factory.IntegerBits(type, width == 64 ? ulong.MaxValue : (1UL << width) - 1)]).Graph;
+            [factory.IntegerBits(type, width == 64 ? ulong.MaxValue : (1UL << width) - 1)], variables: null, cancellationToken: CancellationToken.None).Graph;
     }
 }

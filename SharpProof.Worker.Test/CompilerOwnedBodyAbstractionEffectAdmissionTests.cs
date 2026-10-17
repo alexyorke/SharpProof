@@ -37,7 +37,7 @@ public sealed class CompilerOwnedBodyAbstractionEffectAdmissionTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(emptyVoid ? VoidSource : ScalarSource);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
@@ -45,7 +45,7 @@ public sealed class CompilerOwnedBodyAbstractionEffectAdmissionTests
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(candidate!.IsBodyAbstraction, Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         Assert.That(plan!.HasBodyAbstraction, Is.True);
         var budgets = new WorkerBudgets();
         using var solver = new PassiveCallableSolver(plan, budgets.QueryRlimit, budgets.MethodRlimit);

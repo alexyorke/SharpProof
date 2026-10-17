@@ -61,7 +61,7 @@ public sealed class GenericNullableTypeTestAllocationTests
         {
             if (optimization == OptimizationLevel.Release && !releaseAllocates)
             { continue; }
-            var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets());
+            var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets(), cancellationToken: CancellationToken.None);
             Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), optimization + ": " + native.Reason);
         }
     }
@@ -78,7 +78,7 @@ public sealed class GenericNullableTypeTestAllocationTests
         {
             foreach (var input in new[] { 0, 1 })
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
-            var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets());
+            var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets(), cancellationToken: CancellationToken.None);
             Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), optimization + ": " + native.Reason);
         }
     }
@@ -97,7 +97,7 @@ public sealed class GenericNullableTypeTestAllocationTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 

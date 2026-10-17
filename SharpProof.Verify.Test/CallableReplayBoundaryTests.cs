@@ -171,7 +171,7 @@ public sealed class CallableReplayBoundaryTests
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. variables]);
         return await new ProofKernel(new ModelBackend(new BackendModel(assignments)))
-            .VerifyCallableAsync(query, context);
+            .VerifyCallableAsync(query, context, CancellationToken.None);
     }
 
     private static void AssertReplayFailed(ProofOutcome outcome)

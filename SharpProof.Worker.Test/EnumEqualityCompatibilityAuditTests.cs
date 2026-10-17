@@ -78,7 +78,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
         var captured = artifact.Callables.Single(callable => callable.CallableId == declaredClaim.CallableId);
         Assert.That(captured.Total, Is.Not.Null, "Copied enum equality must retain captured Total.");
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".compiler-artifact.json"),
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaredClaim.CallableId);
         Assert.That(preparation.Total, Is.Not.Null);

@@ -80,7 +80,7 @@ public sealed class FloatingPredicateSoundnessAuditTests
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null, "Expected admitted compiler-captured total body.");
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".compiler-artifact.json"),
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".worker-response.json"),

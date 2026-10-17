@@ -130,9 +130,9 @@ public sealed class CorpusGateTests
                 new(clauseSpan.Document, clauseSpan.Start, clauseSpan.Length));
             Assert.That(coverage.Matched, Is.EqualTo(1), nativeKey.ToString());
             var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
-            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
+            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, item.Id + ":" + reason);
             using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
-            var result = await solver.VerifyCallPreconditionAsync(0);
+            var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
             Assert.That(result.Reason, Is.EqualTo(SharpProof.Worker.Protocol.WorkerClaimReason.None), item.Id);
             var outcome = result.Outcome switch
             {
@@ -894,7 +894,7 @@ public sealed class CorpusGateTests
         CorpusGateResult result;
         try
         {
-            result = await CorpusGate.RunAsync(root);
+            result = await CorpusGate.RunAsync(root, cancellationToken: CancellationToken.None);
         }
         catch (InvalidOperationException exception) when (exception.Data["SharpProof.Corpus.WorkerFailure"] is string diagnostics)
         {

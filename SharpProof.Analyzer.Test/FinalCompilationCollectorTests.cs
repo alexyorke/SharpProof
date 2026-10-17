@@ -744,7 +744,7 @@ public sealed class FinalCompilationCollectorTests
             "later-value");
 
         Assert.That(
-            additional.GetText().ToString(),
+            additional.GetText(cancellationToken: CancellationToken.None).ToString(),
             Is.EqualTo("generator-value"));
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
@@ -782,9 +782,9 @@ public sealed class FinalCompilationCollectorTests
             replacement,
             replacementPath);
         var pairRoundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(pairArtifact));
+            CompilerManifestArtifactJson.Serialize(pairArtifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
         var replacementRoundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(replacementArtifact));
+            CompilerManifestArtifactJson.Serialize(replacementArtifact, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -828,7 +828,7 @@ public sealed class FinalCompilationCollectorTests
             compilation,
             Options(path));
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+            await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1001,7 +1001,7 @@ public sealed class FinalCompilationCollectorTests
             additional);
         var second = await File.ReadAllBytesAsync(path);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            Encoding.UTF8.GetString(first));
+            Encoding.UTF8.GetString(first), cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1274,7 +1274,7 @@ public sealed class FinalCompilationCollectorTests
 
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path));
+                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.SpecificationPackIds, Is.Empty);
@@ -1657,7 +1657,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(diagnostics, Is.Empty);
         Assert.That(File.Exists(path), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+            await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
         Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
     }
 
@@ -1706,7 +1706,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static string Digest(CompilerManifestArtifact artifact)
     {
-        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact)));
+        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None)));
     }
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
@@ -1734,7 +1734,7 @@ public sealed class FinalCompilationCollectorTests
                 await TestContext.Out.WriteLineAsync($"Metadata collector raw JSON exceeds capture limit: {rawArtifact.Length} characters.");
             }
         }
-        return CompilerManifestArtifactJson.Deserialize(rawArtifact);
+        return CompilerManifestArtifactJson.Deserialize(rawArtifact, cancellationToken: CancellationToken.None);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
@@ -1859,7 +1859,7 @@ public sealed class FinalCompilationCollectorTests
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return _text;
@@ -1876,7 +1876,7 @@ public sealed class FinalCompilationCollectorTests
         public override string Path { get; } = path;
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return SourceText.From(

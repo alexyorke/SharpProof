@@ -34,7 +34,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
         if (allocate)
@@ -43,7 +43,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
             Assert.That(evidence.AllocationWitness, Is.Not.Null);
             Assert.That(evidence.ExceptionWitness, Is.Null);
             var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                "ordinary-allocation-summary", 1, summary: true);
+                "ordinary-allocation-summary", 1, summary: true, cancellationToken: CancellationToken.None);
             Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(report.Rows.Single().ExceptionKind, Is.Null);
@@ -53,7 +53,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
         {
             Assert.That(evidence.Outcome, Is.InstanceOf<ProvenOutcome>());
             var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                "ordinary-allocation-summary", 1, summary: true);
+                "ordinary-allocation-summary", 1, summary: true, cancellationToken: CancellationToken.None);
             Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("NotRun"));
             Assert.That(report.Passed, Is.True);
@@ -77,7 +77,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
@@ -86,7 +86,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
         Assert.That(evidence.HasFeasibleEntryWitness, Is.True);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "ordinary-allocation-summary", 1, summary: true);
+            "ordinary-allocation-summary", 1, summary: true, cancellationToken: CancellationToken.None);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));

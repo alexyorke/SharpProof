@@ -30,7 +30,7 @@ public sealed partial class WorkerTests
         using var firstWorker = SharpProofWorker.Create(request.Budgets);
         using var otherWorker = SharpProofWorker.Create(otherRequest.Budgets);
         var actual = await firstWorker.VerifyAsync(request, snapshot, CancellationToken.None);
-        var foreign = await otherWorker.VerifyAsync(otherRequest);
+        var foreign = await otherWorker.VerifyAsync(otherRequest, cancellationToken: CancellationToken.None);
         foreach (var response in new[] { actual, foreign })
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));

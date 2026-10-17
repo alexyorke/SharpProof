@@ -305,8 +305,8 @@ public sealed class WorkerTcbEdgeCaseTests
     {
         Assert.Throws<JsonException>(new Action(() =>
         {
-            var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-            CompilerManifestArtifactJson.DeserializePrepared(json, out _);
+            var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: CancellationToken.None);
         }));
     }
 

@@ -140,11 +140,11 @@ public sealed class WorkerVcMetadataCallTests
         var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(target.Total!.Parameters.Select(parameter => parameter.Entry)));
         var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, refuted.EntryModel);

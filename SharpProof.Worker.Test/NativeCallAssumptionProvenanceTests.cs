@@ -59,15 +59,15 @@ public sealed class NativeCallAssumptionProvenanceTests
                 { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.EqualTo(a && b)); }
             }
         }
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.EntryQuery().Assumptions, Is.Empty);
         using var solver = new PassiveCallableSolver(plan);
-        var entry = await solver.VerifyEntryAsync();
+        var entry = await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None);
         Assert.That(entry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(entry.BodyAssumptions, Is.Empty);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proof.Outcome, assumed ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.BodyAssumptions, Is.EqualTo(assumed ? new[] { firstSite, secondSite } : []));

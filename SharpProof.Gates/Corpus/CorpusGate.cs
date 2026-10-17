@@ -148,7 +148,7 @@ internal static class CorpusGate
 
     public static async Task<CorpusGateResult> RunAsync(
         string repositoryRoot,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repositoryRoot);
         var wallTime = System.Diagnostics.Stopwatch.StartNew();
@@ -487,7 +487,7 @@ internal static class CorpusGate
 
     public static async Task WriteActualSnapshotAsync(
         string repositoryRoot,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repositoryRoot);
         var import = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(

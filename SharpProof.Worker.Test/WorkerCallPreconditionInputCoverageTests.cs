@@ -12,7 +12,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
     public void OwnedCallPreconditionQueriesRejectOutOfRangeOrdinals(int ordinal)
     {
         var candidate = EnrollSourceControl();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True,
             failure.ToString());
         var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
             plan!.CallPreconditionQueries(ordinal)));
@@ -30,7 +30,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
     public void ValidOrdinalsPreserveTheActualOwnedCallQueries()
     {
         var candidate = EnrollSourceControl();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True,
             failure.ToString());
 
         using (Assert.EnterMultipleScope())
@@ -77,7 +77,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
             }
             """);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var target = preparations.Single(preparation => preparation.Total is { CallPreconditions.Length: 2 });
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         using (Assert.EnterMultipleScope())

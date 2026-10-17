@@ -145,7 +145,7 @@ public sealed class ProtocolJsonTests
 
         Assert.Throws<InvalidDataException>(
             (Action)(() => WorkerProtocolJson.ReadUtf8File(path)));
-        Func<Task> readAsync = () => WorkerProtocolJson.ReadUtf8FileAsync(path);
+        Func<Task> readAsync = () => WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken: CancellationToken.None);
         Assert.ThrowsAsync<InvalidDataException>(readAsync);
 
         File.WriteAllBytes(path, [0xff]);
@@ -375,7 +375,7 @@ public sealed class ProtocolJsonTests
                 Throws.InstanceOf<JsonException>());
             Assert.That(
                 (Action)(() =>
-                    CompilerManifestArtifactJson.Deserialize(json)),
+                    CompilerManifestArtifactJson.Deserialize(json, cancellationToken: CancellationToken.None)),
                 Throws.InstanceOf<JsonException>());
         }
     }
@@ -394,8 +394,8 @@ public sealed class ProtocolJsonTests
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(json);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(json, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -418,19 +418,19 @@ public sealed class ProtocolJsonTests
             CompilerManifestArtifactJson.Deserialize(json.Replace(
                 $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
                 $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current},\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
-                StringComparison.Ordinal))));
+                StringComparison.Ordinal), cancellationToken: CancellationToken.None)));
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
                 "\"features\":\"All\"",
                 "\"features\":1",
-                StringComparison.Ordinal))));
+                StringComparison.Ordinal), cancellationToken: CancellationToken.None)));
 
         roundTrip.Manifest.Claims[0].Location.Column++;
         Assert.That(WorkerProtocolJson.ManifestsEqual(
             roundTrip.Manifest, manifest), Is.False);
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(roundTrip))));
+                CompilerManifestArtifactJson.Serialize(roundTrip, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None)));
     }
 
     [Test]

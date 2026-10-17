@@ -35,7 +35,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             var endToEnd = Stopwatch.StartNew();
             using var project = new ShadowTestProject(source);
             var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _), Is.True);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
             using var boundary = new CancellationTokenSource(WorkerBudgets.DefaultMethodWallTimeMilliseconds);
             using var solver = new PassiveCallableSolver(plan!);
             var entry = await Query(solver.VerifyEntryAsync);

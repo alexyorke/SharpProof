@@ -8,7 +8,7 @@ public sealed class TotalProgramFuzzTests
     [Test]
     public async Task RepresentativeTotalBodiesAgreeWithCompiledCodeAndNativeReplay()
     {
-        var result = await TotalProgramDifferentialOracle.RunAsync(128, 23063);
+        var result = await TotalProgramDifferentialOracle.RunAsync(128, 23063, cancellationToken: CancellationToken.None);
         Assert.That(result.Passed, Is.True, string.Join("\n", result.Failures));
         Assert.That(result.Coverage.Agreements, Is.EqualTo(128));
         Assert.That(result.Coverage.NativeProofs, Is.EqualTo(128));

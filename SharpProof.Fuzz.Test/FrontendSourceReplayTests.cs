@@ -21,7 +21,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
         AssertActualCompilation(source, [First], [7], [true]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ExceptionKind, Is.Null);
     }
@@ -31,7 +31,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
         AssertActualCompilation(source, [First], [7], [false]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn did not expose the generated method operation."));
         Assert.That(result.ExceptionKind, Is.Null);
@@ -42,7 +42,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = TwoMethodSource();
         AssertActualCompilation(source, [First, Second], [7, 31], [true, true]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: CancellationToken.None).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected generated method count."));
         Assert.That(result.ExceptionKind, Is.Null);
@@ -53,7 +53,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = TwoMethodSource();
         AssertActualCompilation(source, [First, Second], [7, 31], [true, true]);
-        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second]);
+        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second], cancellationToken: CancellationToken.None);
         Assert.That(results.Length, Is.EqualTo(2));
         Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(result => result.Detail)));
@@ -70,7 +70,7 @@ public sealed class FrontendSourceReplayTests
         var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
-        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second]);
+        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second], cancellationToken: CancellationToken.None);
         Assert.That(results.Length, Is.EqualTo(2));
         foreach (var result in results)
         {
@@ -79,7 +79,7 @@ public sealed class FrontendSourceReplayTests
             Assert.That(result.Detail, Does.Contain("CS1029"));
             Assert.That(result.Detail, Does.Contain("actual-source-replay-rejection"));
         }
-        Assert.That(FrontendDifferentialOracle.CompareSourceBatch(source, []), Is.Empty);
+        Assert.That(FrontendDifferentialOracle.CompareSourceBatch(source, [], cancellationToken: CancellationToken.None), Is.Empty);
     }
 
     private static string TwoMethodSource()

@@ -21,7 +21,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.IntegerBits(type, input)))],
-            Equal(factory, term, factory.IntegerBits(type, expected))));
+            Equal(factory, term, factory.IntegerBits(type, expected))), CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
     }
@@ -55,7 +55,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.IntegerBits(source, input)))],
-            Equal(factory, factory.Cast(target, factory.Variable(x)), factory.IntegerBits(target, expected))));
+            Equal(factory, factory.Cast(target, factory.Variable(x)), factory.IntegerBits(target, expected))), CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
@@ -154,7 +154,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyCallableAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(input), factory.IntegerBits(type, ulong.MaxValue)))],
-            factory.Boolean(false), [input]), replay);
+            factory.Boolean(false), [input]), replay, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(((RefutedOutcome)outcome).Model.Assignments[input].IntegerNumericValue, Is.EqualTo(new BigInteger(ulong.MaxValue)));
         Assert.That(calls, Is.EqualTo(1));
@@ -190,8 +190,8 @@ public sealed class CallableSolverSessionTests
         var assumption = await session.CheckAsync(Query(factory, [Assume(factory, opaque)], factory.Boolean(true)), CancellationToken.None);
         Assert.That(assumption.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
         var kernel = new ProofKernel(session);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [positive], factory.Variable(flag))), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [], factory.Variable(flag))), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [positive], factory.Variable(flag)), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [], factory.Variable(flag)), CancellationToken.None), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -255,7 +255,7 @@ public sealed class CallableSolverSessionTests
             factory.Binary(IrBinaryOperator.NotEqual, value, factory.Integer(0)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
-            [Assume(factory, Equal(factory, factory.Variable(x), factory.Integer(2)))], predicate));
+            [Assume(factory, Equal(factory, factory.Variable(x), factory.Integer(2)))], predicate), CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
@@ -270,7 +270,7 @@ public sealed class CallableSolverSessionTests
         var query = Query(factory, [Assume(factory, Equal(factory, factory.Variable(flag), factory.Boolean(selected)))],
             Equal(factory, value, factory.IntegerBits(type, selected ? ulong.MaxValue : 1)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var model = ((RefutedOutcome)outcome).Model.Assignments;
         Assert.That(model[flag].Boolean, Is.EqualTo(selected));

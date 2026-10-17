@@ -23,7 +23,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         var claim = AssertClaimVerdict(response, expected, WorkerClaimReason.None);
         using (Assert.EnterMultipleScope())
         {

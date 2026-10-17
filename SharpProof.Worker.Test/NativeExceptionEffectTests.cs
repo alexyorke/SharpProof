@@ -18,11 +18,11 @@ public sealed class NativeExceptionEffectTests
         var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
             "[AllowedExceptions(typeof(" + allowed + "))] public static System.Action Target(Receiver instance) { " +
             "return new System.Action(instance.Sink); } }";
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Total!.ExceptionConstraints.Single().AllowedKinds.Contains(IrExceptionKind.Argument), Is.EqualTo(proven));
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         if (!proven)
         { Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.Argument)); }
@@ -36,11 +36,11 @@ public sealed class NativeExceptionEffectTests
     public async Task SerializedEffectOnlyCallableQualifiesWithoutPostconditions(string body, bool proven)
     {
         var source = "using SharpProof.Attributes; public static class C { [DoesNotThrow] public static int Target(int x) { " + body + " } }";
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.EffectClaims.Single().ContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(native.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
         if (preparation.EffectClaims.Single().Outcome == WorkerClaimOutcome.Proven)
         { Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), "Retain inherited compiler proofs."); }
@@ -57,7 +57,7 @@ public sealed class NativeExceptionEffectTests
                 var input = (int)native.EntryModel.Values.Single().IntegerNumericValue;
                 var thrown = Assert.Throws<System.Reflection.TargetInvocationException>(new Action(() => method.Invoke(null, [input])));
                 var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _), Is.True);
+                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
                 var replay = plan!.ReplayException(native.EntryModel, CancellationToken.None);
                 var expected = replay.Exception!.Kind == IrExceptionKind.Overflow ? typeof(OverflowException) : typeof(DivideByZeroException);
                 Assert.That(thrown!.InnerException, Is.TypeOf(expected));
@@ -77,9 +77,9 @@ public sealed class NativeExceptionEffectTests
         var subject = PassiveSourceSubject.Create("class C { public static int Target(int x) { " + body + " } }");
         var candidate = subject.Enroll();
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyExceptionsAsync([]);
+        var result = await solver.VerifyExceptionsAsync([], cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         if (!proven)
         {
@@ -111,14 +111,14 @@ public sealed class NativeExceptionEffectTests
         builder.Throw(division, site, IrExceptionKind.DivideByZero, exit);
         builder.ExceptionalExit(exit, site);
         var candidate = new PassiveCallableCandidate("joined", builder.Build(), [parameter], null, [], []);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         var allowed = ImmutableHashSet.CreateBuilder<IrExceptionKind>();
         if (allowOverflow)
         { allowed.Add(IrExceptionKind.Overflow); }
         if (allowDivision)
         { allowed.Add(IrExceptionKind.DivideByZero); }
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyExceptionsAsync(allowed.ToImmutable());
+        var result = await solver.VerifyExceptionsAsync(allowed.ToImmutable(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, allowOverflow && allowDivision ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         if (result.Outcome is RefutedOutcome)
         {
@@ -133,9 +133,9 @@ public sealed class NativeExceptionEffectTests
         var subject = PassiveSourceSubject.Create("class C { public static int Target(int x) { return x; } }").Enroll()!;
         var candidate = new PassiveCallableCandidate(subject.CallableId, subject.Program, subject.Parameters,
             subject.Result, subject.Requires, subject.Ensures, isBodyAbstraction: true);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyExceptionsAsync([])).Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That((await solver.VerifyExceptionsAsync([], cancellationToken: CancellationToken.None)).Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         Assert.Throws<ArgumentException>(new Action(() => plan!.ExceptionQuery(ImmutableHashSet.Create((IrExceptionKind)99))));
     }
 
@@ -160,9 +160,9 @@ public sealed class NativeExceptionEffectTests
         subject.Builder.Return(returned, subject.Site, subject.Factory.Integer(0));
         subject.Builder.ExceptionalExit(exit, subject.Site);
         var candidate = subject.Candidate(subject.Factory.Boolean(true));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyExceptionsAsync([]);
+        var result = await solver.VerifyExceptionsAsync([], cancellationToken: CancellationToken.None);
         if (consumed)
         { Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable)); }
         else

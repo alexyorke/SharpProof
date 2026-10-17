@@ -86,7 +86,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         {
             context.Unload();
         }
-        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true);
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true, cancellationToken: CancellationToken.None);
         Assert.That(analysis.Diagnostics, Has.Length.EqualTo(2));
         Assert.That(analysis.Diagnostics.Select(static item => item.Id).OrderBy(static id => id, StringComparer.Ordinal), Is.EqualTo(ExpectedDiagnosticIds));
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(1));

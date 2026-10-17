@@ -25,7 +25,7 @@ public sealed class ProofKernelTests
             fixture.Goal);
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Unsatisfiable([1])))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(((ProvenOutcome)outcome).Core.Length, Is.EqualTo(1));
@@ -43,7 +43,7 @@ public sealed class ProofKernelTests
         ]);
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Satisfiable(model)))
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(
@@ -64,7 +64,7 @@ public sealed class ProofKernelTests
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         var value = isNull ? factory.CreateNullValue(type) : factory.CreateReferenceValue(type, new object());
         var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
-            new BackendModel([KeyValuePair.Create(variable, value)])))).VerifyAsync(query);
+            new BackendModel([KeyValuePair.Create(variable, value)])))).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
 
@@ -80,7 +80,7 @@ public sealed class ProofKernelTests
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
-            new BackendModel([KeyValuePair.Create(variable, other.CreateReferenceValue(otherType, new object()))])))).VerifyAsync(query);
+            new BackendModel([KeyValuePair.Create(variable, other.CreateReferenceValue(otherType, new object()))])))).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
@@ -109,7 +109,7 @@ public sealed class ProofKernelTests
 
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Satisfiable(model)))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(query.ModelVariables, Has.Length.EqualTo(3));
@@ -123,7 +123,7 @@ public sealed class ProofKernelTests
                 BackendCheckResult.Satisfiable(new BackendModel(
                     model.Assignments.Append(KeyValuePair.Create(
                         invented, factory.CreateIntegerValue(7)))))))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
         Assert.That(inventedOutcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)inventedOutcome).Reason,
@@ -144,17 +144,17 @@ public sealed class ProofKernelTests
         var exactQuery = new VerificationQuery(factory, [], goal, [integer]);
         var missing = await new ProofKernel(new StubBackend(
                 BackendCheckResult.Satisfiable(new BackendModel([]))))
-            .VerifyAsync(exactQuery);
+            .VerifyAsync(exactQuery, CancellationToken.None);
         var wrongType = await new ProofKernel(new StubBackend(
                 BackendCheckResult.Satisfiable(new BackendModel([
                     KeyValuePair.Create(integer, factory.CreateBooleanValue(false))
                 ]))))
-            .VerifyAsync(exactQuery);
+            .VerifyAsync(exactQuery, CancellationToken.None);
         var unsupported = await new ProofKernel(new StubBackend(
                 BackendCheckResult.Satisfiable(new BackendModel([
                     KeyValuePair.Create(text, factory.CreateStringValue("value"))
                 ]))))
-            .VerifyAsync(new VerificationQuery(factory, [], goal, [text]));
+            .VerifyAsync(new VerificationQuery(factory, [], goal, [text]), CancellationToken.None);
 
         ProofOutcome[] outcomes = [missing, wrongType, unsupported];
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
@@ -202,9 +202,9 @@ public sealed class ProofKernelTests
         ]);
 
         var stale = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(staleModel)))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
         var valid = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(validModel)))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
 
         Assert.That(stale, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)stale).Reason,
@@ -221,10 +221,10 @@ public sealed class ProofKernelTests
         ]);
         var spurious = await new ProofKernel(
             new StubBackend(BackendCheckResult.Satisfiable(trueModel)))
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
         var incomplete = await new ProofKernel(
             new StubBackend(BackendCheckResult.Satisfiable(new BackendModel([]))))
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
 
         Assert.That(
             ((UnknownOutcome)spurious).Reason,
@@ -261,7 +261,7 @@ public sealed class ProofKernelTests
         ]);
 
         var outcome = await new ProofKernel(
-            new StubBackend(BackendCheckResult.Satisfiable(model))).VerifyAsync(query);
+            new StubBackend(BackendCheckResult.Satisfiable(model))).VerifyAsync(query, CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
@@ -292,7 +292,7 @@ public sealed class ProofKernelTests
         ]);
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Satisfiable(model)))
-            .VerifyAsync(query);
+            .VerifyAsync(query, CancellationToken.None);
 
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
@@ -313,7 +313,7 @@ public sealed class ProofKernelTests
         {
             var outcome = await new ProofKernel(
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
-                .VerifyAsync(fixture.Query);
+                .VerifyAsync(fixture.Query, CancellationToken.None);
             Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(pair.Item2));
         }
     }
@@ -345,7 +345,7 @@ public sealed class ProofKernelTests
         foreach (var result in results)
         {
             var outcome = await new ProofKernel(new StubBackend(result))
-                .VerifyAsync(fixture.Query);
+                .VerifyAsync(fixture.Query, CancellationToken.None);
 
             Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
             Assert.That(
@@ -363,7 +363,7 @@ public sealed class ProofKernelTests
 
         var outcome = await new ProofKernel(
                 new ThrowingBackend(throwSynchronously))
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
 
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
@@ -378,7 +378,7 @@ public sealed class ProofKernelTests
         var fixture = CreateFixture();
         Func<Task> action = () => new ProofKernel(
                 new AggregateCancellationBackend())
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
 
         Assert.ThrowsAsync<AggregateException>(action);
     }
@@ -389,7 +389,7 @@ public sealed class ProofKernelTests
         var fixture = CreateFixture();
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Unsatisfiable([4])))
-            .VerifyAsync(fixture.Query);
+            .VerifyAsync(fixture.Query, CancellationToken.None);
 
         Assert.That(
             ((UnknownOutcome)outcome).Reason,

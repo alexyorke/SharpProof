@@ -88,7 +88,7 @@ public sealed class CompilerReportingTests
         var compilation = new CompilerCompilationSnapshot { SyntaxTrees = [first, second] };
         var location = Location();
 
-        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation), Is.EqualTo(-1));
+        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: CancellationToken.None), Is.EqualTo(-1));
         CompilerSourceCoordinates.RememberTree(location, 1);
         CompilerSourceCoordinates.Bind(location, compilation, out var ordinal,
             out var path, out var treeHash, out var mapHash);
@@ -102,9 +102,9 @@ public sealed class CompilerReportingTests
 
         // Rebinding replaces the producer's previous association.
         CompilerSourceCoordinates.RememberTree(location, 0);
-        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation), Is.Zero);
+        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: CancellationToken.None), Is.Zero);
         location.Column++;
-        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation), Is.EqualTo(-1));
+        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: CancellationToken.None), Is.EqualTo(-1));
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerSourceCoordinates.Bind(location, compilation, out _, out _, out _, out _)));
     }
@@ -116,14 +116,14 @@ public sealed class CompilerReportingTests
         tree.LineMap[0].CharacterOffset = 2;
         var location = Location();
         location.Column = 3;
-        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree), Is.True);
-        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [tree]), Is.Zero);
+        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: CancellationToken.None), Is.True);
+        Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [tree], cancellationToken: CancellationToken.None), Is.Zero);
         using (Assert.EnterMultipleScope())
         {
             location.Start = 1;
             location.Column = 2;
-            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree), Is.True);
-            Assert.That(CompilerSourceCoordinates.FindUniqueTree(null, [tree]), Is.EqualTo(-1));
+            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: CancellationToken.None), Is.True);
+            Assert.That(CompilerSourceCoordinates.FindUniqueTree(null, [tree], cancellationToken: CancellationToken.None), Is.EqualTo(-1));
         }
     }
 
@@ -171,7 +171,7 @@ public sealed class CompilerReportingTests
                 entry.SourceLength = tree.TextLength - 1;
                 break;
         }
-        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree), Is.False);
+        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: CancellationToken.None), Is.False);
     }
 
     [Test]
@@ -184,9 +184,9 @@ public sealed class CompilerReportingTests
             CompilerSourceCoordinates.FindUniqueTree(Location(), [tree], canceled.Token)));
         var location = Location();
         location.Start = tree.TextLength + 1;
-        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree), Is.False);
+        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: CancellationToken.None), Is.False);
         tree.LineMap[0].MappedColumn = int.MaxValue;
-        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree), Is.False);
+        Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: CancellationToken.None), Is.False);
     }
 
     [Test]

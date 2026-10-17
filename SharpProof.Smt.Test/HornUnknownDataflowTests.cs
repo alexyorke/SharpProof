@@ -38,9 +38,9 @@ public sealed class HornUnknownDataflowTests
         var preserved = IrSubstitution.Substitute(factory, invariant, counter, next);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [assigned, zero], invariant)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant, belowThree], preserved)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], nonnegative)), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [assigned, zero], invariant), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant, belowThree], preserved), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], nonnegative), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
 
     private static VerificationQuery Query(IrFactory factory, IEnumerable<IrTerm> assumptions, IrTerm goal)

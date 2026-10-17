@@ -28,7 +28,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         Assert.That(evidence.LockWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "unsupported-summary-write", 1, summary: true);
+            "unsupported-summary-write", 1, summary: true, cancellationToken: CancellationToken.None);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expectedRuntime));
@@ -50,7 +50,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         Assert.That(evidence.WriteWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "unsupported-summary-lock", 1, summary: true);
+            "unsupported-summary-lock", 1, summary: true, cancellationToken: CancellationToken.None);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("LockOracleNotRun"));
@@ -65,7 +65,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         foreach (var tree in compilation.SyntaxTrees)
         {

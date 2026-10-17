@@ -69,12 +69,12 @@ public sealed class NativeEffectContractTests
         }
         finally { context.Unload(); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrWriteInstruction>().Any(write => write.Region == IrWriteRegion.Field && write.Field != null), Is.True,
             "The source callee must be inlined as a modeled field store.");
-        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets());
+        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
         Assert.That(verified.WriteWitness, Is.Not.Null);
     }
@@ -149,8 +149,8 @@ public sealed class NativeEffectContractTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; " + Cell + "public sealed class C { " + method + " }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return await NativeEffectSiteVerifier.VerifyEffectContractAsync(
-            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets());
+            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: CancellationToken.None);
     }
 }

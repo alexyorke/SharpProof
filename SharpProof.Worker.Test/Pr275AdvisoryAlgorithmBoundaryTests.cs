@@ -30,7 +30,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         Assert.That(defaultVariables!.ParamName, Is.EqualTo("variables"));
 
         var accepted = new CoreIrAdvisoryInterpreter(program, ImmutableArray<IrVarId>.Empty)
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: CancellationToken.None);
         Assert.That(accepted.Accepted, Is.True);
         Assert.That(accepted.Gaps, Is.Empty);
     }
@@ -69,7 +69,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(7)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(7)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("memory havoc"));
@@ -93,7 +93,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Range(0, 10)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Range(0, 10)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -114,7 +114,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -138,7 +138,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [sequence, loaded])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(loaded, IntervalValue.Constant(9)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(loaded, IntervalValue.Constant(9)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("unsupported load"));
@@ -160,7 +160,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("unsupported instruction"));
@@ -195,7 +195,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [condition, scalar, conditionalText, left, right, equal])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(condition, IntervalValue.Constant(1)));
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(condition, IntervalValue.Constant(1)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -243,7 +243,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var result = new CoreIrAdvisoryInterpreter(program, [condition, input, deepValue, deepText, opaqueText])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(condition, IntervalValue.Constant(1))
-                .Add(input, IntervalValue.Constant(0)));
+                .Add(input, IntervalValue.Constant(0)), token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("term depth"));
@@ -291,7 +291,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(lower, IntervalValue.Range(0, 1))
                 .Add(upper, IntervalValue.Range(3, 4)),
-                markers: markers);
+                markers: markers, token: CancellationToken.None);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);

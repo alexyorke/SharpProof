@@ -42,9 +42,9 @@ public sealed class NativeInstanceCallTests
                 }
             }
             """);
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(purity.Outcome, Is.TypeOf<ProvenOutcome>(), purity.Reason.ToString());
@@ -64,7 +64,7 @@ public sealed class NativeInstanceCallTests
     {
         var preparation = Prepare("public static class C { [DoesNotThrow] public static int Target(Counter counter, int value) { " +
             "Contract.Requires(value > -1000 && value < 1000); " + body + " } }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
         if (outcome == typeof(RefutedOutcome))
         { Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.NullReference)); }
@@ -88,7 +88,7 @@ public sealed class NativeInstanceCallTests
     {
         var preparation = Prepare("public static class C { [EnforcePure] public static int Target(Counter counter) { " +
             "Contract.Requires(counter != null); " + body + " } }");
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
@@ -113,7 +113,7 @@ public sealed class NativeInstanceCallTests
     {
         var preparation = Prepare("public static class C { [EnforcePure] public static void Target(Counter counter) { " +
             "Contract.Requires(counter != null); counter.Value = 1; } }");
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
@@ -123,7 +123,7 @@ public sealed class NativeInstanceCallTests
         // Any override may run, so the call is opaque rather than inlined.
         var preparation = Prepare("public static class C { [DoesNotThrow] public static int Target(Counter counter) { " +
             "Contract.Requires(counter != null); return counter.Dispatched(1); } }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
     }
@@ -131,7 +131,7 @@ public sealed class NativeInstanceCallTests
     private static CompilerCallablePreparation Prepare(string types, bool effects = true)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + Nodes + types);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single(preparation => effects ? preparation.EffectClaims.Length != 0
             : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }

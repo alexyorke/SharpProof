@@ -30,8 +30,8 @@ public sealed class FreshOwnershipEffectAuditTests
             "Contract.Requires(flag == " + (rebind ? "true" : "false") + "); var local = " + fresh + "; " + transfer +
             write + " return 0; } }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, rebind ? Is.TypeOf<RefutedOutcome>() : Is.Not.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("FreshOwnershipRuntime", source).Emit(image).Success, Is.True);

@@ -24,7 +24,7 @@ public sealed class OrdinarySummaryWriteWorkflowTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
         if (write)
@@ -40,7 +40,7 @@ public sealed class OrdinarySummaryWriteWorkflowTests
         }
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "ordinary-write-summary", 1, summary: true);
+            "ordinary-write-summary", 1, summary: true, cancellationToken: CancellationToken.None);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(write ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.None));

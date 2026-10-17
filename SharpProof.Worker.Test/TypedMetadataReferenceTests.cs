@@ -36,7 +36,7 @@ public sealed class TypedMetadataReferenceTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
         var binder = new ContractBinder(subject.Compilation, factory);
-        var binding = binder.BindTotalMetadataRequires(context);
+        var binding = binder.BindTotalMetadataRequires(context, cancellationToken: CancellationToken.None);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         var clause = binding.Clauses.Single();
@@ -70,7 +70,7 @@ public sealed class TypedMetadataReferenceTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context);
+        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: CancellationToken.None);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         var entry = context.Parameters[0].Entry;
         var entryType = factory.GetVariableInfo(entry).Type;
@@ -92,7 +92,7 @@ public sealed class TypedMetadataReferenceTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context);
+        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: CancellationToken.None);
         Assert.That(binding.IsSuccess, Is.EqualTo(success));
         Assert.That(binding.Clauses, Has.Length.EqualTo(count));
         Assert.That(binding.Failure, Is.EqualTo(success ? ContractBindingFailure.None : ContractBindingFailure.InvalidClosedAttribute));
@@ -102,7 +102,7 @@ public sealed class TypedMetadataReferenceTests
             new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellation.Token)));
         var foreignContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
         Assert.Throws<ArgumentException>(new Action(() =>
-            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext)));
+            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext, cancellationToken: CancellationToken.None)));
     }
 
     [Test]
@@ -117,14 +117,14 @@ public sealed class TypedMetadataReferenceTests
                 return Library.Target(string.Concat("left", "right"), value);
             } }
             """);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAssignInstruction>().Any(assign => assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }), Is.True);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out _, out _), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out _, out _, cancellationToken: CancellationToken.None), Is.False);
     }
 
     [TestCase("object", "bool", "return value == null;")]
@@ -158,7 +158,7 @@ public sealed class TypedMetadataReferenceTests
         var decoded = new CompilerTotalIlBodyProvider(subject.Compilation, null).Resolve(metadataMethod, CancellationToken.None);
         Assert.That(decoded, Is.Not.Null, "Captured reference implementation must decode.");
         Assert.That(TotalIlStack.TryValidate(decoded!, _ => true, out _), Is.True, "Reference stack must validate.");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single().Total;
         Assert.That(total, Is.Not.Null);
         var factory = total!.Program.Factory;
@@ -229,7 +229,7 @@ public sealed class TypedMetadataReferenceTests
         using var subject = new MetadataTestSubject(
             $"public static class Library {{ public static bool Target({type} value) {{ return Again(value) {comparison} null; }} private static {type} Again({type} value) {{ return value; }} }}",
             $"using SharpProof.Attributes; public static class Subject {{ public static bool Target({type} value) {{ Contract.Ensures(true); return Library.Target(value); }} }}");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single().Total;
         Assert.That(total, Is.Not.Null);
         var factory = total!.Program.Factory;
@@ -241,10 +241,10 @@ public sealed class TypedMetadataReferenceTests
         var candidate = new PassiveCallableCandidate("reference", total.Program,
             [new(parameter.Entry, parameter.Current, parameter.Old)], total.Result, [],
             [new(goal, factory.Boolean(true), site), new(factory.Unary(IrUnaryOperator.Not, goal), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var proven = await solver.VerifyEnsuresAsync(0);
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(proven.Outcome, Is.InstanceOf<ProvenOutcome>(), proven.Reason.ToString());
         Assert.That(refuted.Outcome, Is.InstanceOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(new[] { parameter.Entry }));
@@ -257,7 +257,7 @@ public sealed class TypedMetadataReferenceTests
         using var subject = new MetadataTestSubject(
             "public static class Library { public static bool Target(string first, string second) { return (object)first == (object)second; } }",
             "using SharpProof.Attributes; public static class Subject { public static bool Target(string first, string second) { Contract.Ensures(true); return Library.Target(first, second); } }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var total = preparations.Single().Total;
         Assert.That(total, Is.Not.Null);
         var factory = total!.Program.Factory;
@@ -286,10 +286,10 @@ public sealed class TypedMetadataReferenceTests
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Length(x), factory.Integer(3)), factory.Boolean(true), site),
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Length(y), factory.Integer(3)), factory.Boolean(true), site)],
             [new(goal, factory.Boolean(true), site), new(factory.Unary(IrUnaryOperator.Not, goal), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total.Parameters.Select(parameter => parameter.Entry)));
     }
@@ -321,7 +321,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         if (mode == "duplicate")
         {
             var factory = new IrFactory(IrExecutionSemantics.Total);
-            var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+            var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: CancellationToken.None);
             Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
             Assert.That(binding.Clauses, Is.Empty);
         }
@@ -443,7 +443,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(2));
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: CancellationToken.None);
         Assert.That(binding.IsSuccess, Is.True);
         Assert.That(binding.Clauses, Has.Length.EqualTo(2));
         var reversed = binding.Clauses.Reverse().ToImmutableArray();
@@ -474,7 +474,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var (compilation, method, _) = CreateSubject(directory.FullName,
             "using SharpProof.Attributes; public static class Library { public static int Target([Positive, InRange(10L, 1L)] int value) => value; }");
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method));
+        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: CancellationToken.None);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(binding.Clauses, Is.Empty);
         Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None), Is.Null);

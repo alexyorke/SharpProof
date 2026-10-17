@@ -71,9 +71,9 @@ public sealed class PartialNativeObservationControls
         var expected = targetClr ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse;
         using var session = FuzzSmtSession.Create(factory);
         var kernel = new ProofKernel(session);
-        var positive = await kernel.VerifyAsync(Query(target.Term, 0));
-        var negative = await kernel.VerifyAsync(Query(control.Term, 1));
-        var unknown = await kernel.VerifyAsync(Query(unsupported.Term, 2));
+        var positive = await kernel.VerifyAsync(Query(target.Term, 0), cancellationToken: CancellationToken.None);
+        var negative = await kernel.VerifyAsync(Query(control.Term, 1), cancellationToken: CancellationToken.None);
+        var unknown = await kernel.VerifyAsync(Query(unsupported.Term, 2), cancellationToken: CancellationToken.None);
         Assert.That(positive, Is.TypeOf<ProvenOutcome>());
         Assert.That(negative, Is.TypeOf<RefutedOutcome>());
         Assert.That(unknown, Is.TypeOf<UnknownOutcome>());

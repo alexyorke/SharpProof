@@ -53,8 +53,8 @@ public sealed class NativeRawEffectWitnessAdmissionTests
         Assert.That(target.Method.ContainingAssembly, Is.SameAs(compilation.Assembly));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
             WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.Entry.CallableId, Is.EqualTo(target.Entry.CallableId));
         var claim = preparation.EffectClaims.Single();
@@ -87,7 +87,7 @@ public sealed class NativeRawEffectWitnessAdmissionTests
         // evidence. The raw admission boundary must reject its missing family.
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
         var entry = await solver.VerifyEntryAsync(CancellationToken.None);
         Assert.That(entry.Outcome, Is.InstanceOf<RefutedOutcome>());

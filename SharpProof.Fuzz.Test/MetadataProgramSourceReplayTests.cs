@@ -16,7 +16,7 @@ public sealed class MetadataProgramSourceReplayTests
         MetadataProgramSourceCase[] cases = [new(PositiveLibrary, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync();
+            await actual.CompileAsync(cancellationToken: CancellationToken.None);
             var premises = actual.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
@@ -25,7 +25,7 @@ public sealed class MetadataProgramSourceReplayTests
             Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
         }
         var replay = new MetadataProgramSourceReplay(12345);
-        await replay.CompareBatchAsync(cases, 0);
+        await replay.CompareBatchAsync(cases, 0, cancellationToken: CancellationToken.None);
         Assert.That(replay.Result.Cases, Is.EqualTo(1));
         Assert.That(replay.Result.Agreements, Is.EqualTo(1));
         Assert.That(replay.Result.NativeProofs, Is.EqualTo(1));
@@ -40,7 +40,7 @@ public sealed class MetadataProgramSourceReplayTests
         MetadataProgramSourceCase[] cases = [new(library, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync();
+            await actual.CompileAsync(cancellationToken: CancellationToken.None);
             var premises = actual.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].HasTotal, Is.True);
@@ -50,7 +50,7 @@ public sealed class MetadataProgramSourceReplayTests
             Assert.That(exception!.InnerException, Is.TypeOf<DivideByZeroException>());
         }
         var replay = new MetadataProgramSourceReplay(12346);
-        await replay.CompareBatchAsync(cases, 0);
+        await replay.CompareBatchAsync(cases, 0, cancellationToken: CancellationToken.None);
         Assert.That(replay.Result.Cases, Is.EqualTo(1));
         Assert.That(replay.Result.Agreements, Is.Zero);
         Assert.That(replay.Result.NativeProofs, Is.Zero);
@@ -70,7 +70,7 @@ public sealed class MetadataProgramSourceReplayTests
         MetadataProgramSourceCase[] cases = [new(PositiveLibrary, extra, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync();
+            await actual.CompileAsync(cancellationToken: CancellationToken.None);
             var premises = actual.Premises;
             Assert.That(premises, Has.Length.EqualTo(2));
             Assert.That(premises.All(item => item.HasTotal && item.HasResult), Is.True);
@@ -78,7 +78,7 @@ public sealed class MetadataProgramSourceReplayTests
             Assert.That(actual.Subject.GetMethod("Target1")!.Invoke(null, [7L]), Is.EqualTo(8L));
         }
         var replay = new MetadataProgramSourceReplay(12347);
-        Func<Task> compare = () => replay.CompareBatchAsync(cases, 0);
+        Func<Task> compare = () => replay.CompareBatchAsync(cases, 0, cancellationToken: CancellationToken.None);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(compare);
         Assert.That(exception!.Message,
             Is.EqualTo("Metadata case universe does not match collected callables."));
@@ -92,7 +92,7 @@ public sealed class MetadataProgramSourceReplayTests
         MetadataProgramSourceCase[] cases = [new(PositiveLibrary, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync();
+            await actual.CompileAsync(cancellationToken: CancellationToken.None);
             var premises = actual.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].HasTotal, Is.True);
@@ -102,7 +102,7 @@ public sealed class MetadataProgramSourceReplayTests
             Assert.That(method.Invoke(null, [7L]), Is.Null);
         }
         var replay = new MetadataProgramSourceReplay(12348);
-        await replay.CompareBatchAsync(cases, 0);
+        await replay.CompareBatchAsync(cases, 0, cancellationToken: CancellationToken.None);
         Assert.That(replay.Result.Cases, Is.EqualTo(1));
         Assert.That(replay.Result.Agreements, Is.Zero);
         Assert.That(replay.Result.NativeProofs, Is.Zero);

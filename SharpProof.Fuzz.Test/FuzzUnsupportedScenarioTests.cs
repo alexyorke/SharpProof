@@ -21,7 +21,7 @@ public sealed class FuzzUnsupportedScenarioTests
             [scenario], [string.Equals(text, "proof", StringComparison.Ordinal)
                 ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse]);
         Func<Task> compare = async () =>
-            await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+            await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
 
         var exception = Assert.ThrowsAsync<ArgumentException>(compare);
         Assert.That(exception!.ParamName, Is.EqualTo("value"));

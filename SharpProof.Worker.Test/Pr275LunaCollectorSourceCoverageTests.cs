@@ -35,7 +35,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .Single(item => item.Method.Name == "Adjust");
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory())
-            .Prepare(target);
+            .Prepare(target, cancellationToken: CancellationToken.None);
 
         Assert.That(preparation.IsSuccess, Is.False);
         Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
@@ -79,9 +79,9 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             new IrFactory(),
             packs,
             trees,
-            references).Prepare(target);
+            references).Prepare(target, cancellationToken: CancellationToken.None);
         var artifact = CreateArtifact(compilation, discovery);
-        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact)
+        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)
             .Single(item => item.Entry.CallableId == target.Entry.CallableId);
 
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
@@ -152,7 +152,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         }
 
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)));
     }
 
     [Test]

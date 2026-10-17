@@ -29,7 +29,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
         }
         else
         {
-            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
             await TestContext.Out.WriteLineAsync($"native root initializer: {result.Outcome?.GetType().Name}/{result.Reason}");
             Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         }
@@ -55,7 +55,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
             " [DoesNotThrow] public static int Target() { " + body + " } } " + other;
         var artifact = CreateAndCheckRuntime(source, scenario);
         var preparation = Prepare(artifact);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
         await TestContext.Out.WriteLineAsync($"native {scenario}: entryComplete={preparation.Total!.EffectsCompleteAtEntry}; {result.Outcome?.GetType().Name}/{result.Reason}");
         var published = await Publish(artifact);
         Assert.That(published, Is.EqualTo(expected));
@@ -106,7 +106,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single(item => item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
     }
 

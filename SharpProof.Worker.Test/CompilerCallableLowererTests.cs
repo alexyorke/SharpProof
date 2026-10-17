@@ -246,7 +246,7 @@ public sealed class CompilerCallableLowererTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
 
-        var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None).Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
@@ -498,11 +498,11 @@ public sealed class CompilerCallableLowererTests
             "Identity");
         var lowerer = new CompilerCallableLowerer(compilation, factory);
 
-        var valid = lowerer.Prepare(target);
+        var valid = lowerer.Prepare(target, cancellationToken: CancellationToken.None);
         var missingClaim = lowerer.Prepare(target with
         {
             Claims = []
-        });
+        }, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -529,7 +529,7 @@ public sealed class CompilerCallableLowererTests
             """,
             "Identity");
         var lowerer = new CompilerCallableLowerer(compilation, factory);
-        var valid = lowerer.Prepare(target);
+        var valid = lowerer.Prepare(target, cancellationToken: CancellationToken.None);
         Assert.That(valid.IsSuccess, Is.True);
 
         var original = target.Claims.Single();
@@ -545,7 +545,7 @@ public sealed class CompilerCallableLowererTests
             Location = entry.Location
         };
         var copied = target with { Claims = [original with { Entry = copiedEntry }] };
-        var rejected = lowerer.Prepare(copied);
+        var rejected = lowerer.Prepare(copied, cancellationToken: CancellationToken.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(copied.Method, Is.SameAs(target.Method));
@@ -553,7 +553,7 @@ public sealed class CompilerCallableLowererTests
             Assert.That(copied.Claims.Single().SourceOperation, Is.SameAs(original.SourceOperation));
             Assert.That(rejected.IsSuccess, Is.False);
             Assert.That(rejected.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
-            Assert.That(lowerer.Prepare(target).IsSuccess, Is.True);
+            Assert.That(lowerer.Prepare(target, cancellationToken: CancellationToken.None).IsSuccess, Is.True);
         }
     }
 
@@ -621,7 +621,7 @@ public sealed class CompilerCallableLowererTests
         string methodName)
     {
         var (compilation, target, factory) = CreateTarget(source, methodName);
-        return new CompilerCallableLowerer(compilation, factory).Prepare(target) with
+        return new CompilerCallableLowerer(compilation, factory).Prepare(target, cancellationToken: CancellationToken.None) with
         {
             EffectClaims = [.. target.EffectClaims.Select(static claim => claim.Evidence)]
         };

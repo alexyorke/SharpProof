@@ -48,7 +48,7 @@ public sealed class WorkerProgramTests
         };
         await File.WriteAllTextAsync(
             manifestPath,
-            CompilerManifestArtifactJson.Serialize(artifact));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None));
 
         var arguments = new[] {
             "verify",

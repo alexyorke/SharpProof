@@ -95,7 +95,7 @@ public sealed class ProtocolExactLengthStreamTests
         {
             await File.WriteAllBytesAsync(path, bytes);
             Assert.That(WorkerProtocolJson.ReadUtf8File(path), Is.EqualTo(json));
-            Assert.That(await WorkerProtocolJson.ReadUtf8FileAsync(path), Is.EqualTo(json));
+            Assert.That(await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken: CancellationToken.None), Is.EqualTo(json));
             Assert.That(WorkerProtocolJson.ComputeFileSha256(path),
                 Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(bytes))));
         }

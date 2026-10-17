@@ -194,7 +194,7 @@ public sealed class EffectSummaryFixpointTests
     public void EffectFreeRecursionDoesNotInventEffectsOrNormalCompletion()
     {
         var graph = Graph("[ZeroAllocations] public static int Root(int x) => Root(x);");
-        var summary = EffectSummaryFixpoint.ComputeValidated(graph).Values.Single();
+        var summary = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None).Values.Single();
         Assert.That(summary.MayEffects, Is.EqualTo(SourceMayEffect.None));
         Assert.That(summary.UnknownEffects, Is.EqualTo(SourceMayEffect.None));
         Assert.That(summary.MayDiverge, Is.True);
@@ -209,7 +209,7 @@ public sealed class EffectSummaryFixpointTests
             static object First(int x) => Second(x);
             static object Second(int x) { object allocated = new object(); return First(x); }
             """);
-        var summaries = EffectSummaryFixpoint.ComputeValidated(graph);
+        var summaries = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None);
         Assert.That(summaries, Has.Count.EqualTo(3));
         Assert.That(summaries.Values.All(summary => summary.MayEffects.HasFlag(SourceMayEffect.Allocation) &&
             summary.UnknownEffects == SourceMayEffect.None && summary.MayDiverge), Is.True);
@@ -217,7 +217,7 @@ public sealed class EffectSummaryFixpointTests
         graph.Bodies = graph.Bodies.Reverse().ToArray();
         foreach (var body in graph.Bodies)
         { body.Callees = body.Callees.Reverse().ToArray(); }
-        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph).ToArray(), Is.EqualTo(expected));
+        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None).ToArray(), Is.EqualTo(expected));
     }
 
     [Test]
@@ -228,7 +228,7 @@ public sealed class EffectSummaryFixpointTests
             static int First(int x) => Second(x);
             static int Second(int x) => First(System.Math.Sign(x));
             """);
-        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph).Values.All(summary =>
+        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None).Values.All(summary =>
             summary.UnknownEffects == SourceMayEffect.All && summary.UnknownExceptions && summary.MayDiverge), Is.True);
     }
 
@@ -242,7 +242,7 @@ public sealed class EffectSummaryFixpointTests
             static int Divide(int x) => 10 / x;
             """);
         var root = graph.Roots.Single().BodyId;
-        var summary = EffectSummaryFixpoint.ComputeValidated(graph)[root];
+        var summary = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None)[root];
         Assert.That(summary.ExceptionKinds & (1 << (int)IrExceptionKind.DivideByZero), Is.Not.Zero);
         Assert.That(summary.MayEffects.HasFlag(SourceMayEffect.Allocation), Is.True);
         Assert.That(summary.CompletionUnknown, Is.True);
@@ -256,7 +256,7 @@ public sealed class EffectSummaryFixpointTests
             [ZeroAllocations] public static int Root() => 1;
             """);
         Assert.That(graph.Bodies.Single().EffectsCompleteAtEntry, Is.False);
-        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph).Values.Single().UnknownEffects,
+        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None).Values.Single().UnknownEffects,
             Is.EqualTo(SourceMayEffect.All));
     }
 
@@ -264,7 +264,7 @@ public sealed class EffectSummaryFixpointTests
     public void LocalLoopsRemainPossiblyDivergent()
     {
         var graph = Graph("[ZeroAllocations] public static int Root(int x) { while (x > 0) { x--; } return x; }");
-        var summary = EffectSummaryFixpoint.ComputeValidated(graph).Values.Single();
+        var summary = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None).Values.Single();
         Assert.That(summary.MayDiverge, Is.True);
         Assert.That(summary.CompletionUnknown, Is.True);
     }
@@ -273,7 +273,7 @@ public sealed class EffectSummaryFixpointTests
     [TestCase("[ZeroAllocations] public static int Root(object gate) { lock (gate) {} return 1; }", (int)SourceMayEffect.Synchronization)]
     public void LocalNonlocalWritesAndLocksRetainTheirEffectFacet(string members, int expected)
     {
-        var summary = EffectSummaryFixpoint.ComputeValidated(Graph(members)).Values.Single();
+        var summary = EffectSummaryFixpoint.ComputeValidated(Graph(members), cancellationToken: CancellationToken.None).Values.Single();
         Assert.That(summary.MayEffects.HasFlag((SourceMayEffect)expected), Is.True);
         Assert.That(summary.UnknownEffects, Is.EqualTo(SourceMayEffect.None));
     }
@@ -282,7 +282,7 @@ public sealed class EffectSummaryFixpointTests
     public void LocalAssignmentsDoNotBecomeNonlocalWrites()
     {
         var summary = EffectSummaryFixpoint.ComputeValidated(
-            Graph("[ZeroAllocations] public static int Root(int x) { x++; return x; }")).Values.Single();
+            Graph("[ZeroAllocations] public static int Root(int x) { x++; return x; }"), cancellationToken: CancellationToken.None).Values.Single();
         Assert.That(summary.MayEffects.HasFlag(SourceMayEffect.NonlocalWrite), Is.False);
         Assert.That(summary.UnknownEffects, Is.EqualTo(SourceMayEffect.None));
     }
@@ -302,7 +302,7 @@ public sealed class EffectSummaryFixpointTests
             Graph = leaf.Graph,
             Callees = index < 4095 ? [(index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)] : cycle ? ["0"] : []
         }).ToArray();
-        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies });
+        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies }, cancellationToken: CancellationToken.None);
         Assert.That(summaries, Has.Count.EqualTo(4096));
         Assert.That(summaries.Values.All(summary => summary.MayEffects == SourceMayEffect.None && summary.MayDiverge == cycle), Is.True);
     }
@@ -321,6 +321,6 @@ public sealed class EffectSummaryFixpointTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { " + members + " }");
         return CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _).ReachableSource!;
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out _, cancellationToken: CancellationToken.None).ReachableSource!;
     }
 }

@@ -46,7 +46,8 @@ internal static class CompilerTotalCallableArtifactCodec
         var encoded = PortableIrGraphCodec.Encode(factory, program,
             clauses.SelectMany(clause => new[] { clause.Value, clause.Safe })
                 .Concat(calls.SelectMany(call => new[] { call.Value, call.Safe })).ToArray(), variables,
-            operations: clauses.Select(clause => clause.Operation).Concat(calls.Select(call => call.ClauseSite)).ToArray());
+            operations: clauses.Select(clause => clause.Operation).Concat(calls.Select(call => call.ClauseSite)).ToArray(),
+            cancellationToken: CancellationToken.None);
         return new()
         {
             IsBodyAbstraction = isBodyAbstraction,

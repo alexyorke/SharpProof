@@ -34,7 +34,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-                RepositoryLayout.FindRoot(), "ordinary-generic-overloads", 1, allocations: true)));
+                RepositoryLayout.FindRoot(), "ordinary-generic-overloads", 1, allocations: true, cancellationToken: CancellationToken.None)));
 
         Assert.That(error!.Message, Is.EqualTo("A source allocation witness has an ambiguous emitted method."));
     }
@@ -63,7 +63,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-            RepositoryLayout.FindRoot(), "ordinary-overloads", 1, allocations: true);
+            RepositoryLayout.FindRoot(), "ordinary-overloads", 1, allocations: true, cancellationToken: CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {

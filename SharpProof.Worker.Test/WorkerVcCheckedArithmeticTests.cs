@@ -113,12 +113,12 @@ public sealed class WorkerVcCheckedArithmeticTests
         var total = project.Snapshot.Callables.Single().Total;
         Assert.That(total, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!,
-            out var plan, out var failure), Is.True, failure.ToString());
+            out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proven = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proven.Outcome, Is.TypeOf<ProvenOutcome>(), proven.Reason.ToString());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total!.Parameters.Select(parameter => parameter.Entry)));
         if (kind == "full-ulong")

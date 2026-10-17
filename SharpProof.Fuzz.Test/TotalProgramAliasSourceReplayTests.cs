@@ -34,7 +34,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         AssertActualCompilerAndInterpreter(member, arguments, sharedIdentity);
 
         var replay = new TotalProgramSourceReplay(12350 + parameterCount);
-        await replay.CompareBatchAsync([new(member, arguments, false)], 0);
+        await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: CancellationToken.None);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
             string.Join("\n", result.Failures.Select(failure => failure.Detail)) +

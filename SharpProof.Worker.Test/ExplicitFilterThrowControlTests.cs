@@ -39,10 +39,10 @@ public sealed class ExplicitFilterThrowControlTests
         }
         finally { context.Unload(); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var result = attribute == "[EnforcePure]"
-            ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets())
-            : await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+            ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None)
+            : await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 }

@@ -16,8 +16,8 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
     {
         var artifact = Create();
         artifact.SchemaVersion = 30;
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: CancellationToken.None)));
     }
 
     [TestCase(false)]
@@ -29,8 +29,8 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
         Assert.That(total.ExceptionConstraints, Has.Length.EqualTo(1));
         if (omit)
         { total.ExceptionConstraints = []; }
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         if (omit)
         { Assert.That(native.Outcome, Is.Null); }
         else

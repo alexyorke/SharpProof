@@ -53,13 +53,13 @@ public sealed class NativeOwnedCallReachabilityTests
         Assert.That(execution.GetCurrentValue(target) == null, Is.EqualTo(!reached));
         if (reached)
         { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.False); }
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.CallPreconditionCount, Is.EqualTo(1));
         Assert.That(plan.CallPreconditionQueries(0), Has.Length.EqualTo(1));
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proof.Outcome, reached ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.CallPreconditionWitness, reached ? Is.EqualTo(site) : Is.Null);

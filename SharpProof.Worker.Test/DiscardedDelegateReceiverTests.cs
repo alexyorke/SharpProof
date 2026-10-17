@@ -46,14 +46,14 @@ public sealed class DiscardedDelegateReceiverTests
         finally { runtime.Unload(); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         ProofOutcome? outcome;
         if (claim == "DoesNotThrow")
-        { outcome = (await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome; }
         else if (claim == "EnforcePure")
-        { outcome = (await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome; }
         else
-        { outcome = (await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: CancellationToken.None)).Outcome; }
         Assert.That(outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
     }
 }

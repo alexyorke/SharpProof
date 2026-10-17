@@ -15,9 +15,9 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
         var compilation = CreateCompilation();
         var sequence = traversal switch
         {
-            0 => ReferencedTypeSymbols.GetAll(null!),
-            1 => ReferencedTypeSymbols.GetAllCached(null!),
-            _ => ReferencedTypeSymbols.GetAllCached(null!, compilation.Assembly)
+            0 => ReferencedTypeSymbols.GetAll(null!, CancellationToken.None),
+            1 => ReferencedTypeSymbols.GetAllCached(null!, CancellationToken.None),
+            _ => ReferencedTypeSymbols.GetAllCached(null!, compilation.Assembly, CancellationToken.None)
         };
         var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToArray()));
         Assert.That(error!.ParamName, Is.EqualTo("compilation"));
@@ -26,7 +26,7 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
     [Test]
     public void CachedTypeTraversalRejectsNullReferencedAssembly()
     {
-        var sequence = ReferencedTypeSymbols.GetAllCached(CreateCompilation(), null!);
+        var sequence = ReferencedTypeSymbols.GetAllCached(CreateCompilation(), null!, CancellationToken.None);
         var error = Assert.Throws<ArgumentNullException>((Action)(() => sequence.ToArray()));
         Assert.That(error!.ParamName, Is.EqualTo("referencedAssembly"));
     }
@@ -38,9 +38,9 @@ public sealed class TypeTraversalInputBoundaryCoverageTests
         var platformAssembly = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         foreach (var types in new[]
                  {
-                     ReferencedTypeSymbols.GetAll(compilation),
-                     ReferencedTypeSymbols.GetAllCached(compilation),
-                     ReferencedTypeSymbols.GetAllCached(compilation, platformAssembly)
+                     ReferencedTypeSymbols.GetAll(compilation, CancellationToken.None),
+                     ReferencedTypeSymbols.GetAllCached(compilation, CancellationToken.None),
+                     ReferencedTypeSymbols.GetAllCached(compilation, platformAssembly, CancellationToken.None)
                  })
         {
             Assert.That(types.Any(type => type.Name == "Subject" &&

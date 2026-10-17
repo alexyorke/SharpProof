@@ -189,7 +189,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         var captured = artifact.Callables.Single(callable => callable.CallableId == callableId);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));

@@ -29,7 +29,7 @@ public sealed class DynamicBuiltinWitnessControlTests
         var query = new VerificationQuery(factory, assumptions,
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [first, second]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, requireAlias ? Is.Not.TypeOf<RefutedOutcome>() : Is.TypeOf<RefutedOutcome>(), outcome.ToString());
     }
 }

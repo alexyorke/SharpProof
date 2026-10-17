@@ -218,7 +218,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                     }
                 }
 
-                var proof = new ProofKernel(session).VerifyAsync(valid).GetAwaiter().GetResult();
+                var proof = new ProofKernel(session).VerifyAsync(valid, CancellationToken.None).GetAwaiter().GetResult();
                 Require(proof is ProvenOutcome, "The real kernel did not validate the native result after pool release.");
                 Console.WriteLine(JsonSerializer.Serialize(new
                 {

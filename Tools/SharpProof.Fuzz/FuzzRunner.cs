@@ -134,7 +134,7 @@ public static class FuzzRunner
         string[] arguments,
         TextWriter output,
         TextWriter error,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         const string usage =
             "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
@@ -171,7 +171,7 @@ public static class FuzzRunner
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (options == null)
         {
@@ -281,8 +281,7 @@ public static class FuzzRunner
 
     internal static async Task<FuzzSourceCampaignResult> ReplaySourceCasesAsync(
         IReadOnlyList<FuzzSourceCampaignCase> sourceCases,
-        int seed = FuzzOptions.DefaultSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken, int seed = FuzzOptions.DefaultSeed)
     {
         ArgumentNullException.ThrowIfNull(sourceCases);
         var sources = sourceCases.Select(source => new FuzzSourceCampaignCase(

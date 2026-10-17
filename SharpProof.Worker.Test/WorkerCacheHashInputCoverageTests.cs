@@ -13,7 +13,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var original = await worker.VerifyAsync(request);
+        var original = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         AssertClaimVerdict(original, WorkerClaimOutcome.Refuted);
         Assert.That(original.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
 

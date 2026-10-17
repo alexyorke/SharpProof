@@ -61,27 +61,27 @@ public sealed class FrontendExpressionCoverageTests
     [Test]
     public void OracleAndShrinkerRejectMissingInputsAndPreserveEmptyBatch()
     {
-        Assert.That(FrontendDifferentialOracle.CompareBatch([]), Is.Empty);
-        Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([]), Is.Empty);
+        Assert.That(FrontendDifferentialOracle.CompareBatch([], cancellationToken: CancellationToken.None), Is.Empty);
+        Assert.That(FrontendDifferentialOracle.CompareSemanticEdges([], cancellationToken: CancellationToken.None), Is.Empty);
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.Compare(null!), "generated");
+            () => FrontendDifferentialOracle.Compare(null!, cancellationToken: CancellationToken.None), "generated");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareBatch(null!), "generatedCases");
+            () => FrontendDifferentialOracle.CompareBatch(null!, cancellationToken: CancellationToken.None), "generatedCases");
         AssertParameter<ArgumentException>(
-            () => FrontendDifferentialOracle.CompareBatch([null!]), "generatedCases");
+            () => FrontendDifferentialOracle.CompareBatch([null!], cancellationToken: CancellationToken.None), "generatedCases");
         AssertParameter<ArgumentNullException>(
-            () => FrontendDifferentialOracle.CompareSemanticEdges(null!), "cases");
+            () => FrontendDifferentialOracle.CompareSemanticEdges(null!, cancellationToken: CancellationToken.None), "cases");
         AssertParameter<ArgumentException>(
-            () => FrontendDifferentialOracle.CompareSemanticEdges([null!]), "cases");
+            () => FrontendDifferentialOracle.CompareSemanticEdges([null!], cancellationToken: CancellationToken.None), "cases");
         AssertParameter<ArgumentOutOfRangeException>(
             () => new SmallCSharpCaseGenerator(1).Next(-1), "maximumDepth");
         AssertParameter<ArgumentNullException>(
             () => CSharpStructuralShrinker.GetCandidates(null!), "expression");
         AssertParameter<ArgumentNullException>(
-            () => CSharpStructuralShrinker.Minimize(null!, _ => true), "generated");
+            () => CSharpStructuralShrinker.Minimize(null!, _ => true, cancellationToken: CancellationToken.None), "generated");
         AssertParameter<ArgumentNullException>(
             () => CSharpStructuralShrinker.Minimize(
-                Case(GeneratedCSharpExpression.Integer(1)), null!),
+                Case(GeneratedCSharpExpression.Integer(1)), null!, cancellationToken: CancellationToken.None),
             "preservesMismatch");
     }
 
@@ -102,7 +102,7 @@ public sealed class FrontendExpressionCoverageTests
                 FrontendSubsetDecision.Exact, FrontendAbstention.None)
         };
 
-        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases);
+        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None);
 
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         using (Assert.EnterMultipleScope())
@@ -237,7 +237,7 @@ public sealed class FrontendExpressionCoverageTests
             reference,
             GeneratedCSharpExpression.NullReference())));
 
-        var results = FrontendDifferentialOracle.CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: CancellationToken.None);
 
         Assert.That(results, Has.Length.EqualTo(cases.Count));
         for (var index = 0; index < cases.Count; index++)
@@ -297,7 +297,7 @@ public sealed class FrontendExpressionCoverageTests
         Assert.That(candidates.All(item => item.Parent.Type == item.Candidate.Type), Is.True);
 
         var cases = candidates.Select(item => Case(item.Candidate)).ToArray();
-        var results = FrontendDifferentialOracle.CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: CancellationToken.None);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < cases.Length; index++)
         {

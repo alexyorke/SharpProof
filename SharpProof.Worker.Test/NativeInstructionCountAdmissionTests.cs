@@ -35,14 +35,14 @@ public sealed class NativeInstructionCountAdmissionTests
         }
         var candidate = new PassiveCallableCandidate("instruction-count-admission", program, [], result, [],
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(result), factory.Integer(0)), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.EqualTo(admitted));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.EqualTo(admitted));
         Assert.That(reason, Is.EqualTo(admitted ? WorkerClaimReason.None : WorkerClaimReason.ResourceLimit));
         Assert.That(plan == null, Is.EqualTo(!admitted));
         if (!admitted)
         { return; }
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));

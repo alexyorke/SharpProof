@@ -119,7 +119,7 @@ public sealed class NightlyRefutationRegressionTests
         Assert.That(exceptions, Is.Empty);
         Assert.That(diagnostics.Where(d => d.Id is "AD0001" or "SP0049" or "SP0025"), Is.Empty);
         Assert.That(File.Exists(manifestPath), Is.True);
-        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath));
+        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: CancellationToken.None);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);

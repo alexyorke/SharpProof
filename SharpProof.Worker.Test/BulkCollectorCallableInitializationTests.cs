@@ -99,7 +99,7 @@ public sealed class BulkCollectorCallableInitializationTests
     private static CompilerTotalCallablePreparation Prepare(CSharpCompilation compilation)
     {
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
         Assert.That(preparation.Total, Is.Not.Null);
         return preparation.Total!;
     }

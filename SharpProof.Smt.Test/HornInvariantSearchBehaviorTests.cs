@@ -23,8 +23,8 @@ public sealed class HornInvariantSearchBehaviorTests
             [Assume(factory, Equal(factory, factory.Variable(counter), factory.Integer(0)))], invariant);
         var safety = Query(factory, [Assume(factory, invariant)], nonnegative);
 
-        Assert.That(await kernel.VerifyAsync(initialization), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(safety), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(initialization, CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(safety, CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]

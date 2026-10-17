@@ -131,10 +131,10 @@ public sealed class Pr275CoreRequiredInputTests
         var interpreter = new CoreIrAdvisoryInterpreter(
             lowering.Program, variables);
 
-        AssertArgumentNull("initial", () => interpreter.Run(null!));
+        AssertArgumentNull("initial", () => interpreter.Run(null!, token: CancellationToken.None));
 
         var result = interpreter.Run(
-            ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: CancellationToken.None);
         Assert.That(result.Accepted, Is.True);
     }
 

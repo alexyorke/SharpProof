@@ -41,8 +41,8 @@ internal static class MetadataProgramDifferentialOracle
 {
     private const int CompilationBatchSize = 280;
 
-    internal static async Task<MetadataProgramFuzzResult> RunAsync(int cases, int seed,
-        Action<string, long>? timingSink = null, CancellationToken cancellationToken = default)
+    internal static async Task<MetadataProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken,
+        Action<string, long>? timingSink = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(cases, 1);
         var replay = new MetadataProgramSourceReplay(seed, timingSink);

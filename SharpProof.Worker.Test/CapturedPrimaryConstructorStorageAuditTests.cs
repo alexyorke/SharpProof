@@ -220,13 +220,13 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             return;
         }
 
-        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath));
+        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: CancellationToken.None);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
         await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
         var preparation = project.Snapshot.Callables.Single(item => item.Entry.CallableId == callableId);
-        var native = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, project.Request.Budgets);
+        var native = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, project.Request.Budgets, cancellationToken: CancellationToken.None);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));

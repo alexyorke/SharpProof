@@ -56,12 +56,12 @@ public sealed class NativeLoopCallObligationTests
             { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.EqualTo(predicate)); }
         }
         Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proof.Outcome, predicate ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.CallPreconditionWitness, predicate ? Is.Null : Is.EqualTo(site));
@@ -132,12 +132,12 @@ public sealed class NativeLoopCallObligationTests
             { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.EqualTo(proven)); }
         }
         Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(proof.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.CallPreconditionWitness, proven ? Is.Null : Is.EqualTo(site));

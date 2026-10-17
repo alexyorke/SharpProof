@@ -31,7 +31,7 @@ public sealed class AllocationOracleCompilationOptionsTests
         Assert.That(measured.Bytes, release ? Is.Zero : Is.GreaterThan(0));
         if (measured.Throws == 0)
         { Assert.That(measured.Result, Is.EqualTo(7)); }
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true, cancellationToken: CancellationToken.None);
         var row = report.Rows.Single();
         await LogAsync($"nullReceiver={nullReceiver}; release={release}", measured.Bytes, measured.Il, row);
         Assert.That(row.NativeOutcome, Is.EqualTo(release ? WorkerClaimOutcome.Proven :
@@ -60,7 +60,7 @@ public sealed class AllocationOracleCompilationOptionsTests
         Assert.That(measured.Throws, Is.Zero);
         Assert.That(measured.Result, Is.EqualTo(7));
         Assert.That(measured.Bytes, Is.Zero);
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: CancellationToken.None);
         var row = report.Rows.Single();
         await LogAsync("nullReceiver=true; contract=DoesNotThrow; release=true", measured.Bytes, measured.Il, row);
         Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -79,7 +79,7 @@ public sealed class AllocationOracleCompilationOptionsTests
         Assert.That(measured.Throws, Is.Zero);
         Assert.That(measured.Bytes, Is.GreaterThan(0));
         Assert.That(measured.Result(7), Is.EqualTo(7));
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true, cancellationToken: CancellationToken.None);
         var row = report.Rows.Single();
         await LogAsync($"escapes=true; release={release}", measured.Bytes, measured.Il, row);
         Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -103,7 +103,7 @@ public sealed class AllocationOracleCompilationOptionsTests
         var measured = Measure<int>(compilation, "Positive");
         Assert.That(measured.Bytes, Is.Zero);
         Assert.That(measured.Throws, Is.Zero);
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["a", "b"], RepositoryLayout.FindRoot(), "test", 2, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["a", "b"], RepositoryLayout.FindRoot(), "test", 2, allocations: true, cancellationToken: CancellationToken.None);
         var positive = report.Rows.Single(row => row.MethodId == (positiveFirst ? "a" : "b"));
         var negative = report.Rows.Single(row => row.MethodId == (positiveFirst ? "b" : "a"));
         await LogAsync($"nullReceiver={nullReceiver}; positiveFirst={positiveFirst}", measured.Bytes, measured.Il, positive);

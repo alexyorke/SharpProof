@@ -75,7 +75,7 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
         {
             context.Unload();
         }
-        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true);
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true, cancellationToken: CancellationToken.None);
         Assert.That(analysis.Diagnostics, Is.Empty);
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(1));
         Assert.That(analysis.SemanticOutcomes.Single().Accessibility, Is.EqualTo(Accessibility.Public));

@@ -21,13 +21,13 @@ public sealed class ArtifactManifestEnumCanonicalizationControlTests
         var callable = artifact.Manifest.Callables.Single();
         Assert.That(callable.SelectedFeatures, Has.Length.EqualTo(2));
         Assert.That(callable.SelectionReasons, Has.Length.EqualTo(2));
-        var expected = CompilerManifestArtifactJson.Serialize(artifact);
+        var expected = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         callable.SelectedFeatures = [.. callable.SelectedFeatures.Reverse()];
         callable.SelectionReasons = [.. callable.SelectionReasons.Reverse()];
 
-        var actual = CompilerManifestArtifactJson.Serialize(artifact);
+        var actual = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
         Assert.That(actual, Is.EqualTo(expected));
-        var decoded = CompilerManifestArtifactJson.Deserialize(actual);
+        var decoded = CompilerManifestArtifactJson.Deserialize(actual, cancellationToken: CancellationToken.None);
         Assert.That(decoded.Manifest.Callables.Single().SelectedFeatures, Is.EqualTo(callable.SelectedFeatures));
         Assert.That(decoded.Manifest.Callables.Single().SelectionReasons, Is.EqualTo(callable.SelectionReasons));
     }

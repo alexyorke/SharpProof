@@ -16,10 +16,10 @@ public sealed class EmptyArrayCacheWrapperControls
             " } private static int Count(params Cell[] values) => values.Length; }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out _, cancellationToken: CancellationToken.None);
         var graph = decoded.ReachableSource!;
         var root = graph.Roots.Single().BodyId;
-        var summary = EffectSummaryFixpoint.ComputeValidated(graph)[root];
+        var summary = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: CancellationToken.None)[root];
         Assert.That((summary.MayEffects | summary.UnknownEffects).HasFlag(SourceMayEffect.Allocation), Is.True);
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);

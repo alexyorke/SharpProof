@@ -26,7 +26,7 @@ public sealed class CanonicalCacheDynamicViewTests
              new Assumption(factory, distinctCaches, new LoweredJustification(factory.CreateOperation()))],
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [input]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());
     }
 }

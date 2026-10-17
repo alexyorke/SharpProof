@@ -23,7 +23,7 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(result.Model!.Assignments[input].String, Is.SameAs(factory.GetString(literal.Value)));
         AssertAssumptions(factory, query, result.Model.Assignments);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
         var length = Query(factory, [], Equal(factory, factory.Length(literal), factory.Integer(text.Length)), []);
         Assert.That((await session.CheckAsync(length, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
@@ -51,7 +51,7 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(result.Model!.Assignments[input], Is.SameAs(factory.CreateEmptyArrayValue(type)));
         AssertAssumptions(factory, query, result.Model.Assignments);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
         var nonNull = Query(factory, [], factory.Binary(IrBinaryOperator.NotEqual, empty, factory.Null(type)), []);
         Assert.That((await session.CheckAsync(nonNull, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         var length = Query(factory, [], Equal(factory, factory.Length(empty), factory.Integer(0)), []);
@@ -79,7 +79,7 @@ public sealed class ReferenceCallableSolverTests
         var model = result.Model!.Assignments;
         Assert.That(ReferenceEquals(model[x].String, model[y].String), Is.EqualTo(alias));
         AssertAssumptions(factory, query, model);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase(true)]
@@ -98,7 +98,7 @@ public sealed class ReferenceCallableSolverTests
         var model = result.Model!.Assignments;
         Assert.That(ReferenceEquals(model[x].Reference, model[y].Reference), Is.EqualTo(same));
         AssertAssumptions(factory, query, model);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase(true)]
@@ -123,7 +123,7 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(model[x].Elements.Length, Is.EqualTo(3));
         Assert.That(model[y].Elements.Length, Is.EqualTo(3));
         AssertAssumptions(factory, query, model);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase(true, 0)]
@@ -145,7 +145,7 @@ public sealed class ReferenceCallableSolverTests
         if (!isNull)
         { Assert.That(value.String.Length, Is.EqualTo(length)); }
         AssertAssumptions(factory, query, result.Model.Assignments);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -156,11 +156,11 @@ public sealed class ReferenceCallableSolverTests
         var length = factory.Length(factory.Variable(text));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var nonnegative = factory.Binary(IrBinaryOperator.GreaterThanOrEqual, length, factory.Integer(0));
-        var proof = await new ProofKernel(session).VerifyAsync(Query(factory, [], nonnegative, [text]));
+        var proof = await new ProofKernel(session).VerifyAsync(Query(factory, [], nonnegative, [text]), CancellationToken.None);
         Assert.That(proof, Is.TypeOf<ProvenOutcome>());
         var maximum = Equal(factory, length, factory.Integer(int.MaxValue));
         var assumptions = ImmutableArray.Create(NotNull(factory, text), Assume(factory, maximum));
-        var maximumProof = await new ProofKernel(session).VerifyAsync(Query(factory, assumptions, maximum, [text]));
+        var maximumProof = await new ProofKernel(session).VerifyAsync(Query(factory, assumptions, maximum, [text]), CancellationToken.None);
         Assert.That(maximumProof, Is.TypeOf<ProvenOutcome>());
         var witness = await session.CheckAsync(Query(factory, assumptions, factory.Boolean(false), [text]), CancellationToken.None);
         Assert.That(witness.Status, Is.EqualTo(BackendCheckStatus.Unknown));
@@ -190,7 +190,7 @@ public sealed class ReferenceCallableSolverTests
             Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(3))),
             Assume(factory, Equal(factory, factory.Variable(index), factory.Integer(2))),
             Assume(factory, Equal(factory, read, expected))], factory.Boolean(false), [x, y, index]);
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var result = await session.CheckAsync(query, CancellationToken.None);
         var model = result.Model!.Assignments;
@@ -213,10 +213,10 @@ public sealed class ReferenceCallableSolverTests
         var query = Query(factory, [NotNull(factory, x),
             Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(3)))],
             Equal(factory, read, factory.Integer(0)), [x]);
-        Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(query, CancellationToken.None), Is.TypeOf<ProvenOutcome>());
         var nullQuery = Query(factory, [Assume(factory, Equal(factory, factory.Variable(x), factory.Null(type)))],
             Equal(factory, read, factory.Integer(0)), [x]);
-        Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery, CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
 
     private static Assumption NotNull(IrFactory factory, IrVarId variable)

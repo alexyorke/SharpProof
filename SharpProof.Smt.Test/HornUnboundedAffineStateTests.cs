@@ -37,9 +37,9 @@ public sealed class HornUnboundedAffineStateTests
             IrSubstitution.Substitute(factory, invariant, first, nextX), second, nextY);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [affine], invariant)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], preserved)), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], affine)), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [affine], invariant), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], preserved), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], affine), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
     }
     private static VerificationQuery Query(IrFactory factory, IEnumerable<IrTerm> assumptions, IrTerm goal)
     {

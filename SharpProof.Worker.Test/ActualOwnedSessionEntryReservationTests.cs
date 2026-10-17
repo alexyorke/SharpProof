@@ -40,8 +40,8 @@ public sealed class ActualOwnedSessionEntryReservationTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations);
+        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         var entry = preparation.TotalEntry!;
         Assert.That(entry, Is.Not.Null);

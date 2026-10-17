@@ -70,7 +70,7 @@ public sealed class NativeAliasingBoundaryTests
             "public static int Target(A a, B b) { Contract.Ensures(Contract.Result<int>() == 1); var allocated = new object(); return 1; } }";
         using var project = new ShadowTestProject(source);
         var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
         var identity = new object();
         var inputs = candidate.Parameters.Select((parameter, ordinal) =>
         {

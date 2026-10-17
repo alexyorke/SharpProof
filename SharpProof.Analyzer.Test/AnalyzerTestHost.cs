@@ -129,14 +129,26 @@ internal static class AnalyzerTestHost
         return compilation.WithOptions(options);
     }
 
-    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         string? mode,
         DiagnosticAnalyzer? analyzer = null,
         string? profile = null,
         string? features = null,
-        bool allowCompilationErrors = false,
-        CancellationToken cancellationToken = default)
+        bool allowCompilationErrors = false)
+    {
+        return AnalyzeAsync(compilation, mode, CancellationToken.None,
+            analyzer, profile, features, allowCompilationErrors);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        string? mode,
+        CancellationToken cancellationToken,
+        DiagnosticAnalyzer? analyzer = null,
+        string? profile = null,
+        string? features = null,
+        bool allowCompilationErrors = false)
     {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
@@ -179,13 +191,24 @@ internal static class AnalyzerTestHost
             .ConfigureAwait(false);
     }
 
-    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
         ImmutableArray<AdditionalText> additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
-        bool allowCompilationErrors = false,
-        CancellationToken cancellationToken = default)
+        bool allowCompilationErrors = false)
+    {
+        return AnalyzeAsync(compilation, values, CancellationToken.None,
+            additionalFiles, analyzer, allowCompilationErrors);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken,
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
     {
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles.IsDefault ? [] : additionalFiles,

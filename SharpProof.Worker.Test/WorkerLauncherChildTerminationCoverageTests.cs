@@ -111,7 +111,7 @@ public sealed partial class WorkerTests
                     Environment.ProcessId.ToString(CultureInfo.InvariantCulture)], CancellationToken.None);
                 File.Move(marker + ".pending", marker);
                 return await verification;
-            });
+            }, validatePreflight: null, cancellationToken: CancellationToken.None);
         }
         finally
         {

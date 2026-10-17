@@ -107,7 +107,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request);
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path));
+                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Compilation.ProjectDirectory,
@@ -134,7 +134,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request, " dotnet.scalar ");
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path));
+                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.SpecificationPackIds, Is.EqualTo(SelectedPackIds));
@@ -175,7 +175,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                     """);
                 Assert.That(diagnostics, Is.Empty);
                 var artifact = CompilerManifestArtifactJson.Deserialize(
-                    await File.ReadAllTextAsync(path));
+                    await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
                 identities.Add(artifact.Manifest.Claims.Single().ClaimId);
             }
@@ -219,7 +219,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 """);
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path));
+                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
@@ -263,8 +263,16 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string path, string request, string? packs = null,
         string source = "internal static class Subject { }",
-        ImmutableArray<AdditionalText> additionalFiles = default,
-        CancellationToken cancellationToken = default)
+        ImmutableArray<AdditionalText> additionalFiles = default)
+    {
+        return AnalyzeAsync(path, request, CancellationToken.None, packs, source, additionalFiles);
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        string path, string request, CancellationToken cancellationToken,
+        string? packs = null,
+        string source = "internal static class Subject { }",
+        ImmutableArray<AdditionalText> additionalFiles = default)
     {
         var options = new Dictionary<string, string>
         {
@@ -285,7 +293,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
         return AnalyzerTestHost.AnalyzeAsync(
             AnalyzerTestHost.CreateCompilation(source, []),
             options,
-            additionalFiles,
+            additionalFiles: additionalFiles,
             analyzer: new FinalCompilationCollectorAnalyzer(),
             cancellationToken: cancellationToken);
     }
@@ -297,7 +305,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
 
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellation.Token);
 
-        public override SourceText GetText(CancellationToken cancellationToken = default)
+        public override SourceText GetText(CancellationToken cancellationToken)
         {
             cancellation.Cancel();
             cancellationToken.ThrowIfCancellationRequested();
@@ -309,9 +317,9 @@ public sealed class CompilerCaptureRequestWorkflowTests
     {
         public override string Path => "input.data";
 
-        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText();
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellationToken: CancellationToken.None);
 
-        public override SourceText GetText(CancellationToken cancellationToken = default)
+        public override SourceText GetText(CancellationToken cancellationToken)
         {
             throw new AggregateException(new IOException("input reader failed"));
         }

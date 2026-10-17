@@ -15,8 +15,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     private readonly IrInterpreter _terms =
         new(factory);
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000,
-        CancellationToken cancellationToken = default)
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
+    {
+        return Execute(program, initialValues, maximumSteps, CancellationToken.None);
+    }
+
+    public IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
+        CancellationToken cancellationToken)
     {
         return Execute(
             program, initialValues, maximumSteps, callHost: null,
@@ -34,8 +40,15 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        int maximumSteps, IrProgramReplayOptions replayOptions)
+    {
+        return Execute(program, initialValues, maximumSteps, replayOptions, CancellationToken.None);
+    }
+
+    public IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         return Execute(program, initialValues, maximumSteps, callHost: null, replayOptions, cancellationToken);
     }

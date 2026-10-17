@@ -11,7 +11,7 @@ public sealed class CalleeInitializationControlTests
     public async Task ExistingRootInitializationAdmissionIsClosed(string members)
     {
         var source = "using SharpProof.Attributes; public static class C { " + members + " [EnforcePure] public static int Target(int x) { return x; } }";
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -64,13 +64,13 @@ public sealed class CalleeInitializationControlTests
     {
         var expression = body?.StartsWith("new Other();", StringComparison.Ordinal) == true ? body : "return " + body;
         var source = "using SharpProof.Attributes; public sealed class Other { " + field + " " + helper + " } public static class C { [EnforcePure] public static int Target(int x) { " + expression + "; } }";
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.Null);
     }
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         return preparations.Single();
     }
 }

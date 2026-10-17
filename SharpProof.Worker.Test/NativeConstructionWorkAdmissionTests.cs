@@ -46,7 +46,7 @@ public sealed class NativeConstructionWorkAdmissionTests
         }
         Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(small, [], CancellationToken.None), Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(large, [], CancellationToken.None), Is.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(large, out var plan, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(large, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         await AssertNativeProofAsync(small);
@@ -106,11 +106,11 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static async Task AssertNativeProofAsync(PassiveCallableCandidate candidate)
     {
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var result = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));

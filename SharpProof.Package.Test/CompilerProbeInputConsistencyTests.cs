@@ -83,7 +83,7 @@ public sealed class CompilerProbeInputConsistencyTests
         public override string Path { get; } = path;
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return SourceText.From(

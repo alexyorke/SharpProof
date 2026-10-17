@@ -95,8 +95,8 @@ public sealed class Pr275BulkWorkerApiTests
     {
         var source = GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single(static item =>
             item.Total is { CallPreconditions.Length: > 0 });
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
@@ -108,8 +108,8 @@ public sealed class Pr275BulkWorkerApiTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             DisjointCallPreconditionSource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single(static item =>
             item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
@@ -123,7 +123,7 @@ public sealed class Pr275BulkWorkerApiTests
     private static PassiveCallableVcPlan BuildPlan(PassiveCallableCandidate candidate)
     {
         var success = PassiveCallableVcBuilder.TryBuild(candidate,
-            out var plan, out var failure);
+            out var plan, out var failure, cancellationToken: CancellationToken.None);
         Assert.That(success, Is.True, failure.ToString());
         Assert.That(plan, Is.Not.Null);
         return plan!;

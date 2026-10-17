@@ -23,15 +23,15 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
         var preparation = preparations.Single();
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True,
             failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var actual = await solver.VerifyEntryAsync();
+        var actual = await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None);
         Assert.That(actual.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         var proof = (ProvenOutcome)actual.Outcome!;
@@ -50,7 +50,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
         var result = AssertClaimVerdict(response, WorkerClaimOutcome.Proven,
             expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions);
         Assert.That(result.ProofCore, Is.Not.Empty);

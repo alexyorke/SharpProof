@@ -34,7 +34,7 @@ public sealed class CanonicalCacheIdentityTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = new VerificationQuery(factory, [],
             new Goal(factory, unequal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>(), outcome.ToString());
     }
 }

@@ -92,8 +92,8 @@ public sealed class IteratorRootAdmissionControlTests
             var preparation = project.Snapshot.Callables.Single();
             var claim = artifact.Manifest.Claims.Single();
             var effectClaim = preparation.EffectClaims.Single();
-            var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets);
-            await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"), CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: CancellationToken.None);
+            await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"), CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
             await File.WriteAllTextAsync(Path.Combine(evidence, "observations.json"), JsonSerializer.Serialize(new
             {
                 ReferenceReturn = referenceReturn,
