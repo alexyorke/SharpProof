@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "minimumAggregateLinePercent": 90,
-  "minimumChangedTcbLinePercent": 73.32,
+  "minimumChangedTcbLinePercent": 100.0,
   "declarationOnlyTcbFiles": [
     "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
     "SharpProof.Smt/GlobalUsings.cs",
