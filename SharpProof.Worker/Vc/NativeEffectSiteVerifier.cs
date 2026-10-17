@@ -5,19 +5,20 @@ internal static class NativeEffectSiteVerifier
 {
     internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken)
-    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
+    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
 
     internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken)
-    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
+    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
 
     // An AllowedCapabilities claim holds when no reachable lock or opaque call
     // uses a capability outside the allowed set.
     internal static async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToArray();
         return claims.Length != 1 ? Unknown(WorkerClaimReason.UnsupportedContract)
             : await VerifyCapabilityClaimAsync(preparation, claims[0].ClaimId, budgets, cancellationToken).ConfigureAwait(false);
     }
@@ -27,7 +28,7 @@ internal static class NativeEffectSiteVerifier
     {
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToArray();
         if (claims.Length != 1 || claims[0].ClaimId != claimId ||
             !preparation.Entry.ClaimIds.Contains(claimId) ||
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
@@ -93,9 +94,9 @@ internal static class NativeEffectSiteVerifier
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.EffectContract).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.EffectContract)).ToArray();
         if (claims.Length != 1 || preparation.Total is not { } total || !total.ValidEffectClaimIds.Contains(claims[0].ClaimId) ||
-            total.ExceptionConstraints.FirstOrDefault(constraint => constraint.ClaimId == claims[0].ClaimId) is not { } exceptions)
+            total.ExceptionConstraints.FirstOrDefault(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (constraint.ClaimId == claims[0].ClaimId)) is not { } exceptions)
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
@@ -110,6 +111,7 @@ internal static class NativeEffectSiteVerifier
         PassiveCallableCandidate candidate, CompilerEffectConstraintArtifact constraint,
         ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
+
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
         ArgumentNullGuard.NotNull(constraint, nameof(constraint));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -118,6 +120,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
+        RepositoryParameterGuard.RequireInitialized(allowedKinds.IsDefault, nameof(allowedKinds), "Array must be initialized.");
         var effects = constraint.AllowedEffects;
         var capabilities = constraint.AllowedCapabilities;
         bool Allows(WorkerEffectSet required)
@@ -143,8 +146,8 @@ internal static class NativeEffectSiteVerifier
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
         var thrown = await solver.VerifyExceptionsAsync([.. allowedKinds], cancellationToken, !throwsDeclared || allowedTypes.Count == 0,
-            site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
-            site => ExplicitThrowSites.IsExact(factory, site)).ConfigureAwait(false);
+            site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),
+            site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site))).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
         {
             // An inconclusive exception component cannot hide an independently
@@ -212,7 +215,7 @@ internal static class NativeEffectSiteVerifier
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToArray();
         if (claims.Length != 1 || claims[0].ClaimId != claimId ||
             !preparation.Entry.ClaimIds.Contains(claimId) ||
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
@@ -231,6 +234,8 @@ internal static class NativeEffectSiteVerifier
         PassiveCallableCandidate candidate, WorkerEffectCapabilitySet allowed, WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(candidate);
         return (allowed & ~WorkerEffectCapabilitySet.Synchronization) != 0 ? Unknown(WorkerClaimReason.UnsupportedContract)
             : await VerifyCapabilityProjectionAsync(candidate, allowed, budgets, cancellationToken).ConfigureAwait(false);
     }
@@ -241,7 +246,7 @@ internal static class NativeEffectSiteVerifier
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == contract).ToArray();
+        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == contract)).ToArray();
         if (claims.Length != 1)
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total == null)

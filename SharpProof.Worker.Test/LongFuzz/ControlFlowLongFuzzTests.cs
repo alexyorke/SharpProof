@@ -205,7 +205,11 @@ public sealed class ControlFlowLongFuzzTests
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    private sealed record GeneratedBody(string Family, string Body);
+    private sealed record GeneratedBody(string Family, string Body)
+    {
+        public string Family { get; init; } = Family ?? throw new System.ArgumentNullException(nameof(Family));
+        public string Body { get; init; } = Body ?? throw new System.ArgumentNullException(nameof(Body));
+    }
 
     internal static CSharpCompilation CompileCandidateForSeed(int seed)
     {
@@ -291,6 +295,9 @@ public sealed class ControlFlowLongFuzzTests
 
     private static async Task RunCase(LongFuzzSession session, int seed, string mode, GeneratedBody generated)
     {
+        System.ArgumentNullException.ThrowIfNull(generated);
+        System.ArgumentNullException.ThrowIfNull(mode);
+        System.ArgumentNullException.ThrowIfNull(session);
         var template = generated.Body;
         var parts = mode.Split('-');
         var kind = parts[0];
@@ -333,7 +340,7 @@ public sealed class ControlFlowLongFuzzTests
             case "dnt":
                 {
                     header = "[DoesNotThrow] " + signature;
-                    var run = runs.FirstOrDefault(r => r.ExceptionType is not null);
+                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is not null));
                     truthViolation = run is null ? null : "threw " + run.ExceptionType!.Name + " at x=" + run.X;
                     break;
                 }
@@ -344,16 +351,16 @@ public sealed class ControlFlowLongFuzzTests
                             "SharpProofEffect.Allocates | SharpProofEffect.Throws, ThrownExceptions = new[] { " +
                             "typeof(System.ArgumentException), typeof(System.InvalidOperationException) })] " + signature
                         : "[AllowedExceptions(typeof(System.ArgumentException), typeof(System.InvalidOperationException))] " + signature;
-                    var run = runs.FirstOrDefault(r => r.ExceptionType is not null &&
+                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is not null &&
                         !typeof(ArgumentException).IsAssignableFrom(r.ExceptionType) &&
-                        !typeof(InvalidOperationException).IsAssignableFrom(r.ExceptionType));
+                        !typeof(InvalidOperationException).IsAssignableFrom(r.ExceptionType)));
                     truthViolation = run is null ? null : "threw " + run.ExceptionType!.Name + " at x=" + run.X;
                     break;
                 }
             case "pure":
                 {
                     header = "[EnforcePure] " + signature;
-                    var run = runs.FirstOrDefault(r => r.StateWrites != 0 || r.LockEntries != 0);
+                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.StateWrites != 0 || r.LockEntries != 0));
                     truthViolation = run is null ? null : run.StateWrites != 0
                         ? "wrote State " + run.StateWrites + " time(s), final " + run.State + ", at x=" + run.X
                         : "entered lock " + run.LockEntries + " time(s) at x=" + run.X;
@@ -361,7 +368,7 @@ public sealed class ControlFlowLongFuzzTests
                 }
             default:
                 {
-                    var run = runs.FirstOrDefault(r => r.ExceptionType is null);
+                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is null));
                     if (run is null)
                     {
                         session.Count("no-normal-run");
@@ -389,7 +396,7 @@ public sealed class ControlFlowLongFuzzTests
             if (response.Errors.Length > 0)
             {
                 session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, claim, "", "", runtime,
-                    string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)), source));
+                    string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))), source));
                 return;
             }
             if (response.ClaimResults.Length != 1)
@@ -422,6 +429,7 @@ public sealed class ControlFlowLongFuzzTests
 
     private static string Verified(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         return body.Replace("%% ", "", StringComparison.Ordinal);
     }
 
@@ -429,17 +437,22 @@ public sealed class ControlFlowLongFuzzTests
     {
         // The generated lock wrapper always locks a fresh object. Count a
         // reached lock only in the CLR copy; verification keeps the original.
+        System.ArgumentNullException.ThrowIfNull(body);
         return body.Replace("%%", "R.F();", StringComparison.Ordinal)
             .Replace("lock (new object())", "lock (R.TrackLock(new object()))", StringComparison.Ordinal);
     }
 
     private static string Source(string state, string header, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(header);
+        System.ArgumentNullException.ThrowIfNull(state);
         return Prelude.Replace("STATE", state, StringComparison.Ordinal) + header + body + " } }";
     }
 
     private static string TypeName(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         return type switch
         {
             "void" => "void",
@@ -452,6 +465,7 @@ public sealed class ControlFlowLongFuzzTests
 
     private static string Retype(string body, string type)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         if (type is not ("void" or "bool"))
         {
             return body;
@@ -465,9 +479,9 @@ public sealed class ControlFlowLongFuzzTests
         var root = CSharpSyntaxTree.ParseText(prefix + parseable + " } }",
             new CSharpParseOptions(LanguageVersion.CSharp12)).GetRoot();
         var returns = root.DescendantNodes().OfType<ReturnStatementSyntax>()
-            .Where(statement => statement.Expression is not null &&
-                !statement.Ancestors().Any(ancestor => ancestor is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))
-            .OrderByDescending(statement => statement.SpanStart);
+            .Where(statement => statement is null ? throw new System.ArgumentNullException(nameof(statement)) : (statement.Expression is not null &&
+                !statement.Ancestors().Any(ancestor => ancestor is null ? throw new System.ArgumentNullException(nameof(ancestor)) : (ancestor is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))))
+            .OrderByDescending(statement => statement is null ? throw new System.ArgumentNullException(nameof(statement)) : (statement.SpanStart));
         foreach (var statement in returns)
         {
             var expression = statement.Expression!;
@@ -489,11 +503,13 @@ public sealed class ControlFlowLongFuzzTests
 
     private static bool HasErrors(CSharpCompilation compilation)
     {
-        return compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        return compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
     private static CSharpCompilation Compile(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]));
         return CSharpCompilation.Create("P" + Guid.NewGuid().ToString("N"), [tree], TestMetadataReferences.WithSharpProof,

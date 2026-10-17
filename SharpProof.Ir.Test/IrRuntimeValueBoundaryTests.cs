@@ -81,6 +81,7 @@ public sealed class IrRuntimeValueBoundaryTests
         object invalidBox = semantics == IrExecutionSemantics.Total ? (object)17L : 17;
         IrEvaluationResult EvaluateBox(object box)
         {
+            System.ArgumentNullException.ThrowIfNull(box);
             return interpreter.Evaluate(
                 factory.Variable(variable),
                 new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateReferenceValue(factory.ObjectType, box) });

@@ -11,7 +11,7 @@ internal sealed partial class EffectiveContractSourceResolution
         DirectInventory.HasRejectedContractApiUsage ||
         Inventory.HasRejectedContractApiUsage ||
         Inventory.Clauses.Any(static clause =>
-            clause.Placement != ContractClausePlacement.NestedCallable);
+            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement != ContractClausePlacement.NestedCallable));
 }
 
 internal sealed class EffectiveContractSourceResolver
@@ -51,10 +51,10 @@ internal sealed class EffectiveContractSourceResolver
         cancellationToken.ThrowIfCancellationRequested();
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            value => new(
+            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(
                 value,
                 ContractClauseInventoryBuilder.ForCompilation(value),
-                cancellationToken));
+                cancellationToken)));
     }
 
     internal EffectiveContractSourceResolution Resolve(
@@ -69,7 +69,7 @@ internal sealed class EffectiveContractSourceResolver
         return implementationBody == null
             ? _cache.GetOrAdd(
                 target,
-                value => ResolveUncached(value, cancellationToken))
+                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ResolveUncached(value, cancellationToken)))
             : ResolveCore(target, implementationBody, cancellationToken);
     }
 
@@ -77,6 +77,7 @@ internal sealed class EffectiveContractSourceResolver
         IMethodSymbol target,
         CancellationToken cancellationToken)
     {
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return ResolveCore(target, null, cancellationToken);
     }
 
@@ -85,6 +86,7 @@ internal sealed class EffectiveContractSourceResolver
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         cancellationToken.ThrowIfCancellationRequested();
         var direct = _clauses.Create(
             target,

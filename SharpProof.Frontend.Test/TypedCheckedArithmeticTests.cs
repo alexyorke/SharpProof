@@ -81,6 +81,7 @@ public sealed class TypedCheckedArithmeticTests
     [TestCase("long Target(int unused) => checked(long.MinValue % -1L);")]
     public void ConstantFoldedRemainderMatchesCompiledRuntime(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(Convert.ToInt64(subject.Invoke([0]), CultureInfo.InvariantCulture), Is.Zero);
         var lowered = subject.Lower();
@@ -93,6 +94,8 @@ public sealed class TypedCheckedArithmeticTests
     [TestCaseSource(nameof(CheckedCases))]
     public void CheckedCandidateMatchesCompiledBoundary(string members, object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke(arguments);
         var lowered = subject.Lower();
@@ -117,8 +120,11 @@ public sealed class TypedCheckedArithmeticTests
     [TestCase("uint Target(uint x, uint y) { checked { x += y; return x; } }", "uint", "uint", true)]
     public void ResolvedCompoundConversionsSelectPromotedOperatorBeforeStorage(string members, string targetType, string rightType, bool identity)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(rightType);
+        System.ArgumentNullException.ThrowIfNull(targetType);
         using var subject = TypedProgramSubject.Create(members);
-        var compounds = subject.Graph.Blocks.SelectMany(block => block.Operations).SelectMany(Descendants)
+        var compounds = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).SelectMany(Descendants)
             .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>().ToArray();
         Assert.That(compounds, Is.Not.Empty);
         foreach (var operation in compounds)
@@ -136,12 +142,13 @@ public sealed class TypedCheckedArithmeticTests
     [TestCase("short", true)]
     public void UIntCompoundWithSignedNarrowOperandIsRejectedByCSharp(string narrow, bool constant)
     {
+        System.ArgumentNullException.ThrowIfNull(narrow);
         var members = constant ? $"uint Target(uint x) {{ const {narrow} y = 1; checked {{ x += y; return x; }} }}"
             : $"uint Target(uint x, {narrow} y) {{ checked {{ x += y; return x; }} }}";
         var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(FrontendTestHelpers.WrapSubjectMembers("public static " + members));
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("PromotionProbe", [tree], TestMetadataReferences.Platform,
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).ToArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS0266"));
     }
@@ -153,6 +160,8 @@ public sealed class TypedCheckedArithmeticTests
     [TestCase("x++ + ++x", int.MaxValue, int.MaxValue, "x++")]
     public void FaultRetainsEarlierEffectsButPreventsItsOwnWrite(string expression, int input, int stored, string site)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(site);
         using var subject = TypedProgramSubject.Create($$"""
             int Target(int x) { try { return checked({{expression}}); } finally { } }
             """);
@@ -173,6 +182,7 @@ public sealed class TypedCheckedArithmeticTests
     [TestCase("++x", int.MaxValue, int.MaxValue)]
     public void CatchAndFinallyObserveOnlyCompletedOperandWrites(string expression, int input, int observed)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         using var subject = TypedProgramSubject.Create($$"""
             int Target(int x) { try { try { return checked({{expression}}); }
                 catch (System.OverflowException) { return x; } } finally { x = 7; } }
@@ -188,6 +198,7 @@ public sealed class TypedCheckedArithmeticTests
 
     private static IEnumerable<Microsoft.CodeAnalysis.IOperation> Descendants(Microsoft.CodeAnalysis.IOperation operation)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         yield return operation;
         foreach (var child in operation.ChildOperations.SelectMany(Descendants))
         { yield return child; }
@@ -195,8 +206,10 @@ public sealed class TypedCheckedArithmeticTests
 
     private static TestCaseData Case(string members, params object[] arguments)
     {
-        var display = arguments.Select(argument => argument is char character
-            ? ((int)character).ToString(CultureInfo.InvariantCulture) : Convert.ToString(argument, CultureInfo.InvariantCulture));
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(members);
+        var display = arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument is char character
+            ? ((int)character).ToString(CultureInfo.InvariantCulture) : Convert.ToString(argument, CultureInfo.InvariantCulture)));
         return new TestCaseData(members, arguments).SetName("Checked oracle: " + members + " [" + string.Join(",", display) + "]");
     }
 }

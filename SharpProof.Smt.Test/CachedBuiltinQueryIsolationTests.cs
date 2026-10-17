@@ -13,6 +13,7 @@ public sealed class CachedBuiltinQueryIsolationTests
     [TestCase("empty-string", true)]
     public async Task IndependentCachedBuiltinsDoNotBlockConcreteCounterexamples(string otherKind, bool previousQuery)
     {
+        System.ArgumentNullException.ThrowIfNull(otherKind);
         Assert.That(ReferenceEquals(Array.Empty<int>(), otherKind switch
         {
             "bool-array" => (object)Array.Empty<bool>(),

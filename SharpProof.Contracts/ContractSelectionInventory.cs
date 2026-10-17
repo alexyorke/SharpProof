@@ -37,7 +37,8 @@ internal sealed class ContractSelectionInventory
     internal static ContractSelectionInventory ForCompilation(
         Compilation compilation)
     {
-        return Cache.GetValue(compilation, static value => new(value));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        return Cache.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     internal INamedTypeSymbol? ContractFor
@@ -47,6 +48,7 @@ internal sealed class ContractSelectionInventory
 
     internal bool IsContractForCandidate(AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return Is(attribute, ContractFor) ||
             _identity.TryGetRejectedAttributeMetadataName(
                 attribute,
@@ -100,6 +102,7 @@ internal sealed class ContractSelectionInventory
 
     internal bool IsClosedContract(AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return GetClosedContractKind(attribute) !=
             ClosedContractAttributeKind.None;
     }
@@ -107,12 +110,14 @@ internal sealed class ContractSelectionInventory
     internal ClosedContractAttributeKind GetClosedContractKind(
         AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return GetClosedContractClassification(attribute)?.Kind ?? ClosedContractAttributeKind.None;
     }
 
     internal ClosedContractAttributeClassification? GetClosedContractClassification(
         AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return Is(attribute, NotNull)
             ? ClosedContractAttributeClassification.NotNull
             : Is(attribute, Positive)
@@ -139,6 +144,7 @@ internal sealed class ContractSelectionInventory
 
     internal bool IsEffectContract(AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return Is(attribute, EnforcePure) ||
         Is(attribute, ZeroAllocations) ||
         Is(attribute, AllowedCapabilities) ||
@@ -155,7 +161,7 @@ internal sealed class ContractSelectionInventory
         var selected = ContractSelectionFeatures.None;
         if (hasContractClause ||
             method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(IsClosedContract)) ||
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(IsClosedContract))) ||
             method.GetReturnTypeAttributes().Any(IsClosedContract))
         {
             selected |= ContractSelectionFeatures.Contracts;
@@ -173,6 +179,7 @@ internal sealed class ContractSelectionInventory
     internal ContractSelectionFeatures GetRejectedSelectionFeatures(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetRejectedSelectionFeatures(
             method,
             out _);
@@ -182,6 +189,7 @@ internal sealed class ContractSelectionInventory
         IMethodSymbol method,
         out ContractSelectionFeatures callable)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         callable = GetRejectedCallableSelectionFeatures(method);
         return callable | GetRejectedControlFeatures(method);
     }
@@ -190,6 +198,9 @@ internal sealed class ContractSelectionInventory
         IMethodSymbol method,
         ImmutableArray<AttributeData> callableAttributes)
     {
+
+        RepositoryParameterGuard.RequireInitialized(callableAttributes.IsDefault, nameof(callableAttributes), "Array must be initialized.");
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = GetRejectedCallableSelectionFeatures(
             method,
             callableAttributes);
@@ -199,6 +210,7 @@ internal sealed class ContractSelectionInventory
     private ContractSelectionFeatures GetRejectedControlFeatures(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
         for (var type = method.ContainingType;
              type != null;
@@ -215,6 +227,7 @@ internal sealed class ContractSelectionInventory
     internal ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetRejectedCallableSelectionFeatures(
             method,
             GetCallableAttributes(method));
@@ -224,6 +237,8 @@ internal sealed class ContractSelectionInventory
         IMethodSymbol method,
         IEnumerable<AttributeData> callableAttributes)
     {
+        callableAttributes = RepositoryParameterGuard.NotNull(callableAttributes, nameof(callableAttributes));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
         foreach (var attribute in callableAttributes)
         {
@@ -247,6 +262,7 @@ internal sealed class ContractSelectionInventory
 
     internal bool IsRejectedControlAttribute(AttributeData attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return _identity.TryGetRejectedAttributeMetadataName(
                 attribute,
                 out var metadataName) &&
@@ -258,6 +274,8 @@ internal sealed class ContractSelectionInventory
     private ContractSelectionFeatures GetRejectedControlFeatures(
         ImmutableArray<AttributeData> attributes)
     {
+
+        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         var selected = ContractSelectionFeatures.None;
         foreach (var attribute in attributes)
         {
@@ -275,6 +293,7 @@ internal sealed class ContractSelectionInventory
         AttributeData attribute,
         INamedTypeSymbol? expected)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return ContractApiMetadata.IsAttribute(attribute, expected);
     }
 

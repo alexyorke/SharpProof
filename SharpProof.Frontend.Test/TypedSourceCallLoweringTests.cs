@@ -33,8 +33,8 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(shadow.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         var body = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(body.IsExact, Is.True, body.Classification.Abstention.ToString());
-        Assert.That(body.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(body.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
     }
 
     [TestCase("int Target(int x) { _ = Helper(x++); return x; } static int Helper(int value) => value + 1;", 3, 4)]
@@ -56,7 +56,7 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         if (members.Contains("new int[]", StringComparison.Ordinal))
         {
-            Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions)
+            Assert.That(lowering.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrAllocationInstruction>().Count(), Is.EqualTo(1));
         }
     }
@@ -74,13 +74,14 @@ public sealed class TypedSourceCallLoweringTests
         "static int Helper(int x) => 10 / x;", 1)]
     public void ShadowSourceCallsRemainFiniteAndCannotClaimExecutableExactness(string members, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var lowered = subject.LowerShadowSourceCalls();
         Assert.That(lowered.Classification.IsExact, Is.True);
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
         Assert.That(lowered.IsExact, Is.False);
         Assert.That(lowered.PreservedSourceCalls, Has.Count.EqualTo(count));
-        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Count(),
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Count(),
             Is.EqualTo(count));
         Assert.That(subject.Execute(lowered, [3]).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
     }
@@ -91,6 +92,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) => Helper(); static int Helper(params int[] x) => x.Length;")]
     public void UnsupportedShadowSourceCallsRemainExplicitlyIncomplete(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var lowered = subject.LowerShadowSourceCalls();
         Assert.That(lowered.Classification.IsExact, Is.False);
@@ -102,6 +104,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("Pack(second: x++, first: x)", 4, 3)]
     public void ShadowSourceCallArgumentsCaptureReadsInSourceOrder(string invocation, int first, int second)
     {
+        System.ArgumentNullException.ThrowIfNull(invocation);
         using var subject = TypedProgramSubject.Create("int Target(int x) => " + invocation +
             "; static int Pack(int first, int second) => first * 10 + second;");
         var lowered = subject.LowerShadowSourceCalls();
@@ -158,6 +161,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { return Generic<int>(x); } static int Generic<T>(int value) => value * 2;", 3, 6)]
     public void SourceCallsHaveIndependentCompiledResults(string members, int input, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
         var lowering = subject.LowerSourceCalls();
@@ -172,6 +176,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("return Capture() == new int[0] ? 1 : 0;", 0)]
     public void EmptyParamsPreserveCompiledCacheIdentity(string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var subject = TypedProgramSubject.Create("int Target(int x) { " + body +
             " } static int Count(params int[] values) => values.Length; static int[] Capture(params int[] values) => values;");
         Assert.That(subject.Invoke([3]), Is.EqualTo(expected));
@@ -218,6 +223,9 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("bool Target(bool x) { return Flip(x); } static bool Flip(bool value) { return !value; }", true, false)]
     public void ScalarFramesPreserveWidthsAndDefaultConstants(string members, object input, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
         var lowering = subject.LowerSourceCalls();
@@ -255,6 +263,8 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { return System.Math.Abs(x); }")]
     public void UnsupportedSourceCallShapesClose(string members, string additionalSource = "")
     {
+        System.ArgumentNullException.ThrowIfNull(additionalSource);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members, additionalSource);
         Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
     }

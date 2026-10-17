@@ -120,6 +120,8 @@ public sealed class DataflowGraph<T>
     private ImmutableArray<int> GetNeighbors(
         int blockId, ImmutableArray<ImmutableArray<int>> adjacency)
     {
+
+        RepositoryParameterGuard.ThrowIfInvalid(adjacency.IsDefault, nameof(adjacency));
         ValidateBlockId(blockId);
         return adjacency[blockId];
     }
@@ -140,6 +142,8 @@ public sealed class DataflowGraph<T>
 
     private static List<int>[] CreateAdjacency(int count)
     {
+        RepositoryParameterGuard.RequireInitialized(count < 0, nameof(count), "Value must be initialized.");
+
         var result = new List<int>[count];
         for (var index = 0; index < count; index++)
         {
@@ -151,6 +155,7 @@ public sealed class DataflowGraph<T>
 
     private static ImmutableArray<ImmutableArray<int>> Freeze(List<int>[] adjacency)
     {
+        adjacency = RepositoryParameterGuard.NotNull(adjacency, nameof(adjacency));
         var result = ImmutableArray.CreateBuilder<ImmutableArray<int>>(adjacency.Length);
         foreach (var neighbors in adjacency)
         {
@@ -162,6 +167,8 @@ public sealed class DataflowGraph<T>
     private static ImmutableArray<bool> FindCyclicBlocks(
         ImmutableArray<ImmutableArray<int>> successors)
     {
+
+        RepositoryParameterGuard.RequireInitialized(successors.IsDefault, nameof(successors), "Array must be initialized.");
         var discovery = new int[successors.Length];
         var lowLink = new int[successors.Length];
         var onStack = new bool[successors.Length];

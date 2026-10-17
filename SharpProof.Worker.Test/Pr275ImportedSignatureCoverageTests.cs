@@ -11,6 +11,7 @@ public sealed class Pr275ImportedSignatureCoverageTests
     [TestCase("ref readonly")]
     public void ImportedReadonlyInputMatchesItsStaticCompanion(string modifier)
     {
+        System.ArgumentNullException.ThrowIfNull(modifier);
         var compilation = ImportCompilerOutput($$"""
             public interface ITarget {
                 void Read({{modifier}} int value);
@@ -35,6 +36,8 @@ public sealed class Pr275ImportedSignatureCoverageTests
     public void ImportedFunctionPointerSignaturesPreserveTheirCallingConventions(
         string targetConventions, string companionConventions, bool matches)
     {
+        System.ArgumentNullException.ThrowIfNull(companionConventions);
+        System.ArgumentNullException.ThrowIfNull(targetConventions);
         var compilation = ImportCompilerOutput($$"""
             public unsafe interface ITarget {
                 delegate* unmanaged[{{targetConventions}}]<int, int> Map(
@@ -60,6 +63,7 @@ public sealed class Pr275ImportedSignatureCoverageTests
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpCompilation ImportCompilerOutput(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var producer = TestCompilation.Create("Pr275ImportedProducer", source, allowUnsafe: true);
         using var image = new MemoryStream();
         var emission = producer.Emit(image);

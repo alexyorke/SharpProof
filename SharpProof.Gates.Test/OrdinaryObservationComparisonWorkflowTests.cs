@@ -38,7 +38,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
         var actualZulu = await ObserveVersionAsync("ZuluTarget", allocate: changeVersions);
         var actualAlpha = await ObserveVersionAsync("AlphaTarget", allocate: changeVersions);
         var expected = new[] { expectedZulu, expectedAlpha }.ToImmutableDictionary(
-            static observation => observation.CaseId, StringComparer.Ordinal);
+            static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId), StringComparer.Ordinal);
 
         var failures = CorpusObservationComparison.CompareConcurrent(expected, [actualZulu, actualAlpha]);
 
@@ -51,6 +51,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
 
     private static async Task<CorpusObservation> ObserveVersionAsync(string className, bool allocate)
     {
+        System.ArgumentNullException.ThrowIfNull(className);
         var source = $$"""
             public static class {{className}} {
                 [SharpProof.Attributes.ZeroAllocations]
@@ -61,7 +62,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
             }
             """;
         var compilation = AnalyzerGateHost.CreateCompilation(source, "OrdinaryObservationVersion");
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var symbol = compilation.GetTypeByMetadataName(className)!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var identity = symbol.GetDocumentationCommentId()!;
         Assert.That(identity, Is.EqualTo($"M:{className}.Target(System.Int32)"));

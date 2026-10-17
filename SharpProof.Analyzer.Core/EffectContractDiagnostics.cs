@@ -15,7 +15,7 @@ internal static class EffectContractDiagnostics
         _ = DecodeAllowedExceptions(
             Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session, reportDiagnostic);
         if (!attributes.Any(attribute =>
-                ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract)))
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract))))
         {
             return;
         }
@@ -39,6 +39,10 @@ internal static class EffectContractDiagnostics
         IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var evaluations = Evaluate(
             method, AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
             session, reportDiagnostic, cancellationToken, out var abstained);
@@ -82,6 +86,7 @@ internal static class EffectContractDiagnostics
     internal static ImmutableArray<EffectClaimEvaluation> Declare(
         IMethodSymbol method, Location location, AnalyzerSession session, CancellationToken cancellationToken)
     {
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         session = ArgumentNullGuard.NotNull(session, nameof(session));
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
@@ -110,7 +115,7 @@ internal static class EffectContractDiagnostics
             established: throws.IsEmpty);
         Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
             new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
-            !throws.IncludesUnknown && throws.Types.All(type => exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(type, allowed))));
+            !throws.IncludesUnknown && throws.Types.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (exceptions.Types.Any(allowed => allowed is null ? throw new System.ArgumentNullException(nameof(allowed)) : (EffectTypeFacts.IsDerivedFrom(type, allowed))))));
         Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
             new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
             contract.Kind != EffectContractResolutionKind.Invalid, true);
@@ -119,6 +124,7 @@ internal static class EffectContractDiagnostics
         void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
             bool valid = true, bool established = false)
         {
+            constraint = RepositoryParameterGuard.NotNull(constraint, nameof(constraint));
             if (selected.IsDefaultOrEmpty)
             { return; }
             established &= trusted && valid;
@@ -139,6 +145,7 @@ internal static class EffectContractDiagnostics
         IMethodSymbol method, Location location, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, out bool abstained)
     {
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         abstained = false;
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         session = ArgumentNullGuard.NotNull(session, nameof(session));
@@ -148,16 +155,16 @@ internal static class EffectContractDiagnostics
         _ = DecodeAllowedExceptions(Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session,
             reportDiagnostic);
         var evaluations = Declare(method, location, session, cancellationToken);
-        if (evaluations.All(evaluation => evaluation.Outcome == EffectEvaluationOutcome.Proven) ||
+        if (evaluations.All(evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome == EffectEvaluationOutcome.Proven)) ||
             session.Compilation is not CSharpCompilation compilation ||
             method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is not { } declaration)
         { return evaluations; }
         // A bodyless declaration has only its trusted contract to report on.
         if (method is { IsAbstract: true } or { IsExtern: true })
         {
-            return [.. evaluations.Select(evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            return [.. evaluations.Select(evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome != EffectEvaluationOutcome.Proven &&
                 evaluation.Certainty == EffectEvaluationCertainty.TrustedCompleteBoundary
-                ? Report(evaluation, method.Name, "its trusted effect contract does not establish it") : evaluation)];
+                ? Report(evaluation, method.Name, "its trusted effect contract does not establish it") : evaluation))];
         }
         var analysis = AdvisoryEffectSites.Analyze(compilation, method, declaration, cancellationToken);
         if (analysis.Gap != null)
@@ -168,12 +175,15 @@ internal static class EffectContractDiagnostics
             return evaluations;
         }
         return [.. evaluations.Select(evaluation =>
-            evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome != EffectEvaluationOutcome.Proven &&
             AdvisoryEffectClaims.FindViolation(evaluation.Kind, evaluation.Constraint, analysis.Sites, compilation) is { } violation
-                ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation)];
+                ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation))];
 
         EffectClaimEvaluation Report(EffectClaimEvaluation evaluation, string subject, string detail)
         {
+            detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
+            evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
+            subject = RepositoryParameterGuard.NotNull(subject, nameof(subject));
             var described = "'" + subject + "' " + detail;
             var (rule, arguments) = evaluation.Kind switch
             {
@@ -194,6 +204,7 @@ internal static class EffectContractDiagnostics
 
     private static string SiteText(Location location)
     {
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         var text = location.SourceTree?.GetText().ToString(location.SourceSpan) ?? "";
         text = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         return text.Length <= 80 ? text : text.Substring(0, 77) + "...";
@@ -203,6 +214,11 @@ internal static class EffectContractDiagnostics
         ImmutableArray<AttributeData> attributes, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
+
+        RepositoryParameterGuard.ThrowIfInvalid(attributes.IsDefault, nameof(attributes));
+        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var value = EffectContractCapabilityKind.None;
         foreach (var attribute in attributes)
         {
@@ -228,6 +244,12 @@ internal static class EffectContractDiagnostics
         ImmutableArray<AttributeData> attributes, Compilation compilation, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
+
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
+        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         var valid = true;
@@ -243,7 +265,7 @@ internal static class EffectContractDiagnostics
                     !type.IsUnboundGenericType &&
                     EffectTypeFacts.IsDerivedFrom(type, exceptionType)))
             {
-                types.AddRange(values.Select(static argument => (INamedTypeSymbol)argument.Value!));
+                types.AddRange(values.Select(static argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : ((INamedTypeSymbol)argument.Value!))));
                 continue;
             }
             ReportInvalidOnce(
@@ -259,6 +281,12 @@ internal static class EffectContractDiagnostics
         AttributeData attribute, string contract, string reason, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        contract = RepositoryParameterGuard.NotNull(contract, nameof(contract));
+        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
+        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (session.TryMarkAttributeValidated(attribute))
         {
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
@@ -272,7 +300,7 @@ internal static class EffectContractDiagnostics
         return string.Join(",", types
             .Select(FormatExceptionType)
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value, StringComparer.Ordinal));
+            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
     }
 
     private static string FormatExceptionType(INamedTypeSymbol type)
@@ -289,6 +317,8 @@ internal static class EffectContractDiagnostics
 
     private static Location GetLocation(AttributeData attribute, Location fallback)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
         return attribute.ApplicationSyntaxReference?.SyntaxTree.GetLocation(
             attribute.ApplicationSyntaxReference.Span) ?? fallback;
     }
@@ -296,7 +326,9 @@ internal static class EffectContractDiagnostics
     private static ImmutableArray<AttributeData> Select(
         ImmutableArray<AttributeData> attributes, INamedTypeSymbol? expected)
     {
-        return [.. attributes.Where(attribute => ContractSelectionInventory.Is(attribute, expected))];
+
+        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
+        return [.. attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (ContractSelectionInventory.Is(attribute, expected)))];
     }
 }
 

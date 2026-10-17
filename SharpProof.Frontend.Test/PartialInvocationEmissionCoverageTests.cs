@@ -17,7 +17,7 @@ public sealed class PartialInvocationEmissionCoverageTests
         Assert.That(subject.Invoke([]), Is.EqualTo(expected));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var invocationSyntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "Skip" });
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "Skip" }));
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(invocationSyntax)!;
         Assert.That(operation, Is.InstanceOf<Microsoft.CodeAnalysis.Operations.IInvocationOperation>());
         var policy = new CSharpInvocationEmissionPolicy(subject.Compilation);

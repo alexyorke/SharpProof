@@ -23,13 +23,13 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         var errors = compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
         Assert.That(emitted.Success, Is.False);
-        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         var model = compilation.GetSemanticModel(tree);
         var methodSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
@@ -59,7 +59,7 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         var observation = new RoslynTotalExpressionLowerer(observationContext, observationBuilder)
             .LowerBodyValue(binary, observationEntry);
         observationBuilder.Return(observation.Continuation, observationContext.Site(binary), observation.Value);
-        var observationInstructions = observationBuilder.Build().Blocks.SelectMany(static block => block.Instructions).ToArray();
+        var observationInstructions = observationBuilder.Build().Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         TestContext.WriteLine($"Recovery expression API: exact={observation.Classification.IsExact}, reason={observation.Classification.Abstention}, sameEntry={observation.Continuation.Equals(observationEntry)}, value={observation.Value.GetType().Name}, type={observationFactory.GetTypeInfo(observation.Value.Type).Kind}, havocs={observationInstructions.OfType<IrHavocInstruction>().Count()}, assigns={observationInstructions.OfType<IrAssignInstruction>().Count()}");
         Assert.That(binary.Type, Is.InstanceOf<IErrorTypeSymbol>());
         Assert.That(binary.Type!.TypeKind, Is.EqualTo(TypeKind.Error));

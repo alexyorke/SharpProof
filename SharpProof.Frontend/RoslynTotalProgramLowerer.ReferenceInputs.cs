@@ -4,12 +4,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private IrProgram InvalidateReferenceInputs(IrProgram program)
     {
-        var references = _context.Parameters.Where(binding => binding.Parameter.RefKind is RefKind.Ref or RefKind.In)
-            .Select(binding => binding.Current).OrderBy(variable => variable.Value).ToImmutableArray();
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
+        var references = _context.Parameters.Where(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.RefKind is RefKind.Ref or RefKind.In))
+            .Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current)).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
         if (references.IsEmpty)
         { return program; }
-        var next = program.Blocks.SelectMany(block => block.Instructions)
-            .Select(instruction => instruction.Id.Value).DefaultIfEmpty(-1).Max() + 1;
+        var next = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id.Value)).DefaultIfEmpty(-1).Max() + 1;
         var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(program.Blocks.Length);
         foreach (var block in program.Blocks)
         {

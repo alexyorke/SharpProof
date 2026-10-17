@@ -15,8 +15,9 @@ public sealed class DirectConsoleWriteAnalyzerTests
     [TestCase("System.Console.Error.WriteLineAsync(\"failure\");")]
     public async Task DirectConsoleLineWritesAreRejected(string call)
     {
+        System.ArgumentNullException.ThrowIfNull(call);
         var diagnostics = await AnalyzeAsync("class Subject { void Run() { " + call + " } }");
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(new[] { DirectConsoleWriteAnalyzer.DiagnosticId }));
     }
 
@@ -68,19 +69,21 @@ public sealed class DirectConsoleWriteAnalyzerTests
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return AnalyzeAsync(source, TestMetadataReferences.Platform);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string source, ImmutableArray<MetadataReference> references)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CSharpCompilation.Create(
             "ConsoleLoggingFixture",
             [CSharpSyntaxTree.ParseText(source)],
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return await compilation.WithAnalyzers(
             [new DirectConsoleWriteAnalyzer()]).GetAnalyzerDiagnosticsAsync();
     }

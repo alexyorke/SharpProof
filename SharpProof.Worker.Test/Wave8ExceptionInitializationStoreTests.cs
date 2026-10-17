@@ -30,7 +30,7 @@ public sealed class Wave8ExceptionInitializationStoreTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0)), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         await TestContext.Out.WriteLineAsync($"{scenario}: native={native.Outcome?.GetType().Name}/{native.Reason}");
         if (expected == WorkerClaimOutcome.Proven)
         { Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>()); }
@@ -65,6 +65,7 @@ public sealed class Wave8ExceptionInitializationStoreTests
 
     private static void CheckBoundStore(CSharpCompilation compilation, string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         if (scenario == "module-empty-return")
         { return; }
         var tree = compilation.SyntaxTrees.Single();
@@ -89,6 +90,8 @@ public sealed class Wave8ExceptionInitializationStoreTests
 
     private static void RunCompiledInvocation(CSharpCompilation compilation, string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));

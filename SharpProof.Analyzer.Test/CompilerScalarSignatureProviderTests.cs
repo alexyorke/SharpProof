@@ -83,6 +83,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [TestCase("FunctionPointer", SpecialType.None)]
     public void GenuineMethodSignaturesClassifyAcceptedAndRejectedTypes(string name, SpecialType expected)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         using var pe = new PEReader(new MemoryStream(_image, writable: false));
         var reader = pe.GetMetadataReader();
         var method = FindMethod(reader, name);
@@ -99,6 +100,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [TestCase("ModifiedReference")]
     public void GenuineReferenceReturnsRemainOutsideTheScalarSubset(string name)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         using var pe = new PEReader(new MemoryStream(_image, writable: false));
         var reader = pe.GetMetadataReader();
         var signature = FindMethod(reader, name).DecodeSignature(
@@ -148,6 +150,8 @@ public sealed class CompilerScalarSignatureProviderTests
 
     private static MethodDefinition FindMethod(MetadataReader reader, string name)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(reader);
         var handle = reader.MethodDefinitions.Single(candidate =>
             reader.GetString(reader.GetMethodDefinition(candidate).Name) == name);
         return reader.GetMethodDefinition(handle);

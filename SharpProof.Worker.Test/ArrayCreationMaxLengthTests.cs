@@ -15,6 +15,7 @@ public sealed class ArrayCreationMaxLengthTests
     [TestCase("public static int Target(int z) { int n = 2147483600; var a = new int[n]; return a.Length; }")]
     public async Task LengthBeyondTheRuntimeMaximumMayThrow(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         Assert.That(await Verify(declaration), Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
@@ -25,6 +26,7 @@ public sealed class ArrayCreationMaxLengthTests
     [TestCase("public static int Target(int n) { Contract.Requires(n == -1); return new int[n].Length; }", WorkerClaimOutcome.Refuted)]
     public async Task BoundedLengthsKeepTheirOutcome(string declaration, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         Assert.That(await Verify(declaration), Is.EqualTo(expected));
     }
 
@@ -35,13 +37,14 @@ public sealed class ArrayCreationMaxLengthTests
         Assert.Throws<OutOfMemoryException>(new Action(() => AllocateBytes(length)));
     }
 
-    private static void AllocateBytes(int length)
+    private static void AllocateBytes(int length /* SPINT001: all values valid - this CLR oracle intentionally exposes allocation faults */)
     {
         _ = new byte[length];
     }
 
     private static async Task<WorkerClaimOutcome> Verify(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { [DoesNotThrow] " +
             declaration + " }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);

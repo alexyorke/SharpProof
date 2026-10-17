@@ -85,6 +85,8 @@ public sealed class ScalarUnaryAlgebraCoverageTests
     [TestCase("long Target(long value) => checked(-value);", 17L)]
     public void AuthenticCompiledUnaryProgramsAgreeWithExactLoweredExecution(string source, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         var native = subject.Invoke([input]);
         var lowered = subject.Lower();

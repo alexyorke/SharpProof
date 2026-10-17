@@ -22,8 +22,8 @@ internal static class CompilerExceptionTypeIdentity
 
         return identity + "::generic-argument-assemblies[" +
             string.Concat(argumentAssemblies.Select(static assembly =>
-                assembly.Length.ToString(CultureInfo.InvariantCulture) +
-                ":" + assembly)) + "]";
+                assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (assembly.Length.ToString(CultureInfo.InvariantCulture) +
+                ":" + assembly))) + "]";
     }
 
     internal static string[] EncodeHierarchy(INamedTypeSymbol? type)
@@ -34,13 +34,15 @@ internal static class CompilerExceptionTypeIdentity
             identities.Add(Encode(current));
         }
 
-        return [.. identities.OrderBy(static value => value, StringComparer.Ordinal)];
+        return [.. identities.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)];
     }
 
     private static void AddNamedTypeArgumentAssemblies(
         INamedTypeSymbol type,
         ICollection<string> identities)
     {
+        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (type.ContainingType is { } containingType)
         {
             AddNamedTypeArgumentAssemblies(containingType, identities);
@@ -56,6 +58,8 @@ internal static class CompilerExceptionTypeIdentity
         ITypeSymbol type,
         ICollection<string> identities)
     {
+        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         switch (type)
         {
             case IArrayTypeSymbol array:

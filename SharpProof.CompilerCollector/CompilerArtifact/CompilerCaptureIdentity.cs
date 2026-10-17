@@ -26,6 +26,7 @@ internal static class CompilerCaptureIdentity
 
     internal static string CaptureMvid(Type type)
     {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return FormatMvid(type.Module.ModuleVersionId);
     }
 

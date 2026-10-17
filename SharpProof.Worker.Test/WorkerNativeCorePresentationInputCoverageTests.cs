@@ -39,10 +39,10 @@ public sealed partial class WorkerTests
 
         // These are presentation inputs only; the native proof and owned plan are unchanged.
         var labels = proof.Core.Distinct().Select((justification, ordinal) =>
-                (Justification: justification, Label: "actual-core:" + ordinal))
+                justification is null ? throw new System.ArgumentNullException(nameof(justification)) : ((Justification: justification, Label: "actual-core:" + ordinal)))
             .ToDictionary(row => row.Justification, row => row.Label);
         var complete = CallableProofCore.Create(proof, labels);
-        Assert.That(complete, Is.EqualTo(labels.Values.OrderBy(label => label, StringComparer.Ordinal)));
+        Assert.That(complete, Is.EqualTo(labels.Values.OrderBy(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal)));
         labels.Remove(proof.Core[0]);
         Assert.That(CallableProofCore.Create(proof, labels), Is.Empty);
         Assert.That(plan!.CoreLabels(proof), Is.Not.Empty);

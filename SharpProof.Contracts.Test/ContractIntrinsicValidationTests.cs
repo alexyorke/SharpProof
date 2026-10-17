@@ -41,6 +41,9 @@ public sealed class ContractIntrinsicValidationTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var compilation = TestCompilation.Create(
             "ContractIntrinsicValidation",
             source);

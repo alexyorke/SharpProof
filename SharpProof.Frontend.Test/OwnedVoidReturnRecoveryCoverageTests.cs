@@ -20,12 +20,14 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
     [TestCase("empty-body", "", false)]
     public void PublicBindingRetainsActualVoidReturnShape(string shape, string body, bool compilerError)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(shape);
         var source = "public static class Subject { public static void Target() { " + body + " } }";
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "owned-void-return.cs");
         var compilation = CSharpCompilation.Create("OwnedVoidReturn_" + shape, [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.Id).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToArray();
         if (compilerError)
         {
             Assert.That(errors, Is.EqualTo(RecoveryErrorIds));
@@ -38,8 +40,8 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.EqualTo(!compilerError));
-        var emitErrors = emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.Id).ToArray();
+        var emitErrors = emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToArray();
         if (compilerError)
         {
             Assert.That(emitErrors, Is.EqualTo(RecoveryErrorIds));
@@ -56,7 +58,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(target.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Void));
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var returns = graph.Blocks.Where(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return)
+        var returns = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return))
             .ToArray();
         if (compilerError)
         {
@@ -75,7 +77,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         else
         {
             Assert.That(returns, Is.Empty);
-            Assert.That(graph.Blocks.Select(block => block.BranchValue).Where(value => value != null), Is.Empty);
+            Assert.That(graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).Where(value => value != null), Is.Empty);
         }
 
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -93,7 +95,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(context.Compilation, Is.SameAs(compilation));
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-        var irReturns = lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().ToArray();
+        var irReturns = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().ToArray();
         Assert.That(irReturns, Is.Not.Empty);
         Assert.That(irReturns.All(instruction => instruction.Value == null), Is.True);
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>());

@@ -66,16 +66,16 @@ public sealed class ActualNativeProjectionAdmissionTests
         var actualEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
-        var requires = target.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)
-            .Select((clause, ordinal) => (Label: "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                Id: clause.AssumptionId!)).ToDictionary(row => row.Label, row => row.Id, StringComparer.Ordinal);
+        var requires = target.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))
+            .Select((clause, ordinal) => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ((Label: "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Id: clause.AssumptionId!))).ToDictionary(row => row.Label, row => row.Id, StringComparer.Ordinal);
         var valid = TotalCallableVerifier.ProjectEntry(actualEntry, requires);
         Assert.That(valid.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(valid.Reason, Is.EqualTo(WorkerClaimReason.None));
         var actualBody = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualBody.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualBody.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(actualBody.Core.Any(label => label.StartsWith("input:disjoint:", StringComparison.Ordinal)), Is.True);
+        Assert.That(actualBody.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("input:disjoint:", StringComparison.Ordinal))), Is.True);
         // Wrong semantic family: reject the actual body proof rather than enrolling it as an entry proof.
         var rejected = TotalCallableVerifier.ProjectEntry(actualBody, requires);
         Assert.That(rejected.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
@@ -102,7 +102,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         {
             TotalCallableClaimCheck? actual = null;
             await TotalCallableVerifier.VerifyAsync(target, project.Request.Budgets,
-                check => actual = check, TestContext.CurrentContext.CancellationToken);
+                check => { System.ArgumentNullException.ThrowIfNull(check); actual = check; }, TestContext.CurrentContext.CancellationToken);
             Assert.That(actual, Is.Not.Null);
             Assert.That(actual!.Checked, Is.True);
             Assert.That(actual.Enrolled, Is.True);
@@ -122,6 +122,8 @@ public sealed class ActualNativeProjectionAdmissionTests
 
     private static ShadowTestProject CreateProject(string source, string assemblyName)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(assemblyName, ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -134,6 +136,8 @@ public sealed class ActualNativeProjectionAdmissionTests
 
     private static void ValidateRoundTrip(ShadowTestProject project, WorkerClaimResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
+        System.ArgumentNullException.ThrowIfNull(result);
         var target = project.Snapshot.Callables.Single();
         var reason = WorkerResultAssembler.ProjectCallableReasons([result]).Reason;
         var callable = new WorkerCallableResult
@@ -147,7 +151,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var response = WorkerResultAssembler.Create(project.Bind().InputHash, project.Snapshot.CompilerManifest.Manifest,
             status, failure, [callable], [result], project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var json = WorkerProtocolJson.SerializeResponse(response);
         var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
             ?? throw new AssertionException("The canonical response did not deserialize.");

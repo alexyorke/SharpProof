@@ -10,8 +10,8 @@ public sealed class InvalidOperationExceptionConstructorSpecTests
     public void ParameterlessConstructorIncludesResourceLookupEffects()
     {
         var template = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier ==
-                "bcl.invalid-operation-exception.ctor");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier ==
+                "bcl.invalid-operation-exception.ctor"));
 
         using (Assert.EnterMultipleScope())
         {

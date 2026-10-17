@@ -16,6 +16,7 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
 
     internal SharpProofAnalyzer(IAnalyzerSessionFactory sessionFactory)
     {
+        sessionFactory = RepositoryParameterGuard.NotNull(sessionFactory, nameof(sessionFactory));
         _engine = new SharpProofAnalyzerEngine(sessionFactory);
     }
 

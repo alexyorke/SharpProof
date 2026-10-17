@@ -35,6 +35,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
     [TestCase("UShort", (ushort)32768, -1, false, 1)]
     public void VisualBasicShiftMatchesEmittedRuntime(string storageType, object input, int count, bool leftShift, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(storageType);
         ArgumentNullException.ThrowIfNull(input);
         var source = "Public Class Subject\nPublic Shared Function Target(value As " + storageType + ", count As Integer) As " + storageType +
             "\nvalue " + (leftShift ? "<<=" : ">>=") + " count\nReturn value\nEnd Function\nEnd Class";
@@ -66,6 +67,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
     [TestCase("ushort", (ushort)32768, 16, 0)]
     public void CSharpKeepsPromotedMaskAndCheckedStorage(string storageType, object boundary, int width, int wrapped)
     {
+        System.ArgumentNullException.ThrowIfNull(storageType);
         ArgumentNullException.ThrowIfNull(boundary);
         foreach (var isChecked in new[] { false, true })
         {
@@ -88,7 +90,10 @@ public sealed class VisualBasicNarrowCompoundShiftTests
     private static void AssertRuntimeAndReplay(Compilation compilation, ControlFlowGraph graph, object input,
         int count, int expected, bool overflow)
     {
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(graph);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -122,9 +127,9 @@ public sealed class VisualBasicNarrowCompoundShiftTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = context.Parameters.ToDictionary(binding => binding.Entry,
-            binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
-                binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count));
+        var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
+                binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count)));
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, environment);
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (overflow)

@@ -15,6 +15,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
     [TestCase("struct")]
     public async Task ExplicitStaticImplementationPreservesCensusAndNativeEffect(string ownerKind)
     {
+        System.ArgumentNullException.ThrowIfNull(ownerKind);
         var source = $$"""
             using SharpProof.Attributes;
             public interface IStaticRoot { static abstract int Root(int value); }
@@ -46,7 +47,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = await tree.GetRootAsync();
         var declaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(node => node.ExplicitInterfaceSpecifier != null);
+            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.ExplicitInterfaceSpecifier != null));
         var model = compilation.GetSemanticModel(tree);
         var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         Assert.That(method.IsStatic, Is.True);
@@ -60,11 +61,11 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
 
         var builder = new ClaimManifestBuilder(compilation);
         var inventory = builder.BuildPotentialCallShadow();
-        var gap = inventory.Gaps.Single(candidate => candidate.Start == declaration.SpanStart);
+        var gap = inventory.Gaps.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Start == declaration.SpanStart));
         Assert.That(gap.Reason, Is.EqualTo("UnsupportedOwner"));
         Assert.That(gap.TreeOrdinal, Is.Zero);
         Assert.That(gap.Length, Is.EqualTo(declaration.Span.Length));
-        Assert.That(inventory.Owners.Any(owner => SymbolEqualityComparer.Default.Equals(owner.Method, method)), Is.False);
+        Assert.That(inventory.Owners.Any(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (SymbolEqualityComparer.Default.Equals(owner.Method, method))), Is.False);
         Assert.That(inventory.Owners.Single().Method.Name, Is.EqualTo("Run"));
         var discovery = builder.Build();
         var target = discovery.Targets.Single().Value;

@@ -37,6 +37,7 @@ public sealed class PortableTotalExecutionTests
     [TestCase("length")]
     public void MissingSemanticWireFieldsFailClosed(string field)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         var json = JsonSerializer.SerializeToNode(CreateGraph(), WorkerProtocolJson.SharedOptions)!;
         var row = field switch
         {
@@ -63,9 +64,10 @@ public sealed class PortableTotalExecutionTests
     [TestCase("throw-target")]
     public void MalformedSemanticMetadataIsRejected(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var graph = CreateGraph();
-        var instructions = graph.Blocks.SelectMany(block => block.Instructions).ToArray();
-        var span = graph.Operations.Single(operation => operation.SourceSpan != null).SourceSpan!;
+        var instructions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var span = graph.Operations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!;
         switch (mutation)
         {
             case "mode":
@@ -75,7 +77,7 @@ public sealed class PortableTotalExecutionTests
                 instructions[0].Origin = (IrHavocOrigin)99;
                 break;
             case "unused-origin":
-                instructions.Single(row => row.Kind == IrInstructionKind.Throw).Origin = IrHavocOrigin.Input;
+                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).Origin = IrHavocOrigin.Input;
                 break;
             case "span-start":
                 span.Start = -1;
@@ -90,10 +92,10 @@ public sealed class PortableTotalExecutionTests
                 span.Document = " ";
                 break;
             case "throw-kind":
-                instructions.Single(row => row.Kind == IrInstructionKind.Throw).A = 99;
+                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).A = 99;
                 break;
             case "throw-target":
-                instructions.Single(row => row.Kind == IrInstructionKind.Throw).B = 99;
+                instructions.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Throw)).B = 99;
                 break;
         }
         Assert.Throws<InvalidDataException>((Action)(() =>

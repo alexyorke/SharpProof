@@ -45,7 +45,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         var bound = new ContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
-        Assert.That(bound.Clauses.All(clause => clause.Evidence == BoundContractEvidence.ClosedAttribute), Is.True);
+        Assert.That(bound.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)), Is.True);
         var entry = context.Parameters[0].Entry;
         var result = context.Result!.Value;
         var type = factory.GetVariableInfo(entry).Type;
@@ -105,9 +105,9 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                 }
                 if (legacy.IsSuccess)
                 {
-                    var legacyValues = legacy.Contracts!.Variables.Where(variable => variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result)
-                        .ToDictionary(variable => variable.Variable, variable => legacyFactory.CreateIntegerValue(
-                            legacyFactory.GetVariableInfo(variable.Variable).Type, (long)value));
+                    var legacyValues = legacy.Contracts!.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result))
+                        .ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable), variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (legacyFactory.CreateIntegerValue(
+                            legacyFactory.GetVariableInfo(variable.Variable).Type, (long)value)));
                     Assert.That(legacy.Contracts.Clauses, Has.Length.EqualTo(2));
                     foreach (var clause in legacy.Contracts.Clauses)
                     {
@@ -172,6 +172,8 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
 
     private static CSharpCompilation CreateCompilation(string typeName, string attribute)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var compilation = TestCompilation.Create("ClosedAttributeBoundaryMatrix", $$"""
             #nullable enable
             using SharpProof.Attributes;
@@ -189,6 +191,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
 
     private static IMethodSymbol GetTarget(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var operation = compilation.GetSemanticModel(tree).GetOperation(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single());
         Assert.That(operation, Is.InstanceOf<IInvocationOperation>());
@@ -202,6 +205,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
 
     private static MemoryStream Emit(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         image.Position = 0;
@@ -210,6 +214,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
 
     private static object RuntimeValue(string typeName, BigInteger value)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         return typeName switch
         {
             "sbyte" => (sbyte)value,

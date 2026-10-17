@@ -43,9 +43,10 @@ if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
     $existingReport = Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File `
         -ErrorAction Stop |
+        Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
         Select-Object -First 1
     if ($null -ne $existingReport) {
         throw (
@@ -157,7 +158,8 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
             -TimeoutSeconds $TimeoutSeconds `
             -TestFilter $broadFilter `
             -CoverageSettings $managedSettings `
-            -CoverageResultsDirectory $semanticResults
+            -CoverageResultsDirectory $semanticResults `
+            -AttributesCollectedSeparately
         if ($LASTEXITCODE -ne 0) {
             throw (
                 'Sharded semantic coverage failed with exit code ' +
@@ -295,9 +297,10 @@ $coverageReports = @(
     Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File `
-        -ErrorAction Stop)
+        -ErrorAction Stop |
+        Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json

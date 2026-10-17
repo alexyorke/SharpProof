@@ -27,6 +27,7 @@ internal static partial class ApiSpecTermValidator
     {
         // Digests and instantiation expand shared subtrees. Bound that work
         // before either traversal, without changing the digest representation.
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         var measured = new Dictionary<SpecTermDeclaration, (int Height, int Nodes)>(
             DeclarationReferenceComparer.Instance);
         _ = Measure(declaration, 1);
@@ -79,6 +80,7 @@ internal static partial class ApiSpecTermValidator
 
             void Include(SpecTermDeclaration child)
             {
+                child = RepositoryParameterGuard.NotNull(child, nameof(child));
                 var size = Measure(child, depth + 1);
                 height = Math.Max(height, size.Height + 1);
                 nodes = Math.Min(MaximumExpandedExpressionNodes + 1, nodes + size.Nodes);
@@ -95,7 +97,7 @@ internal static partial class ApiSpecTermValidator
             bool allowResult)
         {
             private readonly Dictionary<SpecTermDeclaration, TermFacts> _validated =
-                new(DeclarationReferenceComparer.Instance);
+                (validatedTerms is null ? throw new System.ArgumentNullException(nameof(validatedTerms)) : (facets is null ? throw new System.ArgumentNullException(nameof(facets)) : (variables is null ? throw new System.ArgumentNullException(nameof(variables)) : new(DeclarationReferenceComparer.Instance))));
 
             internal TermFacts Validate(SpecTermDeclaration declaration, int depth)
             {
@@ -397,6 +399,7 @@ internal static partial class ApiSpecTermValidator
 
         public int GetHashCode(SpecTermDeclaration declaration)
         {
+            declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
             return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
                 declaration);
         }

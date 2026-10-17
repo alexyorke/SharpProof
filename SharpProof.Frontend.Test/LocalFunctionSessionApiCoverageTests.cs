@@ -38,6 +38,7 @@ public sealed class LocalFunctionSessionApiCoverageTests
         var preparations = 0;
         bool PrepareCallee(TotalLoweringContext candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             preparations++;
             Assert.That(captures, Is.False);
             Assert.That(localGraph, Is.Not.Null);

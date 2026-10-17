@@ -10,6 +10,7 @@ public sealed partial class WorkerTests
     public async Task InstanceDelegateConstructionPreservesDeclaredExceptionBoundary(
         string allowedException, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(allowedException);
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
             public class Receiver { public void Sink() { } }

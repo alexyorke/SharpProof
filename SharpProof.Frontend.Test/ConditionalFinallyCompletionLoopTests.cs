@@ -31,9 +31,9 @@ public sealed class ConditionalFinallyCompletionLoopTests
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var loop = subject.Graph.OriginalOperation.Descendants().OfType<IWhileLoopOperation>().Single();
         Assert.That(loop.ConditionIsTop, Is.False);
-        var completion = subject.Graph.Blocks.Single(block => block.IsReachable &&
+        var completion = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
             block.ConditionKind != ControlFlowConditionKind.None &&
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling);
+            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling));
         Assert.That(completion.EnclosingRegion.Kind, Is.EqualTo(ControlFlowRegionKind.Finally));
         var fall = completion.FallThroughSuccessor!;
         Assert.That(fall.Source, Is.SameAs(completion));

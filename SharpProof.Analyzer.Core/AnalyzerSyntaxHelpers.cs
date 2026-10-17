@@ -4,8 +4,7 @@ internal static class AnalyzerSyntaxHelpers
 {
     internal static Location GetCallableDeclarationLocation(SyntaxNode node)
     {
-        if (node is null)
-        { throw new System.ArgumentNullException(nameof(node)); }
+        node = RepositoryParameterGuard.NotNull(node, nameof(node));
 
         return node switch
         {
@@ -30,8 +29,7 @@ internal static class AnalyzerSyntaxHelpers
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        if (method is null)
-        { throw new System.ArgumentNullException(nameof(method)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
 
         var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
         return reference == null

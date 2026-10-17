@@ -32,10 +32,10 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     private static readonly ImmutableArray<string> ShadowAliases = ["Shadow"];
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(code => unchecked((ushort)code.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string NamespaceProducerSource = """
         namespace System.Diagnostics
@@ -135,6 +135,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     [TestCase("mixed-all-absent")]
     public async Task ConditionalCallEmissionMatchesNativeDoesNotThrow(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var settings = Settings(scenario);
         var producerSource = settings.Nested ? NestedProducerSource : NamespaceProducerSource;
         var source = settings.Mixed ? MixedConsumerSource : settings.Official ? OfficialConsumerSource : AliasConsumerSource;
@@ -172,13 +173,13 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             [tree], TestMetadataReferences.WithSharpProof.Add(shadow), producer.Options);
         var diagnostics = compilation.GetDiagnostics();
         await Save(directory, "caller-diagnostics.json", Diagnostics(diagnostics));
-        Assert.That(diagnostics.Where(item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(diagnostics.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var targetSyntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var logSyntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Log");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Log"));
         var target = (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!;
         var log = (IMethodSymbol)model.GetDeclaredSymbol(logSyntax)!;
         var discovery = new ClaimManifestBuilder(compilation).Build();
@@ -208,20 +209,35 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         MethodDeclarationSyntax logSyntax, IMethodSymbol target, IMethodSymbol log, ClaimManifestBuildResult discovery,
         PeObservation producerPe)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(discovery);
+        System.ArgumentNullException.ThrowIfNull(log);
+        System.ArgumentNullException.ThrowIfNull(logSyntax);
+        System.ArgumentNullException.ThrowIfNull(model);
+        System.ArgumentNullException.ThrowIfNull(producerPe);
+        System.ArgumentNullException.ThrowIfNull(producerSource);
+        System.ArgumentNullException.ThrowIfNull(root);
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(settings);
+        System.ArgumentNullException.ThrowIfNull(shadow);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(target);
+        System.ArgumentNullException.ThrowIfNull(targetSyntax);
         var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(shadow)!;
         var privateType = assembly.GetTypeByMetadataName(settings.Nested
             ? "System.Diagnostics+ConditionalAttribute" : "System.Diagnostics.ConditionalAttribute")!;
         var officialType = compilation.GetTypeByMetadataName("System.Diagnostics.ConditionalAttribute")!;
         var attributes = log.GetAttributes();
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(call => call.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" });
+            .Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" }));
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var assignment = (ISimpleAssignmentOperation)invocation.Arguments.Single().Value;
         var parameter = (IParameterReferenceOperation)assignment.Target;
         var requires = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" }).ToArray();
+            .Where(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" })).ToArray();
         var selected = discovery.Targets.Values.Single();
-        var attributeObservations = attributes.Select(attribute => new
+        var attributeObservations = attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
         {
             Type = attribute.AttributeClass!.ToDisplayString(),
             Assembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
@@ -230,7 +246,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Argument = (string)attribute.ConstructorArguments.Single().Value!,
             IsPrivate = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, privateType),
             IsOfficial = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType)
-        }).ToArray();
+        })).ToArray();
         await Save(directory, "source-and-compiler.json", new
         {
             Scenario = scenario,
@@ -274,17 +290,17 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.Parameter, target.Parameters.Single()), Is.True);
         Assert.That(assignment.Value.ConstantValue.Value, Is.EqualTo(settings.Mixed ? 0 : 1));
         Assert.That(attributes.Length, Is.EqualTo(settings.Mixed ? 2 : 1));
-        Assert.That(attributeObservations.Count(item => item.IsPrivate), Is.EqualTo(settings.Official ? 0 : 1));
-        Assert.That(attributeObservations.Count(item => item.IsOfficial), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
-        Assert.That(attributeObservations.All(item => item.IsPrivate || item.IsOfficial), Is.True);
+        Assert.That(attributeObservations.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate)), Is.EqualTo(settings.Official ? 0 : 1));
+        Assert.That(attributeObservations.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsOfficial)), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
+        Assert.That(attributeObservations.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate || item.IsOfficial)), Is.True);
         foreach (var attribute in attributes)
         {
             Assert.That(attribute.AttributeConstructor!.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_String));
             Assert.That(attribute.ConstructorArguments.Single().Kind, Is.EqualTo(TypedConstantKind.Primitive));
         }
-        Assert.That(attributeObservations.Where(item => item.IsPrivate).Select(item => item.Argument),
+        Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
             Is.EqualTo(settings.Official ? Array.Empty<string>() : new[] { settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT" }));
-        Assert.That(attributeObservations.Where(item => item.IsOfficial).Select(item => item.Argument),
+        Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsOfficial)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
             Is.EqualTo(settings.Official || settings.Mixed ? new[] { settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT" }
                 : Array.Empty<string>()));
         Assert.That(target.IsStatic && target.Parameters.Single().RefKind == RefKind.None, Is.True);
@@ -313,7 +329,14 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     private static async Task ObserveNative(string directory, string scenario, string source, string producerSource,
         CaseSettings settings, bool throws, CompilerManifestArtifact artifact, PeObservation producerPe, PeObservation callerPe)
     {
-        var capturedReference = artifact.Compilation.References.Single(reference => reference.Aliases.Contains("Shadow"));
+        System.ArgumentNullException.ThrowIfNull(callerPe);
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(producerPe);
+        System.ArgumentNullException.ThrowIfNull(producerSource);
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(settings);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var capturedReference = artifact.Compilation.References.Single(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Aliases.Contains("Shadow")));
         var capturedModule = capturedReference.Modules.Single();
         await Save(directory, "original-reference-capture.json", new
         {
@@ -349,7 +372,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             TotalPresent = captured.Total != null,
             TotalIsBodyAbstraction = captured.Total?.IsBodyAbstraction,
             PreparedTotalPresent = preparation.Total != null,
-            Clauses = captured.Total?.Clauses.Select(clause => clause.Kind.ToString())
+            Clauses = captured.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString()))
         });
         var budgets = project.Request.Budgets;
         var enrolled = PassiveCallableArtifactAdapter.Enroll(preparation);
@@ -416,7 +439,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             DirectReason = native.Reason.ToString(),
             DirectQueryCompleted = native.QueryCompleted,
             DirectCore = native.Core,
-            DirectBodyAssumptions = native.BodyAssumptions.Select(operation => operation.ToString()),
+            DirectBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())),
             native.HasFeasibleEntryWitness,
             AllocationWitness = native.AllocationWitness?.ToString(),
             WriteWitness = native.WriteWitness?.ToString(),
@@ -467,7 +490,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(manifestClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
         Assert.That(preparation.Total.ValidEffectClaimIds, Does.Contain(manifestClaim.ClaimId));
         Assert.That(preparation.Total.ExceptionConstraints.Single().AllowedKinds, Is.Empty);
-        Assert.That(captured.Total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Requires),
+        Assert.That(captured.Total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)),
             Is.EqualTo(settings.Mixed ? 1 : 0));
         Assert.That(artifact.Manifest.Callables.Single().Assumptions.Length, Is.EqualTo(settings.Mixed ? 1 : 0));
         Assert.That(project.Request.Cache.Enabled, Is.False);
@@ -537,6 +560,13 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     private static async Task ObserveClr(string directory, byte[] producerBytes, byte[] callerBytes,
         PeObservation producerPe, PeObservation callerPe, CaseSettings settings, bool retained, bool throws, int[] inputs)
     {
+        System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        System.ArgumentNullException.ThrowIfNull(callerPe);
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(producerPe);
+        System.ArgumentNullException.ThrowIfNull(settings);
         var context = new AssemblyLoadContext("ConditionalOracle_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -550,7 +580,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, callerBytes);
-            var attributes = logMethod.GetCustomAttributesData().Select(attribute => new
+            var attributes = logMethod.GetCustomAttributesData().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
             {
                 Type = attribute.AttributeType.FullName,
                 Assembly = attribute.AttributeType.Assembly.GetName().Name,
@@ -559,7 +589,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 Argument = (string)attribute.ConstructorArguments.Single().Value!,
                 IsPrivate = attribute.AttributeType.Assembly == producerAssembly,
                 IsOfficial = attribute.AttributeType == typeof(System.Diagnostics.ConditionalAttribute)
-            }).ToArray();
+            })).ToArray();
             await Save(directory, "decoded-il.json", new
             {
                 Target = targetIl,
@@ -589,9 +619,9 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Assert.That(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic |
                 BindingFlags.Static | BindingFlags.Instance), Is.Empty);
             Assert.That(logIl.Instructions.Single().OpCode, Is.EqualTo("ret"));
-            var calls = targetIl.Instructions.Where(instruction => instruction.OpCode is "call" or "callvirt").ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction.OpCode is "starg" or "starg.s").ToArray();
-            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction.OpCode == "div");
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
+            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
             Assert.That(calls.Length, Is.EqualTo(retained ? 1 : 0), "Requires is absent from the emitted caller.");
             Assert.That(stores.Length, Is.EqualTo(retained ? 1 : 0));
             if (retained)
@@ -605,18 +635,18 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 Assert.That(store.Offset, Is.LessThan(call.Offset));
                 Assert.That(call.Offset, Is.LessThan(divisionInstruction.Offset));
                 Assert.That(targetIl.Instructions.Count(instruction =>
-                    instruction.OpCode == (settings.Mixed ? "ldc.i4.0" : "ldc.i4.1")), Is.EqualTo(1));
+                    instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == (settings.Mixed ? "ldc.i4.0" : "ldc.i4.1"))), Is.EqualTo(1));
             }
             Assert.That(attributes.Length, Is.EqualTo(settings.Mixed ? 2 : 1));
-            Assert.That(attributes.Count(attribute => attribute.IsPrivate), Is.EqualTo(settings.Official ? 0 : 1));
-            Assert.That(attributes.Count(attribute => attribute.IsOfficial), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
-            Assert.That(attributes.All(attribute => attribute.IsPrivate || attribute.IsOfficial), Is.True);
-            foreach (var attribute in attributes.Where(attribute => attribute.IsPrivate))
+            Assert.That(attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate)), Is.EqualTo(settings.Official ? 0 : 1));
+            Assert.That(attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsOfficial)), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
+            Assert.That(attributes.All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate || attribute.IsOfficial)), Is.True);
+            foreach (var attribute in attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate)))
             {
                 Assert.That(attribute.Mvid, Is.EqualTo(producerPe.Mvid));
                 Assert.That(attribute.Argument, Is.EqualTo(settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT"));
             }
-            foreach (var attribute in attributes.Where(attribute => attribute.IsOfficial))
+            foreach (var attribute in attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsOfficial)))
             {
                 Assert.That(attribute.Argument, Is.EqualTo(settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT"));
             }
@@ -628,9 +658,9 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 ExpectedThrows = throws,
                 HasValidPrecondition = !settings.Mixed || inputs.All(input => input == 1)
             });
-            Assert.That(observations.Select(observation => observation.ExceptionType),
+            Assert.That(observations.Select(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.ExceptionType)),
                 Is.All.EqualTo(throws ? typeof(DivideByZeroException).FullName : null));
-            Assert.That(observations.Select(observation => observation.Returned), Is.All.EqualTo(throws ? (int?)null : 10));
+            Assert.That(observations.Select(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.Returned)), Is.All.EqualTo(throws ? (int?)null : 10));
             Assert.That(!settings.Mixed || inputs.All(input => input == 1), Is.True);
         }
         finally
@@ -641,6 +671,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
 
     private static ClrObservation Invoke(Func<int, int> target, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         try
         {
             return new(input, target(input), null);
@@ -653,6 +684,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
 
     private static PeObservation DescribePe(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -662,6 +694,8 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
 
     private static IlObservation DecodeIl(MethodInfo method, byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        System.ArgumentNullException.ThrowIfNull(method);
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -707,24 +741,29 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
 
     private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
-        return diagnostics.Select(diagnostic => (object)new
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
         {
             diagnostic.Id,
             Severity = diagnostic.Severity.ToString(),
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        }).ToArray();
+        })).ToArray();
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name),
             JsonSerializer.Serialize(value, WorkerProtocolJson.SharedOptions) + "\n");
     }
 
     private static string Hash(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 
@@ -744,11 +783,26 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     }
 
     private sealed record CaseSettings(bool Official, bool Present, bool Nested, bool Mixed);
-    private sealed record PeObservation(string Sha256, int Bytes, string AssemblyName, Guid Mvid);
+    private sealed record PeObservation(string Sha256, int Bytes, string AssemblyName, Guid Mvid)
+    {
+        public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
+        public string AssemblyName { get; init; } = AssemblyName ?? throw new System.ArgumentNullException(nameof(AssemblyName));
+    }
     private sealed record IlInstruction(int Offset, string OpCode, string RawOperand,
-        int? Token, string? ResolvedMethod, Guid? ResolvedMvid);
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string RawIl, List<IlInstruction> Instructions);
+        int? Token, string? ResolvedMethod, Guid? ResolvedMvid)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
+    }
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string RawIl, List<IlInstruction> Instructions)
+    {
+        public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
+        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+    }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
     private sealed record ReplayObservation(string Status, bool ConsumedApproximation,
-        string? Kind, string? Site, IrSourceSpan? SourceSpan, bool IsIrThrowInstruction);
+        string? Kind, string? Site, IrSourceSpan? SourceSpan, bool IsIrThrowInstruction)
+    {
+        public string Status { get; init; } = Status ?? throw new System.ArgumentNullException(nameof(Status));
+    }
 }

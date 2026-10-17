@@ -49,6 +49,7 @@ public sealed class OrdinarySummaryThrowAfterWriteReportTests
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
@@ -58,7 +59,7 @@ public sealed class OrdinarySummaryThrowAfterWriteReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
-        var probeTree = compilation.SyntaxTrees.Single(tree => tree.FilePath == file.Path);
+        var probeTree = compilation.SyntaxTrees.Single(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath == file.Path));
         var probeRoot = await probeTree.GetRootAsync();
         var instrumented = probeRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         Assert.That(instrumented.AttributeLists, Has.Count.EqualTo(2));
@@ -69,7 +70,7 @@ public sealed class OrdinarySummaryThrowAfterWriteReportTests
         Assert.That(OpenSourceCorpusRunner.CorpusMethodId(restored), Is.EqualTo("sample"));
         compilation = compilation.ReplaceSyntaxTree(probeTree, probeTree.WithRootAndOptions(
             probeRoot.ReplaceNode(instrumented, restored), probeTree.Options));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

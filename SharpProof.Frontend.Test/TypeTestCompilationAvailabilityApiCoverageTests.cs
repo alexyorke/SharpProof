@@ -17,7 +17,7 @@ public sealed class TypeTestCompilationAvailabilityApiCoverageTests
         Assert.That(subject.Invoke([17]), Is.True);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(syntax => syntax.Identifier.ValueText == "Helper");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Helper"));
         var operation = subject.Compilation.GetSemanticModel(tree)
             .GetOperation(method.ExpressionBody!.Expression);
         Assert.That(operation, Is.AssignableTo<IIsTypeOperation>());

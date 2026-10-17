@@ -221,10 +221,10 @@ public sealed class IrProgramTests
         int[] expectedIds = [0, 1, 2, 3, 4];
 
         Assert.That(
-            instructions.Select(static instruction => instruction.Kind),
+            instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)),
             Is.EqualTo(expectedKinds));
         Assert.That(
-            instructions.Select(static instruction => instruction.Id.Value),
+            instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id.Value)),
             Is.EqualTo(expectedIds));
         Assert.That(
             ((IrLoadInstruction)instructions[1]).Location.Type,
@@ -258,18 +258,18 @@ public sealed class IrProgramTests
         Assert.That(first.Entry, Is.Not.EqualTo(second.Entry));
         Assert.That(first.Entry.Value, Is.EqualTo(second.Entry.Value));
         Assert.That(
-            first.Blocks.Select(static block => block.Id.Value),
-            Is.EqualTo(second.Blocks.Select(static block => block.Id.Value)));
+            first.Blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value)),
+            Is.EqualTo(second.Blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))));
         Assert.That(
             first.Blocks
-                .SelectMany(static block => block.Instructions)
+                .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .Select(static instruction =>
-                    (instruction.Id.Value, instruction.Kind)),
+                    instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id.Value, instruction.Kind))),
             Is.EqualTo(
                 second.Blocks
-                    .SelectMany(static block => block.Instructions)
+                    .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                     .Select(static instruction =>
-                        (instruction.Id.Value, instruction.Kind))));
+                        instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id.Value, instruction.Kind)))));
         Assert.Throws<ArgumentException>(
             (Action)(() => first.GetBlock(second.Entry)));
     }
@@ -488,6 +488,16 @@ public sealed class IrProgramTests
         AssertOperandEvaluatedBeforeNullReceiver(
             (factory, builder, entry, resultVariable) =>
             {
+                if (entry.IsDefault)
+                {
+                    throw new System.ArgumentOutOfRangeException(nameof(entry));
+                }
+                if (resultVariable.IsDefault)
+                {
+                    throw new System.ArgumentOutOfRangeException(nameof(resultVariable));
+                }
+                System.ArgumentNullException.ThrowIfNull(builder);
+                System.ArgumentNullException.ThrowIfNull(factory);
                 var receiverType = factory.GetOrCreateReferenceType(
                     factory.CreateIdentity(),
                     "Box");
@@ -514,6 +524,16 @@ public sealed class IrProgramTests
         AssertOperandEvaluatedBeforeNullReceiver(
             (factory, builder, entry, resultVariable) =>
             {
+                if (entry.IsDefault)
+                {
+                    throw new System.ArgumentOutOfRangeException(nameof(entry));
+                }
+                if (resultVariable.IsDefault)
+                {
+                    throw new System.ArgumentOutOfRangeException(nameof(resultVariable));
+                }
+                System.ArgumentNullException.ThrowIfNull(builder);
+                System.ArgumentNullException.ThrowIfNull(factory);
                 var sequenceType =
                     factory.GetOrCreateSequenceType(factory.IntegerType);
                 return builder.Load(
@@ -580,6 +600,14 @@ public sealed class IrProgramTests
         string returnOperation,
         IrTerm value)
     {
+        if (sequence.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(sequence));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(returnOperation);
+        System.ArgumentNullException.ThrowIfNull(storeOperation);
+        System.ArgumentNullException.ThrowIfNull(value);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var store = builder.Store(
@@ -611,6 +639,7 @@ public sealed class IrProgramTests
     private static void AssertOperandEvaluatedBeforeNullReceiver(
         Func<IrFactory, IrProgramBuilder, IrBlockId, IrVarId, IrInstruction> append)
     {
+        System.ArgumentNullException.ThrowIfNull(append);
         var factory = new IrFactory();
         var resultVariable =
             factory.CreateVariable("result", factory.IntegerType);
@@ -648,6 +677,7 @@ public sealed class IrProgramTests
 
     private static IrTerm DivisionByZero(IrFactory factory)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         return factory.Binary(
             IrBinaryOperator.Divide,
             factory.Integer(1),

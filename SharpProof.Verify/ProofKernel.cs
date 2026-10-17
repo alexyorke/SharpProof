@@ -8,12 +8,14 @@ public sealed class ProofKernel(ISmtBackend backend)
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken)
     {
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         return VerifyCoreAsync(query, null, cancellationToken);
     }
 
     public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
         CallableReplayContext replayContext, CancellationToken cancellationToken)
     {
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         return VerifyCoreAsync(query, ArgumentNullGuard.NotNull(replayContext, nameof(replayContext)), cancellationToken);
     }
 
@@ -167,8 +169,8 @@ public sealed class ProofKernel(ISmtBackend backend)
         CancellationToken cancellationToken)
     {
         if (assignments.Count != query.ModelVariables.Length ||
-            query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)) ||
-            assignments.Keys.Any(key => !query.ModelVariables.Contains(key)))
+            query.ModelVariables.Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!assignments.ContainsKey(variable))) ||
+            assignments.Keys.Any(key => key.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(key)) : (!query.ModelVariables.Contains(key))))
         {
             return false;
         }
@@ -200,6 +202,7 @@ public sealed class ProofKernel(ISmtBackend backend)
 
         bool IsReferenceDomain(IrTypeId type)
         {
+            RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
             var info = query.Factory.GetTypeInfo(type);
             return info.Kind == IrTypeKind.Sequence && info.ElementType is { } element
                 ? element == query.Factory.BooleanType || element == query.Factory.StringType ||
@@ -210,6 +213,7 @@ public sealed class ProofKernel(ISmtBackend backend)
 
     private static bool IsBoolean(IrEvaluationResult result, bool expected)
     {
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status == IrEvaluationStatus.Value &&
         result.Value is { Kind: IrValueKind.Boolean } value &&
         value.Boolean == expected;

@@ -24,7 +24,7 @@ public sealed class InitializerIntrinsicAnalyzerPolicyControlAuditTests
             }
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
@@ -44,7 +44,7 @@ public sealed class InitializerIntrinsicAnalyzerPolicyControlAuditTests
             }
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         AnalyzerTestHost.AssertIds(diagnostics);
     }

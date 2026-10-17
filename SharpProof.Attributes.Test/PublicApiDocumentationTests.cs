@@ -133,17 +133,19 @@ internal sealed class PublicApiDocumentationTests
             : "(" + string.Join(
                 ",",
                 parameters.Select(static parameter =>
-                    GetParameterTypeName(parameter.ParameterType))) + ")";
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (GetParameterTypeName(parameter.ParameterType)))) + ")";
         return "M:" + GetTypeName(declaringType) + "." + name + parameterList;
     }
 
     private static string GetTypeName(Type type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         return (type.FullName ?? type.Name).Replace('+', '.');
     }
 
     private static string GetParameterTypeName(Type type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         return type.IsArray
             ? GetParameterTypeName(type.GetElementType()!) + "[]"
             : type.IsGenericParameter
@@ -154,6 +156,7 @@ internal sealed class PublicApiDocumentationTests
 
     private static ParameterInfo[] GetParameters(MemberInfo member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         return member is MethodBase method ? method.GetParameters() : [];
     }
 
@@ -163,13 +166,17 @@ internal sealed class PublicApiDocumentationTests
         string name,
         string id)
     {
+        System.ArgumentNullException.ThrowIfNull(elementName);
+        System.ArgumentNullException.ThrowIfNull(id);
+        System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(name);
         Assert.That(
             member.Elements(elementName).Any(element =>
-                string.Equals(
+                element is null ? throw new System.ArgumentNullException(nameof(element)) : (string.Equals(
                     (string?)element.Attribute("name"),
                     name,
                     StringComparison.Ordinal) &&
-                !string.IsNullOrWhiteSpace(element.Value)),
+                !string.IsNullOrWhiteSpace(element.Value))),
             Is.True,
             id + " must document " + elementName + " '" + name + "'.");
     }

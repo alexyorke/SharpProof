@@ -60,6 +60,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool HasLayoutQualifier(INamedTypeSymbol type)
     {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var interop = type.ContainingSymbol;
         var runtime = interop.ContainingSymbol;
         var system = runtime?.ContainingSymbol;
@@ -69,6 +70,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool HasSynchronizedEntry(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return (method.MethodImplementationFlags & System.Reflection.MethodImplAttributes.Synchronized) != 0;
     }
 
@@ -76,13 +78,15 @@ internal static partial class CSharpOperationSemantics
     // this subset, so no subsequent value can depend on omitted heap state.
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
     {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
         return HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
             (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
             // An instance store never runs type initialization; a compiler-
             // generated static constructor only runs static field initializers.
             (field.ContainingType.StaticConstructors.Length == 0 ||
-                !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
+                !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.IsImplicitlyDeclared)));
     }
 
     // An instance field read runs no code; its only fault is a null receiver.
@@ -91,12 +95,15 @@ internal static partial class CSharpOperationSemantics
     // field read is an approximation.
     internal static bool IsSupportedFieldRead(IFieldSymbol field)
     {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         return HasIndependentFieldStorage(field) && !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
             (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0 : field.ContainingType.IsReferenceType);
     }
 
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return FieldWrite(factory, value, receiver);
     }
 
@@ -120,7 +127,7 @@ internal static partial class CSharpOperationSemantics
             setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
         { return null; }
         return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
-            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+            .FirstOrDefault(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)));
     }
 
     internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
@@ -130,7 +137,7 @@ internal static partial class CSharpOperationSemantics
             !property.IsStatic && !property.ContainingType.IsReferenceType)
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
-            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+            .FirstOrDefault(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)));
         if (backing != null)
         { return IsSupportedFieldRead(backing) ? backing : null; }
         if (getter.DeclaringSyntaxReferences.Length != 1)
@@ -162,6 +169,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule FieldWrite(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return receiver == null ? Exact(value) : new(value,
             [new(IrExceptionKind.NullReference,
                 factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],

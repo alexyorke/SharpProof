@@ -66,6 +66,7 @@ public sealed class CanonicalHashWriterTests
     {
         static string Hash(string value)
         {
+            System.ArgumentNullException.ThrowIfNull(value);
             using var writer = new CanonicalHashWriter();
             return writer.Add(value).Finish();
         }
@@ -117,6 +118,7 @@ public sealed class CanonicalHashWriterTests
 
     private static void AssertStreamGrowthFails(byte[] initial)
     {
+        System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
         using var writer = new CanonicalHashWriter();
         using var stream = new GrowingStream(initial);
 
@@ -152,12 +154,14 @@ public sealed class CanonicalHashWriterTests
 
         internal GrowingStream(byte[] initial)
         {
+            System.ArgumentNullException.ThrowIfNull(initial, nameof(initial));
             Write(initial);
             Position = 0;
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer));
             if (!_grown)
             {
                 _grown = true;

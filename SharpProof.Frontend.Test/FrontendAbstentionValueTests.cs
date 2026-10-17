@@ -41,6 +41,7 @@ public sealed class FrontendAbstentionValueTests
         Action action,
         string? parameterName)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         var exception = Assert.Throws<ArgumentOutOfRangeException>(action);
         if (parameterName != null)
         {

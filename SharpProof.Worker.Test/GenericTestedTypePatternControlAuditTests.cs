@@ -55,6 +55,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
 
     private static async Task<PatternObservation> ObserveForm(string form, string evidenceDirectory)
     {
+        System.ArgumentNullException.ThrowIfNull(evidenceDirectory);
+        System.ArgumentNullException.ThrowIfNull(form);
         var source = SourceFor(form);
         var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
         Assert.That(sourceHash, Is.EqualTo(ExpectedSourceHash(form)), "Frozen pattern source changed.");
@@ -66,18 +68,18 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var model = compilation.GetSemanticModel(tree);
         var root = await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(node => node.Identifier.ValueText == "Target");
+            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target"));
         var expression = method.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!;
         var operation = model.GetOperation(expression);
         var graph = ControlFlowGraph.Create(method, model, TestContext.CurrentContext.CancellationToken)!;
-        var flowPatterns = graph.Blocks.Select(block => block.BranchValue).OfType<IIsPatternOperation>().ToArray();
+        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToArray();
         var expectedPattern = form == "discard-declaration" ? OperationKind.DeclarationPattern : OperationKind.TypePattern;
         await Save(evidenceDirectory, form + "-shape.json", new
         {
             SourceSha256 = sourceHash,
             ExpectedPattern = expectedPattern.ToString(),
             Operation = Shape(operation),
-            FlowBranches = graph.Blocks.Select(block => new { block.Ordinal, Shape = Shape(block.BranchValue) }).ToArray(),
+            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToArray(),
             Roslyn = typeof(IOperation).Assembly.GetName().Version!.ToString(),
             Role = "Compiler/CFG setup qualification; shape mismatch is not a product allocation red."
         });
@@ -104,8 +106,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
             var controlFlags = controlMethod.GetMethodImplementationFlags();
             var il = generic.GetMethodBody()!.GetILAsByteArray()!;
             var instructions = ReadIl(il);
-            var hasBox = instructions.Any(instruction => instruction.OpCode == "box");
-            var hasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst");
+            var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
+            var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
             await Save(evidenceDirectory, form + "-runtime.json", new
             {
                 SourceSha256 = sourceHash,
@@ -168,18 +170,18 @@ public sealed class GenericTestedTypePatternControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = discovery.Manifest.Claims.Select(claim => new
+            ManifestClaims = discovery.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            }).ToArray(),
+            })).ToArray(),
             Target = measured,
             Control = control,
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven. Zero measured allocation rejects this hypothesis for the tested form/runtime."
@@ -300,6 +302,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static CaseObservation Measure(string name, Func<int, bool> target, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(target);
         var actual = target(InputValue);
         for (var index = 0; index < WarmupCount; index++)
         {
@@ -320,10 +324,11 @@ public sealed class GenericTestedTypePatternControlAuditTests
 
     private static IlInstruction[] ReadIl(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field.FieldType == typeof(OpCode))
-            .Select(field => (OpCode)field.GetValue(null)!)
-            .ToDictionary(opcode => unchecked((ushort)opcode.Value));
+            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = new List<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
@@ -351,14 +356,28 @@ public sealed class GenericTestedTypePatternControlAuditTests
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record CaseObservation(string Name, bool Expected, bool Actual, int TrueResults,
-        long AllocatedBytes, double BytesPerCall);
+        long AllocatedBytes, double BytesPerCall)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+    }
 
-    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex);
+    private sealed record IlInstruction(int Offset, string OpCode, string OperandHex)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string OperandHex { get; init; } = OperandHex ?? throw new System.ArgumentNullException(nameof(OperandHex));
+    }
 
     private sealed record PatternObservation(string Form, CaseObservation Target,
-        WorkerClaimOutcome Outcome, WorkerClaimReason Reason);
+        WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
+    {
+        public string Form { get; init; } = Form ?? throw new System.ArgumentNullException(nameof(Form));
+        public CaseObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
+    }
 }

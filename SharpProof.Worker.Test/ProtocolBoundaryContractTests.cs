@@ -80,7 +80,7 @@ public sealed class ProtocolBoundaryContractTests
             Kind = kind
         }).ToArray();
         WorkerProtocolJson.Canonicalize(manifest);
-        Assert.That(manifest.Callables[0].Assumptions.Select(value => value.Kind),
+        Assert.That(manifest.Callables[0].Assumptions.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)),
             Is.EqualTo(Enum.GetValues<WorkerAssumptionKind>()));
         var hash = WorkerProtocolJson.ComputeManifestHash(manifest);
         manifest.Callables[0].Assumptions = manifest.Callables[0].Assumptions.Reverse().ToArray();
@@ -95,7 +95,7 @@ public sealed class ProtocolBoundaryContractTests
     {
         var manifest = Manifest();
         manifest.Callables[0].SelectedFeatures = nullArray ? null! : [];
-        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(error => error.Code),
+        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("manifest.selected_features"));
     }
 
@@ -104,7 +104,7 @@ public sealed class ProtocolBoundaryContractTests
     {
         var manifest = Manifest();
         manifest.Callables[0].ClaimIds = ["claim.different"];
-        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(error => error.Code),
+        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("manifest.claim_membership"));
     }
 
@@ -118,7 +118,7 @@ public sealed class ProtocolBoundaryContractTests
         var versions = response.Summary.Versions;
         response.Summary = null!;
         Assert.That(WorkerProtocolJson.ValidateForRequest(response, response.RequestHash,
-            response.InputHash, response.Manifest, request, versions).Errors.Select(error => error.Code),
+            response.InputHash, response.Manifest, request, versions).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("response.summary"));
     }
 
@@ -136,7 +136,7 @@ public sealed class ProtocolBoundaryContractTests
         {
             response.ClaimResults[0].Outcome = (WorkerClaimOutcome)int.MaxValue;
         }
-        var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error.Code).ToArray();
+        var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToArray();
         Assert.That(codes, Does.Contain(callable ? "response.callable_coverage" : "response.claim_outcome"));
         Assert.That(codes, Does.Contain(callable ? "response.callable_reason" : "response.claim_reason"));
     }

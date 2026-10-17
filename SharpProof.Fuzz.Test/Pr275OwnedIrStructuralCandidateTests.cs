@@ -66,9 +66,9 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
 
         Assert.That(interpreter.Evaluate(term, bindings).Status, Is.EqualTo(IrEvaluationStatus.Value), shape);
         Assert.That(candidates, Is.Not.Empty, shape);
-        Assert.That(repeated.Select(static candidate => candidate.Id),
-            Is.EqualTo(candidates.Select(static candidate => candidate.Id)), shape);
-        Assert.That(candidates.Select(static candidate => candidate.Id).Distinct().Count(), Is.EqualTo(candidates.Length), shape);
+        Assert.That(repeated.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id)),
+            Is.EqualTo(candidates.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id))), shape);
+        Assert.That(candidates.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id)).Distinct().Count(), Is.EqualTo(candidates.Length), shape);
         foreach (var candidate in candidates)
         {
             Assert.That(candidate.Type, Is.EqualTo(term.Type), shape);

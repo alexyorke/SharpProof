@@ -122,6 +122,8 @@ public sealed class IrTypedIntegerDifferentialTests
 
     private static void AssertSameResult(IrEvaluationResult folded, IrEvaluationResult evaluated)
     {
+        System.ArgumentNullException.ThrowIfNull(evaluated);
+        System.ArgumentNullException.ThrowIfNull(folded);
         Assert.That(folded.Status, Is.EqualTo(evaluated.Status));
         if (folded.Status == IrEvaluationStatus.Exception)
         {

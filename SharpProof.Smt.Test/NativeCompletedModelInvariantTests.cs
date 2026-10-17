@@ -25,6 +25,7 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCaseSource(nameof(IntegerCases))]
     public void CompletedScalarKeepsItsAdmittedIntegerType(int width, bool signedness, string mode)
     {
+        System.ArgumentNullException.ThrowIfNull(mode);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(width, signedness);
         var variable = factory.CreateVariable("input", type);
@@ -34,6 +35,10 @@ public sealed class NativeCompletedModelInvariantTests
             : [Equal(factory, factory.Variable(variable), factory.IntegerBits(type, bits))];
         WithNativeModel(factory, variable, predicates, (encoder, model, meter, values) =>
         {
+            System.ArgumentNullException.ThrowIfNull(encoder);
+            System.ArgumentNullException.ThrowIfNull(meter);
+            System.ArgumentNullException.ThrowIfNull(model);
+            System.ArgumentNullException.ThrowIfNull(values);
             var value = values[variable];
             Assert.That(value.Type, Is.EqualTo(type));
             Assert.That(value.IntegerBits, Is.EqualTo(bits));
@@ -51,12 +56,17 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCase("true", true)]
     public void CompletedScalarIsAConcreteBoolean(string mode, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(mode);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("flag", factory.BooleanType);
         IrTerm[] predicates = mode == "free" ? []
             : [Equal(factory, factory.Variable(variable), factory.Boolean(expected))];
         WithNativeModel(factory, variable, predicates, (encoder, model, meter, values) =>
         {
+            System.ArgumentNullException.ThrowIfNull(encoder);
+            System.ArgumentNullException.ThrowIfNull(meter);
+            System.ArgumentNullException.ThrowIfNull(model);
+            System.ArgumentNullException.ThrowIfNull(values);
             Assert.That(values[variable].Type, Is.EqualTo(factory.BooleanType));
             Assert.That(values[variable].Boolean, Is.EqualTo(expected));
             using var evaluated = model.Evaluate(encoder.GetVariable(variable, meter), true);
@@ -76,13 +86,14 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCase("int-array", 3)]
     public void NonnullBuiltinLengthDecodesIntoTheIndependentClrShape(string kind, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
         var term = factory.Variable(variable);
         WithNativeModel(factory, variable,
             [Nonnull(factory, term), Equal(factory, factory.Length(term), factory.Integer(count))],
-            (_, _, _, values) => AssertBuiltin(factory, values[variable], kind, count));
+            (_, _, _, values) => { System.ArgumentNullException.ThrowIfNull(values); AssertBuiltin(factory, values[variable], kind, count); });
     }
 
     [TestCase("string")]
@@ -90,12 +101,14 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCase("int-array")]
     public void NativeNullBuiltinDecodesAsNull(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
         WithNativeModel(factory, variable, [Equal(factory, factory.Variable(variable), factory.Null(type))],
             (_, _, _, values) =>
             {
+                System.ArgumentNullException.ThrowIfNull(values);
                 Assert.That(values[variable].Type, Is.EqualTo(type));
                 Assert.That(values[variable].Kind, Is.EqualTo(IrValueKind.Null));
             });
@@ -106,6 +119,7 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCase("int-array")]
     public void ActualEncodedLengthCanReachInt32MaxWithoutAllocatingAWitness(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
@@ -114,6 +128,9 @@ public sealed class NativeCompletedModelInvariantTests
             [Nonnull(factory, term), Equal(factory, factory.Length(term), factory.Integer(int.MaxValue))],
             (encoder, model, meter, _) =>
             {
+                System.ArgumentNullException.ThrowIfNull(encoder);
+                System.ArgumentNullException.ThrowIfNull(meter);
+                System.ArgumentNullException.ThrowIfNull(model);
                 var equality = encoder.EncodeBoolean(Equal(factory, factory.Length(term), factory.Integer(int.MaxValue)), meter);
                 Assert.That(equality.FuncDecl.DeclKind, Is.EqualTo(Z3_decl_kind.Z3_OP_EQ));
                 Assert.That(equality.NumArgs, Is.EqualTo(2U));
@@ -137,8 +154,15 @@ public sealed class NativeCompletedModelInvariantTests
     private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,
         Action<BvEncoder, Model, SmtQueryResourceMeter, Dictionary<IrVarId, IrValue>> inspect, bool decode = true)
     {
+        System.ArgumentNullException.ThrowIfNull(predicates, nameof(predicates));
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(inspect);
         var query = new VerificationQuery(factory,
-            predicates.Select(predicate => new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))),
+            predicates.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         using var context = new Context();
         using var solver = context.MkSolver();
@@ -175,16 +199,21 @@ public sealed class NativeCompletedModelInvariantTests
     }
 
     private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
-    { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
     private static IrTerm Nonnull(IrFactory factory, IrTerm term)
-    { return factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type)); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); System.ArgumentNullException.ThrowIfNull(term, nameof(term)); return factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type)); }
     private static IrTypeId BuiltinType(IrFactory factory, string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(kind);
         return kind == "string" ? factory.StringType
             : factory.GetOrCreateSequenceType(kind == "bool-array" ? factory.BooleanType : factory.IntegerType);
     }
     private static void AssertBuiltin(IrFactory factory, IrValue value, string kind, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(kind);
+        System.ArgumentNullException.ThrowIfNull(value);
         Assert.That(value.Type, Is.EqualTo(BuiltinType(factory, kind)));
         if (kind == "string")
         { Assert.That(value.String, Is.EqualTo(new string('\0', count))); }

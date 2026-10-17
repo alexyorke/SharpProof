@@ -34,12 +34,12 @@ public sealed partial class WorkerTests
         var total = preparation.Total!;
         Assert.That(total.IsBodyAbstraction, Is.False);
         Assert.That(total.EffectsCompleteAtEntry, Is.True);
-        Assert.That(total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(instruction => instruction.Origin == IrHavocOrigin.Approximation), Is.False);
-        Assert.That(total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Requires), Is.EqualTo(1));
-        var actualGoals = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
+        Assert.That(total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.False);
+        Assert.That(total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)), Is.EqualTo(1));
+        var actualGoals = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToArray();
         Assert.That(actualGoals, Has.Length.EqualTo(2));
-        Assert.That(actualGoals.Select(goal => goal.ClaimId), Is.EquivalentTo(preparation.Entry.ClaimIds));
+        Assert.That(actualGoals.Select(goal => goal is null ? throw new System.ArgumentNullException(nameof(goal)) : (goal.ClaimId)), Is.EquivalentTo(preparation.Entry.ClaimIds));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True,
@@ -73,13 +73,13 @@ public sealed partial class WorkerTests
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(response.ClaimResults.Select(result => result.ClaimId).Distinct().Count(), Is.EqualTo(2));
-            Assert.That(response.ClaimResults.All(result => result.Outcome == (broken
+            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(response.ClaimResults.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == (broken
                 ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven) &&
-                result.Reason == WorkerClaimReason.None && result.Vacuity == WorkerVacuityKind.None), Is.True);
+                result.Reason == WorkerClaimReason.None && result.Vacuity == WorkerVacuityKind.None)), Is.True);
             Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
-        Assert.That(response.ClaimResults.Select(result => GetCallableId(response, result)).Distinct().Count(), Is.EqualTo(1));
+        Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result))).Distinct().Count(), Is.EqualTo(1));
     }
 }

@@ -147,6 +147,11 @@ public sealed class ResourceAccountingRegressionTests
         ScopedIrId<IrOperationTag> operation,
         int assumptionCount)
     {
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         var assumptions = Enumerable.Range(0, assumptionCount)
             .Select(index => new Assumption(
                 factory,

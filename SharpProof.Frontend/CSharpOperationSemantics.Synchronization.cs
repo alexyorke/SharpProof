@@ -14,7 +14,7 @@ internal static partial class CSharpOperationSemantics
             method.Parameters.Length >= 1 && method.Parameters[0].Type.SpecialType == SpecialType.System_Object &&
             SymbolEqualityComparer.Default.Equals(owner.ContainingAssembly, method.Parameters[0].Type.ContainingAssembly) &&
             (method.Parameters.Length == 1 && invocation.Arguments.Length == 1 ||
-                invocation.IsImplicit && invocation.Syntax.AncestorsAndSelf().Any(syntax => syntax is Microsoft.CodeAnalysis.CSharp.Syntax.LockStatementSyntax) && method.Name == "Enter" &&
+                invocation.IsImplicit && invocation.Syntax.AncestorsAndSelf().Any(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax is Microsoft.CodeAnalysis.CSharp.Syntax.LockStatementSyntax)) && method.Name == "Enter" &&
                 method.Parameters.Length == 2 && invocation.Arguments.Length == 2 &&
                 method.Parameters[1].RefKind == RefKind.Ref && method.Parameters[1].Type.SpecialType == SpecialType.System_Boolean &&
                 invocation.Arguments[1].Value is ILocalReferenceOperation);
@@ -31,7 +31,7 @@ internal static partial class CSharpOperationSemantics
         if (compilation == null || !compilation.SyntaxTrees.Contains(syntax.SyntaxTree))
         {
             return syntax.SyntaxTree.Options.Features.Keys.Any(static feature =>
-                feature.StartsWith("Interceptors", StringComparison.Ordinal));
+                feature is null ? throw new System.ArgumentNullException(nameof(feature)) : (feature.StartsWith("Interceptors", StringComparison.Ordinal)));
         }
         return Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetInterceptorMethod(
             Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree), syntax) != null;

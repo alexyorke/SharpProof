@@ -45,14 +45,14 @@ public sealed class ContractsCoverageBoundaryTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!)
+            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
             .ToArray();
-        var target = invocations.Single(invocation => invocation.TargetMethod.ContainingType.Name == "ITarget")
+        var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
         var companion = invocations.Single(invocation =>
-                invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
-                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName)
+                invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
+                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName))
             .TargetMethod;
         var targetArgument = (ITypeParameterSymbol)target.TypeArguments.Single();
         var companionArgument = (ITypeParameterSymbol)companion.TypeArguments.Single();
@@ -98,14 +98,14 @@ public sealed class ContractsCoverageBoundaryTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!)
+            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
             .ToArray();
-        var target = invocations.Single(invocation => invocation.TargetMethod.ContainingType.Name == "ITarget")
+        var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
         var companion = invocations.Single(invocation =>
-                invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
-                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName)
+                invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
+                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName))
             .TargetMethod;
         var targetArgument = (ITypeParameterSymbol)target.TypeArguments.Single();
         var companionArgument = (ITypeParameterSymbol)companion.TypeArguments.Single();
@@ -294,8 +294,8 @@ public sealed class ContractsCoverageBoundaryTests
             .GetAnalyzerDiagnosticsAsync();
 
         Assert.That(diagnostics, Has.Length.EqualTo(resultIntrinsic ? 2 : 0),
-            string.Join("\n", diagnostics.Select(diagnostic => diagnostic.Id + ": " +
-                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture))));
+            string.Join("\n", diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + ": " +
+                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)))));
         foreach (var diagnostic in diagnostics)
         {
             Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));
@@ -345,6 +345,7 @@ public sealed class ContractsCoverageBoundaryTests
     [TestCase("ref int", false)]
     public void MetadataBindingRejectsReferencesWithoutSourceWriteEvidence(string parameterType, bool byValue)
     {
+        System.ArgumentNullException.ThrowIfNull(parameterType);
         var compilation = CreateMetadataConsumer(
             $"public static class Library {{ public static int Target({parameterType} value) => 0; }}",
             includeContractApi: true);
@@ -362,6 +363,7 @@ public sealed class ContractsCoverageBoundaryTests
 
     private static TotalMetadataRequiresBindingResult Bind(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var method = compilation.GetTypeByMetadataName("Library")!
             .GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -371,6 +373,7 @@ public sealed class ContractsCoverageBoundaryTests
 
     private static CSharpCompilation CreateMetadataConsumer(string source, bool includeContractApi)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var library = TestCompilation.Create("ContractsMetadataBoundaryLibrary", source);
         using var image = new MemoryStream();
         var emitted = library.Emit(image);
@@ -392,10 +395,12 @@ public sealed class ContractsCoverageBoundaryTests
         public override AnalyzerConfigOptions GlobalOptions => _options;
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return _options;
         }
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return _options;
         }
     }
@@ -404,6 +409,7 @@ public sealed class ContractsCoverageBoundaryTests
     {
         public override bool TryGetValue(string key, out string value)
         {
+            System.ArgumentNullException.ThrowIfNull(key);
             value = key switch
             {
                 "sharpproof_profile" => "strict",

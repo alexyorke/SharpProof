@@ -15,7 +15,7 @@ public sealed class ParenthesizedDelegateErasureCoverageTests
         using var subject = TypedProgramSubject.Create("int Target() { _ = ((new System.Action(Sink))); return 17; } static void Sink() { }");
         Assert.That(subject.Invoke([]), Is.EqualTo(17));
         var tree = subject.Compilation.SyntaxTrees.Single();
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(syntax => syntax.Identifier.ValueText == "Target");
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Target"));
         var body = subject.Compilation.GetSemanticModel(tree).GetOperation(method)!;
         var creation = body.DescendantsAndSelf().OfType<IDelegateCreationOperation>().Single();
         Assert.That(CSharpOperationSemantics.DelegateValueIsErased(creation, null), Is.False);

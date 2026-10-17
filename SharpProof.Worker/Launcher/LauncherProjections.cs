@@ -7,16 +7,17 @@ internal static partial class LauncherPresentation
     internal static string AssumptionsDeclaredMessage(
         string callableId, IReadOnlyList<WorkerAssumptionEvidence> assumptions)
     {
+        System.ArgumentNullException.ThrowIfNull(callableId);
         ArgumentNullException.ThrowIfNull(assumptions);
         var user = assumptions
             .Where(static assumption =>
-                assumption.Kind == WorkerAssumptionKind.UserAssume)
-            .Select(static assumption => assumption.Id)
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume))
+            .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
             .ToArray();
         var trusted = assumptions
             .Where(static assumption =>
-                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
-            .Select(static assumption => assumption.Id)
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
+            .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
             .ToArray();
         var userIds = string.Join(", ", user);
         var trustedIds = string.Join(", ", trusted);

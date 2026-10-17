@@ -53,7 +53,7 @@ public sealed class LoweredJustification(OperationId operation) : ProofJustifica
         : throw new ArgumentException("A non-default operation identifier is required.", nameof(operation));
 }
 
-public sealed class UserAssumedJustification(SourceLocationId location) : ProofJustification
+public sealed class UserAssumedJustification(SourceLocationId location /* SPINT001: all values valid - every location index, including zero, is valid */) : ProofJustification
 {
     public SourceLocationId Location { get; } = location;
 }
@@ -96,7 +96,7 @@ public sealed partial class Goal
         IrFactory factory,
         IrTerm predicate,
         ProofDiagnosticKind diagnostic,
-        SourceLocationId location)
+        SourceLocationId location /* SPINT001: all values valid - every location index, including zero, is valid */)
         : this(
             IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate)),
             diagnostic,

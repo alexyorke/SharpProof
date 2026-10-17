@@ -32,6 +32,8 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
     private static (string Fingerprint, string ClaimId) Capture(
         string firstType, string secondType, int selectedOrdinal, int expectedValue)
     {
+        System.ArgumentNullException.ThrowIfNull(secondType);
+        System.ArgumentNullException.ThrowIfNull(firstType);
         var selectedType = selectedOrdinal == 0 ? firstType : secondType;
         var expectedResult = expectedValue == 7;
         var compilation = AnalyzerTestHost.CreateCompilation(
@@ -51,7 +53,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
             }
             """, [], filePath: "nested-generic-predicate.cs");
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
 
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
@@ -62,7 +64,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
         var lambdaSyntax = rootSyntax.DescendantNodes().OfType<ParenthesizedLambdaExpressionSyntax>().Single();
         var lambda = (IAnonymousFunctionOperation)model.GetOperation(lambdaSyntax)!;
         var clauseSyntax = rootSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(static syntax => syntax.Expression.ToString() == "Contract.Ensures");
+            .Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Contract.Ensures"));
         var clause = (IInvocationOperation)model.GetOperation(clauseSyntax)!;
         var references = clause.Arguments.Single().Value.DescendantsAndSelf()
             .OfType<IParameterReferenceOperation>().ToArray();
@@ -116,7 +118,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
             Assert.That(claim.Entry.Ordinal, Is.Zero);
             Assert.That(claim.Entry.ClaimId, Is.EqualTo(SemanticClaimIdentity.Create(
                 compilation.AssemblyName!, target.Entry.CallableId, fingerprint, duplicateRank: 0)));
-            Assert.That(discovery.Manifest.Claims.Select(static entry => entry.ClaimId),
+            Assert.That(discovery.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)),
                 Does.Contain(claim.Entry.ClaimId));
         }
         return (fingerprint, claim.Entry.ClaimId);

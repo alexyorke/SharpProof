@@ -182,7 +182,7 @@ public sealed class EffectBoundaryCoverageTests
         var compilation = CSharpCompilation.Create(name,
             [CSharpSyntaxTree.ParseText("public class C { public static void Run() {} public static void Run() {} }")],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS0111"), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS0111")), Is.True);
         var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "source-method-ambiguity");
         var target = new ApiSpecTarget("duplicate-source-method", "M:C.Run", "C", SpecTargetMemberKind.Method,
             "Run", true, 0, null, [], null, [new ApiSpecAssemblyIdentity(name, "")]);
@@ -213,6 +213,7 @@ public sealed class EffectBoundaryCoverageTests
     [TestCase("ThrownExceptions = null")]
     public void MalformedCompilerProducedContractArgumentsCannotAuthorizeEffects(string argument)
     {
+        System.ArgumentNullException.ThrowIfNull(argument);
         var source = "using SharpProof.Attributes; [SharpProofTrusted(\"reviewed boundary\")] class C { " +
             "[EffectContract(SharpProofEffect.None, " + argument + ")] public void M() {} }";
         var compilation = CSharpCompilation.Create("MalformedContract", [CSharpSyntaxTree.ParseText(source)],

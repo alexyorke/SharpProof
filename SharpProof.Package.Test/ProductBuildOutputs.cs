@@ -4,6 +4,7 @@ internal static class ProductBuildOutputs
 {
     internal static string RuntimeAssemblyPath(string project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         return AssemblyPath(
             project,
             "net9.0",
@@ -31,6 +32,9 @@ internal static class ProductBuildOutputs
         string targetFramework,
         string assembly)
     {
+        System.ArgumentNullException.ThrowIfNull(assembly);
+        System.ArgumentNullException.ThrowIfNull(project);
+        System.ArgumentNullException.ThrowIfNull(targetFramework);
         var testAssemblyDirectory = new DirectoryInfo(
             Path.GetDirectoryName(
                 typeof(ProductBuildOutputs).Assembly.Location)!);

@@ -14,6 +14,7 @@ public sealed class ConstantConcatenationUtf16DomainCoverageTests
     public void ActualConstantConcatenationRetainsUnpairedCodeUnitAndAbstains(
         string escape, int codeUnit)
     {
+        System.ArgumentNullException.ThrowIfNull(escape);
         using var subject = TypedProgramSubject.Create($"string Target() => \"{escape}\" + \"\";");
         var native = subject.Invoke([]);
         Assert.That(native, Is.TypeOf<string>());

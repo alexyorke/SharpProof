@@ -24,7 +24,7 @@ public sealed class ValidatedArrayInitializerDepthCoverageTests
         { Assert.That(subject.Invoke([input]), Is.EqualTo(input)); }
 
         var operation = subject.Graph.Blocks.Single(block =>
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return).BranchValue;
+            block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return)).BranchValue;
         Assert.That(operation, Is.InstanceOf<IArrayElementReferenceOperation>());
         var access = (IArrayElementReferenceOperation)operation!;
         IOperation receiver = access.ArrayReference;

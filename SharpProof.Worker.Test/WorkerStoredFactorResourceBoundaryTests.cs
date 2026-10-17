@@ -89,6 +89,8 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
 
     private static async Task ObserveAsync(string label, string source, bool requireProof)
     {
+        System.ArgumentNullException.ThrowIfNull(label);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("FactorTheoremObservation", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
@@ -100,15 +102,15 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
-            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block.Instructions).ToArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(static havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
+            .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(instructions.Single(instruction =>
-            instruction.Id == preparation.Total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
+            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == preparation.Total.CallPreconditions[0].Instruction)), Is.TypeOf<IrAssignInstruction>());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
@@ -134,10 +136,10 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
                 searchIsBoundedSearch = plan.LoopSearch.IsBoundedSearch,
                 proofQueryCount = proofQueries.Length,
                 searchQueryCount = searchQueries.Length,
-                proofAssumptionCounts = proofQueries.Select(query => query.Assumptions.Length).ToArray(),
-                searchAssumptionCounts = searchQueries.Select(query => query.Assumptions.Length).ToArray(),
-                proofModelCounts = proofQueries.Select(query => query.ModelVariables.Length).ToArray(),
-                searchModelCounts = searchQueries.Select(query => query.ModelVariables.Length).ToArray()
+                proofAssumptionCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToArray(),
+                searchAssumptionCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToArray(),
+                proofModelCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToArray(),
+                searchModelCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToArray()
             }));
         }
         var budgets = new WorkerBudgets();
@@ -171,7 +173,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedJustifications = plan.CallPreconditionQueries(0)
-                .SelectMany(query => query.Assumptions).Select(assumption => assumption.Justification).ToHashSet();
+                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToHashSet();
             Assert.That(((ProvenOutcome)result.Outcome!).Core.All(ownedJustifications.Contains), Is.True);
         }
         else
@@ -180,7 +182,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
             Assert.That(callResourceReads.Length % 2, Is.Zero);
             var queryDeltas = Enumerable.Range(0, callResourceReads.Length / 2)
-                .Select(ordinal => callResourceReads[ordinal * 2 + 1] - callResourceReads[ordinal * 2]).ToArray();
+                .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (callResourceReads[ordinal * 2 + 1] - callResourceReads[ordinal * 2]))).ToArray();
             var cutQueryCount = plan.CallPreconditionQueries(0).Length;
             Assert.That(queryDeltas.Length, Is.GreaterThan(cutQueryCount));
             Assert.That(queryDeltas.Length, Is.LessThanOrEqualTo(cutQueryCount + plan.LoopSearch!.CallPreconditionQueries(0).Length));
@@ -204,6 +206,10 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
     private static void WriteObservation(string label, string stage, string source,
         PassiveCallableCheckResult result, long before, long after)
     {
+        System.ArgumentNullException.ThrowIfNull(label);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(stage);
         TestContext.Progress.WriteLine("FACTOR-OBSERVATION " + JsonSerializer.Serialize(new
         {
             label,
@@ -215,7 +221,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             core = result.Core.ToArray(),
             model = result.EntryModel.OrderBy(pair => pair.Key.Value).Select(pair => new
             { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToArray(),
-            bodyAssumptions = result.BodyAssumptions.Select(item => item.Value).ToArray(),
+            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToArray(),
             callPreconditionWitness = result.CallPreconditionWitness?.Value,
             consumedBefore = before,
             consumedAfter = after,

@@ -42,14 +42,14 @@ public sealed class CompilerBodyAbstractionTests
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
-        Assert.That(checks.Values.Count(check => check.Evidence.Outcome is ProvenOutcome), Is.EqualTo(1));
-        var unknown = checks.Values.Single(check => check.Evidence.Outcome is not ProvenOutcome);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
+        var unknown = checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is not ProvenOutcome));
         Assert.That(unknown.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(unknown.Checked, Is.True);
-        Assert.That(checks.Values.Select(check => check.Vacuity), Is.All.EqualTo(WorkerVacuityKind.None));
-        Assert.That(checks.Values.Select(check => check.Feasibility), Is.All.EqualTo(PassiveCallableFeasibilityKind.Unknown));
-        Assert.That(checks.Values.Any(check => check.Evidence.Outcome is RefutedOutcome), Is.False);
+        Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Vacuity)), Is.All.EqualTo(WorkerVacuityKind.None));
+        Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Feasibility)), Is.All.EqualTo(PassiveCallableFeasibilityKind.Unknown));
+        Assert.That(checks.Values.Any(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome)), Is.False);
     }
 
     [TestCase("drop-current")]
@@ -59,10 +59,11 @@ public sealed class CompilerBodyAbstractionTests
     [TestCase("missing-marker")]
     public void AbstractBodyWireCannotNarrowMutableState(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source);
         var total = artifact.Callables.Single().Total!;
         var instructions = total.Graph.Blocks.Single().Instructions;
-        var havoc = instructions.Single(instruction => instruction.Kind == IrInstructionKind.Havoc);
+        var havoc = instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Havoc));
         switch (mutation)
         {
             case "missing-marker":
@@ -92,6 +93,7 @@ public sealed class CompilerBodyAbstractionTests
     {
         // A reference passes through an opaque call exactly; no body
         // abstraction is needed to preserve its heap.
+        System.ArgumentNullException.ThrowIfNull(type);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject { public static {{type}} Target({{type}} x) {
@@ -106,6 +108,7 @@ public sealed class CompilerBodyAbstractionTests
     [TestCase("Value = 1;")]
     public async Task OnlyCapturedEmptyInitializersPermitExactIlReplay(string initialization)
     {
+        System.ArgumentNullException.ThrowIfNull(initialization);
         using var metadata = new MetadataTestSubject($$"""
             public static class Library {
                 private static int Value;
@@ -123,14 +126,14 @@ public sealed class CompilerBodyAbstractionTests
         using var project = new ShadowTestProject(metadata.CreateArtifact());
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
         Assert.That(checks, Has.Count.EqualTo(2));
         if (string.IsNullOrEmpty(initialization))
         {
-            Assert.That(checks.Values.Any(check => check.Evidence.Outcome is ProvenOutcome), Is.True);
-            Assert.That(checks.Values.Any(check => check.Evidence.Outcome is RefutedOutcome), Is.True);
+            Assert.That(checks.Values.Any(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.True);
+            Assert.That(checks.Values.Any(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome)), Is.True);
         }
         else
-        { Assert.That(checks.Values.Select(check => check.Evidence.Reason), Is.All.EqualTo(WorkerClaimReason.CounterexampleNotReplayable)); }
+        { Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Reason)), Is.All.EqualTo(WorkerClaimReason.CounterexampleNotReplayable)); }
     }
 }

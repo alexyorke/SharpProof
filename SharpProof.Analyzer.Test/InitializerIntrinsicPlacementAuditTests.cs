@@ -26,7 +26,7 @@ public sealed class InitializerIntrinsicPlacementAuditTests
     public async Task ResultInBaseInitializerReportsPlacementDiagnostic()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(Source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
@@ -49,8 +49,8 @@ public sealed class InitializerIntrinsicPlacementAuditTests
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         var observed = string.Join("\n", diagnostics.Select(diagnostic =>
-            $"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
-        Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds),
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
+        Assert.That(diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds),
             $"Same-compilation emit succeeded; CLR construction threw InvalidOperationException: {runtimeFailure}\n" +
             $"intrinsic={operation.Kind};ownerKind={owner?.Kind};owner={owner};span={invocation.Span}\nActual diagnostics: {observed}");
         using (Assert.EnterMultipleScope())

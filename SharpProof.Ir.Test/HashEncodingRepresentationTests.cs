@@ -52,6 +52,7 @@ public sealed class HashEncodingRepresentationTests
 
     private static void RecordBinding(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var assembly = typeof(IrHashEncoding).Assembly;
         Assert.That(assembly.GetName().Name, Is.EqualTo("SharpProof.Ir"));
         Assert.That(assembly, Is.Not.SameAs(typeof(HashEncodingRepresentationTests).Assembly));

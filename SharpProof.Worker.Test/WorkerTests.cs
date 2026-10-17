@@ -41,7 +41,7 @@ public sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(changedBudget.RunStatus, Is.EqualTo(WorkerRunStatus.Complete),
-                string.Join("; ", changedBudget.Errors.Select(static error => error.Code + ": " + error.Message)));
+                string.Join("; ", changedBudget.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
             Assert.That(changedBudget.InputHash, Is.Not.EqualTo(first.InputHash));
             Assert.That(changedBudget.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(changedBudget.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -54,6 +54,7 @@ public sealed partial class WorkerTests
     [TestCase("public static int Identity(int value) => value;")]
     public async Task CompleteResponsesReuseCacheAcrossEffectUnknownAndEmptyClaims(string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject { {{member}} }
@@ -67,8 +68,8 @@ public sealed partial class WorkerTests
             Assert.That(first.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-            Assert.That(second.ClaimResults.Select(static claim => (claim.Outcome, claim.Reason)),
-                Is.EqualTo(first.ClaimResults.Select(static claim => (claim.Outcome, claim.Reason))));
+            Assert.That(second.ClaimResults.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : ((claim.Outcome, claim.Reason))),
+                Is.EqualTo(first.ClaimResults.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : ((claim.Outcome, claim.Reason)))));
             Assert.That(WorkerProtocolJson.ValidateForRequest(second,
                 WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
                 second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
@@ -165,7 +166,7 @@ public sealed partial class WorkerTests
         var validation = WorkerProtocolJson.Validate(request);
         Assert.That(validation.IsValid, Is.False);
         Assert.That(
-            validation.Errors.Select(static error => error.Code),
+            validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Is.SupersetOf(InvalidBudgetErrorCodes));
         Assert.Throws<JsonException>((Action)(() =>
             WorkerProtocolJson.DeserializeRequest(
@@ -176,7 +177,7 @@ public sealed partial class WorkerTests
         request.Budgets.MethodRlimit = 1;
         validation = WorkerProtocolJson.Validate(request);
         Assert.That(
-            validation.Errors.Select(static error => error.Code),
+            validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("budgets.rlimit_order"));
     }
 
@@ -189,7 +190,7 @@ public sealed partial class WorkerTests
 
         Assert.That(validation.IsValid, Is.False);
         Assert.That(
-            validation.Errors.Select(static error => error.Code),
+            validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("project.compiler_manifest"));
     }
 
@@ -226,7 +227,7 @@ public sealed partial class WorkerTests
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
         Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
-        Assert.That(response.Errors.Select(static error => error.Code),
+        Assert.That(response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("budgets.query_rlimit_mismatch"));
     }
 
@@ -265,13 +266,13 @@ public sealed partial class WorkerTests
                 Is.True);
             Assert.That(
                 response.CallableResults.All(static result =>
-                    result.Coverage == WorkerCallableCoverage.Complete &&
-                    result.Reason == WorkerCallableCoverageReason.None),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Complete &&
+                    result.Reason == WorkerCallableCoverageReason.None)),
                 Is.True);
             Assert.That(
                 response.ClaimResults.All(static result =>
-                    result.Outcome == WorkerClaimOutcome.Proven &&
-                    result.Reason == WorkerClaimReason.None),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven &&
+                    result.Reason == WorkerClaimReason.None)),
                 Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(factoryCalls, Is.EqualTo(1));
@@ -350,8 +351,8 @@ public sealed partial class WorkerTests
             expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions);
         var usedPreconditions = result.Assumptions.Where(
             static assumption =>
-                assumption.Kind ==
-                WorkerAssumptionKind.Precondition);
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind ==
+                WorkerAssumptionKind.Precondition));
 
         using (Assert.EnterMultipleScope())
         {
@@ -363,7 +364,7 @@ public sealed partial class WorkerTests
             Assert.That(usedPreconditions, Is.Not.Empty);
             Assert.That(
                 usedPreconditions.All(
-                    static assumption => assumption.Used),
+                    static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)),
                 Is.True);
             Assert.That(
                 first.Summary.CacheStatus,
@@ -400,8 +401,8 @@ public sealed partial class WorkerTests
         var result = response.ClaimResults.Single();
         var preconditions = result.Assumptions.Where(
             static assumption =>
-                assumption.Kind ==
-                WorkerAssumptionKind.Precondition).ToArray();
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind ==
+                WorkerAssumptionKind.Precondition)).ToArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -412,7 +413,7 @@ public sealed partial class WorkerTests
             Assert.That(preconditions, Has.Length.EqualTo(2));
             Assert.That(
                 preconditions.Count(
-                    static assumption => assumption.Used),
+                    static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)),
                 Is.EqualTo(1));
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
@@ -498,31 +499,31 @@ public sealed partial class WorkerTests
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.Outcome),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.Reason),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(
                     WorkerClaimReason.UnsupportedContract),
                 string.Join(", ", response.Errors.Select(static error =>
-                    error.Code)));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.EffectCertainty),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectCertainty)),
                 Is.All.EqualTo(
                     WorkerEffectEvidenceCertainty.Unavailable));
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.Vacuity),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity)),
                 Is.All.EqualTo(WorkerVacuityKind.None));
             Assert.That(
                 response.ClaimResults.SelectMany(static result =>
-                    result.ProofCore),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ProofCore)),
                 Is.Empty);
             Assert.That(
                 response.CallableResults.Select(static result =>
-                    result.Coverage),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
                 Is.All.EqualTo(
                     WorkerCallableCoverage.Incomplete));
             Assert.That(
@@ -567,17 +568,17 @@ public sealed partial class WorkerTests
             string.Join(
                 Environment.NewLine,
                 response.Manifest.Claims.Select(static claim =>
-                    claim.CallableId + " / " +
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId + " / " +
                     claim.Kind + " / " +
-                    claim.Evidence)));
+                    claim.Evidence))));
         var allocation = response.ClaimResults.Single(result =>
-            GetCallableId(response, result).Contains(
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                 ".AllocateOnly",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         var throwing = response.ClaimResults.Single(result =>
-            GetCallableId(response, result).Contains(
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                 ".ThrowExisting(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -614,15 +615,15 @@ public sealed partial class WorkerTests
                 Is.Empty);
             Assert.That(
                 response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId.Contains(
                         ".AllocateOnly",
-                        StringComparison.Ordinal)).Coverage,
+                        StringComparison.Ordinal))).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(
                 response.CallableResults.Single(result =>
-                    result.CallableId.Contains(
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId.Contains(
                         ".ThrowExisting(",
-                        StringComparison.Ordinal)).Coverage,
+                        StringComparison.Ordinal))).Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -659,13 +660,13 @@ public sealed partial class WorkerTests
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var maybeNull = response.ClaimResults.Single(result =>
-            GetCallableId(response, result).Contains(
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                 ".MaybeNull(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         var requiredNonNull = response.ClaimResults.Single(result =>
-            GetCallableId(response, result).Contains(
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                 ".RequiredNonNull(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -676,7 +677,7 @@ public sealed partial class WorkerTests
             Assert.That(requiredNonNull.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(requiredNonNull.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
             Assert.That(requiredNonNull.ProofCore, Has.One.StartsWith("native-effect:"));
-            Assert.That(response.CallableResults.Select(static result => result.Coverage), Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)), Is.All.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -800,15 +801,15 @@ public sealed partial class WorkerTests
         {
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.Outcome),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 response.ClaimResults.Select(static result =>
-                    result.EffectWitness),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness)),
                 Is.All.Null);
             Assert.That(
                 response.CallableResults.Select(static result =>
-                    result.Coverage),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
                 Is.All.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
@@ -835,23 +836,23 @@ public sealed partial class WorkerTests
             """,
             cacheEnabled: false);
         var results = response.ClaimResults.OrderBy(result =>
-            response.Manifest.Claims.Single(claim =>
-                claim.ClaimId == result.ClaimId).EffectContractKind).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (response.Manifest.Claims.Single(claim =>
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)).EffectContractKind)).ToArray();
         var responseJson = WorkerProtocolJson.SerializeResponse(response);
 
         using (Assert.EnterMultipleScope())
         {
             // Z3 refutes purity at the field store; the capability claim keeps
             // its replayed compiler violation.
-            Assert.That(results.Select(static result => result.Outcome),
+            Assert.That(results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Refuted), responseJson);
-            Assert.That(results.Select(static result => result.EffectCertainty),
+            Assert.That(results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectCertainty)),
                 Is.All.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
             Assert.That(results[0].EffectWitness?.Kind, Is.EqualTo("nonlocal-write"));
             Assert.That(results[0].EffectWitness?.Effects, Is.EqualTo(WorkerEffectSet.WritesReceiverState));
             Assert.That(results[1].EffectWitness?.Kind, Is.EqualTo("synchronization-lock"));
             Assert.That(results[1].EffectWitness?.Capabilities, Is.EqualTo(WorkerEffectCapabilitySet.Synchronization));
-            Assert.That(response.CallableResults.Select(static result => result.Coverage),
+            Assert.That(response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
                 Is.All.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -863,6 +864,7 @@ public sealed partial class WorkerTests
     {
         async Task<WorkerVerifyResponse> AnalyzeMember(string member)
         {
+            System.ArgumentNullException.ThrowIfNull(member);
             var source = $$"""
                 using System;
                 using SharpProof.Attributes;
@@ -873,8 +875,8 @@ public sealed partial class WorkerTests
             using var project = TestProject.Create(source);
             var sourceErrors = project.CreateCompilation().GetDiagnostics()
                 .Where(diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
-                .Select(static diagnostic => diagnostic.ToString())
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
                 .ToArray();
             Assert.That(
                 sourceErrors,
@@ -890,12 +892,14 @@ public sealed partial class WorkerTests
             WorkerVerifyResponse response,
             string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
+            System.ArgumentNullException.ThrowIfNull(response);
             var claim = response.Manifest.Claims.Single(candidate =>
-                candidate.CallableId.Contains(
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.CallableId.Contains(
                     "." + methodName,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal)));
             return response.ClaimResults.Single(result =>
-                result.ClaimId == claim.ClaimId);
+                result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId));
         }
 
         void AssertOutcome(
@@ -903,6 +907,7 @@ public sealed partial class WorkerTests
             string methodName,
             WorkerClaimOutcome expected)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             var responseJson = WorkerProtocolJson.SerializeResponse(response);
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
@@ -1054,10 +1059,10 @@ public sealed partial class WorkerTests
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
-            Assert.That(result.Assumptions.Select(static item => item.Kind),
+            Assert.That(result.Assumptions.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind)),
                 Does.Contain(WorkerAssumptionKind.TrustedBoundary));
             Assert.That(result.Assumptions.Single(static item =>
-                    item.Kind == WorkerAssumptionKind.TrustedBoundary).Used,
+                    item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.TrustedBoundary)).Used,
                 Is.True);
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
@@ -1073,6 +1078,7 @@ public sealed partial class WorkerTests
         WorkerClaimOutcome.Unknown)]
     public async Task TrustedCompleteExternContractDecidesOtherEffectClaims(string effects, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(effects);
         using var project = TestProject.Create(
             """
             using SharpProof.Attributes;
@@ -1088,14 +1094,14 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = new SharpProofWorker(new CountingBackend(BackendCheckResult.Unsatisfiable([])));
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var effectClaims = response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.Effect)
-            .Select(claim => response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId)).ToArray();
+        var effectClaims = response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect))
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))).ToArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(effectClaims, Has.Length.EqualTo(3));
-            Assert.That(effectClaims.Count(static result => result.Outcome == WorkerClaimOutcome.Proven),
+            Assert.That(effectClaims.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)),
                 Is.EqualTo(outcome == WorkerClaimOutcome.Proven ? 3 : 1));
-            Assert.That(effectClaims.Select(static result => result.EffectCertainty),
+            Assert.That(effectClaims.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectCertainty)),
                 Has.All.EqualTo(WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
         }
     }
@@ -1118,14 +1124,14 @@ public sealed partial class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(response.Manifest.Claims.Select(static claim => claim.Kind),
+            Assert.That(response.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)),
                 Is.EqualTo([
                     WorkerClaimKind.Postcondition,
                     WorkerClaimKind.Effect
                 ]));
-            Assert.That(response.ClaimResults.Select(static result => result.ClaimId),
-                Is.EqualTo(response.Manifest.Claims.Select(static claim => claim.ClaimId)));
-            Assert.That(response.ClaimResults.Select(static result => result.Outcome),
+            Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)),
+                Is.EqualTo(response.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+            Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(backend.CallCount, Is.GreaterThan(0));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -1175,7 +1181,7 @@ public sealed partial class WorkerTests
             Assert.That(response.ClaimResults.Single().Reason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedContract),
                 string.Join(", ", response.Errors.Select(static error =>
-                    error.Code)));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(response.CallableResults.Single().Reason,
@@ -1245,7 +1251,7 @@ public sealed partial class WorkerTests
         var results = second.ClaimResults
             .OrderBy(
                 static result =>
-                    result.EffectWitness?.Kind ?? string.Empty,
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness?.Kind ?? string.Empty),
                 StringComparer.Ordinal)
             .ToArray();
 
@@ -1258,26 +1264,26 @@ public sealed partial class WorkerTests
                 second.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(
-                results.Select(static result => result.Outcome),
+                results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
-                results.Select(static result => result.EffectCertainty),
+                results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectCertainty)),
                 Is.All.EqualTo(
                     WorkerEffectEvidenceCertainty.DefiniteViolation));
             Assert.That(
-                results.Select(static result => result.Reason),
+                results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 results.Select(static result =>
-                    result.EffectWitness!.Kind),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness!.Kind)),
                 Is.EqualTo(ReplayedAllocationWitnessKinds));
             Assert.That(
                 results.Select(static result =>
-                    result.EffectWitness!.Effects),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness!.Effects)),
                 Is.All.EqualTo(WorkerEffectSet.Allocates));
             Assert.That(
                 second.CallableResults.Select(static result =>
-                    result.Coverage),
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
                 Is.All.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(
                 second.RunStatus,
@@ -1317,15 +1323,15 @@ public sealed partial class WorkerTests
     {
         var response = await RunAsync(WorkerTestSources.UnsupportedContractCallables, cacheEnabled: false);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-        var generic = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Generic", StringComparison.Ordinal));
-        var asynchronous = response.ClaimResults.Single(result => GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal));
+        var generic = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(".Generic", StringComparison.Ordinal)));
+        var asynchronous = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(".Async", StringComparison.Ordinal)));
         Assert.That(generic.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(generic.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(asynchronous.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(asynchronous.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
-        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Generic", StringComparison.Ordinal)).Coverage,
+        Assert.That(response.CallableResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId.Contains(".Generic", StringComparison.Ordinal))).Coverage,
             Is.EqualTo(WorkerCallableCoverage.Complete));
-        Assert.That(response.CallableResults.Single(result => result.CallableId.Contains(".Async", StringComparison.Ordinal)).Coverage,
+        Assert.That(response.CallableResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId.Contains(".Async", StringComparison.Ordinal))).Coverage,
             Is.EqualTo(WorkerCallableCoverage.Incomplete));
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
@@ -1448,6 +1454,7 @@ public sealed partial class WorkerTests
 
         static JsonException? CaptureJson(Action action)
         {
+            System.ArgumentNullException.ThrowIfNull(action);
             try
             {
                 action();
@@ -1461,6 +1468,7 @@ public sealed partial class WorkerTests
 
         static IOException? CaptureIOException(Action action)
         {
+            System.ArgumentNullException.ThrowIfNull(action);
             try
             {
                 action();
@@ -1812,6 +1820,7 @@ public sealed partial class WorkerTests
 
         static string DifferentHash(string value)
         {
+            System.ArgumentNullException.ThrowIfNull(value);
             return (value[0] == '0' ? "1" : "0") + value[1..];
         }
     }
@@ -1842,14 +1851,14 @@ public sealed partial class WorkerTests
         Assert.That(first.Errors, Is.Empty);
         Assert.That(first.ClaimResults.Length, Is.EqualTo(2));
         Assert.That(
-            first.ClaimResults.Select(static record => record.Outcome),
+            first.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.EquivalentTo(new[] {
                 WorkerClaimOutcome.Proven,
                 WorkerClaimOutcome.Refuted
             }));
         Assert.That(
             first.ClaimResults.Select(record =>
-                GetCallableId(first, record)),
+                record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(first, record))),
             Is.Ordered);
         AssertSemanticallyEquivalent(first, second);
     }
@@ -1884,7 +1893,7 @@ public sealed partial class WorkerTests
             .Build()
             .Targets
             .Values
-            .Single(candidate => candidate.Method.Name == "Identity");
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.Name == "Identity"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(target.Method.PartialDefinitionPart, Is.Not.Null);
@@ -1898,7 +1907,7 @@ public sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
-                error.Code)));
+                error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
         Assert.That(
             response.ClaimResults[0].Outcome,
@@ -1919,7 +1928,7 @@ public sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
-                error.Code)));
+                error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(cases.Length));
 
         var runtimeCompilation = project.CreateCompilation(
@@ -1932,22 +1941,23 @@ public sealed partial class WorkerTests
             string.Join(
                 Environment.NewLine,
                 emit.Diagnostics.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         RuntimeAssemblyTestHost.WithRuntimeAssembly(
             "SharpProof.Worker.Test.RuntimeContractOracle",
             image,
             assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             var fixture = assembly.GetType(
                     "RuntimeContractOracle",
                     throwOnError: true)!;
             foreach (var item in cases)
             {
                 var record = response.ClaimResults.Single(candidate =>
-                    GetCallableId(response, candidate).Contains(
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (GetCallableId(response, candidate).Contains(
                         "." + item.MethodName + "(",
-                        StringComparison.Ordinal));
+                        StringComparison.Ordinal)));
                 Assert.That(
                     record.Outcome,
                     Is.EqualTo(item.ExpectedStatus),
@@ -2059,21 +2069,21 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(8));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Proven));
         var intIdentity = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Id(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         Assert.That(
             intIdentity.ProofCore,
             Is.Empty);
         Assert.That(
             response.ClaimResults
-                .Where(record => !GetCallableId(response, record).Contains(
+                .Where(record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (!GetCallableId(response, record).Contains(
                     ".Int64Identity(",
-                    StringComparison.Ordinal))
-                .SelectMany(static record => record.ProofCore),
+                    StringComparison.Ordinal)))
+                .SelectMany(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.ProofCore)),
             Is.Empty);
     }
 
@@ -2113,8 +2123,8 @@ public sealed partial class WorkerTests
             TestContext.CurrentContext.CancellationToken);
         var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
             .Total!.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Assume)
-            .Select(static clause => clause.AssumptionId).ToArray();
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume))
+            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId)).ToArray();
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -2130,14 +2140,14 @@ public sealed partial class WorkerTests
             Is.EqualTo(IrExecutionSemantics.Total));
         var userAssumptions = record.Assumptions
             .Where(static evidence =>
-                evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+                evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                userAssumptions.Count(static evidence => evidence.Used),
+                userAssumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used)),
                 Is.EqualTo(2));
             Assert.That(
-                userAssumptions.Where(static evidence => evidence.Used).Select(static evidence => evidence.Id),
+                userAssumptions.Where(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used)).Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Id)),
                 Is.EquivalentTo(expectedUsedIds));
         }
     }
@@ -2235,10 +2245,10 @@ public sealed partial class WorkerTests
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.ClaimResults, Has.Length.EqualTo(5));
             Assert.That(
-                contradictory.Select(static result => result.Outcome),
+                contradictory.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                contradictory.Select(static result => result.Vacuity),
+                contradictory.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity)),
                 Is.All.EqualTo(
                     WorkerVacuityKind.ContradictoryPreconditions));
             Assert.That(
@@ -2254,10 +2264,11 @@ public sealed partial class WorkerTests
 
         WorkerClaimResult Result(string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             return response.ClaimResults.Single(result =>
-                GetCallableId(response, result).Contains(
+                result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                     "." + methodName + "(",
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal)));
         }
     }
 
@@ -2295,16 +2306,17 @@ public sealed partial class WorkerTests
         Assert.That(response.ClaimResults, Has.Length.EqualTo(3));
         WorkerClaimResult For(string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             var matching = response.ClaimResults.Where(result =>
-                    GetCallableId(response, result).Contains(
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                         "." + methodName + "(",
-                        StringComparison.Ordinal))
+                        StringComparison.Ordinal)))
                 .ToArray();
             Assert.That(
                 matching,
                 Has.Length.EqualTo(1),
                 string.Join(", ", response.ClaimResults.Select(result =>
-                    GetCallableId(response, result))));
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result)))));
             return matching[0];
         }
 
@@ -2329,7 +2341,7 @@ public sealed partial class WorkerTests
         if (positive.Outcome == WorkerClaimOutcome.Refuted)
         {
             Assert.That(
-                positive.Model.Single(value => value.Variable == "parameter:0").Value,
+                positive.Model.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable == "parameter:0")).Value,
                 Is.EqualTo("0"));
         }
     }
@@ -2406,21 +2418,21 @@ public sealed partial class WorkerTests
             string.Join(
                 Environment.NewLine,
                 response.ClaimResults.Select(record =>
-                    GetCallableId(response, record) + " / " +
+                    record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record) + " / " +
                     GetClaim(response, record).Ordinal + " / " +
                     record.Outcome + " / " +
-                    record.Reason)));
+                    record.Reason))));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Proven));
         var concat = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Concat(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         var empty = response.ClaimResults
-            .Where(record => GetCallableId(response, record).Contains(
+            .Where(record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Empty",
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)))
             .ToArray();
         using (Assert.EnterMultipleScope())
         {
@@ -2465,7 +2477,7 @@ public sealed partial class WorkerTests
             string.Join(
                 Environment.NewLine,
                 response.Errors.Select(error =>
-                    error.Code + ": " + error.Message)));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
         // Enumerable.Empty is an opaque call: its result is unknown.
         var record = AssertClaimVerdict(
             response,
@@ -2577,10 +2589,10 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
             Is.All.EqualTo(WorkerClaimReason.None));
     }
 
@@ -2646,13 +2658,13 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         var loop = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Loop(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         var call = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Call(",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -2662,9 +2674,9 @@ public sealed partial class WorkerTests
             Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(call.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
-                call.ProofCore.Any(static item => item.StartsWith(
+                call.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                     "source-summary:",
-                    StringComparison.Ordinal)),
+                    StringComparison.Ordinal))),
                 Is.False);
         }
     }
@@ -2698,7 +2710,7 @@ public sealed partial class WorkerTests
             .Single();
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
-            candidate.Method.MetadataName == "Call");
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == "Call"));
         var lowerer = new CompilerCallableLowerer(
             compilation,
             new IrFactory());
@@ -2716,9 +2728,9 @@ public sealed partial class WorkerTests
             response,
             WorkerClaimOutcome.Proven);
         Assert.That(
-            result.ProofCore.Any(static item => item.StartsWith(
+            result.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                 "il-summary:",
-                StringComparison.Ordinal)),
+                StringComparison.Ordinal))),
             Is.False);
     }
 
@@ -2791,9 +2803,9 @@ public sealed partial class WorkerTests
             var callableId = DocumentationCommentId.CreateDeclarationId(method);
             Assert.That(callableId, Is.Not.Null, methodName);
             var claim = response.Manifest.Claims.Single(candidate =>
-                candidate.CallableId == callableId);
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.CallableId == callableId));
             var result = response.ClaimResults.Single(candidate =>
-                candidate.ClaimId == claim.ClaimId);
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ClaimId == claim.ClaimId));
 
             using (Assert.EnterMultipleScope())
             {
@@ -2802,9 +2814,9 @@ public sealed partial class WorkerTests
                     Is.EqualTo(WorkerClaimOutcome.Proven),
                     methodName + ": " + result.Reason);
                 Assert.That(
-                    result.ProofCore.Any(static item => item.StartsWith(
+                    result.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                         "il-summary:",
-                        StringComparison.Ordinal)),
+                        StringComparison.Ordinal))),
                     Is.False,
                     methodName + " retained a legacy implementation-IL summary.");
             }
@@ -2952,7 +2964,7 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(result.ProofCore.Any(static item => item.StartsWith("source-summary:", StringComparison.Ordinal)), Is.False);
+        Assert.That(result.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("source-summary:", StringComparison.Ordinal))), Is.False);
     }
 
     [Test]
@@ -3005,17 +3017,17 @@ public sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 response.ClaimResults,
                 Has.All.Matches<WorkerClaimResult>(result =>
-                    !result.ProofCore.Any(static item => item.StartsWith(
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (!result.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                         "il-summary:",
-                        StringComparison.Ordinal))));
+                        StringComparison.Ordinal))))));
         }
     }
 
@@ -3024,6 +3036,8 @@ public sealed partial class WorkerTests
     [TestCase("^", "!=")]
     public async Task ImplementationIlBooleanOperatorsProveAndRefuteTruthTables(string bodyOperator, string contractOperator)
     {
+        System.ArgumentNullException.ThrowIfNull(bodyOperator);
+        System.ArgumentNullException.ThrowIfNull(contractOperator);
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -3187,14 +3201,14 @@ public sealed partial class WorkerTests
             """);
         var compilation = project.CreateCompilation();
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
+            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
             var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
-                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
+                .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Any(),
                 Is.EqualTo(targetName == "VerifyInadmissibleCall"), targetName);
         }
     }
@@ -3290,7 +3304,7 @@ public sealed partial class WorkerTests
             OptimizationLevel.Debug);
         var compilation = project.CreateCompilation();
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
+            .ToDictionary(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name), StringComparer.Ordinal);
 
         foreach (var targetName in new[]
                  {
@@ -3303,7 +3317,7 @@ public sealed partial class WorkerTests
             var preparation = lowerer.Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
-                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
+                .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Any(),
                 Is.EqualTo(targetName == "VerifyManyLocals"), targetName);
         }
 
@@ -3314,7 +3328,7 @@ public sealed partial class WorkerTests
             targets["VerifyManyParameters"], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             widePreparation.Total!.IsBodyAbstraction || widePreparation.Total.Program.Blocks
-                .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
+                .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Any(),
             Is.True);
     }
 
@@ -3356,9 +3370,9 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         var loop = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(".Loop(", StringComparison.Ordinal));
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(".Loop(", StringComparison.Ordinal)));
         var recursion = response.ClaimResults.Single(record =>
-            GetCallableId(response, record).Contains(".Recurse(", StringComparison.Ordinal));
+            record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(".Recurse(", StringComparison.Ordinal)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -3441,9 +3455,9 @@ public sealed partial class WorkerTests
             Assert.That(enabled.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(enabled.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
-                enabled.ProofCore.Any(static item => item.StartsWith(
+                enabled.ProofCore.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                     "spec-pack:dotnet.scalar@1:",
-                    StringComparison.Ordinal)),
+                    StringComparison.Ordinal))),
                 Is.False);
             Assert.That(totalArtifact, Is.Not.Null);
             Assert.That(withArtifact.SpecificationPackIds, Has.Length.EqualTo(1));
@@ -3462,6 +3476,7 @@ public sealed partial class WorkerTests
     [TestCase("Contract.Result<int>() == left", WorkerClaimOutcome.Refuted)]
     public async Task NativeSpecificationPackRequiresExplicitOptIn(string predicate, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(predicate);
         using var project = TestProject.Create($$"""
             using System;
             using SharpProof.Attributes;
@@ -3697,10 +3712,11 @@ public sealed partial class WorkerTests
         Assert.That(response.ClaimResults, Has.Length.EqualTo(6));
         WorkerClaimResult ResultFor(string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             return response.ClaimResults.Single(result =>
-                GetCallableId(response, result).Contains(
+                result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                     methodName,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal)));
         }
 
         foreach (var methodName in new[]
@@ -3772,15 +3788,15 @@ public sealed partial class WorkerTests
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
-                response.ClaimResults.SelectMany(static result => result.Model)
-                    .Any(static value => value.Variable.StartsWith(
-                        "variable:", StringComparison.Ordinal)),
+                response.ClaimResults.SelectMany(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Model))
+                    .Any(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable.StartsWith(
+                        "variable:", StringComparison.Ordinal))),
                 Is.False);
         }
     }
@@ -3867,7 +3883,7 @@ public sealed partial class WorkerTests
             WorkerClaimOutcome.Refuted);
         Assert.That(
             record.Model.Single(value =>
-                value.Variable == "parameter:0").Value,
+                value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable == "parameter:0")).Value,
             Is.EqualTo(byte.MaxValue.ToString(
                 System.Globalization.CultureInfo.InvariantCulture)));
     }
@@ -3958,19 +3974,19 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Proven),
             string.Join(
                 Environment.NewLine,
                 response.ClaimResults.Select(record =>
-                    GetCallableId(response, record) + ": " +
+                    record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record) + ": " +
                     record.Outcome + " / " +
-                    record.Reason)));
+                    record.Reason))));
         Assert.That(
-            response.ClaimResults.Select(static record => record.ProofCore),
-            Has.All.Matches<string[]>(core => core.Any(static item => item.StartsWith("normal-completion:", StringComparison.Ordinal))));
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.ProofCore)),
+            Has.All.Matches<string[]>(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("normal-completion:", StringComparison.Ordinal))))));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Vacuity),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Vacuity)),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
     }
 
@@ -4065,7 +4081,7 @@ public sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
-                error.Code)));
+                error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         _ = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
@@ -4101,7 +4117,7 @@ public sealed partial class WorkerTests
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         // A null value concatenates as "", which is not null.
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
@@ -4130,14 +4146,14 @@ public sealed partial class WorkerTests
             maximumExpressionDepth: 3);
 
         Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
             Is.EquivalentTo(new[] {
                 WorkerClaimReason.DeepPostcondition,
                 WorkerClaimReason.CounterexampleNotReplayable
             }));
         Assert.That(
             response.ClaimResults.All(static record =>
-                record.Outcome == WorkerClaimOutcome.Unknown),
+                record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome == WorkerClaimOutcome.Unknown)),
             Is.True);
     }
 
@@ -4162,7 +4178,7 @@ public sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
-                error.Code)));
+                error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         _ = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
@@ -4282,7 +4298,7 @@ public sealed partial class WorkerTests
                 response.ClaimResults.Single().Reason,
                 Is.EqualTo(claimReason),
                 string.Join(", ", response.Errors.Select(static error =>
-                    error.Code)));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         }
     }
 
@@ -4370,19 +4386,19 @@ public sealed partial class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(validation.IsValid, Is.True, string.Join(';', validation.Errors.Select(error => error.Code)));
+            Assert.That(validation.IsValid, Is.True, string.Join(';', validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerClaimReason[])[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
-            Assert.That(response.CallableResults.Select(static result => result.Reason),
+            Assert.That(response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerCallableCoverageReason[])[WorkerCallableCoverageReason.InfrastructureFailure,
                     WorkerCallableCoverageReason.MethodTimeout]));
-            Assert.That(response.ClaimResults.Select(static result => result.ClaimId),
-                Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim.ClaimId)));
+            Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)),
+                Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             Assert.That(VerificationCache.IsCacheable(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest), Is.False);
         }
     }
@@ -4390,22 +4406,24 @@ public sealed partial class WorkerTests
     internal static WorkerVerifyResponse AssembleFatalAndTimedOut(
         WorkerVerifyRequest request, WorkerInputSnapshot snapshot, bool reverseRecords)
     {
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(snapshot);
         var manifest = snapshot.CompilerManifest.Manifest;
         Assert.That(manifest.Callables, Has.Length.EqualTo(2));
-        var callables = manifest.Callables.Select((callable, index) => new WorkerCallableResult
+        var callables = manifest.Callables.Select((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
         {
             CallableId = callable.CallableId,
             Coverage = WorkerCallableCoverage.Incomplete,
             Reason = index == 0 ? WorkerCallableCoverageReason.InfrastructureFailure : WorkerCallableCoverageReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        }).ToArray();
-        var claims = manifest.Callables.SelectMany((callable, index) => callable.ClaimIds.Select(claimId => new WorkerClaimResult
+        })).ToArray();
+        var claims = manifest.Callables.SelectMany((callable, index) => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (new WorkerClaimResult
         {
             ClaimId = claimId,
             Outcome = WorkerClaimOutcome.Unknown,
             Reason = index == 0 ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.MethodTimeout,
             Assumptions = callable.Assumptions
-        })).ToArray();
+        })))).ToArray();
         if (reverseRecords)
         {
             Array.Reverse(callables);
@@ -4739,7 +4757,7 @@ public sealed partial class WorkerTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(backend.CallCount, Is.EqualTo(4));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.EqualTo(expectedStatuses));
         Assert.That(
             response.ClaimResults[2].Reason,
@@ -4761,13 +4779,13 @@ public sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(response.ClaimResults.Select(static result => result.Outcome),
+            Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(coordination.Created, Is.EqualTo(2));
             Assert.That(coordination.MaximumActive, Is.EqualTo(2));
             Assert.That(coordination.Disposed, Is.EqualTo(2));
-            var callableIds = response.CallableResults.Select(static result => result.CallableId).ToArray();
-            Assert.That(callableIds, Is.EqualTo(callableIds.OrderBy(static value => value, StringComparer.Ordinal)));
+            var callableIds = response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)).ToArray();
+            Assert.That(callableIds, Is.EqualTo(callableIds.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)));
         }
     }
 
@@ -4840,14 +4858,14 @@ public sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(3));
             Assert.That(created, Has.Count.EqualTo(2));
             Assert.That(
-                created.Select(static backend => backend.DisposeCalls),
+                created.Select(static backend => backend is null ? throw new System.ArgumentNullException(nameof(backend)) : (backend.DisposeCalls)),
                 Is.All.EqualTo(1));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.BackendUnavailable));
         }
     }
@@ -4870,7 +4888,7 @@ public sealed partial class WorkerTests
         Assert.That(
             response.FailureReason,
             Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
-        Assert.That(response.ClaimResults.Select(static result => result.Reason),
+        Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
             Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
         Assert.That(response.Errors.Single().Code, Is.EqualTo("worker.infrastructure"));
         Assert.That(backend.CallCount, Is.Zero);
@@ -4901,7 +4919,7 @@ public sealed partial class WorkerTests
             Assert.That(backend.MaximumActive, Is.EqualTo(1));
             Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(
-                responses.Select(static response => response.RunStatus),
+                responses.Select(static response => response is null ? throw new System.ArgumentNullException(nameof(response)) : (response.RunStatus)),
                 Is.All.EqualTo(WorkerRunStatus.Complete));
         }
     }
@@ -4926,13 +4944,13 @@ public sealed partial class WorkerTests
         {
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.EqualTo((WorkerClaimOutcome[])[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven
                 ]));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerClaimReason[])[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None
@@ -4975,13 +4993,13 @@ public sealed partial class WorkerTests
                     ? WorkerRunFailureReason.BackendUnavailable
                     : WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(
-                response.CallableResults.Select(static result => result.Reason),
+                response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerCallableCoverageReason[])[
                     WorkerCallableCoverageReason.MethodTimeout,
                     WorkerCallableCoverageReason.InfrastructureFailure
                 ]));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerClaimReason[])[
                     WorkerClaimReason.MethodTimeout,
                     backendUnavailable
@@ -5020,6 +5038,7 @@ public sealed partial class WorkerTests
         WorkerClaimReason expectedClaimReason,
         int expectedFactoryCalls)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
@@ -5060,7 +5079,7 @@ public sealed partial class WorkerTests
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerClaimReason[])[
                     WorkerClaimReason.MethodTimeout,
                     expectedClaimReason
@@ -5136,10 +5155,10 @@ public sealed partial class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
             Assert.That(
-                response.CallableResults.Select(static result => result.Reason),
+                response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.MethodTimeout));
         }
     }
@@ -5181,14 +5200,14 @@ public sealed partial class WorkerTests
         {
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.EqualTo((WorkerClaimOutcome[])[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
                     WorkerClaimOutcome.Refuted
                 ]));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Reason),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.EqualTo((WorkerClaimReason[])[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None,
@@ -5238,7 +5257,7 @@ public sealed partial class WorkerTests
         {
             Assert.That(factoryCalls, Is.EqualTo(4));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.EqualTo((WorkerClaimOutcome[])[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
@@ -5247,7 +5266,7 @@ public sealed partial class WorkerTests
                 ]));
             Assert.That(
                 response.ClaimResults.Take(2)
-                    .Select(static result => result.Reason),
+                    .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.MethodTimeout));
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
         }
@@ -5264,10 +5283,10 @@ public sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
@@ -5288,10 +5307,10 @@ public sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
             Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
             Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
@@ -5391,7 +5410,7 @@ public sealed partial class WorkerTests
             Assert.That(response.Manifest.Claims, Is.Empty);
             Assert.That(response.ClaimResults, Is.Empty);
             Assert.That(
-                response.Errors.Select(static error => error.Code),
+                response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
                 Does.Contain("worker.canceled"));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -5442,7 +5461,7 @@ public sealed partial class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
             Assert.That(
-                response.ClaimResults.Select(static result => result.Outcome),
+                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
                 Is.All.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -5594,6 +5613,7 @@ public sealed partial class WorkerTests
         int maximumExpressionDepth =
             WorkerBudgets.DefaultMaximumExpressionDepth)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(
             cacheEnabled,
@@ -5607,11 +5627,13 @@ public sealed partial class WorkerTests
         WorkerVerifyResponse response,
         WorkerClaimResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
+        System.ArgumentNullException.ThrowIfNull(result);
         return response.Manifest.Claims.Single(claim =>
-            string.Equals(
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (string.Equals(
                 claim.ClaimId,
                 result.ClaimId,
-                StringComparison.Ordinal));
+                StringComparison.Ordinal)));
     }
 
     private static WorkerClaimResult AssertClaimVerdict(
@@ -5620,6 +5642,7 @@ public sealed partial class WorkerTests
         WorkerClaimReason? expectedReason = null,
         WorkerVacuityKind? expectedVacuity = null)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
         var result = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope())
         {
@@ -5640,11 +5663,14 @@ public sealed partial class WorkerTests
         WorkerVerifyResponse response,
         WorkerClaimResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
+        System.ArgumentNullException.ThrowIfNull(result);
         return GetClaim(response, result).CallableId;
     }
 
     private static string[] CacheFiles(TestProject project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         return Directory.Exists(project.CacheDirectory)
             ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
             : [];
@@ -5665,6 +5691,8 @@ public sealed partial class WorkerTests
         WorkerVerifyResponse expected,
         WorkerVerifyResponse actual)
     {
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(expected);
         WorkerProtocolJson.Canonicalize(expected);
         WorkerProtocolJson.Canonicalize(actual);
         Assert.That(
@@ -5673,6 +5701,7 @@ public sealed partial class WorkerTests
 
         static string SemanticJson(WorkerVerifyResponse response)
         {
+            System.ArgumentNullException.ThrowIfNull(response);
             return JsonSerializer.Serialize(
                 new
                 {
@@ -5693,6 +5722,9 @@ public sealed partial class WorkerTests
         int seed,
         int count)
     {
+        if (count < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(count)); }
+
         var random = new Random(seed);
         var result = new RuntimeContractCase[count];
         for (var index = 0; index < count; index++)
@@ -5789,6 +5821,7 @@ public sealed partial class WorkerTests
     private static string CreateRuntimeContractSource(
         IEnumerable<RuntimeContractCase> cases)
     {
+        System.ArgumentNullException.ThrowIfNull(cases);
         var builder = new System.Text.StringBuilder();
         builder.AppendLine("using SharpProof.Attributes;");
         builder.AppendLine("public static class RuntimeContractOracle {");
@@ -5821,7 +5854,14 @@ public sealed partial class WorkerTests
         Func<long, bool> Requires,
         Func<long, long, bool> Ensures,
         WorkerClaimOutcome ExpectedStatus,
-        long[] Inputs);
+        long[] Inputs)
+    {
+        public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
+        public string EnsuresSource { get; init; } = EnsuresSource ?? throw new System.ArgumentNullException(nameof(EnsuresSource));
+        public Func<long, bool> Requires { get; init; } = Requires ?? throw new System.ArgumentNullException(nameof(Requires));
+        public Func<long, long, bool> Ensures { get; init; } = Ensures ?? throw new System.ArgumentNullException(nameof(Ensures));
+        public long[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+    }
 
     private const string TautologySource =
         """
@@ -5861,7 +5901,7 @@ public sealed partial class WorkerTests
     private sealed class CountingBackend(BackendCheckResult result)
         : ISmtBackend
     {
-        private readonly BackendCheckResult _result = result;
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
@@ -5870,6 +5910,7 @@ public sealed partial class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(_result);
@@ -5888,6 +5929,7 @@ public sealed partial class WorkerTests
 
         public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             Interlocked.Increment(ref _active);
             Started.TrySetResult();
             try
@@ -5921,6 +5963,7 @@ public sealed partial class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
@@ -5930,11 +5973,13 @@ public sealed partial class WorkerTests
     private sealed class SignalingDelayingBackend(
         TaskCompletionSource started) : ISmtBackend
     {
+        private TaskCompletionSource _guarded_started = started ?? throw new System.ArgumentNullException(nameof(started));
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
-            started.TrySetResult();
+            System.ArgumentNullException.ThrowIfNull(query);
+            _guarded_started.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
@@ -5949,6 +5994,7 @@ public sealed partial class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
@@ -5998,13 +6044,14 @@ public sealed partial class WorkerTests
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             var assignments = query.ModelVariables.Select(variable =>
-                KeyValuePair.Create(variable,
+                variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable,
                     query.Factory.GetVariableInfo(variable).Type == query.Factory.BooleanType
                         ? query.Factory.CreateBooleanValue(false)
-                        : query.Factory.CreateIntegerValue(0)));
+                        : query.Factory.CreateIntegerValue(0))));
             return Task.FromResult(BackendCheckResult.Satisfiable(
                 new BackendModel(assignments)));
         }
@@ -6074,6 +6121,7 @@ public sealed partial class WorkerTests
         private readonly CountingNativeBackend _backend = new();
         internal CoordinatedBackend(ConcurrentLaneState state)
         {
+            System.ArgumentNullException.ThrowIfNull(state);
             _state = state;
             state.CreatedBackend();
         }
@@ -6110,6 +6158,7 @@ public sealed partial class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             return _backend?.CheckAsync(query, cancellationToken) ?? Task.FromResult(_result!);
         }
@@ -6156,6 +6205,7 @@ public sealed partial class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             int call;
             lock (_gate)
             {
@@ -6218,6 +6268,8 @@ public sealed partial class WorkerTests
         string methodName,
         ushort declaredMaxStack)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(path);
         var bytes = File.ReadAllBytes(path);
         int methodBodyOffset;
         using (var stream = new MemoryStream(bytes, writable: false))
@@ -6271,6 +6323,8 @@ public sealed partial class WorkerTests
 
         private TestProject(TempDirectory temporary, string[] sourcePaths)
         {
+            System.ArgumentNullException.ThrowIfNull(sourcePaths, nameof(sourcePaths));
+            System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             DirectoryPath = temporary.FullName;
             SourcePaths = sourcePaths;
@@ -6292,12 +6346,14 @@ public sealed partial class WorkerTests
 
         internal static TestProject Create(string source)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             return Create(("Subject.cs", source));
         }
 
         internal static TestProject Create(
             params (string FileName, string Source)[] sources)
         {
+            System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
             var temporary = TempDirectory.CreateOwned(
                 "SharpProof.Worker.Test",
                 string.Empty,
@@ -6337,8 +6393,10 @@ public sealed partial class WorkerTests
             WorkerFeatureSet features = WorkerFeatureSet.All,
             int maximumExpressionDepth =
                 WorkerBudgets.DefaultMaximumExpressionDepth,
-            ImmutableArray<string> specificationPacks = default)
+            ImmutableArray<string> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ specificationPacks = default)
         {
+
+            System.ArgumentNullException.ThrowIfNull(targetFramework);
             var compilation = CreateCompilation(
                 parseOptions, compilationOptions);
             var discovery = new ClaimManifestBuilder(
@@ -6382,6 +6440,7 @@ public sealed partial class WorkerTests
             string source,
             OptimizationLevel optimizationLevel = OptimizationLevel.Release)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             var path = Path.Combine(
                 DirectoryPath,
                 "implementation-" + Guid.NewGuid().ToString("N") +
@@ -6408,7 +6467,7 @@ public sealed partial class WorkerTests
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic.ToString())));
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
             _additionalReferencePaths.Add(path);
             return path;
         }
@@ -6438,8 +6497,8 @@ public sealed partial class WorkerTests
                 .Select(Path.GetFileName)
                 .Where(static value => value != null)
                 .Select(static value => Version.Parse(value!))
-                .Where(value => value.Major == Environment.Version.Major)
-                .OrderByDescending(static value => value)
+                .Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Major == Environment.Version.Major))
+                .OrderByDescending(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value))
                 .First();
             var references = Directory.GetFiles(
                 Path.Combine(
@@ -6454,8 +6513,8 @@ public sealed partial class WorkerTests
             return [.. references
                 .Append(typeof(Contract).Assembly.Location)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)
-                .Select(static path => MetadataReference.CreateFromFile(path))];
+                .OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.Ordinal)
+                .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)))];
         }
 
         internal CSharpCompilation CreateCompilation(
@@ -6465,18 +6524,18 @@ public sealed partial class WorkerTests
             var effectiveParseOptions =
                 parseOptions ?? CreateParseOptions();
             var syntaxTrees = SourcePaths.Select(path =>
-                CSharpSyntaxTree.ParseText(
+                path is null ? throw new System.ArgumentNullException(nameof(path)) : (CSharpSyntaxTree.ParseText(
                     SourceText.From(
                         File.ReadAllText(path),
                         System.Text.Encoding.UTF8,
                         SourceHashAlgorithm.Sha256),
                     effectiveParseOptions,
-                    path));
+                    path)));
             var references = (_useNetCoreReferencePack
                     ? NetCoreReferencePack
                     : DefaultReferences)
                 .AddRange(_additionalReferencePaths.Select(static path =>
-                    MetadataReference.CreateFromFile(path)));
+                    path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));
             return CSharpCompilation.Create(
                 "WorkerTest",
                 syntaxTrees,

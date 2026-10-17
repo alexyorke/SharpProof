@@ -26,7 +26,7 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
             var tree = VisualBasicSyntaxTree.ParseText(source, path: item.Name + ".vb");
             var compilation = VisualBasicCompilation.Create("UnusedLocal_" + item.Name, [tree], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-            Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty, item.Name);
+            Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty, item.Name);
             using var image = new MemoryStream();
             Assert.That(compilation.Emit(image).Success, Is.True, item.Name);
             var runtime = new System.Runtime.Loader.AssemblyLoadContext(item.Name, isCollectible: true);

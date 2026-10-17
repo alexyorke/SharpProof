@@ -28,8 +28,8 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(assumption.Kind, Is.EqualTo(WorkerAssumptionKind.UserAssume));
         var total = project.Snapshot.Callables.Single().Total!;
         Assert.That(total, Is.Not.Null);
-        var clause = total.Clauses.Single(clause => clause.Kind == CompilerContractKind.Assume);
-        var point = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssumeInstruction>().Single();
+        var clause = total.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume));
+        var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
         Assert.That(point.Operation, Is.EqualTo(clause.Operation));
         Assert.That(point.Condition.Id, Is.EqualTo(total.Program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id));
         Assert.That(clause.AssumptionId, Is.EqualTo(assumption.Id));
@@ -53,6 +53,7 @@ public sealed class WorkerVcSourceAssumeTests
     public async Task PointFilterKeepsEntryFeasibilityMutationAndOriginalReplay(string kind,
         WorkerClaimOutcome expected, WorkerVacuityKind vacuity)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var body = kind switch
         {
             "mutation" => "Contract.Assume(x == 7); Contract.Ensures(Contract.Result<int>() == 8 && Contract.Old(x) == 7); x++; return x;",
@@ -70,10 +71,10 @@ public sealed class WorkerVcSourceAssumeTests
         var preparation = project.Snapshot.Callables.Single();
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
-        Assert.That(total.Program.Blocks.SelectMany(block => block.Instructions).Any(instruction => instruction is IrThrowInstruction), Is.False,
+        Assert.That(total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrThrowInstruction)), Is.False,
             "Compiler-elided assumption arguments must not emit runtime faults.");
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
-        Assert.That(plan!.EntryQuery().Assumptions.All(assumption => assumption.Justification is not UserAssumedJustification), Is.True);
+        Assert.That(plan!.EntryQuery().Assumptions.All(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification is not UserAssumedJustification)), Is.True);
         using var solver = new PassiveCallableSolver(plan);
         Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
         var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -93,7 +94,7 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(result.Vacuity, Is.EqualTo(vacuity));
         if (expected == WorkerClaimOutcome.Proven)
         {
-            Assert.That(result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.True);
+            Assert.That(result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.True);
         }
         else
         { Assert.That(result.Model, Is.Not.Empty); }
@@ -115,14 +116,15 @@ public sealed class WorkerVcSourceAssumeTests
         var result = Postcondition(response);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
-        Assert.That(result.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.False);
+        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).Used, Is.False);
     }
 
     private static WorkerClaimResult Postcondition(WorkerVerifyResponse response)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
-        var id = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition).ClaimId;
-        return response.ClaimResults.Single(result => result.ClaimId == id);
+        var id = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ClaimId;
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == id));
     }
 
     [TestCase("x++; Contract.Assume(x > 0); return x;")]
@@ -132,6 +134,7 @@ public sealed class WorkerVcSourceAssumeTests
     [TestCase("Contract.Assume(Contract.Old(x) > 0); return x;")]
     public void UnsupportedPlacementAndConditionKeepTotalAdmissionClosed(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject($$"""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); {{body}} } }
@@ -148,6 +151,7 @@ public sealed class WorkerVcSourceAssumeTests
     [TestCase("canonical-role")]
     public void MalformedPointEvidenceRejectsTheWholeArtifact(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
@@ -156,8 +160,8 @@ public sealed class WorkerVcSourceAssumeTests
             } }
             """);
         var total = artifact.Callables.Single().Total!;
-        var clauses = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume).ToArray();
-        var points = total.Graph.Blocks.SelectMany(block => block.Instructions).Where(instruction => instruction.Kind == IrInstructionKind.Assume).ToArray();
+        var clauses = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)).ToArray();
+        var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToArray();
         switch (mutation)
         {
             case "id":
@@ -180,7 +184,7 @@ public sealed class WorkerVcSourceAssumeTests
                 break;
             case "canonical-role":
                 var current = total.Parameters[0].Current;
-                foreach (var term in total.Graph.Terms.Where(term => term.Kind == IrTermKind.Variable && term.A == current))
+                foreach (var term in total.Graph.Terms.Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Variable && term.A == current)))
                 { term.A = total.Parameters[0].Entry; }
                 break;
         }
@@ -203,13 +207,14 @@ public sealed class WorkerVcSourceAssumeTests
 
     internal static bool RelocatedAssumptionRejected(string source, bool unreachable)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
-        var blocks = total.Program.Blocks.ToDictionary(block => block.Id, block => builder.CreateBlock());
+        var blocks = total.Program.Blocks.ToDictionary(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id), block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
         builder.SetEntry(blocks[total.Program.Entry]);
-        var point = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssumeInstruction>().Single();
+        var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
         var moved = false;
         foreach (var block in total.Program.Blocks)
         {

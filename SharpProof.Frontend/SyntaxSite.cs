@@ -4,15 +4,9 @@ internal static class SyntaxSite
 {
     internal static bool IsSame(SyntaxNode left, SyntaxNode right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
 
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
 
         return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
     }

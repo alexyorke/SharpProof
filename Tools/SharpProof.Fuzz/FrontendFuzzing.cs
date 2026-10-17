@@ -68,13 +68,15 @@ public sealed class GeneratedCSharpExpression
         ImmutableArray<GeneratedCSharpExpression> children,
         string? stringValue = null)
     {
+
+        RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Array must be initialized.");
         Kind = kind;
         Type = type;
         IntegerValue = integerValue;
         BooleanValue = booleanValue;
         StringValue = stringValue;
         Children = children;
-        NodeCount = 1 + children.Sum(static child => child.NodeCount);
+        NodeCount = 1 + children.Sum(static child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.NodeCount));
     }
 
     public GeneratedExpressionKind Kind { get; }
@@ -485,6 +487,7 @@ public sealed class GeneratedCSharpExpression
 
     private void AppendTo(StringBuilder builder)
     {
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
         switch (Kind)
         {
             case GeneratedExpressionKind.BooleanLiteral:
@@ -646,6 +649,7 @@ public sealed record GeneratedCSharpCase(
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }
+    public GeneratedCSharpExpression Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
 }
 
 public sealed class SmallCSharpCaseGenerator(int seed)
@@ -871,7 +875,10 @@ public sealed class SmallCSharpCaseGenerator(int seed)
 public sealed record FrontendDifferentialResult(
     FuzzOracleStatus Status,
     string Detail,
-    IrExceptionKind? ExceptionKind = null);
+    IrExceptionKind? ExceptionKind = null)
+{
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public sealed record FrontendSemanticEdgeCase(
     string ReturnType,
@@ -879,14 +886,23 @@ public sealed record FrontendSemanticEdgeCase(
     string Expression,
     IReadOnlyList<object?> Arguments,
     FrontendSubsetDecision ExpectedDecision,
-    FrontendAbstention ExpectedAbstention);
+    FrontendAbstention ExpectedAbstention)
+{
+    public string ReturnType { get; init; } = ReturnType ?? throw new System.ArgumentNullException(nameof(ReturnType));
+    public string Parameters { get; init; } = Parameters ?? throw new System.ArgumentNullException(nameof(Parameters));
+    public string Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
+    public IReadOnlyList<object?> Arguments { get; init; } = Arguments ?? throw new System.ArgumentNullException(nameof(Arguments));
+}
 
 public sealed record FrontendSemanticEdgeResult(
     FuzzOracleStatus Status,
     FrontendSubsetDecision? ActualDecision,
     FrontendAbstention? ActualAbstention,
     string Detail,
-    IrExceptionKind? ExceptionKind = null);
+    IrExceptionKind? ExceptionKind = null)
+{
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public static class FrontendDifferentialOracle
 {
@@ -952,6 +968,7 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken)
     {
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         if (!HasValidBatch(generatedCases))
         {
             return [];
@@ -1003,6 +1020,9 @@ public static class FrontendDifferentialOracle
         MemoryStream image,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        image = RepositoryParameterGuard.NotNull(image, nameof(image));
+        syntaxTree = RepositoryParameterGuard.NotNull(syntaxTree, nameof(syntaxTree));
         cancellationToken.ThrowIfCancellationRequested();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             compilation,
@@ -1011,8 +1031,8 @@ public static class FrontendDifferentialOracle
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .OrderBy(
-                static method => ParseMethodIndex(
-                    method.Identifier.ValueText))
+                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ParseMethodIndex(
+                    method.Identifier.ValueText)))
             .ToArray();
         if (methodSyntaxes.Length != generatedCases.Count)
         {
@@ -1146,8 +1166,8 @@ public static class FrontendDifferentialOracle
         var generatedTypes = compilationUnit
             .DescendantNodes()
             .OfType<ClassDeclarationSyntax>()
-            .Where(static type => type.Identifier.ValueText ==
-                "SharpProofGeneratedFrontendEdges")
+            .Where(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText ==
+                "SharpProofGeneratedFrontendEdges"))
             .ToArray();
         if (generatedTypes.Length != 1)
         {
@@ -1222,6 +1242,7 @@ public static class FrontendDifferentialOracle
             "SharpProofGeneratedFrontendEdges",
             runtimeType =>
             {
+                runtimeType = RepositoryParameterGuard.NotNull(runtimeType, nameof(runtimeType));
                 var results =
                     ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
                         cases.Count);
@@ -1246,6 +1267,9 @@ public static class FrontendDifferentialOracle
         string typeName,
         Func<Type, TResult> callback)
     {
+        callback = RepositoryParameterGuard.NotNull(callback, nameof(callback));
+        contextName = RepositoryParameterGuard.NotNull(contextName, nameof(contextName));
+        image = RepositoryParameterGuard.NotNull(image, nameof(image));
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
             contextName,
@@ -1270,6 +1294,7 @@ public static class FrontendDifferentialOracle
             string detail,
             CancellationToken cancellationToken)
     {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         if (cases.Count == 1)
         {
             return RepeatSemanticFailure(1, detail);
@@ -1293,6 +1318,10 @@ public static class FrontendDifferentialOracle
         FrontendLoweringResult lowering,
         GeneratedCSharpCase generated)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
@@ -1326,6 +1355,8 @@ public static class FrontendDifferentialOracle
 
         IrValue CreateSequenceValue(IrTypeId type, long[] values)
         {
+            values = RepositoryParameterGuard.NotNull(values, nameof(values));
+            RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
             var value = factory.CreateSequenceValue(
                 type,
                 values.Select(factory.CreateIntegerValue));
@@ -1342,6 +1373,8 @@ public static class FrontendDifferentialOracle
         int index,
         CancellationToken cancellationToken)
     {
+        methodSyntax = RepositoryParameterGuard.NotNull(methodSyntax, nameof(methodSyntax));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         var method = (IMethodSymbol?)model.GetDeclaredSymbol(
             methodSyntax,
             cancellationToken);
@@ -1429,6 +1462,10 @@ public static class FrontendDifferentialOracle
             FrontendLoweringResult lowering,
             IReadOnlyList<object?> arguments)
     {
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
             ReferenceEqualityComparer.Instance);
@@ -1453,6 +1490,8 @@ public static class FrontendDifferentialOracle
         IMethodSymbol method,
         FrontendLoweringResult lowering)
     {
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is IParameterSymbol parameter &&
@@ -1472,6 +1511,10 @@ public static class FrontendDifferentialOracle
         Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues,
         Dictionary<IrValue, Array> sequenceOrigins)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
+        sequenceValues = RepositoryParameterGuard.NotNull(sequenceValues, nameof(sequenceValues));
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
         {
@@ -1540,6 +1583,7 @@ public static class FrontendDifferentialOracle
         ExpressionSyntax? expression,
         CancellationToken cancellationToken)
     {
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         if (expression == null)
         {
             return null;
@@ -1572,6 +1616,8 @@ public static class FrontendDifferentialOracle
         GeneratedCSharpCase generated,
         CancellationToken cancellationToken)
     {
+        generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return InvokeMethod(
             method,
             [
@@ -1590,6 +1636,8 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<object?> arguments,
         CancellationToken cancellationToken)
     {
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
@@ -1607,6 +1655,7 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         bool indexedMethods = true)
     {
+        generatedCases = RepositoryParameterGuard.NotNull(generatedCases, nameof(generatedCases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine("public static class SharpProofGeneratedFrontend {");
@@ -1630,6 +1679,7 @@ public static class FrontendDifferentialOracle
     private static string CreateSemanticEdgeSource(
         IReadOnlyList<FrontendSemanticEdgeCase> cases)
     {
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine(
@@ -1673,11 +1723,13 @@ public static class FrontendDifferentialOracle
 
     private static string FormatGeneratedMethodName(string prefix, int index)
     {
+        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
         return prefix + index.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int ParseMethodIndex(string name)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return int.Parse(
             name.AsSpan("Target".Length),
             NumberStyles.None,
@@ -1693,6 +1745,8 @@ public static class FrontendDifferentialOracle
             string assemblyName,
             CancellationToken cancellationToken)
     {
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
@@ -1715,6 +1769,7 @@ public static class FrontendDifferentialOracle
         RuntimeOutcome actual,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         if (actual.Exception != null)
         {
             var kind = IrExceptionKindFacts.FromException(actual.Exception);
@@ -1756,6 +1811,8 @@ public static class FrontendDifferentialOracle
         IrValue interpreted,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
+        interpreted = RepositoryParameterGuard.NotNull(interpreted, nameof(interpreted));
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         return interpreted.Kind switch
         {
             IrValueKind.Boolean =>
@@ -1806,6 +1863,7 @@ public static class FrontendDifferentialOracle
 
     private static FrontendDifferentialResult Mismatch(string detail)
     {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return new(FuzzOracleStatus.Mismatch, detail);
     }
 
@@ -1814,13 +1872,14 @@ public static class FrontendDifferentialOracle
             int count,
             string detail)
     {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return [.. Enumerable.Repeat(
             SemanticFailure(null, null, detail),
             count)];
     }
 
     private static FrontendSemanticEdgeResult SemanticAgreement(
-        FrontendSubsetClassification classification)
+        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
     {
         return new(
             FuzzOracleStatus.Agreement,
@@ -1834,6 +1893,7 @@ public static class FrontendDifferentialOracle
         FrontendAbstention? abstention,
         string detail)
     {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return new(
             FuzzOracleStatus.Mismatch,
             decision,
@@ -1850,6 +1910,7 @@ public static class FrontendDifferentialOracle
 
         internal static RuntimeOutcome Threw(Exception exception)
         {
+            exception = RepositoryParameterGuard.NotNull(exception, nameof(exception));
             return new(null, exception);
         }
     }
@@ -1915,10 +1976,10 @@ public static class CSharpStructuralShrinker
 
         return StructuralShrinkCandidates.GetCandidates(
             expression,
-            static value => value.Children,
-            static (parent, child) => parent.Type == child.Type,
-            static value => value.NodeCount,
-            static value => value.Render(),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Children),
+            static (parent, child) => child is null ? throw new System.ArgumentNullException(nameof(child)) : parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Type == child.Type),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.NodeCount),
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Render()),
             GetDomainCandidates,
             TryReplaceChild,
             StringComparer.Ordinal);
@@ -1927,6 +1988,7 @@ public static class CSharpStructuralShrinker
     private static IEnumerable<GeneratedCSharpExpression> GetDomainCandidates(
         GeneratedCSharpExpression expression)
     {
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         return expression.Type switch
         {
             GeneratedExpressionType.Integer => [
@@ -1955,6 +2017,8 @@ public static class CSharpStructuralShrinker
         int childIndex,
         GeneratedCSharpExpression child)
     {
+        child = RepositoryParameterGuard.NotNull(child, nameof(child));
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         return expression.Kind switch
         {
             GeneratedExpressionKind.Not or
@@ -1990,6 +2054,7 @@ internal static class GeneratedCompilationEmitter
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var image = new MemoryStream();
         try
         {

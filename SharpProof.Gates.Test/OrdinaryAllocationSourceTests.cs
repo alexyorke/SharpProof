@@ -16,6 +16,7 @@ public sealed class OrdinaryAllocationSourceTests
     [TestCase(nameof(CreateArray), true)]
     public void CompilerEmittedOrdinaryMethodsHaveExpectedAllocationClassification(string name, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var method = typeof(OrdinaryAllocationSourceTests).GetMethod(name, BindingFlags.Public | BindingFlags.Static)!;
         Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.EqualTo(expected));
     }
@@ -52,7 +53,7 @@ public sealed class OrdinaryAllocationSourceTests
         return total;
     }
 
-    public static int FilteredDivision(int value)
+    public static int FilteredDivision(int value /* SPINT001: all values valid - the zero divisor has an explicit exception-filter fallback */)
     {
         try
         {
@@ -99,7 +100,7 @@ public sealed class OrdinaryAllocationSourceTests
         }
     }
 
-    public static int[] CreateArray(int length)
+    public static int[] CreateArray(int length /* SPINT001: all values valid - the IL allocation oracle includes faulting array lengths */)
     {
         return new int[length];
     }

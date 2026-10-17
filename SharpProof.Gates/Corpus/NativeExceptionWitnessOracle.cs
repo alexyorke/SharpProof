@@ -29,7 +29,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         ArgumentNullException.ThrowIfNull(expected);
         cancellationToken.ThrowIfCancellationRequested();
         if (!method.IsStatic || method.Arity != 0 || preparation.Parameters.Length != method.Parameters.Length ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
+            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)))
         { return "UnsupportedInvocationShape"; }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
         {
@@ -62,6 +62,8 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     // Reports what the compiled invocation actually did, before matching native evidence.
     internal static Exception? ObserveInvocationException(MethodInfo callable, object?[] values)
     {
+        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        System.ArgumentNullException.ThrowIfNull(callable);
         try
         {
             callable.Invoke(null, values);
@@ -75,6 +77,9 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
 
     private bool MatchesExplicitException(IrFactory factory, OperationId site, Exception actual)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(factory);
         var expectedType = ExplicitThrowSites.Types(factory, site).FirstOrDefault();
         var exact = ExplicitThrowSites.IsExact(factory, site);
         return MatchesExceptionType(compilation, expectedType, exact, actual);
@@ -82,6 +87,8 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
 
     internal static bool MatchesExceptionType(CSharpCompilation compilation, string? expectedType, bool exact, Exception actual)
     {
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         for (Type? runtimeType = actual.GetType(); runtimeType != null; runtimeType = exact ? null : runtimeType.BaseType)
         {
             if (runtimeType.FullName is not { } metadataName ||
@@ -110,6 +117,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
 
     private static string MetadataName(INamedTypeSymbol type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var names = new Stack<string>();
         for (var current = type; current != null; current = current.ContainingType)
         { names.Push(current.MetadataName); }

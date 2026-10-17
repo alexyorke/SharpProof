@@ -71,7 +71,7 @@ public sealed class TotalSourceIrreducibleControl
         var result = replay.Result;
         await TestContext.Out.WriteLineAsync("input=" + input + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +
-            "; details=" + string.Join(" | ", result.Failures.Select(failure => failure.Detail)));
+            "; details=" + string.Join(" | ", result.Failures.Select(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.Detail))));
         Assert.That(result.Cases, Is.EqualTo(1));
         Assert.That(result.ExceptionalExits, Is.Zero);
         Assert.That(result.Agreements, Is.Zero);

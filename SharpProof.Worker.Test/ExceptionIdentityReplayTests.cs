@@ -46,14 +46,14 @@ public sealed class ExceptionIdentityReplayTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
+                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         var method = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Compare")
@@ -134,6 +134,7 @@ public sealed class ExceptionIdentityReplayTests
 
         WorkerClaimResult Replay(string allowedExceptionType)
         {
+            System.ArgumentNullException.ThrowIfNull(allowedExceptionType);
             const string claimId = "constructed-generic-exception";
             var evidence = new CompilerEffectClaimArtifact
             {
@@ -173,6 +174,9 @@ public sealed class ExceptionIdentityReplayTests
         Version version,
         string alias)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(version);
         var tree = CSharpSyntaxTree.ParseText(
             $$"""
             using System.Reflection;
@@ -208,7 +212,7 @@ public sealed class ExceptionIdentityReplayTests
             string.Join(
                 Environment.NewLine,
                 emit.Diagnostics.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         return MetadataReference.CreateFromImage(
             stream.ToArray().ToImmutableArray(),
             new MetadataReferenceProperties(

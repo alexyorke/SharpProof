@@ -21,7 +21,7 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
     {
         const string source = "using SharpProof.Attributes; public static class OrdinaryCancellation { [EnforcePure] public static int Identity(int value) => value; }";
         var compilation = AnalyzerGateHost.CreateCompilation(source, "OrdinaryNativeCancellation", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var temporary = new TempDirectory("SharpProof-ordinary-native-cancellation-");
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
@@ -57,10 +57,10 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
         }
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
-        Assert.That(response.Errors.Select(static error => error.Code), Does.Contain("worker.canceled"));
+        Assert.That(response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("worker.canceled"));
         var failure = Assert.Throws<InvalidOperationException>((Action)(() => NativeCorpusVerifier.EnsureComplete(response, request.Budgets)));
         Assert.That(failure!.Message, Is.EqualTo("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
-            response.FailureReason + "): " + string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message))));
+            response.FailureReason + "): " + string.Join("; ", response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)))));
         var captured = (string)failure.Data["SharpProof.Corpus.WorkerFailure"]!;
         Assert.That(captured, Is.EqualTo(NativeCorpusVerifier.CaptureWorkerDiagnostics(response, request.Budgets)));
         using var diagnostics = JsonDocument.Parse(captured);
@@ -71,6 +71,7 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
 
     private static string ComputeSha256(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return string.Concat(SHA256.HashData(bytes).Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
     }
 }

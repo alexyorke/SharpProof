@@ -24,23 +24,23 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
         var compilation = VisualBasicCompilation.Create("RegionTermination", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.ConsoleApplication, optionStrict: OptionStrict.On,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>()
-            .Single(block => block.SubOrFunctionStatement.Identifier.ValueText == "Target");
+            .Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.SubOrFunctionStatement.Identifier.ValueText == "Target"));
         var graph = ControlFlowGraph.Create(declaration, model)!;
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(target.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(graph.OriginalOperation.Descendants().OfType<IEndOperation>().Count(), Is.EqualTo(terminate ? 1 : 0));
         var regions = EnumerateRegions(graph.Root).ToArray();
-        Assert.That(regions.Count(region => region.Kind == ControlFlowRegionKind.TryAndFinally), Is.EqualTo(1));
-        Assert.That(regions.Count(region => region.Kind == ControlFlowRegionKind.Try), Is.EqualTo(1));
-        Assert.That(regions.Count(region => region.Kind == ControlFlowRegionKind.Finally), Is.EqualTo(1));
-        var edges = graph.Blocks.Select(block => block.FallThroughSuccessor)
+        Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.EqualTo(1));
+        Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Try)), Is.EqualTo(1));
+        Assert.That(regions.Count(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Finally)), Is.EqualTo(1));
+        var edges = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor))
             .Where(edge => edge?.Semantics == (terminate
                 ? ControlFlowBranchSemantics.ProgramTermination : ControlFlowBranchSemantics.Return)).ToArray();
         Assert.That(edges, Has.Length.EqualTo(1));
@@ -96,6 +96,7 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
 
     private static IEnumerable<ControlFlowRegion> EnumerateRegions(ControlFlowRegion root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         yield return root;
         foreach (var child in root.NestedRegions)
         {

@@ -94,6 +94,7 @@ public sealed class RuntimeFlagshipOracleTests
             image,
             assembly =>
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             var fixture = assembly.GetType(
                     "RuntimeFlagshipFixture",
                     throwOnError: true)!;
@@ -184,10 +185,12 @@ public sealed class RuntimeFlagshipOracleTests
         IEnumerable<Diagnostic> diagnostics,
         params (string Id, string Method)[] expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         var actual = diagnostics
             .Select(static diagnostic =>
-                (diagnostic.Id, Method: ExtractQuotedName(
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture))))
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((diagnostic.Id, Method: ExtractQuotedName(
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)))))
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
             .ToArray();
@@ -200,6 +203,7 @@ public sealed class RuntimeFlagshipOracleTests
 
     private static string ExtractQuotedName(string message)
     {
+        System.ArgumentNullException.ThrowIfNull(message);
         var first = message.IndexOf('\'', StringComparison.Ordinal);
         var second = first < 0 ? -1 : message.IndexOf('\'', first + 1);
         return first >= 0 && second > first
@@ -211,6 +215,7 @@ public sealed class RuntimeFlagshipOracleTests
     private static void AssertThrows<TException>(Func<int, int> method)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         Action invocation = () => method(0);
         Assert.Throws<TException>(invocation);
     }

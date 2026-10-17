@@ -26,9 +26,9 @@ public sealed class NestedConditionalRethrowRegionCoverageTests
             """);
         var actual = subject.Invoke([input]);
         Assert.That(actual, input == 0 ? Is.TypeOf<DivideByZeroException>() : Is.EqualTo(1));
-        var source = subject.Graph.Blocks.Single(block => block.BranchValue != null &&
+        var source = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue != null &&
             (block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Rethrow ||
-             block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Rethrow));
+             block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Rethrow)));
         var region = source.EnclosingRegion;
         Assert.That(region.Kind, Is.EqualTo(ControlFlowRegionKind.Try));
         var climbed = 0;

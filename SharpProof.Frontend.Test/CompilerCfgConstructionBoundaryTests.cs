@@ -18,6 +18,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
     public void FrozenIndependentBranchProgramsReportTheirActualCfgAndLowering(
         int expectedIfCount, string expectedHash, bool positiveControl)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedHash);
         var name = "branch-" + expectedIfCount;
         var path = name + ".cs";
         var sourceBuilder = new StringBuilder("#nullable enable\npublic static class LunaCfgProbe\n{\n    public static int Target(int x)\n    {\n");
@@ -45,9 +46,9 @@ public sealed class CompilerCfgConstructionBoundaryTests
                 generalDiagnosticOption: ReportDiagnostic.Error,
                 nullableContextOptions: NullableContextOptions.Enable));
         var diagnostics = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error))
             .ToArray();
-        Assert.That(diagnostics, Is.Empty, string.Join(Environment.NewLine, diagnostics.Select(diagnostic => diagnostic.ToString())));
+        Assert.That(diagnostics, Is.Empty, string.Join(Environment.NewLine, diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream);
@@ -62,7 +63,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
 
             var methodSyntax = tree.GetRoot().DescendantNodes()
                 .OfType<MethodDeclarationSyntax>()
-                .Single(method => method.Identifier.ValueText == "Target");
+                .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
             var model = compilation.GetSemanticModel(tree);
             var graph = ControlFlowGraph.Create(methodSyntax, model)!;
             var actualIfCount = tree.GetRoot().DescendantNodes().OfType<IfStatementSyntax>().Count();
@@ -86,8 +87,8 @@ public sealed class CompilerCfgConstructionBoundaryTests
                 Assert.That(lowering.IsExact, Is.True);
                 Assert.That(lowering.ConstructionLimitExceeded, Is.False);
                 var inputs = context.Parameters.ToDictionary(
-                    binding => binding.Entry,
-                    binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, -1L));
+                    binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                    binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, -1L)));
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, inputs);
                 WriteEvidence(
                     $"case={name}; ir_status={replay.Status}; ir_return={replay.ReturnValue?.IntegerNumericValue}; " +
@@ -113,6 +114,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
 
     private static void WriteEvidence(string line)
     {
+        System.ArgumentNullException.ThrowIfNull(line);
         TestContext.Progress.WriteLine(line);
 
     }

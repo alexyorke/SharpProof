@@ -16,6 +16,8 @@ public sealed class ConditionalCustomModifierIdentityTests
     public void CompilerProducedModifiersRequireMatchingLengthKindAndType(
         string leftKey, string rightKey, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(rightKey);
+        System.ArgumentNullException.ThrowIfNull(leftKey);
         var compilation = TestCompilation.Create("ModifierIdentityProducer", """
             public unsafe class ModifierSubject
             {
@@ -36,7 +38,7 @@ public sealed class ConditionalCustomModifierIdentityTests
         TestCompilation.AssertNoErrors(consumer);
         var subject = consumer.GetTypeByMetadataName("ModifierSubject")!;
         Assert.That(subject, Is.Not.Null);
-        Assert.That(subject.Locations.All(location => location.IsInMetadata), Is.True);
+        Assert.That(subject.Locations.All(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
         var init = ((IPropertySymbol)subject.GetMembers("P").Single()).SetMethod!.ReturnTypeCustomModifiers;
         var otherInit = ((IPropertySymbol)subject.GetMembers("Q").Single()).SetMethod!.ReturnTypeCustomModifiers;
         var readOnly = ((IMethodSymbol)subject.GetMembers("R").Single()).RefCustomModifiers;
@@ -65,6 +67,7 @@ public sealed class ConditionalCustomModifierIdentityTests
     private static void AssertModifier(ImmutableArray<CustomModifier> modifiers,
         bool optional, string metadataName)
     {
+        System.ArgumentNullException.ThrowIfNull(metadataName);
         Assert.That(modifiers, Has.Length.EqualTo(1));
         Assert.That(modifiers[0].IsOptional, Is.EqualTo(optional));
         Assert.That(modifiers[0].Modifier.ToDisplayString(), Is.EqualTo(metadataName));

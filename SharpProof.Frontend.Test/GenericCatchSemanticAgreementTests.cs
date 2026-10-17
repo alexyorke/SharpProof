@@ -26,7 +26,7 @@ public sealed class GenericCatchSemanticAgreementTests
         var invocationSyntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var helperSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Helper");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
         var helperSymbol = (IMethodSymbol)model.GetDeclaredSymbol(helperSyntax)!;
         var helperGraph = ControlFlowGraph.Create(helperSyntax, model)!;
         var catchSyntax = helperSyntax.DescendantNodes().OfType<CatchClauseSyntax>().Single();
@@ -49,7 +49,7 @@ public sealed class GenericCatchSemanticAgreementTests
             Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ConstraintTypes[0], exception), Is.True);
             TestContext.WriteLine($"Compiler SDK={typeof(Compilation).Assembly.FullName}; CSharp SDK={typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly.FullName}; compilation={subject.Compilation.Assembly.Identity}");
             var projectedAdmission = CSharpOperationSemantics.TryCatchKinds(subject.Compilation, parameter, out var projectedKinds);
-            TestContext.WriteLine($"SDK catch parameter BaseType={parameter.BaseType?.ToDisplayString() ?? "<null>"}; BaseKind={parameter.BaseType?.TypeKind}; constraints={string.Join("|", parameter.ConstraintTypes.Select(type => type.ToDisplayString()))}; catchAdmitted={projectedAdmission}; kindCount={(projectedKinds.IsDefault ? -1 : projectedKinds.Length)}");
+            TestContext.WriteLine($"SDK catch parameter BaseType={parameter.BaseType?.ToDisplayString() ?? "<null>"}; BaseKind={parameter.BaseType?.TypeKind}; constraints={string.Join("|", parameter.ConstraintTypes.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())))}; catchAdmitted={projectedAdmission}; kindCount={(projectedKinds.IsDefault ? -1 : projectedKinds.Length)}");
             Assert.That(parameter.BaseType, Is.Null);
             Assert.That(SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.TypeArguments.Single(),
                 subject.Compilation.GetTypeByMetadataName("System.DivideByZeroException")), Is.True);
@@ -72,6 +72,7 @@ public sealed class GenericCatchSemanticAgreementTests
         var preparations = 0;
         bool Prepare(TotalLoweringContext candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             preparations++;
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);

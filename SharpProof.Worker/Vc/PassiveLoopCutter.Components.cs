@@ -3,7 +3,12 @@ namespace SharpProof.Worker;
 internal sealed partial class PassiveLoopCutter
 {
     private sealed record ExceptionComponent(ImmutableArray<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes, bool ForgetsHeap,
-        ImmutableArray<IrThrowInstruction> Throws);
+        ImmutableArray<IrThrowInstruction> Throws)
+    {
+        public ImmutableArray<IrBlockId> Blocks { get; init; } = Blocks.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Blocks)) : Blocks;
+        public ImmutableArray<IrVarId> Writes { get; init; } = Writes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Writes)) : Writes;
+        public ImmutableArray<IrThrowInstruction> Throws { get; init; } = Throws.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Throws)) : Throws;
+    }
 
     private bool FindExceptionComponents()
     {
@@ -66,7 +71,7 @@ internal sealed partial class PassiveLoopCutter
             if (!exceptionFlow)
             { continue; }
             Spend(nodes.Count);
-            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.Value)], writes, forgetsHeap, throws.ToImmutable());
+            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value))], writes, forgetsHeap, throws.ToImmutable());
             foreach (var block in nodes)
             { Spend(); _exceptionComponents.Add(block, component); }
         }
@@ -75,6 +80,7 @@ internal sealed partial class PassiveLoopCutter
 
     private ImmutableArray<IrVarId> WrittenVariables(IEnumerable<IrBlockId> nodes)
     {
+        System.ArgumentNullException.ThrowIfNull(nodes);
         var writes = new HashSet<IrVarId>();
         foreach (var node in nodes)
         {
@@ -93,6 +99,6 @@ internal sealed partial class PassiveLoopCutter
             }
         }
         Spend(writes.Count);
-        return [.. writes.OrderBy(variable => variable.Value)];
+        return [.. writes.OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 }

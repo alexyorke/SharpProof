@@ -30,6 +30,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (_calls != null && !_calls.Enter(_context.Target))
         { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
         try
@@ -58,19 +59,19 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
-                .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
-                    CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent));
+                .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent)));
         // Roslyn captures a local or parameter that a branching right-hand
         // side assigns; every capture of that id names the same variable.
-        foreach (var captures in graph.Blocks.SelectMany(block => block.Operations).OfType<IFlowCaptureOperation>().GroupBy(capture => capture.Id))
+        foreach (var captures in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>().GroupBy(capture => capture is null ? throw new System.ArgumentNullException(nameof(capture)) : (capture.Id)))
         {
-            var symbols = captures.Select(capture => capture.Value switch
+            var symbols = captures.Select(capture => capture is null ? throw new System.ArgumentNullException(nameof(capture)) : (capture.Value switch
             {
                 IParameterReferenceOperation parameter when parameter.Parameter.RefKind == RefKind.None && _context.OwnsParameter(parameter.Parameter) =>
                     (ISymbol)parameter.Parameter,
                 ILocalReferenceOperation { Local.RefKind: RefKind.None } local => local.Local,
                 _ => null
-            }).Distinct(SymbolEqualityComparer.Default).ToArray();
+            })).Distinct(SymbolEqualityComparer.Default).ToArray();
             if (symbols.Length == 1 && symbols[0] is { } symbol)
             { _context.RecordStorageCapture(captures.Key, symbol); }
         }
@@ -84,7 +85,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { _frame.Entry = entry; }
         if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
             (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
-                block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow)))
+                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow))))
         { _regionStructural = structural; LowerRegions(graph, entry, structural); return; }
         if (!_context.HasScalarSignature || !_context.OwnsBody(graph.OriginalOperation) ||
             HasUnsupportedRegion(graph.Root) || !TrySelect(graph.Blocks[0], out var selected))
@@ -118,7 +119,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
-            ExceptionTarget = _frame == null ? null : (kind, site) => _frame.Search(kind, site, static target => target)
+            ExceptionTarget = _frame == null ? null : (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (_frame.Search(kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target)))
         };
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
         { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }
@@ -172,7 +173,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 // Nonvoid C# fallthrough is rejected by the compiler. A
                 // constant loop can still expose its impossible exit in CFG;
                 // keep that structural return typed, behind its false edge.
-                IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor.Semantics == ControlFlowBranchSemantics.Regular)
+                IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor is null ? throw new System.ArgumentNullException(nameof(predecessor)) : (predecessor.Semantics == ControlFlowBranchSemantics.Regular))
                     ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(exitResult).Type)
                     : null;
                 Return(block, site, filler);
@@ -203,6 +204,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         // value. Unused, unreachable and compiler-elided declarations keep
         // their existing admission. VB initializes ordinary local storage
         // once per invocation, including locals declared inside loops.
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToArray();
         if (bindings.Length == 0)
         { return; }
@@ -236,6 +240,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasOwnIteratorBody(IOperation root)
     {
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = new Stack<IOperation>();
         pending.Push(root);
         while (pending.Count > 0)
@@ -257,6 +262,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private void Return(IrBlockId block, OperationId site, IrTerm? value = null)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         if (_frame == null)
         { _builder.Return(block, site, value); }
         else
@@ -265,6 +272,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedStaticFieldMutation(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         var conversionAllowed = false;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
@@ -296,6 +304,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedInstanceFieldMutation(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
         { discarded = assignment.Value; }
@@ -312,6 +321,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     }
     private void EmitEntrySpecificationAssumptions(IrBlockId entry)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         foreach (var assumption in _context.EntrySpecificationAssumptions)
         {
             SpendRegion();
@@ -321,6 +331,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         SpendRegion();
         if (_context.TryGetSpecificationAssumption(operation, out var assumption, out var site))
         {
@@ -398,6 +409,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private TotalBodyValue Condition(IOperation operation, IrBlockId block)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = Value(operation, block);
         // Unsupported handler success captures can be untyped; their
         // approximation is not a Boolean branch condition.
@@ -408,6 +421,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private TotalBodyValue Value(IOperation operation, IrBlockId block)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = _expressions.LowerBodyValue(operation, block);
         if (!value.Classification.IsExact)
         {
@@ -443,6 +458,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasUnsupportedRegion(ControlFlowRegion region)
     {
+        region = RepositoryParameterGuard.NotNull(region, nameof(region));
         var pending = new Stack<ControlFlowRegion>();
         pending.Push(region);
         var remaining = MaximumRegionSteps;
@@ -466,6 +482,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
     {
+        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         var visited = new HashSet<BasicBlock>();
         var active = new HashSet<BasicBlock>();
         var order = new List<BasicBlock>();

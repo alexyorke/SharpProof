@@ -9,7 +9,7 @@ public sealed class DependencyBoundaryTests
         Assert.That(
             typeof(IAbstractDomain<>).Assembly
                 .GetReferencedAssemblies()
-                .Select(static assembly => assembly.Name),
+                .Select(static assembly => assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (assembly.Name)),
             Has.None.StartsWith("Microsoft.CodeAnalysis"));
     }
 }

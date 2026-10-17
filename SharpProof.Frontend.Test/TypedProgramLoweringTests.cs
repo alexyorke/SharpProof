@@ -104,6 +104,7 @@ public sealed class TypedProgramLoweringTests
         "static Receiver Pass(Receiver receiver) => receiver; public class Receiver { public void Sink() {} }")]
     public void UnsupportedAllocationOperandsAbstainWithValidResultTypes(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.False);
@@ -115,6 +116,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("[\"\\uDC00\"]")]
     public void IllFormedArrayStringElementsAbstainWithoutThrowing(string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         using var subject = TypedProgramSubject.Create("string[] Target() => " + expression + ";");
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.False);
@@ -124,6 +126,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("[\"\\uD83D\\uDE00\"]")]
     public void WellFormedArrayStringElementsRemainExact(string expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         using var subject = TypedProgramSubject.Create("string[] Target() => " + expression + ";");
         Assert.That(subject.Lower().IsExact, Is.True);
     }
@@ -131,6 +134,8 @@ public sealed class TypedProgramLoweringTests
     [TestCaseSource(nameof(ScalarCases))]
     public void CandidateMatchesCompiledCSharp(string members, object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
@@ -170,6 +175,8 @@ public sealed class TypedProgramLoweringTests
     [TestCase("bool Target(char x) => x is >= 'a' and <= 'z';", '{')]
     public void ScalarPatternBodyMatchesCompiledCSharp(string members, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -201,6 +208,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("int Target(int d) => d == 0 ? 10 / d : 1;", 0)]
     public void DirectBodyShortCircuitMatchesCompiledCSharp(string members, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -241,7 +249,7 @@ public sealed class TypedProgramLoweringTests
             "public static Flag operator &(Flag x, Flag y) => x; }");
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         var builder = new IrProgramBuilder(subject.Factory);
         var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder)
@@ -254,6 +262,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("int Target(int? x) => x is 3 ? 1 : 0;")]
     public void TypeDeclarationAndNullablePatternsRemainOutsideExactLowering(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<IsPatternExpressionSyntax>().Single();
@@ -276,6 +285,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("int Target(Box x) => ~x; public sealed class Box { public static int operator ~(Box x) => 1; }")]
     public void LiftedEnumAndUserDefinedBitwiseRemainClosed(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Lower().IsExact, Is.False);
     }
@@ -284,6 +294,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase(1, 0, "c / d")]
     public void FirstFaultPreventsLaterChildEvaluation(int firstDenominator, int secondDenominator, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create("int Target(int a, int b, int c, int d) => a / b + c / d;");
         var execution = subject.Execute(subject.Lower(), [10, firstDenominator, 20, secondDenominator]);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
@@ -296,6 +307,7 @@ public sealed class TypedProgramLoweringTests
     [TestCase("int Target(int x) { ref readonly int r = ref x; x++; return r; }")]
     public void ReferenceLocalAliasesAbstainInsteadOfCopyingStorage(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([3]), Is.EqualTo(4));
         Assert.That(subject.Lower().IsExact, Is.False);
@@ -303,6 +315,8 @@ public sealed class TypedProgramLoweringTests
 
     private static TestCaseData Case(string members, params object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(members);
         return new TestCaseData(members, arguments).SetName("Candidate: " + members + " [" + string.Join(",", arguments) + "]");
     }
 }
@@ -314,6 +328,12 @@ internal sealed class TypedProgramSubject : IDisposable
     private TypedProgramSubject(string source, Compilation compilation, ControlFlowGraph graph, TotalLoweringContext context,
         AssemblyLoadContext assemblyContext, MethodInfo method)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyContext);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(graph);
+        System.ArgumentNullException.ThrowIfNull(method);
+        System.ArgumentNullException.ThrowIfNull(source);
         Source = source;
         Compilation = compilation;
         Graph = graph;
@@ -329,12 +349,14 @@ internal sealed class TypedProgramSubject : IDisposable
 
     internal static TypedProgramSubject Create(string members, string additionalSource = "", IEnumerable<string>? preprocessorSymbols = null)
     {
+        System.ArgumentNullException.ThrowIfNull(additionalSource);
+        System.ArgumentNullException.ThrowIfNull(members);
         var source = FrontendTestHelpers.WrapSubjectMembers("public static " + members) + additionalSource;
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: preprocessorSymbols), "typed.cs");
         var compilation = CSharpCompilation.Create("TypedSubject", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = compilation.GetSemanticModel(tree);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
         using var stream = new MemoryStream();
@@ -373,6 +395,7 @@ internal sealed class TypedProgramSubject : IDisposable
 
         TotalScalarCallModel? ResolveArrayEmpty(IMethodSymbol method)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             return method.IsStatic && method.ContainingType.SpecialType == SpecialType.System_Array &&
                 method.Name == "Empty" && method.Arity == 1 && method.Parameters.IsEmpty &&
                 CSharpOperationSemantics.IsReferenceDomain(method.ReturnType)
@@ -382,17 +405,25 @@ internal sealed class TypedProgramSubject : IDisposable
     }
     internal IrProgramExecutionResult Execute(FrontendProgramLoweringResult lowering, object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(lowering);
         return new IrProgramInterpreter(Factory).Execute(lowering.Program,
-            Context.Parameters.ToDictionary(binding => binding.Entry, binding => Value(binding.Entry, arguments[binding.Parameter.Ordinal])));
+            Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
     }
     internal IrValue Value(IrVarId variable, object value)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        System.ArgumentNullException.ThrowIfNull(value);
         var type = Factory.GetVariableInfo(variable).Type;
         return value is bool boolean ? Factory.CreateBooleanValue(boolean) : value is ulong unsigned
             ? Factory.CreateIntegerValue(type, unsigned) : Factory.CreateIntegerValue(type, Convert.ToInt64(value, CultureInfo.InvariantCulture));
     }
     internal object? Invoke(object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         try
         { return _method.Invoke(null, arguments); }
         catch (TargetInvocationException exception) { return exception.InnerException; }

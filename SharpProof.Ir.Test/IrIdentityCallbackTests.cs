@@ -22,7 +22,7 @@ public sealed class IrIdentityCallbackTests
     {
         private bool _inserted;
         internal IrIdentityId InsertedIdentity { get; private set; }
-        internal List<(int, int)> Comparisons { get; } = [];
+        internal List<(int, int)> Comparisons { get; } = (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : []);
 
         public bool Equals(int left, int right)
         {

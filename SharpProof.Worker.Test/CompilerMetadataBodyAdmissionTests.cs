@@ -90,7 +90,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreatePlatformCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 MetadataReference.CreateFromFile(path));
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!.GetMembers("Identity").Single();
             var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
@@ -139,19 +139,19 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 $"internal static class Caller {{ internal static int Invoke() => AnnotationSubject.Identity({arguments}); }}",
                 MetadataReference.CreateFromFile(path));
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("AnnotationSubject")!
                 .GetMembers("Identity").Single();
             Assert.That(method.Parameters[0].GetAttributes(), Has.Length.EqualTo(annotations));
-            Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute.AttributeClass!.Name == "TagAttribute"), Is.True);
+            Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.Name == "TagAttribute")), Is.True);
             using var pe = new PEReader(new MemoryStream(image, writable: false));
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
-            var rows = definition.GetParameters().Select(handle => reader.GetParameter(handle)).ToArray();
-            var attributeRows = rows.Sum(row => row.GetCustomAttributes().Count);
+            var rows = definition.GetParameters().Select(handle => ((handle.IsNil) ? throw new System.ArgumentException("Value must be initialized.", nameof(handle)) : (reader.GetParameter(handle)))).ToArray();
+            var attributeRows = rows.Sum(row => ((row.Equals(default(Parameter))) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetCustomAttributes().Count)));
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(rows.Select(row => row.SequenceNumber), Is.EqualTo(Enumerable.Range(1, parameters)));
+                Assert.That(rows.Select(row => ((row.Equals(default(Parameter))) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.SequenceNumber))), Is.EqualTo(Enumerable.Range(1, parameters)));
                 Assert.That(rows, Has.Length.EqualTo(parameters));
                 Assert.That(rows[0].GetCustomAttributes().Count, Is.EqualTo(annotations));
                 Assert.That(attributeRows, Is.EqualTo(annotations));
@@ -191,7 +191,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
         try
         {
             var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToArray();
-            var source = string.Concat(names.Select(name => $"public class {name} {{\n")) +
+            var source = string.Concat(names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ($"public class {name} {{\n"))) +
                 "public static int Identity([SharpProof.Attributes.Positive] int value) { return value; }\n" +
                 new string('}', owners);
             var dependency = CreateCompilation(source).WithAssemblyName("OwnerAncestryDependency");
@@ -202,7 +202,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 $"internal static class Subject {{ internal static int Identity(int value) => {string.Join('.', names)}.Identity(value); }}",
                 MetadataReference.CreateFromFile(path));
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName(string.Join('+', names))!
                 .GetMembers("Identity").Single();
             Assert.That(method.ContainingType.IsGenericType, Is.False);
@@ -246,6 +246,9 @@ public sealed class CompilerMetadataBodyAdmissionTests
     private static void CheckAdmission(string initialization, string statements, bool expectedAdmitted,
         string returnAttributes = "")
     {
+        System.ArgumentNullException.ThrowIfNull(initialization);
+        System.ArgumentNullException.ThrowIfNull(returnAttributes);
+        System.ArgumentNullException.ThrowIfNull(statements);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofMetadataAdmission-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -266,7 +269,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 MetadataReference.CreateFromFile(path));
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
             Assert.That(method.GetReturnTypeAttributes(), Has.Length.EqualTo(returnAttributes.Length == 0 ? 0 : 1));
@@ -280,8 +283,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
             }
             Assert.That(body, Is.Not.Null);
             var admitted = body!;
-            var module = captured.References.SelectMany(reference => reference.Modules)
-                .Single(candidate => Path.GetFullPath(candidate.Path) == Path.GetFullPath(path));
+            var module = captured.References.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules))
+                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (Path.GetFullPath(candidate.Path) == Path.GetFullPath(path)));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(admitted.Method, Is.SameAs(method));
@@ -301,6 +304,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
 
     private static CSharpCompilation CreateCompilation(string source, params MetadataReference[] additionalReferences)
     {
+        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
             TestMetadataReferences.WithSharpProof.AddRange(additionalReferences),
@@ -309,6 +314,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
 
     private static CSharpCompilation CreatePlatformCompilation(string source, params MetadataReference[] additionalReferences)
     {
+        System.ArgumentNullException.ThrowIfNull(additionalReferences, nameof(additionalReferences));
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
             TestMetadataReferences.WithoutSharpProof.AddRange(additionalReferences),
@@ -331,12 +338,13 @@ public sealed class CompilerMetadataBodyAdmissionTests
 
     private static byte[] EmitImage(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         if (!result.Success)
         {
             throw new InvalidOperationException(string.Join(Environment.NewLine,
-                result.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
+                result.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
         return stream.ToArray();
     }

@@ -36,7 +36,7 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
                 ModuleMetadata.CreateFromImage(firstImage), ModuleMetadata.CreateFromImage(secondImage));
             var reference = metadata.GetReference(filePath: manifestPath);
             var subject = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []).AddReferences(reference);
-            Assert.That(subject.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(subject.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.InstanceOf<IAssemblySymbol>());
             var maximumModule = Math.Max(manifestImage.LongLength, Math.Max(firstImage.LongLength, secondImage.LongLength));
             var closureBytes = manifestImage.LongLength + firstImage.LongLength + secondImage.LongLength;
@@ -48,11 +48,11 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(captured.Kind, Is.EqualTo("Assembly"));
-                Assert.That(captured.Modules.Select(module => module.Name),
+                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
                     Is.EqualTo(ExpectedModuleNames));
-                Assert.That(captured.Modules.Select(module => module.SizeBytes),
+                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
                     Is.EqualTo(new[] { manifestImage.LongLength, firstImage.LongLength, secondImage.LongLength }));
-                Assert.That(captured.Modules.Select(module => module.Path),
+                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
                     Is.EqualTo(new[] { manifestPath, firstPath, secondPath }.Select(Path.GetFullPath)));
             }
         }
@@ -64,6 +64,7 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
 
     private static byte[] EmitModule(string name)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var compilation = AnalyzerTestHost.CreateCompilation(
             $"public static class {name} {{ public static int Value => 1; }}", []).WithAssemblyName(name);
         return AnalyzerTestHost.EmitImage(compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.NetModule)));

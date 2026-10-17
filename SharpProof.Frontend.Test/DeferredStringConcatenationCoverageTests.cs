@@ -17,10 +17,10 @@ public sealed class DeferredStringConcatenationCoverageTests
         Assert.That(subject.Invoke([input!, choose]), Is.EqualTo(expected));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding.Entry, binding =>
-            binding.Parameter.Name == "choose" ? subject.Factory.CreateBooleanValue(choose) : input == null
+        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding =>
+            binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Name == "choose" ? subject.Factory.CreateBooleanValue(choose) : input == null
                 ? subject.Factory.CreateNullValue(subject.Factory.GetVariableInfo(binding.Entry).Type)
-                : subject.Factory.CreateStringValue(input));
+                : subject.Factory.CreateStringValue(input)));
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, inputs);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));

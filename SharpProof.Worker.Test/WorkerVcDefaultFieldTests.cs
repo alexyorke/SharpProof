@@ -13,6 +13,8 @@ public sealed class WorkerVcDefaultFieldTests
     public async Task FreshFieldsRespectRuntimeInitialization(string field, string body, int contractResult,
         int runtimeResult, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(field);
         var source = "using SharpProof.Attributes; public sealed class Cell { " + field +
             " } public static class Subject { public static int Target() { " +
             "Contract.Ensures(Contract.Result<int>() == " + contractResult + "); " +
@@ -31,6 +33,7 @@ public sealed class WorkerVcDefaultFieldTests
 
     private static void AssertRuntimeResult(string source, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("DefaultFieldRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

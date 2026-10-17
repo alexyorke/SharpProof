@@ -32,7 +32,7 @@ public sealed class ContractForValidatorGeneratorTests
             new ThrowingAnalyzer());
 
         Assert.That(
-            run.Diagnostics.Any(static diagnostic => diagnostic.Id == "AD0001"),
+            run.Diagnostics.Any(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")),
             Is.True);
     }
 
@@ -55,6 +55,9 @@ public sealed class ContractForValidatorGeneratorTests
         string targetDefault,
         string companionDefault)
     {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
         var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
 
         AssertSingle(run, "SPCF0005");
@@ -75,6 +78,9 @@ public sealed class ContractForValidatorGeneratorTests
         string targetDefault,
         string companionDefault)
     {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
         var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
 
         Assert.That(run.Diagnostics, Is.Empty);
@@ -85,6 +91,9 @@ public sealed class ContractForValidatorGeneratorTests
         string targetDefault,
         string companionDefault)
     {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
         return $$"""
             using SharpProof.Attributes;
             public interface ITarget {
@@ -239,6 +248,8 @@ public sealed class ContractForValidatorGeneratorTests
         string targetKind,
         string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(targetKind);
         var run = Run(
             $$"""
             using SharpProof.Attributes;
@@ -284,6 +295,8 @@ public sealed class ContractForValidatorGeneratorTests
         string targetRefKind,
         string companionRefKind)
     {
+        System.ArgumentNullException.ThrowIfNull(companionRefKind);
+        System.ArgumentNullException.ThrowIfNull(targetRefKind);
         var companionAssignment = companionRefKind == "out"
             ? "value = 0;"
             : string.Empty;
@@ -432,6 +445,8 @@ public sealed class ContractForValidatorGeneratorTests
         string returnKind,
         string expressionKind)
     {
+        System.ArgumentNullException.ThrowIfNull(expressionKind);
+        System.ArgumentNullException.ThrowIfNull(returnKind);
         var run = Run(
             $$"""
             using SharpProof.Attributes;
@@ -453,6 +468,7 @@ public sealed class ContractForValidatorGeneratorTests
     [TestCase("ref readonly")]
     public void RefReturningBlockBodiedCompanionRemainsValid(string returnKind)
     {
+        System.ArgumentNullException.ThrowIfNull(returnKind);
         var run = Run(
             $$"""
             using SharpProof.Attributes;
@@ -717,11 +733,13 @@ public sealed class ContractForValidatorGeneratorTests
         string companionPointer,
         int expectedDiagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
         var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
 
         Assert.That(run.Diagnostics, Has.Length.EqualTo(expectedDiagnostics));
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(Enumerable.Repeat("SPCF0005", expectedDiagnostics)));
     }
 
@@ -735,6 +753,8 @@ public sealed class ContractForValidatorGeneratorTests
         string targetPointer,
         string companionPointer)
     {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
         var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
 
         AssertSingle(run, "SPCF0005");
@@ -744,6 +764,8 @@ public sealed class ContractForValidatorGeneratorTests
         string targetPointer,
         string companionPointer)
     {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
         return $$"""
             using SharpProof.Attributes;
             public unsafe interface ITarget {
@@ -766,6 +788,8 @@ public sealed class ContractForValidatorGeneratorTests
         string targetPointer,
         string companionPointer)
     {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
         var run = Run(
             $$"""
             using SharpProof.Attributes;
@@ -866,6 +890,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void OpenGenericCompanionTypeMustMatchArityAndConstraints(
         string declarations)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
         var run = Run(
             """
             #nullable enable
@@ -929,13 +954,13 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(["SPCF0002", "SPCF0002"]));
         Assert.That(
             run.Diagnostics.All(diagnostic =>
-                GetLocatedText(diagnostic).Contains(
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (GetLocatedText(diagnostic).Contains(
                     "ContractFor",
-                    StringComparison.Ordinal)),
+                    StringComparison.Ordinal))),
             Is.True);
     }
 
@@ -962,7 +987,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(["SPCF0002", "SPCF0002"]));
     }
 
@@ -1007,6 +1032,10 @@ public sealed class ContractForValidatorGeneratorTests
         string sourceTarget,
         string sourceCompanion)
     {
+        System.ArgumentNullException.ThrowIfNull(referencedCompanion);
+        System.ArgumentNullException.ThrowIfNull(referencedTarget);
+        System.ArgumentNullException.ThrowIfNull(sourceCompanion);
+        System.ArgumentNullException.ThrowIfNull(sourceTarget);
         var compilation = GeneratorTestHost.CreateCompilationWithReference(
             $$"""
             using SharpProof.Attributes;
@@ -1201,6 +1230,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void ContractForTargetMustBeAClassOrInterface(
         string targetDeclaration)
     {
+        System.ArgumentNullException.ThrowIfNull(targetDeclaration);
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -1393,6 +1423,7 @@ public sealed class ContractForValidatorGeneratorTests
         """)]
     public void ExactSignatureMismatchesFailClosed(string declarations)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
         var run = Run(
             """
             #nullable enable
@@ -1519,6 +1550,8 @@ public sealed class ContractForValidatorGeneratorTests
         string target,
         string companion)
     {
+        System.ArgumentNullException.ThrowIfNull(companion);
+        System.ArgumentNullException.ThrowIfNull(target);
         var run = Run(
             $$"""
             using SharpProof.Attributes;
@@ -1583,11 +1616,11 @@ public sealed class ContractForValidatorGeneratorTests
 
         Assert.That(
             run.Diagnostics.Any(static diagnostic =>
-                diagnostic.Id == "SPCF0006"),
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0006")),
             Is.True);
         Assert.That(
             run.Diagnostics.All(static diagnostic =>
-                diagnostic.Id == "SPCF0006"),
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0006")),
             Is.True);
     }
 
@@ -1692,7 +1725,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(Enumerable.Repeat("SPCF0008", 3)));
         string[] expectedMessages = [
             "Contract.Ensures in companion method 'Invoke' has invalid placement: Conditional",
@@ -1701,8 +1734,8 @@ public sealed class ContractForValidatorGeneratorTests
         ];
         Assert.That(
             run.Diagnostics.Select(static diagnostic =>
-                diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture)),
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture))),
             Is.EquivalentTo(expectedMessages));
     }
 
@@ -1737,6 +1770,7 @@ public sealed class ContractForValidatorGeneratorTests
     public void CompilationGlobalProfileOffDisablesValidationInCustomHosts(
         string optionKey)
     {
+        System.ArgumentNullException.ThrowIfNull(optionKey);
         var compilation = GeneratorTestHost.CreateCompilation(
             ("Subject.cs",
             """
@@ -1800,6 +1834,10 @@ public sealed class ContractForValidatorGeneratorTests
         string secondValue,
         bool validationEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(firstKey);
+        System.ArgumentNullException.ThrowIfNull(firstValue);
+        System.ArgumentNullException.ThrowIfNull(secondKey);
+        System.ArgumentNullException.ThrowIfNull(secondValue);
         var compilation = GeneratorTestHost.CreateCompilation(
             ("Subject.cs",
             """
@@ -1823,7 +1861,7 @@ public sealed class ContractForValidatorGeneratorTests
             });
 
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             validationEnabled ? Is.EqualTo(["SPCF0004"]) : Is.Empty);
     }
 
@@ -1907,12 +1945,12 @@ public sealed class ContractForValidatorGeneratorTests
             GeneratorTestHost.DiagnosticKeys(reversed),
             Is.EqualTo(GeneratorTestHost.DiagnosticKeys(first)));
         Assert.That(
-            first.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            first.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(["SPCF0002", "SPCF0002"]));
         var cachedReasons = cached.RunResult.Results
-            .SelectMany(static result => result.TrackedSteps.Values)
+            .SelectMany(static result => ((result.Equals(default(GeneratorRunResult))) ? throw new System.ArgumentException("Value must be initialized.", nameof(result)) : (result.TrackedSteps.Values)))
             .SelectMany(static steps => steps)
-            .SelectMany(static step => step.Outputs)
+            .SelectMany(static step => step is null ? throw new System.ArgumentNullException(nameof(step)) : (step.Outputs))
             .Select(static output => output.Reason)
             .ToImmutableArray();
         Assert.That(cachedReasons, Is.Empty);
@@ -1949,6 +1987,7 @@ public sealed class ContractForValidatorGeneratorTests
 
     private static AnalyzerRun Run(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return GeneratorTestHost.RunAnalyzer(
             GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
     }
@@ -1957,11 +1996,13 @@ public sealed class ContractForValidatorGeneratorTests
         AnalyzerRun run,
         string diagnosticId)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnosticId);
+        System.ArgumentNullException.ThrowIfNull(run);
         Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo([diagnosticId]),
             string.Join(Environment.NewLine, run.Diagnostics.Select(
-                static diagnostic => diagnostic.ToString())));
+                static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         return run.Diagnostics[0];
     }
 
@@ -1981,10 +2022,17 @@ internal sealed class InvalidOutputGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        if (context.Equals(default(IncrementalGeneratorInitializationContext)))
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
         context.RegisterPostInitializationOutput(static postInitialization =>
-            postInitialization.AddSource(
+            {
+                if ((postInitialization.Equals(default(IncrementalGeneratorPostInitializationContext))))
+                { throw new System.ArgumentException("Value must be initialized.", nameof(postInitialization)); }
+                postInitialization.AddSource(
                 "Invalid.g.cs",
-                "public sealed class Generated {"));
+                "public sealed class Generated {");
+            });
     }
 }
 
@@ -2005,6 +2053,7 @@ internal sealed class ThrowingAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterCompilationAction(static _ =>

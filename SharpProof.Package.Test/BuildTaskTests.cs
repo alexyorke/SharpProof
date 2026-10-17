@@ -27,6 +27,7 @@ public sealed class BuildTaskTests
     [Platform("Linux")]
     public void RuntimePublicationRejectsBeforeRewritingInvocationArguments(string workerIdentity)
     {
+        System.ArgumentNullException.ThrowIfNull(workerIdentity);
         using var directory = new TempDirectory("sharpproof-publication-runtime-");
         var runtime = Path.Combine(directory.FullName, "runtime");
         Directory.CreateDirectory(runtime);
@@ -86,6 +87,7 @@ public sealed class BuildTaskTests
     [Platform("Linux")]
     public async System.Threading.Tasks.Task PublicationValidationKeepsCooperatingWritersAndDeletesOutsideTheLease(string competingAction)
     {
+        System.ArgumentNullException.ThrowIfNull(competingAction);
         using var directory = new TempDirectory("sharpproof-publication-lease-");
         var stable = Path.Combine(directory.FullName, "stable");
         Directory.CreateDirectory(stable);
@@ -177,6 +179,7 @@ public sealed class BuildTaskTests
 
         VerificationPublication Prepare(string name, char inputIdentity)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return PreparePublication(directory.FullName, name, inputIdentity, [request, result, manifest, sarif], out _);
         }
     }
@@ -184,6 +187,9 @@ public sealed class BuildTaskTests
     private static VerificationPublication PreparePublication(string root, string name, char inputIdentity,
         string[] stablePaths, out string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(stablePaths, nameof(stablePaths));
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(root);
         var invocation = Path.Combine(root, name);
         Directory.CreateDirectory(invocation);
         arguments = ["verify", "--request", Path.Combine(invocation, "request.json"), "--result", Path.Combine(invocation, "result.json"),
@@ -240,6 +246,7 @@ public sealed class BuildTaskTests
     [Platform("Linux")]
     public void PreparedPublicationCannotSubstituteItsPrivateInvocation(string change)
     {
+        System.ArgumentNullException.ThrowIfNull(change);
         using var directory = new TempDirectory("sharpproof-publication-binding-");
         var stableDirectory = Path.Combine(directory.FullName, "stable");
         Directory.CreateDirectory(stableDirectory);
@@ -359,6 +366,7 @@ public sealed class BuildTaskTests
     [Platform("Linux")]
     public void PublishedResultValidatorRejectsInvalidEvidence(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         using var directory = new TempDirectory("sharpproof-result-binding-");
         var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
         var request = Path.Combine(directory.FullName, "request.json");
@@ -692,7 +700,7 @@ public sealed class BuildTaskTests
             { await System.Threading.Tasks.Task.Delay(10); }
             Assert.That(File.Exists(marker), Is.True,
                 "The actual child must publish its closed PID before its process deadline. Exit=" + task.ExitCode +
-                "; messages=" + string.Join(";", engine.Messages.Select(message => message.Message)));
+                "; messages=" + string.Join(";", engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
             var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
             Assert.That(processId, Is.GreaterThan(0));
             Assert.That(IsProcessRunning(processId), Is.True);
@@ -885,7 +893,7 @@ public sealed class BuildTaskTests
         {
             Assert.That(task.ExitCode, Is.EqualTo(exitCode));
             Assert.That(
-                engine.Errors.Select(static error => error.Code),
+                engine.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
                 Does.Contain("SP0047"));
             Assert.That(
                 task.HasStructuredError,
@@ -989,7 +997,7 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.Zero);
                 Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(6)));
                 Assert.That(
-                    engine.Messages.Select(static message => message.Message),
+                    engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
                     Has.Some.Contains("descendant holding its output"));
             }
         }
@@ -1077,6 +1085,8 @@ public sealed class BuildTaskTests
     public void InvalidationPreflightsAllCollisionsBeforeDeletingAnyOutput(
         string collision, string expectedError)
     {
+        System.ArgumentNullException.ThrowIfNull(collision);
+        System.ArgumentNullException.ThrowIfNull(expectedError);
         using var directory = new TempDirectory("sharpproof-invalidation-collision-");
         Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
         File.WriteAllText(Path.Combine(directory.FullName, "result.json"), "result");
@@ -1113,7 +1123,7 @@ public sealed class BuildTaskTests
         }
 
         Assert.That(task.Execute(), Is.False);
-        Assert.That(engine.Errors.Select(static item => item.Message), Has.Some.Contains(expectedError));
+        Assert.That(engine.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Message)), Has.Some.Contains(expectedError));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.json")), Is.EqualTo("result"));
@@ -1145,7 +1155,7 @@ public sealed class BuildTaskTests
         Assert.That(task.Execute(), Is.True);
         Assert.That(engine.Errors, Is.Empty);
         Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "unrelated.txt")), Is.EqualTo("unrelated.txt"));
-        Assert.That(names.Take(4).Select(name => File.Exists(Path.Combine(directory.FullName, name))), Is.All.False);
+        Assert.That(names.Take(4).Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (File.Exists(Path.Combine(directory.FullName, name)))), Is.All.False);
     }
 
     [Test]
@@ -1261,6 +1271,7 @@ public sealed class BuildTaskTests
     [TestCase("--publish-compiler-manifest")]
     public void IncompletePublicationOptionsRejectBeforeRewritingArguments(string option)
     {
+        System.ArgumentNullException.ThrowIfNull(option);
         using var directory = new TempDirectory("sharpproof-publication-incomplete-");
         string[] arguments = ["verify", option, Path.Combine(directory.FullName, "stable.json")];
         var original = arguments.ToArray();
@@ -1298,7 +1309,7 @@ public sealed class BuildTaskTests
         Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "completed.txt")), Is.EqualTo("completed"));
         Assert.That(task.ExitCode, Is.EqualTo(3));
         Assert.That(task.HasStructuredError, Is.False);
-        Assert.That(engine.Messages.Select(static item => item.Message),
+        Assert.That(engine.Messages.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Message)),
             Has.Some.Contains("SharpProof worker result could not be published"));
         foreach (var path in stable)
         {
@@ -1379,7 +1390,7 @@ public sealed class BuildTaskTests
                 }
             }
             Assert.That(publishing, Is.True, "The launcher must acquire a publication member after the child exits. " +
-                string.Join(Environment.NewLine, engine.Messages.Select(static message => message.Message)));
+                string.Join(Environment.NewLine, engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
             task.Cancel();
 
             Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
@@ -1448,7 +1459,7 @@ public sealed class BuildTaskTests
             Assert.That(task.ExitCode, Is.EqualTo(LinuxProcessControlConstants.TimeoutExitCode));
             Assert.That(task.HasStructuredError, Is.False);
             Assert.That(engine.Errors, Is.Empty);
-            Assert.That(engine.Messages.Select(static message => message.Message),
+            Assert.That(engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
                 Has.Some.Contains("descendant holding its output"));
             foreach (var path in stable)
             {
@@ -1495,6 +1506,7 @@ public sealed class BuildTaskTests
     [TestCase("/tmp/other-host")]
     public void VerifierRejectsUntrustedMuxerNames(string executable)
     {
+        System.ArgumentNullException.ThrowIfNull(executable);
         Action resolve = () => { RunVerifier.ResolveDotNetHost(executable); };
         Assert.That(resolve, Throws.InvalidOperationException);
     }
@@ -1528,6 +1540,8 @@ public sealed class BuildTaskTests
         string directory,
         string source = "using System.Threading; Thread.Sleep(3000);")
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(source);
         var assemblyPath = Path.Combine(directory, "TimedProcess.dll");
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var references = TestMetadataReferences.Platform;
@@ -1597,6 +1611,8 @@ public sealed class BuildTaskTests
         int graceMilliseconds = 1000,
         RecordingBuildEngine? buildEngine = null)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(helper);
         return new RunVerifier
         {
             BuildEngine = buildEngine ?? new RecordingBuildEngine(),
@@ -1625,16 +1641,19 @@ public sealed class BuildTaskTests
 
         public void LogErrorEvent(BuildErrorEventArgs e)
         {
+            System.ArgumentNullException.ThrowIfNull(e);
             Errors.Add(e);
         }
 
         public void LogWarningEvent(BuildWarningEventArgs e)
         {
+            System.ArgumentNullException.ThrowIfNull(e);
             Warnings.Add(e);
         }
 
         public void LogMessageEvent(BuildMessageEventArgs e)
         {
+            System.ArgumentNullException.ThrowIfNull(e);
             Messages.Add(e);
             if (e.Message?.Contains("SharpProof summary", StringComparison.Ordinal) == true)
             {
@@ -1642,7 +1661,7 @@ public sealed class BuildTaskTests
             }
         }
 
-        public void LogCustomEvent(CustomBuildEventArgs e) { }
+        public void LogCustomEvent(CustomBuildEventArgs e) { System.ArgumentNullException.ThrowIfNull(e, nameof(e)); }
 
         public bool BuildProjectFile(
             string projectFileName,
@@ -1650,6 +1669,10 @@ public sealed class BuildTaskTests
             System.Collections.IDictionary globalProperties,
             System.Collections.IDictionary targetOutputs)
         {
+            System.ArgumentNullException.ThrowIfNull(targetNames, nameof(targetNames));
+            System.ArgumentNullException.ThrowIfNull(globalProperties);
+            System.ArgumentNullException.ThrowIfNull(projectFileName);
+            System.ArgumentNullException.ThrowIfNull(targetOutputs);
             return false;
         }
     }

@@ -49,9 +49,9 @@ public sealed class ControlFlowGeneratorCompileRegressionTests
         }
 
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(errors, Is.Empty,
-            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}\n{source}");
+            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}\n{source}");
     }
 }

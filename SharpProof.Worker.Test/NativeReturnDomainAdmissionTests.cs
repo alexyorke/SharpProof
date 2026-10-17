@@ -12,7 +12,7 @@ public sealed class NativeReturnDomainAdmissionTests
     [TestCase("Boolean", "Integer", false)]
     [TestCase("Void", "Void", true)]
     public Task RepresentativeReturnDomainsPreserveModuleAdmission(string actual, string declared, bool admitted)
-    { return VerifyAsync(actual, declared, admitted); }
+    { System.ArgumentNullException.ThrowIfNull(actual, nameof(actual)); System.ArgumentNullException.ThrowIfNull(declared, nameof(declared)); return VerifyAsync(actual, declared, admitted); }
 
     [TestCase("Integer", "Integer", true)]
     [TestCase("Integer", "Boolean", false)]
@@ -21,10 +21,12 @@ public sealed class NativeReturnDomainAdmissionTests
     [TestCase("Void", "Integer", false)]
     [TestCase("Void", "Boolean", false)]
     public Task RemainingReturnDomainsPreserveModuleAdmission(string actual, string declared, bool admitted)
-    { return VerifyAsync(actual, declared, admitted); }
+    { System.ArgumentNullException.ThrowIfNull(actual, nameof(actual)); System.ArgumentNullException.ThrowIfNull(declared, nameof(declared)); return VerifyAsync(actual, declared, admitted); }
 
     private static async Task VerifyAsync(string actual, string declared, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(declared);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

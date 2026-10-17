@@ -18,6 +18,7 @@ internal sealed class PublicationLease : IDisposable
         Justification = "The returned acquired lease transfers ownership to the caller, which disposes it after publication.")]
     internal static PublicationLease Acquire(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(paths);
         return AcquireAsync(paths, cancellationToken).GetAwaiter().GetResult();
     }
 
@@ -77,18 +78,20 @@ internal sealed class PublicationLease : IDisposable
 
     internal static string CanonicalMember(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return CanonicalMember(path, OperatingSystem.IsWindows());
     }
 
     internal static string CanonicalMember(string path, bool isWindows)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var full = Path.GetFullPath(path);
         if (isWindows)
         {
             // Win32 normalization can trim these aliases before full-path
             // validation sees them. Check the caller's spelling as well.
             if (path.Split(['\\', '/']).Any(static segment =>
-                segment is not ("." or "..") && (segment.EndsWith('.') || segment.EndsWith(' '))))
+                segment is null ? throw new System.ArgumentNullException(nameof(segment)) : (segment is not ("." or "..") && (segment.EndsWith('.') || segment.EndsWith(' ')))))
             {
                 throw new ArgumentException("SharpProof Windows paths must not have ambiguous trailing dots or spaces.");
             }
@@ -145,12 +148,14 @@ internal sealed class PublicationLease : IDisposable
 
     internal static bool IsLocalNtfs(string root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         var drive = new DriveInfo(root);
         return drive.DriveType == DriveType.Fixed && drive.DriveFormat == "NTFS";
     }
 
     internal static bool IsReparsePoint(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return (File.Exists(path) || Directory.Exists(path)) &&
             (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
     }

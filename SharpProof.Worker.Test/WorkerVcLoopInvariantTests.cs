@@ -126,6 +126,7 @@ public sealed class WorkerVcLoopInvariantTests
     [TestCase("Nested")]
     public void InductiveInvariantProvesThePostcondition(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
@@ -173,6 +174,7 @@ public sealed class WorkerVcLoopInvariantTests
     [TestCase("GuardedWrite")]
     public void InductiveInvariantProvesEffectSiteClaims(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
@@ -197,16 +199,17 @@ public sealed class WorkerVcLoopInvariantTests
     {
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable.CallableId.Contains(".CountUp(", StringComparison.Ordinal));
-        var claim = response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains(".CountUp(", StringComparison.Ordinal)));
+        var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
         Assert.That(claim.Assumptions.Single().Used, Is.True);
     }
 
     private static WorkerClaimResult Claim(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal));
-        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

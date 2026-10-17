@@ -117,12 +117,12 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
                 TestMetadataReferences.WithSharpProof.Add(libraryReference));
             var consumerImage = Emit(consumer);
             var consumerHasForeignReference = consumer.References.Select(consumer.GetAssemblyOrModuleSymbol)
-                .OfType<IAssemblySymbol>().Any(assembly => assembly.Name == foreignName);
+                .OfType<IAssemblySymbol>().Any(assembly => assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (assembly.Name == foreignName));
             Assert.That(consumerHasForeignReference, Is.False);
             if (attributePath != null)
             {
                 Assert.That(consumer.References.OfType<PortableExecutableReference>()
-                    .Any(reference => reference.FilePath == attributePath), Is.False);
+                    .Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.FilePath == attributePath)), Is.False);
             }
 
             var selected = ContractSelectionInventory.ForCompilation(consumer).Positive;
@@ -228,8 +228,10 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
         }
     }
 
-    private static CSharpCompilation Create(string name, string source, ImmutableArray<MetadataReference> references)
+    private static CSharpCompilation Create(string name, string source, ImmutableArray<MetadataReference> /* SPINT001: all values valid - Roslyn accepts default as an empty reference list for malformed-reference test fixtures */ references)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(name);
         var compilation = CSharpCompilation.Create(name,
             [CSharpSyntaxTree.ParseText(source, ParseOptions)], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -240,6 +242,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
 
     private static byte[] Emit(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.That(result.Success, Is.True, string.Join("\n", result.Diagnostics));

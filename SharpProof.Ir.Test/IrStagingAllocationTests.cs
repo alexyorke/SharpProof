@@ -71,6 +71,7 @@ public sealed class IrStagingAllocationTests
 
     private static string Name(string directory, Guid identity)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         return Path.Combine(directory, ".sharpproof-" + identity.ToString("N") + ".tmp");
     }
 }

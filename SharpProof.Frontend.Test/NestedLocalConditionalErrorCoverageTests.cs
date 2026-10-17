@@ -57,13 +57,13 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     public void OuterLabelInElseProducesOwnedConditionalErrorAndRefusesControlFlow()
     {
         var compilation = CreateCompilation(OuterLabelSource);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedErrorIds));
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedErrorIds));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var (graph, context, factory) = CreateLocalCandidate(compilation);
-        Assert.That(graph.Blocks.Any(block => block.IsReachable &&
-            block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error), Is.True);
+        Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
+            block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error)), Is.True);
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
@@ -74,7 +74,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     public void LocalLabelInElseEmitsAndReplaysSeven()
     {
         var compilation = CreateCompilation(LocalLabelSource);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -84,8 +84,8 @@ public sealed class NestedLocalConditionalErrorCoverageTests
             image.Position = 0;
             var target = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             var (graph, context, factory) = CreateLocalCandidate(compilation);
-            Assert.That(graph.Blocks.Any(block => block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error ||
-                block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Error), Is.False);
+            Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error ||
+                block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Error)), Is.False);
             var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
@@ -105,6 +105,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, path: "nested-local-conditional-error.cs");
         return CSharpCompilation.Create("LocalConditionalError", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
@@ -113,6 +114,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     private static (ControlFlowGraph Graph, TotalLoweringContext Context, IrFactory Factory)
         CreateLocalCandidate(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var targetSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -134,6 +136,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
 
     private static bool ContainsFinally(ControlFlowRegion region)
     {
+        System.ArgumentNullException.ThrowIfNull(region);
         return region.Kind == ControlFlowRegionKind.Finally || region.NestedRegions.Any(ContainsFinally);
     }
 }

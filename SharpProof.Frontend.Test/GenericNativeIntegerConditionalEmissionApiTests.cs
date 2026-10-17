@@ -67,7 +67,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var callerTree = CSharpSyntaxTree.ParseText(source, options, "source-native-caller.cs");
         var compilation = CSharpCompilation.Create("GenericNativeConditional", [coreTree, callerTree], [],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -77,14 +77,14 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var method = invocation.TargetMethod;
         var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
-        var raw = candidates.Single(candidate => candidate.Arity == 0);
-        var generic = candidates.Single(candidate => candidate.Arity == 1);
+        var raw = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 0));
+        var generic = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 1));
         var attribute = raw.GetAttributes().Single();
         Assert.That(candidates, Has.Length.EqualTo(2));
-        Assert.That(candidates.Select(candidate => candidate.Arity), Is.EquivalentTo(UnderlyingArities));
+        Assert.That(candidates.Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity)), Is.EquivalentTo(UnderlyingArities));
         Assert.That(method.Arity, Is.Zero);
         Assert.That(method.IsGenericMethod, Is.False);
-        Assert.That(method.ContainingType.GetMembers("Trace").OfType<IMethodSymbol>().Select(candidate => candidate.Arity), Is.EqualTo(NativeArities));
+        Assert.That(method.ContainingType.GetMembers("Trace").OfType<IMethodSymbol>().Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity)), Is.EqualTo(NativeArities));
         Assert.That(generic.GetAttributes().Single().ConstructorArguments[0].Value, Is.EqualTo("OTHER"));
         Assert.That(method.IsConditional, Is.True);
         Assert.That(method.ContainingType.IsNativeIntegerType, Is.True);
@@ -145,6 +145,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
 
     private static string[] TraceCalls(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes);
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -188,8 +189,8 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
 
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(opcode => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

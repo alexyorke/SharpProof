@@ -68,9 +68,9 @@ public sealed class ActualOwnedSessionEntryReservationTests
         Assert.That(factory.GetTypeInfo(x.Type).Width, Is.EqualTo(64));
         Assert.That(factory.GetTypeInfo(x.Type).Signed, Is.True);
         Assert.That(y.Type, Is.EqualTo(x.Type));
-        var domain = entry.Clauses.Select(clause => new Assumption(factory,
+        var domain = entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new Assumption(factory,
             factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value),
-            new LoweredJustification(clause.Operation))).ToImmutableArray();
+            new LoweredJustification(clause.Operation)))).ToImmutableArray();
         long[] primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
         const long maximumInput = 1000000033L;
         foreach (var prime in primes)
@@ -108,7 +108,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                 // Manually constructed IR/Smt API lemmas use compiler-decoded
                 // bindings. They are not compiler-produced contract clauses.
                 var assumptions = domain.AddRange(constraints.Select(predicate =>
-                    new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))));
+                    predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))));
                 var query = new VerificationQuery(factory, assumptions,
                     Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
                 var before = session.ConsumedResourceCount;
@@ -120,7 +120,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                 if (outcome is ProvenOutcome proven)
                 {
                     Assert.That(proven.Core, Is.Not.Empty);
-                    Assert.That(proven.Core.All(core => assumptions.Any(assumption => assumption.Justification == core)), Is.True);
+                    Assert.That(proven.Core.All(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification == core)))), Is.True);
                 }
                 else
                 {
@@ -133,7 +133,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                     q,
                     outcome = outcome.GetType().Name,
                     reason = outcome is UnknownOutcome unknown ? unknown.Reason.ToString() : "None",
-                    core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core.Operation.Value).ToArray() : [],
+                    core = outcome is ProvenOutcome proof ? proof.Core.Cast<LoweredJustification>().Select(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Operation.Value)).ToArray() : [],
                     delta,
                     consumed = session.ConsumedResourceCount
                 }));

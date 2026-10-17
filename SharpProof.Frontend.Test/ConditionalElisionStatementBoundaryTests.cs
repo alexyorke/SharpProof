@@ -26,8 +26,8 @@ public sealed class ConditionalElisionStatementBoundaryTests
             static void Log(bool value) { }
             """);
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
-        var mutations = subject.Graph.Blocks.SelectMany(block => block.Operations)
-            .Select(operation => operation is IExpressionStatementOperation statement ? statement.Operation : operation)
+        var mutations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
+            .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
             .OfType<ICompoundAssignmentOperation>().ToArray();
         Assert.That(mutations.Length, Is.EqualTo(2));
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);

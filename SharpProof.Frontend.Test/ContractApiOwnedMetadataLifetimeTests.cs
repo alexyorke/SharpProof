@@ -74,7 +74,7 @@ public sealed class ContractApiOwnedMetadataLifetimeTests
             TestMetadataReferences.WithoutSharpProof.Add(reference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(
-            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True,
@@ -100,12 +100,12 @@ public sealed class ContractApiOwnedMetadataLifetimeTests
         Assert.That(candidate.ContainingNamespace.ContainingNamespace.Name, Is.EqualTo("SharpProof"));
         Assert.That(candidate.ContainingNamespace.ContainingNamespace.ContainingNamespace.IsGlobalNamespace,
             Is.True);
-        Assert.That(candidate.Locations.Any(location => location.IsInSource), Is.False);
+        Assert.That(candidate.Locations.Any(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
         var assembly = candidate.ContainingAssembly;
         Assert.That(assembly.Identity.Name, Is.EqualTo("SharpProof.Attributes"));
         Assert.That(assembly.Identity.CultureName, Is.Null.Or.Empty);
         Assert.That(assembly.Identity.Version, Is.Not.Null);
-        Assert.That(compilation.References.Any(item => item is CompilationReference), Is.False);
+        Assert.That(compilation.References.Any(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item is CompilationReference)), Is.False);
         Assert.That(compilation.GetAssemblyOrModuleSymbol(reference), Is.SameAs(assembly));
         return candidate;
     }
