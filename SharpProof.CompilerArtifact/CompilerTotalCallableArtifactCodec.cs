@@ -168,9 +168,8 @@ internal static class CompilerTotalCallableArtifactCodec
         WorkerAssumptionEvidence[] assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
         bool entryOnly, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
     {
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         assumptions = RepositoryParameterGuard.NotNull(assumptions, nameof(assumptions));
-        if (artifact == null)
-        { return null; }
         Require(!claims.IsDefault && claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim != null)), "The Total callable claim list contains a missing row.");
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");

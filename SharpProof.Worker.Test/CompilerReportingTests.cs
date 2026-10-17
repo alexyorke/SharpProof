@@ -7,6 +7,18 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReportingTests
 {
+    [Test]
+    public void DefaultAdditionalFilesCaptureAsAnEmptyCollection()
+    {
+        var compilation = TestCompilation.Create("DefaultAdditionalFiles",
+            ("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var captured = CompilerCompilationCapture.Capture(compilation,
+            Directory.GetCurrentDirectory(), "net8.0", default,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(captured.AdditionalFiles, Is.Empty);
+        Assert.That(captured.SyntaxTrees, Has.Length.EqualTo(1));
+    }
+
     private static readonly string[][] CapturedPathCases = [
         ["Subject.cs", "./Subject.cs"],
         ["Subject.cs", "Subject.cs", "Subject.cs#1"],

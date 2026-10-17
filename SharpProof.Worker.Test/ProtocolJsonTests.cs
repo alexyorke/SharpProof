@@ -1447,6 +1447,24 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void RequestBoundValidationRejectsUnknownCacheStatus()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.Summary.CacheStatus = (WorkerCacheStatus)int.MaxValue;
+        AssertContainsErrorCode(ValidateForRequest(response), "response.cache_request_mismatch");
+    }
+
+    [Test]
+    public void ResponseValidationRejectsUnknownRunStatus()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = (WorkerRunStatus)int.MaxValue;
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
+        Assert.That(WorkerProtocolMetadata.MatchesRunFailure(response.RunStatus,
+            WorkerRunFailureReason.None), Is.False);
+    }
+
+    [Test]
     public void RequestBoundValidationRequiresProducerCompatibleCacheStates()
     {
         var activeRequest = CreateRequest();

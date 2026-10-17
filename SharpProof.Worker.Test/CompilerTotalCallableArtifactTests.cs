@@ -11,6 +11,15 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerTotalCallableArtifactTests
 {
     [Test]
+    public void AbsentOptionalTotalArtifactsProduceNoPreparation()
+    {
+        Assert.That(CompilerTotalCallableArtifactCodec.Decode(null, null!, default,
+            TestContext.CurrentContext.CancellationToken), Is.Null);
+        Assert.That(CompilerTotalCallableArtifactCodec.DecodeEntry(null, null!,
+            TestContext.CurrentContext.CancellationToken), Is.Null);
+    }
+
+    [Test]
     public void NullEntryPreparationProducesNoArtifact()
     {
         Assert.That(CompilerTotalCallableArtifactCodec.EncodeEntry(null), Is.Null);
