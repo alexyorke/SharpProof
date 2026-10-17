@@ -54,7 +54,9 @@ public sealed class ContractApiPolicyBoundaryTests
     [Test]
     public void LowercaseShaMetadataAcceptsTheActualPayload()
     {
-        var policy = CreatePolicy((ShaKey, AttributesHash().ToLowerInvariant()), (MvidKey, AttributesMvid()));
+        var lowercaseHash = string.Concat(Convert.FromHexString(AttributesHash())
+            .Select(static value => value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)));
+        var policy = CreatePolicy((ShaKey, lowercaseHash), (MvidKey, AttributesMvid()));
         AssertPayloadAccepted(policy);
     }
 
