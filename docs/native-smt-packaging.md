@@ -10,17 +10,17 @@ Attributes supplies the compile-time API. SharpProof supplies the portable analy
 
 The portable package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`. It does not contain the native worker/Z3 payload.
 
-The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9` and the native library at `tools/native/linux-x64/libz3.so`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
+The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9`, the Linux native library at `tools/native/linux-x64/libz3.so`, and the staged Windows native library at `tools/native/win-x64/libz3.dll`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries. The Windows payload is packaged but native Windows verification is not yet enabled.
 
 Implementation assemblies are tool payloads, not supported application compile APIs.
 
 ## Pinned Z3 closure
 
-[eng/container/toolchain.json](../eng/container/toolchain.json) owns Z3 version 4.12.2, the official archive URL/hash, extracted managed/native hashes, and byte sizes. The Dockerfile verifies pinned inputs; binaries are not checked into source.
+[eng/container/toolchain.json](../eng/container/toolchain.json) owns Z3 version 4.12.2, the official Linux and Windows archive URLs/hashes, extracted managed/native hashes, and byte sizes. The Dockerfile verifies pinned inputs; binaries are not checked into source.
 
 Before a native context is created, container loading validates the expected environment and resolves the required absolute library through the installed resolver. Ambient system libraries and `LD_LIBRARY_PATH` do not substitute for the pinned payload.
 
-The archive pin, managed `Microsoft.Z3.dll`, and native `libz3.so` are distinct checks. Keep them synchronized when changing the payload.
+The archive pins, managed `Microsoft.Z3.dll` files, and native `libz3.so`/`libz3.dll` files are distinct checks. Keep them synchronized when changing the payload. The package currently uses the Linux archive's managed assembly for its common worker closure; Windows managed binding compatibility still needs a native proof test before enabling Windows execution.
 
 ## Execution boundary
 

@@ -132,7 +132,8 @@ public sealed class PackageLayoutSmokeTests
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
-        "tools/native/linux-x64/libz3.so"
+        "tools/native/linux-x64/libz3.so",
+        "tools/native/win-x64/libz3.dll"
     ];
     private static readonly string[] ExpectedDependencyAttributes = [
         "id",
@@ -1851,11 +1852,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             allEntries.Where(static entry =>
                 IsNativeZ3(entry.FullName)),
-            Is.EqualTo([
-                (
-                    PackagedProductFeed.VerifierPackageId,
-                    ExpectedNativeZ3Entries[0])
-            ]));
+            Is.EquivalentTo(ExpectedNativeZ3Entries.Select(static entry =>
+                (PackagedProductFeed.VerifierPackageId, entry))));
     }
 
     private static void AssertArchiveLayout(
@@ -2210,6 +2208,12 @@ public sealed class PackageLayoutSmokeTests
             "tools/native/linux-x64/libz3.so",
             z3.GetProperty("libraryBytes").GetInt64(),
             z3.GetProperty("librarySha256").GetString()!);
+        var windows = z3.GetProperty("windows");
+        VerifyPackagePayload(
+            archive,
+            "tools/native/win-x64/libz3.dll",
+            windows.GetProperty("libraryBytes").GetInt64(),
+            windows.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
             archive,
             "tools/net9/Microsoft.Z3.dll",

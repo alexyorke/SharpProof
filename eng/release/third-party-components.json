@@ -107,12 +107,17 @@
         "license": "MIT",
         "entries": [
           "tools/net9/Microsoft.Z3.dll",
-          "tools/native/linux-x64/libz3.so"
+          "tools/native/linux-x64/libz3.so",
+          "tools/native/win-x64/libz3.dll"
         ],
         "entrySha256": [
           {
             "path": "tools/native/linux-x64/libz3.so",
             "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
+          },
+          {
+            "path": "tools/native/win-x64/libz3.dll",
+            "sha256": "3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae"
           },
           {
             "path": "tools/net9/Microsoft.Z3.dll",

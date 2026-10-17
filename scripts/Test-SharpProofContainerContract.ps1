@@ -449,6 +449,24 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $managedSha256 `
         $catalog.z3.managedAssemblySha256 `
         'Installed managed Z3 SHA-256 digest'
+    $windowsNative = Join-Path `
+        ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
+        "z3/$($catalog.z3.version)/win-x64/libz3.dll"
+    $windowsInformation = Get-Item -LiteralPath $windowsNative
+    Assert-Exact $windowsInformation.Length $catalog.z3.windows.libraryBytes 'Installed Windows Z3 size'
+    $windowsSha256 = (Get-FileHash -LiteralPath $windowsNative -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact $windowsSha256 $catalog.z3.windows.librarySha256 'Installed Windows Z3 SHA-256 digest'
+    $windowsManaged = Join-Path (Split-Path -Parent $windowsNative) 'Microsoft.Z3.dll'
+    $windowsManagedInformation = Get-Item -LiteralPath $windowsManaged
+    Assert-Exact `
+        $windowsManagedInformation.Length `
+        $catalog.z3.windows.managedAssemblyBytes `
+        'Installed Windows managed Z3 size'
+    $windowsManagedSha256 = (Get-FileHash -LiteralPath $windowsManaged -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact `
+        $windowsManagedSha256 `
+        $catalog.z3.windows.managedAssemblySha256 `
+        'Installed Windows managed Z3 SHA-256 digest'
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {

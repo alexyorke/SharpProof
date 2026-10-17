@@ -8,9 +8,10 @@ remains unsupported as described in [preview support](preview-support.md).
 
 ## Current boundary
 
-- `SharpProof.Verifier` contains only `tools/native/linux-x64/libz3.so`. The
-  toolchain catalog, payload preparation, package layout, and package checks
-  pin this Linux binary.
+- `SharpProof.Verifier` now stages `tools/native/win-x64/libz3.dll` alongside
+  `tools/native/linux-x64/libz3.so`. The toolchain catalog, payload preparation,
+  package layout, and package checks pin both binaries. The worker still loads
+  only the Linux payload.
 - `ContainerContract` requires Linux x64 and a canonical container marker. Its
   Z3 loader verifies a file and loads it through `/proc/self/fd`.
 - Verifier MSBuild props/targets require the container marker and point to the
@@ -36,12 +37,12 @@ remains unsupported as described in [preview support](preview-support.md).
    environment for Windows runtime needs while retaining startup-hook and
    ambient native-library rejection. Add case-aware path identity without
    relaxing Linux's exact comparisons.
-3. **Pin and package Windows Z3.** Select the official Windows x64 archive for
-   the same Z3/managed binding version; record archive, DLL, and managed
-   assembly hashes and lengths in the toolchain catalog. Stage and pack
-   `tools/native/win-x64/libz3.dll` alongside the unchanged Linux payload.
-   Extend package layout, component notice, and hash validation. Reject an
-   unpinned or ambient DLL.
+3. **Pin and package Windows Z3.** The official Windows x64 archive for Z3
+   4.12.2, its native DLL, and its managed assembly are now pinned by hash and
+   length. The DLL is staged and packed alongside the unchanged Linux payload.
+   A Windows loader must still reject an unpinned or ambient DLL and establish
+   compatibility between the Windows native DLL and the common managed
+   assembly currently packaged under `tools/net9`.
 4. **Add a Windows host contract and loader.** Select the host contract by
    actual OS and process architecture, not by a caller-controlled flag. Check
    the pinned package inputs before loading Z3 by an absolute path. Preserve
