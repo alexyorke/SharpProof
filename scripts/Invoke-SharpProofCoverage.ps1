@@ -28,6 +28,7 @@ if ($CoveragePhase -ne 'all' -and -not [string]::IsNullOrWhiteSpace($TestFilter)
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 & (Join-Path $PSScriptRoot 'Test-SharpProofSourceDocuments.ps1')
+& (Join-Path $PSScriptRoot 'Test-SharpProofCoverageEvidence.ps1')
 $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -43,9 +44,10 @@ if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
     $existingReport = Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File `
         -ErrorAction Stop |
+        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name } |
         Select-Object -First 1
     if ($null -ne $existingReport) {
         throw (
@@ -295,9 +297,10 @@ $coverageReports = @(
     Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File `
-        -ErrorAction Stop)
+        -ErrorAction Stop |
+        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json

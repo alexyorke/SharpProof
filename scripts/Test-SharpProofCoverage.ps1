@@ -24,6 +24,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
 function Test-CoverageFloor {
@@ -199,8 +200,9 @@ $reports = @(
     Get-ChildItem `
         -LiteralPath $resolvedCoverageRoot `
         -Recurse `
-        -Filter '*.cobertura.xml' `
+        -Filter '*.cobertura*.xml' `
         -File |
+        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name } |
         Where-Object {
             [IO.Path]::GetRelativePath(
                 $resolvedCoverageRoot,

@@ -1,5 +1,12 @@
 Set-StrictMode -Version Latest
 
+function Test-SharpProofCoverageReportName {
+    param([string]$Path)
+
+    # VSTest disambiguates same-second collector attachments with [1], [2], etc.
+    return $Path -cmatch '\.cobertura(?:\[[1-9][0-9]*\])?\.xml$'
+}
+
 function Save-SharpProofCoverageCohort {
     param([string]$Root, [object[]]$Expected, [object[]]$Completed, [string]$ProjectPath = '')
 
@@ -61,7 +68,7 @@ function Save-SharpProofCoverageCohort {
                 }
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
-                Where-Object { [string]$_.href -like '*.cobertura.xml' })
+                Where-Object { Test-SharpProofCoverageReportName -Path ([string]$_.href) })
             if ($attachments.Count -eq 0) { throw "Coverage task '$name' has no collector attachment." }
             foreach ($attachment in $attachments) {
                 $report = Join-Path $receipt.DirectoryName ([string]$attachment.href)
@@ -90,14 +97,14 @@ function Save-SharpProofCoverageShardManifest {
 
     $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -like '*.cobertura.xml' } |
+            $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
         Sort-Object FullName | ForEach-Object {
             [ordered]@{
                 path = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
             }
         })
-    if (@($files | Where-Object { $_.path -like '*.cobertura.xml' }).Count -eq 0 -or
+    if (@($files | Where-Object { Test-SharpProofCoverageReportName -Path $_.path }).Count -eq 0 -or
         @($files | Where-Object { $_.path -like '*/coverage-cohort.json' }).Count -ne 1) {
         throw "Coverage shard '$Phase' has no complete cohort evidence."
     }
@@ -118,12 +125,12 @@ function Assert-SharpProofCoverageShardManifest {
     }
     $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -like '*.cobertura.xml' } |
+            $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
         ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object)
     $recorded = @($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object)
     if ($actual.Count -eq 0 -or ($actual -join "`n") -cne ($recorded -join "`n") -or
         @($recorded | Select-Object -Unique).Count -ne $recorded.Count -or
-        @($recorded | Where-Object { $_ -like '*.cobertura.xml' }).Count -eq 0 -or
+        @($recorded | Where-Object { Test-SharpProofCoverageReportName -Path $_ }).Count -eq 0 -or
         @($recorded | Where-Object { $_ -like '*/coverage-cohort.json' }).Count -ne 1 -or
         @($recorded | Where-Object { $_ -eq 'coverage-authority.json' }).Count -ne 1 -or
         ($Phase -eq 'semantic' -and $recorded -cnotcontains 'coverage-cohort.json')) {

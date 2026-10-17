@@ -591,7 +591,8 @@ switch ($Command) {
         if (Test-Path -LiteralPath $mergedAuthorityPath) {
             throw 'coverage-gate requires a coverage root without merged authority evidence.'
         }
-        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura.xml' -File)) {
+        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura*.xml' -File |
+                Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })) {
             $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
             if ($relativeReport -cnotmatch '^(semantic|package)/') {
                 throw 'coverage-gate found a report outside the two authenticated shards.'
@@ -613,8 +614,9 @@ switch ($Command) {
             $shardReports = @(Get-ChildItem `
                     -LiteralPath $shardRoot `
                     -Recurse `
-                    -Filter '*.cobertura.xml' `
-                    -File)
+                    -Filter '*.cobertura*.xml' `
+                    -File |
+                    Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
             if ($shardReports.Count -eq 0) {
                 throw "Coverage shard '$shardName' produced no Cobertura reports."
             }
