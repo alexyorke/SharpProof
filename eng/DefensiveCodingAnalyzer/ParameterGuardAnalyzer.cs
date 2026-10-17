@@ -68,7 +68,10 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             if (symbol.Type.SpecialType == SpecialType.System_Boolean ||
                 SymbolEqualityComparer.Default.Equals(
                     symbol.Type,
-                    context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken")))
+                    context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken")) ||
+                symbol.GetAttributes().Any(static attribute =>
+                    attribute.AttributeClass?.ToDisplayString() ==
+                    "SharpProof.Internal.AllValuesValidAttribute"))
             {
                 continue;
             }

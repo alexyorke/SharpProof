@@ -153,6 +153,21 @@ internal sealed class ContractApiTests
     }
 
     [Test]
+    public void EffectFlagsRejectUnknownBits()
+    {
+        Assert.That(new AllowedCapabilitiesAttribute(SharpProofCapability.None).Capabilities,
+            Is.EqualTo(SharpProofCapability.None));
+        Assert.That(new EffectContractAttribute(SharpProofEffect.None).Effects,
+            Is.EqualTo(SharpProofEffect.None));
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(static () => _ = new AllowedCapabilitiesAttribute((SharpProofCapability)(1 << 30))))!.ParamName,
+            Is.EqualTo("capabilities"));
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(static () => _ = new EffectContractAttribute((SharpProofEffect)(1L << 30))))!.ParamName,
+            Is.EqualTo("effects"));
+    }
+
+    [Test]
     public void ClosedContractsTargetOnlyParametersAndReturns()
     {
         foreach (var type in new[] {

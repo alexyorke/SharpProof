@@ -120,6 +120,33 @@ public sealed class ParameterGuardAnalyzerTests
             Is.EqualTo(ImmutableArray.Create("Parameter 'count' has no explicit guard")));
     }
 
+    [Test]
+    public async Task ExplicitTotalDomainExemptionAppliesOnlyToAnnotatedParameter()
+    {
+        const string source = """
+            namespace SharpProof.Internal
+            {
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                internal sealed class AllValuesValidAttribute : System.Attribute
+                {
+                    public AllValuesValidAttribute(string reason)
+                    {
+                        if (reason is null) throw new System.ArgumentNullException(nameof(reason));
+                    }
+                }
+            }
+            public static class Sample
+            {
+                public static int Read(
+                    [SharpProof.Internal.AllValuesValid("Any integer is accepted.")] int any,
+                    int limited) => any + limited;
+            }
+            """;
+
+        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EqualTo(ImmutableArray.Create("Parameter 'limited' has no explicit guard")));
+    }
+
     private static async Task<Diagnostic[]> Analyze(string source, string path = "input.cs")
     {
         var compilation = AnalyzerTestHost.CreateCompilation(source, [], filePath: path);

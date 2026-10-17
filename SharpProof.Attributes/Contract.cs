@@ -41,7 +41,7 @@ public static class Contract
     /// <typeparam name="T">The expression value type.</typeparam>
     /// <param name="value">The expression whose entry value is requested.</param>
     /// <returns>A static-analysis placeholder for the entry value.</returns>
-    public static T Old<T>(T value)
+    public static T Old<T>([SharpProof.Internal.AllValuesValid("Placeholder always rejects runtime use.")] T value)
     {
         throw new InvalidOperationException("Contract.Old(...) is valid only inside Contract.Ensures(...).");
     }

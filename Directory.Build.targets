@@ -6,6 +6,10 @@
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(RunAnalyzersDuringBuild)' != 'false'">
     <Analyzer Include="$(_DefensiveAnalyzerAssembly)" />
   </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/AllValuesValidAttribute.cs"
+             Link="AllValuesValidAttribute.cs" />
+  </ItemGroup>
   <Target Name="_RequireDefensiveCodingAnalyzer"
           BeforeTargets="ResolveReferences"
           Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(DesignTimeBuild)' != 'true' AND '$(RunAnalyzersDuringBuild)' != 'false'">
