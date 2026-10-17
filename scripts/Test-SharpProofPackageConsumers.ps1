@@ -151,6 +151,13 @@ function New-FrameworkPackageSource {
             Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
         }
     )
+    if ($IsWindows) {
+        $frameworkPackages += [pscustomobject]@{
+            Id = 'microsoft.windowsdesktop.app.ref'
+            Version = $testRuntimeVersion
+            Pattern = 'Microsoft.WindowsDesktop.App.Ref'
+        }
+    }
     foreach ($package in $frameworkPackages) {
         $fileName = "$($package.Id).$($package.Version).nupkg"
         $source = [IO.Path]::Combine(
