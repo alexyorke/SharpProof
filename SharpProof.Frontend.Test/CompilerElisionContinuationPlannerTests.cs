@@ -84,7 +84,7 @@ public sealed class CompilerElisionContinuationPlannerTests
         Assert.That(source.FallThroughSuccessor!.Destination, Is.Not.Null);
         Assert.That(source.ConditionalSuccessor!.Destination!.IsReachable, Is.False);
         var rejection = Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(
-            () => CompilerElisionContinuationPlanner.ElidedEmissionSuccessor(source));
+            (System.Action)(() => CompilerElisionContinuationPlanner.ElidedEmissionSuccessor(source)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         Assert.That(CompilerElisionContinuationPlanner.ElidedEmissionSuccessor(source, allowUnreachableCompilerElision: true),
             Is.SameAs(source.FallThroughSuccessor));
@@ -122,7 +122,7 @@ public sealed class CompilerElisionContinuationPlannerTests
         Assert.That(subject.Planner.TryElidedSpecificationContinuation(source, out _, out var work, compilerMode: true), Is.False);
         Assert.That(work, Is.EqualTo(2));
         var rejection = Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(
-            () => subject.Planner.RequireCompilerContinuation(source));
+            (System.Action)(() => subject.Planner.RequireCompilerContinuation(source)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         foreach (var child in children)
         {
@@ -150,7 +150,7 @@ public sealed class CompilerElisionContinuationPlannerTests
             work.Spend();
         }
         Assert.That(work.ConstructionLimitExceeded, Is.False);
-        Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(() => work.Spend());
+        Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>((System.Action)(() => work.Spend()));
         Assert.That(work.ConstructionLimitExceeded, Is.True);
         if (session != null)
         {
@@ -166,7 +166,7 @@ public sealed class CompilerElisionContinuationPlannerTests
         var session = sharedSession
             ? new TotalSourceCallSession(subject.Compilation, null, null, CancellationToken.None) : null;
         var work = new TotalRegionWork(new CancellationToken(canceled: true), session);
-        Assert.Throws<OperationCanceledException>(() => work.Spend());
+        Assert.Throws<OperationCanceledException>((System.Action)(() => work.Spend()));
         Assert.That(work.ConstructionLimitExceeded, Is.False);
         if (session != null)
         {

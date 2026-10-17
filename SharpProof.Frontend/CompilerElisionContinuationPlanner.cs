@@ -355,8 +355,12 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         return true;
     }
 
-    internal bool IsRestored(BasicBlock block) => _compilerRestoredBlocks.Contains(block);
-    internal bool IsSpecificationConditional(BasicBlock block) => _regionSpecificationConditionals.Contains(block);
-    internal bool TryGetPlan(BasicBlock block, out BasicBlock target) => _compilerElidedPlans.TryGetValue(block, out target!);
-    private void SpendRegion() => work.Spend();
+    internal bool IsRestored(BasicBlock block)
+    { return _compilerRestoredBlocks.Contains(block); }
+    internal bool IsSpecificationConditional(BasicBlock block)
+    { return _regionSpecificationConditionals.Contains(block); }
+    internal bool TryGetPlan(BasicBlock block, out BasicBlock target)
+    { return _compilerElidedPlans.TryGetValue(block, out target!); }
+    private void SpendRegion()
+    { work.Spend(); }
 }
