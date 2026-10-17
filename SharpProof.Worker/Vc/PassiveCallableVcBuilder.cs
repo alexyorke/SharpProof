@@ -657,11 +657,7 @@ internal sealed class PassiveCallableVcBuilder
             if (postcondition && _oldInputs.TryGetValue(variable, out var entry))
             { replacement = _factory.Variable(entry); }
             else if (postcondition && variable == _candidate.Result)
-            {
-                if (returned is null)
-                { value = null!; return false; }
-                replacement = returned.Value;
-            }
+            { replacement = returned?.Value; }
             else
             { state.TryGetValue(variable, out replacement); }
             if (replacement == null)
