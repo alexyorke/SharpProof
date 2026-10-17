@@ -22,7 +22,10 @@ internal sealed class ContractApiPayloadPolicy
 
     internal Version ExpectedAssemblyVersion { get; }
 
-    internal static ContractApiPayloadPolicy FromRuntimeOwner(Assembly owner) => new(owner);
+    internal static ContractApiPayloadPolicy FromRuntimeOwner(Assembly owner)
+    {
+        return new(owner);
+    }
 
     internal bool HasTrustedPayload(
         Compilation compilation, IAssemblySymbol assembly, out string? unreadableReason)

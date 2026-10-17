@@ -20,20 +20,28 @@ public sealed class ContractApiPolicyBoundaryTests
     private const string RequiresMethod = "[System.Diagnostics.Conditional(ConditionalSymbol)] public static void Requires(bool condition) { }";
 
     [Test]
-    public void MissingShaMetadataRejectsThePayload() =>
+    public void MissingShaMetadataRejectsThePayload()
+    {
         AssertPayloadMetadataRejected([]);
+    }
 
     [Test]
-    public void ShortShaMetadataRejectsThePayload() =>
+    public void ShortShaMetadataRejectsThePayload()
+    {
         AssertPayloadMetadataRejected([(ShaKey, AttributesHash()[..63])]);
+    }
 
     [Test]
-    public void NonHexShaMetadataRejectsThePayload() =>
+    public void NonHexShaMetadataRejectsThePayload()
+    {
         AssertPayloadMetadataRejected([(ShaKey, "GG" + AttributesHash()[2..])]);
+    }
 
     [Test]
-    public void ConflictingShaMetadataRejectsThePayload() =>
+    public void ConflictingShaMetadataRejectsThePayload()
+    {
         AssertPayloadMetadataRejected([(ShaKey, AttributesHash()), (ShaKey, OtherAssemblyHash())]);
+    }
 
     [Test]
     public void IdenticalShaMetadataRemainOneExpectedValue()
@@ -51,16 +59,22 @@ public sealed class ContractApiPolicyBoundaryTests
     }
 
     [Test]
-    public void MissingMvidMetadataRejectsTheImage() =>
+    public void MissingMvidMetadataRejectsTheImage()
+    {
         AssertImageMetadataRejected([(ShaKey, AttributesHash())]);
+    }
 
     [Test]
-    public void InvalidMvidMetadataRejectsTheImage() =>
+    public void InvalidMvidMetadataRejectsTheImage()
+    {
         AssertImageMetadataRejected([(ShaKey, AttributesHash()), (MvidKey, "not-a-guid")]);
+    }
 
     [Test]
-    public void ConflictingMvidMetadataRejectsTheImage() =>
+    public void ConflictingMvidMetadataRejectsTheImage()
+    {
         AssertImageMetadataRejected([(ShaKey, AttributesHash()), (MvidKey, AttributesMvid()), (MvidKey, OtherAssemblyMvid())]);
+    }
 
     [Test]
     public void IdenticalMvidMetadataRemainOneExpectedValue()
@@ -133,41 +147,57 @@ public sealed class ContractApiPolicyBoundaryTests
     }
 
     [Test]
-    public void GenuineCompatibleApiShapeIsAccepted() =>
+    public void GenuineCompatibleApiShapeIsAccepted()
+    {
         AssertShape(ResultMethod, OldMethod, RequiresMethod, accepted: true);
+    }
 
     [Test]
-    public void NongenericResultShapeIsRejected() =>
+    public void NongenericResultShapeIsRejected()
+    {
         AssertShape("public static int Result() => 0;", OldMethod, RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void NonIdentityReturnShapeIsRejected() =>
+    public void NonIdentityReturnShapeIsRejected()
+    {
         AssertShape("public static int Result<T>() => 0;", OldMethod, RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void ConstrainedIdentityShapeIsRejected() =>
+    public void ConstrainedIdentityShapeIsRejected()
+    {
         AssertShape("public static T Result<T>() where T : class => throw new System.InvalidOperationException();",
             OldMethod, RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void RefIdentityParameterShapeIsRejected() =>
+    public void RefIdentityParameterShapeIsRejected()
+    {
         AssertShape(ResultMethod, "public static T Old<T>(ref T value) => value;", RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void InternalIdentityMethodShapeIsRejected() =>
+    public void InternalIdentityMethodShapeIsRejected()
+    {
         AssertShape("internal static T Result<T>() => throw new System.InvalidOperationException();",
             OldMethod, RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void DistinctResultOverloadsAreRejected() =>
+    public void DistinctResultOverloadsAreRejected()
+    {
         AssertShape(ResultMethod + " public static T Result<T>(int unused) => throw new System.InvalidOperationException();",
             OldMethod, RequiresMethod, accepted: false);
+    }
 
     [Test]
-    public void DistinctClauseOverloadsAreRejected() =>
+    public void DistinctClauseOverloadsAreRejected()
+    {
         AssertShape(ResultMethod, OldMethod,
             RequiresMethod + " [System.Diagnostics.Conditional(ConditionalSymbol)] public static void Requires(object condition) { }",
             accepted: false);
+    }
 
     [Test]
     public void ShapeAcceptanceDoesNotGrantAssemblyTrust()
@@ -192,15 +222,35 @@ public sealed class ContractApiPolicyBoundaryTests
     }
 
     private static string AttributesPath => typeof(SharpProof.Attributes.Contract).Assembly.Location;
-    private static ContractApiPayloadPolicy ActualPolicy() =>
-        ContractApiPayloadPolicy.FromRuntimeOwner(typeof(ContractApiIdentityResolver).Assembly);
-    private static PortableExecutableReference AttributesReference() =>
-        MetadataReference.CreateFromImage(File.ReadAllBytes(AttributesPath));
-    private static string AttributesHash() => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(AttributesPath)));
-    private static string OtherAssemblyHash() =>
-        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Compilation).Assembly.Location)));
-    private static string AttributesMvid() => ModuleVersionId(AttributesPath);
-    private static string OtherAssemblyMvid() => ModuleVersionId(typeof(Compilation).Assembly.Location);
+    private static ContractApiPayloadPolicy ActualPolicy()
+    {
+        return ContractApiPayloadPolicy.FromRuntimeOwner(typeof(ContractApiIdentityResolver).Assembly);
+    }
+
+    private static PortableExecutableReference AttributesReference()
+    {
+        return MetadataReference.CreateFromImage(File.ReadAllBytes(AttributesPath));
+    }
+
+    private static string AttributesHash()
+    {
+        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(AttributesPath)));
+    }
+
+    private static string OtherAssemblyHash()
+    {
+        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Compilation).Assembly.Location)));
+    }
+
+    private static string AttributesMvid()
+    {
+        return ModuleVersionId(AttributesPath);
+    }
+
+    private static string OtherAssemblyMvid()
+    {
+        return ModuleVersionId(typeof(Compilation).Assembly.Location);
+    }
 
     private static string ModuleVersionId(string path)
     {
@@ -210,9 +260,11 @@ public sealed class ContractApiPolicyBoundaryTests
         return metadata.GetGuid(metadata.GetModuleDefinition().Mvid).ToString("D");
     }
 
-    private static CSharpCompilation Consumer(PortableExecutableReference reference) =>
-        CSharpCompilation.Create("ContractPolicyConsumer", references: TestMetadataReferences.WithoutSharpProof.Add(reference),
+    private static CSharpCompilation Consumer(PortableExecutableReference reference)
+    {
+        return CSharpCompilation.Create("ContractPolicyConsumer", references: TestMetadataReferences.WithoutSharpProof.Add(reference),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
 
     private static void AssertPayloadMetadataRejected((string Key, string Value)[] facts)
     {
@@ -285,13 +337,17 @@ public sealed class ContractApiPolicyBoundaryTests
         return image.ToArray();
     }
 
-    private static CSharpCompilation ShapeConsumer(string source) =>
-        CSharpCompilation.Create("ContractShapeConsumer",
+    private static CSharpCompilation ShapeConsumer(string source)
+    {
+        return CSharpCompilation.Create("ContractShapeConsumer",
             references: TestMetadataReferences.Platform.Add(MetadataReference.CreateFromImage(Emit(source))),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
 
-    private static ContractApiShapeValidator ShapeValidator(Compilation compilation) =>
-        new(compilation.GetTypeByMetadataName(ContractApiMetadata.ConditionalAttribute), new ContractApiMetadataNameMatcher());
+    private static ContractApiShapeValidator ShapeValidator(Compilation compilation)
+    {
+        return new(compilation.GetTypeByMetadataName(ContractApiMetadata.ConditionalAttribute), new ContractApiMetadataNameMatcher());
+    }
 
     private static void AssertShape(string result, string old, string requires, bool accepted)
     {
@@ -307,8 +363,9 @@ public sealed class ContractApiPolicyBoundaryTests
         }
     }
 
-    private static string ShapeSource(string result, string old, string requires, string namespaceName = "Fixture") =>
-        $$"""
+    private static string ShapeSource(string result, string old, string requires, string namespaceName = "Fixture")
+    {
+        return $$"""
         namespace {{namespaceName}}
         {
             public static class Contract
@@ -322,6 +379,7 @@ public sealed class ContractApiPolicyBoundaryTests
             }
         }
         """;
+    }
 
     private static string LockedNativeZ3Path()
     {
