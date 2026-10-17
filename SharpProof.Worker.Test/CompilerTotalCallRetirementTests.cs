@@ -45,7 +45,7 @@ public sealed class CompilerTotalCallRetirementTests
         Assert.That(targets, Has.Length.EqualTo(2));
         foreach (var target in targets)
         {
-            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
             await AssertProvesAsync(preparation);
         }
     }
@@ -78,7 +78,7 @@ public sealed class CompilerTotalCallRetirementTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary, NullableContextOptions.Enable));
         TestCompilation.AssertNoErrors(compilation);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(target => target.Method.Name == "Verify");
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await AssertProvesAsync(preparation, emitted && resultPlaceholder ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven);
     }
 
@@ -99,10 +99,10 @@ public sealed class CompilerTotalCallRetirementTests
             }
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), CancellationToken.None);
+            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), TestContext.CurrentContext.CancellationToken);
         // Excessive expansion either yields no Total body (nothing is published,
         // so nothing can be proven) or only non-proven results.
         if (results.Count == 0)
@@ -115,7 +115,7 @@ public sealed class CompilerTotalCallRetirementTests
         Assert.That(preparation.Total, Is.Not.Null);
         var results = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+            check => results[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results.Values.Single().Outcome, Is.EqualTo(expected), results.Values.Single().Reason.ToString());
     }
@@ -190,7 +190,7 @@ public sealed class CompilerTotalCallRetirementTests
         for (var lookup = 0; lookup < 2; lookup++)
         {
             Assert.That(resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name,
-                CancellationToken.None, out _, out _, out var selectedPath), Is.True);
+                TestContext.CurrentContext.CancellationToken, out _, out _, out var selectedPath), Is.True);
             Assert.That(new[] { implementationPath, duplicatePath }, Does.Contain(selectedPath));
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
@@ -202,9 +202,9 @@ public sealed class CompilerTotalCallRetirementTests
             WorkerFeatureSet.All,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
-        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact);
+        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded, Has.Length.EqualTo(2));
         foreach (var preparation in decoded)
         {

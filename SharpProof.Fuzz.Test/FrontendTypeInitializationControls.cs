@@ -31,7 +31,7 @@ public sealed class FrontendTypeInitializationControls
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -79,7 +79,7 @@ public sealed class FrontendTypeInitializationControls
         {
             context.Unload();
         }
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [Input]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [Input], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(fault ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ExceptionKind, Is.Null);
         if (fault)

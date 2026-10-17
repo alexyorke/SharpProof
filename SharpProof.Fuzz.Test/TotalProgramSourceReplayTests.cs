@@ -22,7 +22,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12345);
-        await replay.CompareBatchAsync([new(member, [7L], false)], 0);
+        await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(replay.Result, Is.EqualTo(new TotalProgramSourceResult(
             1, 1, 1, 1, 0, ImmutableArray<FuzzFailure>.Empty)));
@@ -37,7 +37,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Values, Is.EqualTo(new object?[] { 9L }));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12346);
-        await replay.CompareBatchAsync([new(member, [7L], true)], 0);
+        await replay.CompareBatchAsync([new(member, [7L], true)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(replay.Result, Is.EqualTo(new TotalProgramSourceResult(
             1, 1, 1, 1, 0, ImmutableArray<FuzzFailure>.Empty)));
@@ -52,7 +52,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Classifications[0].Exact, Is.True);
         Assert.That(reference.Classifications[0].Execution, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var replay = new TotalProgramSourceReplay(12347);
-        await replay.CompareBatchAsync([new(member, [7L], false)], 0);
+        await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var result = replay.Result;
         Assert.That(result.Cases, Is.EqualTo(1));
@@ -76,7 +76,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
         Assert.That(reference.Classifications[0].Exact, Is.False);
         var replay = new TotalProgramSourceReplay(12351);
-        await replay.CompareBatchAsync([new(member, [7L], false)], 0);
+        await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         Assert.That(result.Cases, Is.EqualTo(1));
         Assert.That(result.Agreements, Is.Zero);
@@ -94,7 +94,7 @@ public sealed class TotalProgramSourceReplayTests
     {
         const string member = "public static long Target0(long value) => long.MaxValue + 1L;";
         var compilation = Compile([member]);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
         Assert.That(emission.Emit.Diagnostics.Where(diagnostic =>
@@ -104,7 +104,7 @@ public sealed class TotalProgramSourceReplayTests
             diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
             Does.Contain("CS0220"));
         var replay = new TotalProgramSourceReplay(12348);
-        Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0);
+        Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(compare);
         Assert.That(exception!.Message, Does.Contain("CS0220"));
@@ -120,7 +120,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Classifications, Has.Length.EqualTo(2));
         Assert.That(reference.Classifications.All(item => item.Exact), Is.True);
         var replay = new TotalProgramSourceReplay(12349);
-        Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0);
+        Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(compare);
         Assert.That(exception!.Message,
@@ -139,8 +139,8 @@ public sealed class TotalProgramSourceReplayTests
             item.Execution == IrProgramExecutionStatus.Unsupported), Is.True);
         var replay = new TotalProgramSourceReplay(12350);
         var cases = members.Select(member => new TotalProgramSourceCase(member, [7L], false)).ToArray();
-        await replay.CompareBatchAsync(cases.Take(33).ToArray(), 0);
-        await replay.CompareBatchAsync(cases.Skip(33).ToArray(), 33);
+        await replay.CompareBatchAsync(cases.Take(33).ToArray(), 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        await replay.CompareBatchAsync(cases.Skip(33).ToArray(), 33, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var result = replay.Result;
         Assert.That(result.Cases, Is.EqualTo(65));
@@ -179,7 +179,7 @@ public sealed class TotalProgramSourceReplayTests
         ObserveActualSource(IReadOnlyList<string> members, string[] names)
     {
         var compilation = Compile(members);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join("\n", emission.Emit.Diagnostics));
         var tree = compilation.SyntaxTrees.Single();
@@ -206,7 +206,7 @@ public sealed class TotalProgramSourceReplayTests
                 var loweringContext = new TotalLoweringContext(factory, declared);
                 var lowering = new RoslynProgramLowerer(factory).LowerCandidate(
                     ControlFlowGraph.Create(method, model)!, loweringContext,
-                    CancellationToken.None);
+                    TestContext.CurrentContext.CancellationToken);
                 IrProgramExecutionStatus? execution = null;
                 if (lowering.IsExact)
                 {

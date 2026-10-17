@@ -45,7 +45,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
         Assert.That(method.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(libraryTree));
         Assert.That(method.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),
             Is.EqualTo("SharpProof.Attributes.PositiveAttribute"));
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
+        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.HasPotentialCallPreconditions(method), Is.True);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
@@ -67,7 +67,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
         Assert.That(owner.DiscoveryComplete, Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(owner.Calls.Single().Target, method), Is.True);
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, []);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

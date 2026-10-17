@@ -55,7 +55,7 @@ $containerAst = [Management.Automation.Language.Parser]::ParseInput($containerSc
 if ($parseErrors.Count -gt 0 -or $null -eq $containerAst.ParamBlock) { throw 'Cannot parse the canonical tooling parameter declarations.' }
 Add-Source 'scripts/Invoke-SharpProofContainer.ps1' $containerAst.ParamBlock.Extent.Text 'powershell'
 $gateSource = [IO.File]::ReadAllText((Join-Path $RepositoryRoot 'SharpProof.Gates/Program.cs'))
-$usage = [regex]::Match($gateSource, '(?s)Console\.Error\.WriteLine\("Usage:.*?;')
+$usage = [regex]::Match($gateSource, '(?s)Log\.Error\("Usage:.*?;')
 if (-not $usage.Success) { throw 'Cannot locate the corpus CLI usage declaration.' }
 Add-Source 'SharpProof.Gates/Program.cs' $usage.Value 'text'
 foreach ($path in @(

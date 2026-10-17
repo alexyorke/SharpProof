@@ -24,7 +24,7 @@ public sealed class NativeBackendSemanticsAdmissionTests
         var query = new VerificationQuery(factory, [], new Goal(factory,
             factory.Boolean(predicate), ProofDiagnosticKind.Precondition, new SourceLocationId(site.Value)));
         using var backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
-        var result = await backend.CheckAsync(query, CancellationToken.None);
+        var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(semantics == IrExecutionSemantics.Legacy

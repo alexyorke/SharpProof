@@ -58,7 +58,7 @@ internal static class CompilerManifestArtifactProducer
                     snapshot.SyntaxTrees,
                     snapshot.References);
                 var artifact = CompilerLoweredArtifact.Encode(
-                    lowerer.Prepare(item, cancellationToken));
+                    lowerer.Prepare(item, cancellationToken), cancellationToken);
                 return artifact.AttachEffectEvidence(item);
             })];
         }

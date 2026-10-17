@@ -41,7 +41,7 @@ public sealed class CallableVerificationPolicyRegressionTests
 
         var result = CallableVerificationPolicy.FailedLowering(
             target,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var claim = result.Claims.Single();
 
         using (Assert.EnterMultipleScope())

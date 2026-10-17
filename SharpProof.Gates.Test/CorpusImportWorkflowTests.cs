@@ -30,7 +30,7 @@ public sealed class CorpusImportWorkflowTests
         {
             Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, source);
             Assert.That(await OpenSourceCorpusImporter.PrepareIfRequestedAsync(
-                "unused-repository", CancellationToken.None), Is.Null);
+                "unused-repository", TestContext.CurrentContext.CancellationToken), Is.Null);
         }
         finally
         {
@@ -52,7 +52,7 @@ public sealed class CorpusImportWorkflowTests
         var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
         Assert.That(commit, Has.Length.EqualTo(64));
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-            await OpenSourceCorpusImporter.PrepareAsync(upstream.FullName, upstream.FullName, CancellationToken.None)));
+            await OpenSourceCorpusImporter.PrepareAsync(upstream.FullName, upstream.FullName, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo($"Upstream HEAD is not a full Git commit: {commit}"));
         Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
     }
@@ -72,7 +72,7 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
         var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-            await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName, commit, CancellationToken.None)));
+            await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName, commit, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo(
             $"Expected upstream source directory is missing: {Path.Combine(upstream.FullName, "DataStructures")}"));
         Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
@@ -113,7 +113,7 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, "remote", "add", "origin", ApprovedRepository);
         var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
         var (files, candidates) = await OpenSourceCorpusImporter.DiscoverSourcesAsync(
-            upstream.FullName, commit, CancellationToken.None);
+            upstream.FullName, commit, TestContext.CurrentContext.CancellationToken);
         var selected = OpenSourceCorpusImporter.SelectDiverseCandidates(candidates, 200);
         var corpusDirectory = OpenSourceCorpusCatalog.GetCorpusDirectory(target.FullName);
         Directory.CreateDirectory(corpusDirectory);
@@ -144,7 +144,7 @@ public sealed class CorpusImportWorkflowTests
             if (review != "reviewed")
             {
                 var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-                    await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None)));
+                    await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, TestContext.CurrentContext.CancellationToken)));
                 Assert.That(error!.Message, review == "empty-manifest"
                     ? Is.EqualTo("The existing OSS corpus manifest is empty.")
                     : Does.Contain("methods without a reviewed support classification"));
@@ -158,7 +158,7 @@ public sealed class CorpusImportWorkflowTests
                     const string missingMethodsManifest = "{\"schemaVersion\":2}";
                     await File.WriteAllTextAsync(manifestPath, missingMethodsManifest);
                     var missingMethodsError = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-                        await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None)));
+                        await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, TestContext.CurrentContext.CancellationToken)));
                     Assert.That(missingMethodsError!.Message,
                         Is.EqualTo("The existing OSS corpus manifest has no methods array."));
                     Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(missingMethodsManifest));
@@ -166,7 +166,7 @@ public sealed class CorpusImportWorkflowTests
                 }
                 return;
             }
-            var plan = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None);
+            var plan = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, TestContext.CurrentContext.CancellationToken);
             Assert.That(plan, Is.Not.Null);
             Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(existingManifest));
             using (Assert.EnterMultipleScope())
@@ -180,7 +180,7 @@ public sealed class CorpusImportWorkflowTests
                 Assert.That(plan.Document.Sources.Single().Commit, Is.EqualTo(commit));
                 Assert.That(plan.Updates, Has.Length.EqualTo(2));
             }
-            await CorpusFileTransaction.WriteAllAsync(corpusDirectory, plan!.Updates, CancellationToken.None);
+            await CorpusFileTransaction.WriteAllAsync(corpusDirectory, plan!.Updates, TestContext.CurrentContext.CancellationToken);
             var imported = OpenSourceCorpusCatalog.Load(target.FullName);
             Assert.That(imported.Methods, Is.EqualTo(plan.Document.Methods));
             Assert.That(imported.Files, Is.EqualTo(plan.Document.Files));
@@ -196,6 +196,6 @@ public sealed class CorpusImportWorkflowTests
 
     private static Task<string> GitAsync(string path, params string[] arguments)
     {
-        return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, CancellationToken.None);
+        return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, TestContext.CurrentContext.CancellationToken);
     }
 }

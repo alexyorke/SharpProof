@@ -32,6 +32,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Source declaration reference](generated/source-reference.md) | Generated literal configuration, API, diagnostic, and command declarations |
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
+| [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64 proofs, supported paths, resource boundary, and CI |
 
 ## Develop and qualify
 

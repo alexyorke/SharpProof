@@ -1,4 +1,24 @@
 <Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'ConsoleLoggingAnalyzer'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
+                      GlobalPropertiesToRemove="BaseIntermediateOutputPath;MSBuildProjectExtensionsPath;IntermediateOutputPath;BaseOutputPath;OutputPath;OutDir"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
+    <_DefensiveAnalyzerProject>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj</_DefensiveAnalyzerProject>
+    <_DefensiveAnalyzerAssembly>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/bin/$(Configuration)/netstandard2.0/SharpProof.DefensiveCodingAnalyzer.dll</_DefensiveAnalyzerAssembly>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(RunAnalyzersDuringBuild)' != 'false'">
+    <Analyzer Include="$(_DefensiveAnalyzerAssembly)" />
+  </ItemGroup>
+
+  <Target Name="_RequireDefensiveCodingAnalyzer"
+          BeforeTargets="ResolveReferences"
+          Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(DesignTimeBuild)' != 'true' AND '$(RunAnalyzersDuringBuild)' != 'false'">
+    <Error Condition="!Exists('$(_DefensiveAnalyzerAssembly)')"
+           Text="Internal defensive analyzer is missing. Build '$(_DefensiveAnalyzerProject)' in the canonical container before building this project." />
+  </Target>
   <Import Project="$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props"
           Condition="'$(SharpProofSelfApplication)' == 'true' AND Exists('$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props')" />
 

@@ -35,13 +35,13 @@ public sealed class CachedBuiltinQueryIsolationTests
         {
             var priming = new VerificationQuery(factory, [],
                 new Goal(factory, known, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
-            Assert.That(await new ProofKernel(session).VerifyAsync(priming), Is.TypeOf<ProvenOutcome>());
+            Assert.That(await new ProofKernel(session).VerifyAsync(priming, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
         }
         var assumptions = previousQuery ? Array.Empty<Assumption>() :
             new[] { new Assumption(factory, known, new LoweredJustification(factory.CreateOperation())) };
         var query = new VerificationQuery(factory, assumptions,
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(1)));
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());
         Assert.That(((RefutedOutcome)outcome).Model.Assignments, Is.Empty);
     }

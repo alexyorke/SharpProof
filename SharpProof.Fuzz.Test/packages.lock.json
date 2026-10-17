@@ -196,6 +196,7 @@
           "SharpProof.CompilerCollector": "[1.0.0-preview.1, )",
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
           "SharpProof.Host": "[1.0.0-preview.1, )",
+          "SharpProof.Logging": "[1.0.0-preview.1, )",
           "SharpProof.Smt": "[1.0.0-preview.1, )",
           "SharpProof.Testing": "[1.0.0-preview.1, )",
           "SharpProof.Worker": "[1.0.0-preview.1, )",
@@ -210,6 +211,9 @@
         "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
         }
+      },
+      "sharpproof.logging": {
+        "type": "Project"
       },
       "sharpproof.smt": {
         "type": "Project",
@@ -245,6 +249,7 @@
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
           "SharpProof.Dataflow": "[1.0.0-preview.1, )",
           "SharpProof.Host": "[1.0.0-preview.1, )",
+          "SharpProof.Logging": "[1.0.0-preview.1, )",
           "SharpProof.Smt": "[1.0.0-preview.1, )",
           "System.Text.Json": "[10.0.10, )"
         }

@@ -86,7 +86,7 @@ public sealed class TypedMetadataCallTests
         else
         { Assert.That(runtime, Is.EqualTo(expected)); }
         var artifact = subject.CreateArtifact();
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var factory = total.Program.Factory;
@@ -118,7 +118,7 @@ public sealed class TypedMetadataCallTests
             """);
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
         Assert.That(subject.InvokeRoot(0), Is.EqualTo(1));
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;
@@ -217,16 +217,16 @@ public sealed class TypedMetadataCallTests
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return Library.Target(x); } }
             """);
         var captured = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, captured);
-        var owned = provider.Resolve(method, CancellationToken.None)!;
+        var owned = provider.Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(owned, Is.Not.Null);
         Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
         subject.MutateImage((bytes, _, il) => bytes[il] = 0x26);
-        Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(owned));
+        Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(owned));
         Assert.That(owned.Instructions[0].Code, Is.EqualTo("Ldarg"));
-        Assert.That(new CompilerTotalIlBodyProvider(subject.Compilation, captured).Resolve(method, CancellationToken.None), Is.Null);
+        Assert.That(new CompilerTotalIlBodyProvider(subject.Compilation, captured).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
 
     [TestCase("static Library() { }")]
@@ -298,9 +298,9 @@ public sealed class TypedMetadataCallTests
             public static class Subject { public static int Target(int x) { Contract.Ensures(true); return x; } }
             """);
         var captured = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        Assert.That(new CompilerTotalIlBodyProvider(subject.Compilation, captured).Resolve(method, CancellationToken.None), Is.Null);
+        Assert.That(new CompilerTotalIlBodyProvider(subject.Compilation, captured).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
         Assert.That(subject.CreateArtifact().Callables.Single().Total, Is.Not.Null, "An independent scalar root stays admitted.");
     }
 
@@ -421,7 +421,7 @@ internal sealed class MetadataTestSubject : IDisposable
     internal CompilerManifestArtifact CreateArtifact()
     {
         return CompilerManifestArtifactProducer.Create(Compilation, _directory.FullName, "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(Compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(Compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     internal object? InvokeRoot(object input)

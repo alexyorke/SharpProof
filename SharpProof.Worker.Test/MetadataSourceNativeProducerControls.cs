@@ -56,9 +56,9 @@ public sealed class MetadataSourceNativeProducerControls
             Assert.That(actualSubject, Is.Not.Null);
             var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0",
                 WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-                WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+                WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             CompilerManifestArtifactJson.DeserializePrepared(
-                CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+                CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparations, Has.Length.EqualTo(1));
             Assert.That(preparations[0].Entry.CallableId, Does.Contain("MetadataSubject.Target0("));
             Assert.That(preparations[0].Total, Is.Not.Null);

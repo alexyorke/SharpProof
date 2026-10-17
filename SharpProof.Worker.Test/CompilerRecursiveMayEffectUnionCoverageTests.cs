@@ -27,7 +27,7 @@ public sealed class CompilerRecursiveMayEffectUnionCoverageTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.ReachableSource, Is.Not.Null);
         var graph = decoded.ReachableSource!;
         Assert.That(graph.CollectionComplete, Is.True);
@@ -37,7 +37,7 @@ public sealed class CompilerRecursiveMayEffectUnionCoverageTests
         Assert.That(graph.Bodies.All(body => body.Graph != null && body.CallsComplete &&
             body.EffectsCompleteAtEntry && body.IsCallSkeleton && body.SourceCalls.Length == 1 &&
             body.Callees.Length == 1 && body.Callees[0] != body.BodyId && ids.Contains(body.Callees[0])), Is.True);
-        var locals = graph.Bodies.Select(body => PortableIrGraphCodec.Decode(body.Graph!)).ToArray();
+        var locals = graph.Bodies.Select(body => PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToArray();
         Assert.That(locals.All(local => local.Program != null), Is.True);
         var allocations = locals.Where(local => local.Instructions.OfType<IrAllocationInstruction>().Any()).ToArray();
         var writes = locals.Where(local => local.Instructions.OfType<IrWriteInstruction>()
@@ -48,7 +48,7 @@ public sealed class CompilerRecursiveMayEffectUnionCoverageTests
         Assert.That(writes[0].Instructions.OfType<IrWriteInstruction>()
             .Any(write => write.Region == IrWriteRegion.Static), Is.True);
 
-        var summaries = EffectSummaryFixpoint.ComputeValidated(graph);
+        var summaries = EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(summaries.Keys, Is.EquivalentTo(ids));
         Assert.That(summaries.Values.All(summary =>
             summary.MayEffects == (SourceMayEffect.Allocation | SourceMayEffect.NonlocalWrite) &&

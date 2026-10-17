@@ -72,7 +72,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
         Assert.That(target.IsVerifierSupported, Is.True);
 
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         var claim = artifact.Manifest.Claims.Single();
         Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
@@ -83,7 +83,7 @@ public sealed class CompilerStaticInterfaceSourceCensusTests
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
         Assert.That(result.ClaimId, Is.EqualTo(claim.ClaimId));

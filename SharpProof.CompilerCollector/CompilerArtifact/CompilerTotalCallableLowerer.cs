@@ -22,7 +22,8 @@ internal static class CompilerTotalCallableLowerer
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
         context.ModelReceiver();
-        var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context);
+        var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context,
+            cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToArray();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions ||
@@ -59,7 +60,8 @@ internal static class CompilerTotalCallableLowerer
         context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
-            : new ContractBinder(compilation, context.Factory).BindTotal(context);
+            : new ContractBinder(compilation, context.Factory).BindTotal(context,
+                cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -259,7 +261,8 @@ internal static class CompilerTotalCallableLowerer
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => documents[tree]) { CaptureShadowCallAncestry = true };
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+            cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || !binding.Clauses.IsEmpty)
         { reason = "UnsupportedOwnContracts"; return null; }

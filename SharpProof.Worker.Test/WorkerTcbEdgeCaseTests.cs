@@ -121,7 +121,7 @@ public sealed class WorkerTcbEdgeCaseTests
         var backend = new ThrowingBackend("Deep typed precondition reached the backend.");
         var budgets = new WorkerBudgets { MaximumExpressionDepth = 1 };
         var results = await VerifyNativeClaimsAsync(target, backend, budgets);
-        var entry = await TotalCallableVerifier.VerifyEntryAsync(target, budgets, CancellationToken.None,
+        var entry = await TotalCallableVerifier.VerifyEntryAsync(target, budgets, TestContext.CurrentContext.CancellationToken,
             backend, CreateResourceBudget());
         Assert.That(backend.CallCount, Is.Zero);
         Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -167,7 +167,7 @@ public sealed class WorkerTcbEdgeCaseTests
         else
         {
             var result = await TotalCallableVerifier.VerifyEntryAsync(project.Snapshot.Callables.Single(),
-                project.Request.Budgets, CancellationToken.None);
+                project.Request.Budgets, TestContext.CurrentContext.CancellationToken);
             Assert.That(result.IsContradictory, Is.True);
         }
     }
@@ -289,7 +289,7 @@ public sealed class WorkerTcbEdgeCaseTests
     private static async Task<WorkerClaimResult> VerifyNativeSourceAsync(ShadowTestProject project)
     {
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         return response.ClaimResults.Single();
@@ -306,8 +306,8 @@ public sealed class WorkerTcbEdgeCaseTests
     {
         Assert.Throws<JsonException>(new Action(() =>
         {
-            var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-            CompilerManifestArtifactJson.DeserializePrepared(json, out _);
+            var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }));
     }
 
@@ -373,7 +373,7 @@ public sealed class WorkerTcbEdgeCaseTests
             inputHash,
             manifest,
             new WorkerBudgets(),
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response, Is.Null);
     }
@@ -398,7 +398,7 @@ public sealed class WorkerTcbEdgeCaseTests
             inputHash,
             manifest,
             new WorkerBudgets(),
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response, Is.Null);
     }
@@ -431,7 +431,7 @@ public sealed class WorkerTcbEdgeCaseTests
                     response,
                     inputHash,
                     manifest,
-                    CancellationToken.None),
+                    TestContext.CurrentContext.CancellationToken),
                 Is.False,
                 maximumBytes.ToString(CultureInfo.InvariantCulture));
             Assert.That(
@@ -479,7 +479,7 @@ public sealed class WorkerTcbEdgeCaseTests
         using var projectBoundary = new CancellationTokenSource();
         var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, budgets,
             readConsumedResources, WorkerBudgets.DefaultMethodWallTimeMilliseconds,
-            projectBoundary, CancellationToken.None);
+            projectBoundary, TestContext.CurrentContext.CancellationToken);
         return result.Claims;
     }
     private static CompilerCallablePreparation CreateTrivialTarget()

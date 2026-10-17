@@ -1,3 +1,4 @@
+using SharpProof.Logging;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
@@ -14,6 +15,7 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class Program
 {
+    private static RepositoryLogger Log => new(Console.Out, Console.Error);
     // Refuted contracts are semantic verifier failures. Keep their transport
     // identity separate from incomplete analysis and assumption diagnostics so
     // the build task can preserve the source location and claim-specific code.
@@ -24,23 +26,27 @@ internal static class Program
     {
         if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof launcher refused unsafe runtime environment variable " +
                 variable + ".");
             return 125;
         }
-        return await RunMain(args).ConfigureAwait(false);
+        using var cancellation = new ConsoleCancellationScope();
+        return await RunMain(args, verify: null, validatePreflight: null,
+            cancellation.Token).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
         string[] args,
-        Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify = null,
-        Action<LauncherArguments>? validatePreflight = null)
+        Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify,
+        Action<LauncherArguments>? validatePreflight,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         args = ArgumentNullGuard.NotNull(args, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "Usage: SharpProof.Worker " + WorkerInvocationArguments.Command + " " +
                 WorkerInvocationArguments.RequestOption + " <path> " +
                 WorkerInvocationArguments.ResultOption + " <path> " +
@@ -61,7 +67,7 @@ internal static class Program
         {
             (validatePreflight ?? (static value => value.ValidatePreflight()))(arguments);
             expectedVersions = ExpectedVersions();
-            request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput);
+            request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput, cancellationToken);
             expectedInputHash = preparedInput.InputHash;
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
@@ -70,13 +76,13 @@ internal static class Program
                 return 2;
             }
             await AtomicFile.WriteUtf8Async(arguments.RequestPath,
-                WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
+                WorkerProtocolJson.SerializeRequest(request), cancellationToken).ConfigureAwait(false);
             DeleteIfExists(arguments.ResultPath);
         }
         catch (PlatformNotSupportedException exception)
         {
             var failure = ClassifyLauncherFailure(exception);
-            Console.Error.WriteLine(failure.ConsoleMessage);
+            Log.Error(failure.ConsoleMessage);
             return failure.ExitCode;
         }
         catch (Exception exception) when (
@@ -85,13 +91,13 @@ internal static class Program
                 InvalidDataException or JsonException or KeyNotFoundException or
                 InvalidOperationException)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
             return 2;
         }
 
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var terminate = PosixSignalRegistration.Create(
             PosixSignal.SIGTERM,
             context =>
@@ -105,10 +111,15 @@ internal static class Program
                     ? verify(request, cancellation.Token)
                     : WorkerHost.VerifyAsync(request, cancellation.Token, preparedInput, operationStarted))
                 .ConfigureAwait(false);
+            // The response may itself report cancellation; publish it after the
+            // run token is canceled so the caller receives the typed result.
+            using var resultPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003
             await AtomicFile.WriteUtf8Async(
                     arguments.ResultPath,
-                    WorkerProtocolJson.SerializeCanonicalResponse(response))
+                    WorkerProtocolJson.SerializeCanonicalResponse(response), resultPublication.Token)
                 .ConfigureAwait(false);
+#pragma warning restore SPINT003
         }
         catch (AggregateException)
         {
@@ -119,27 +130,37 @@ internal static class Program
                 not OperationCanceledException)
         {
             var failure = ClassifyLauncherFailure(exception);
-            Console.Error.WriteLine(failure.ConsoleMessage);
+            Log.Error(failure.ConsoleMessage);
+            using var failurePublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
-                failure.Code, failure.Message).ConfigureAwait(false);
+                failure.Code, failure.Message, failurePublication.Token).ConfigureAwait(false);
+#pragma warning restore SPINT003
         }
+        using var promotionPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
         await PromotePreManifestProjectTimeoutAsync(
                 arguments.ResultPath,
                 request,
                 artifact,
                 expectedInputHash,
-                expectedVersions)
+                expectedVersions,
+                promotionPublication.Token)
             .ConfigureAwait(false);
+#pragma warning restore SPINT003
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
+            using var malformedPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, WorkerRunStatus.Failed,
                 WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
-                "The worker result was unavailable or malformed.").ConfigureAwait(false);
+                "The worker result was unavailable or malformed.", malformedPublication.Token).ConfigureAwait(false);
+#pragma warning restore SPINT003
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse);
@@ -156,7 +177,7 @@ internal static class Program
                     UnauthorizedAccessException or ArgumentException or OperationCanceledException or
                     OverflowException)
             {
-                Console.Error.WriteLine(
+                Log.Error(
                     "SharpProof worker result could not be published.");
                 return 3;
             }
@@ -238,7 +259,7 @@ internal static class Program
             exception is ArgumentException or IOException or InvalidDataException or
                 UnauthorizedAccessException or JsonException)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof worker result is unavailable or malformed.");
             return 3;
         }
@@ -286,7 +307,7 @@ internal static class Program
             var vacuity = result.Vacuity == WorkerVacuityKind.None
                 ? string.Empty
                 : " [vacuous: " + result.Vacuity + "]";
-            Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
+            Log.Info("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
                 LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason + vacuity);
             if (result.Outcome == WorkerClaimOutcome.Refuted)
             {
@@ -328,7 +349,7 @@ internal static class Program
         var incompleteError = (incompleteCount != 0 || projectTimedOut) &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
-        Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
+        Log.Info("SharpProof summary " + JsonSerializer.Serialize(
             new
             {
                 response.RunStatus,
@@ -339,7 +360,7 @@ internal static class Program
         if (response.RunStatus != WorkerRunStatus.Complete &&
             !timeoutAttributedToCoverage)
         {
-            Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
+            Log.Error("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
             return LauncherPresentation.ExitCode(
                 response.RunStatus,
@@ -363,7 +384,7 @@ internal static class Program
         // the structured diagnostic channel. The shared transport validator
         // owns the accepted code set; this line remains schema-compatible when
         // the launcher is paired with an older host during package bootstrap.
-        Console.Error.WriteLine(
+        Log.Error(
             VerifierDiagnosticTransport.Prefix + JsonSerializer.Serialize(new
             {
                 schema = 1,
@@ -378,7 +399,7 @@ internal static class Program
             ? "SharpProof"
             : claim.Location.Path + FormattableString.Invariant(
                 $"({claim.Location.Line},{claim.Location.Column})");
-        Console.Out.WriteLine(prefix + ": error " +
+        Log.Info(prefix + ": error " +
             RefutedContractDiagnosticCode + ": " + message);
     }
 
@@ -421,11 +442,11 @@ internal static class Program
         var diagnostic = prefix + ": " + severity + " " + id + ": " + message;
         if (severity == "info")
         {
-            Console.Out.WriteLine(diagnostic);
+            Log.Info(diagnostic);
             return;
         }
 
-        Console.Error.WriteLine(VerifierDiagnosticTransport.Serialize(
+        Log.Error(VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
                 severity,
                 id,
@@ -433,7 +454,7 @@ internal static class Program
                 location.Line,
                 location.Column,
                 message)));
-        Console.Out.WriteLine(diagnostic);
+        Log.Info(diagnostic);
     }
 
     // Cooperating publishers/invalidation hold all stable member leases. The
@@ -453,7 +474,7 @@ internal static class Program
             new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
                 .Where(path => path != null)!);
         if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
-            .Select(PublicationLease.CanonicalMember), StringComparer.Ordinal).Any())
+            .Select(PublicationLease.CanonicalMember), PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
         }
@@ -491,11 +512,12 @@ internal static class Program
             WorkerProtocolJson.SerializeCanonicalResponse(response), publicationDeadline.Token).ConfigureAwait(false);
     }
 
+    // A failed run must still publish a typed failure result after cancellation.
     private static Task WriteLauncherFailureAsync(
         string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
         string expectedInputHash, WorkerVersionSummary expectedVersions,
         WorkerRunStatus status,
-        WorkerRunFailureReason reason, string code, string message)
+        WorkerRunFailureReason reason, string code, string message, CancellationToken publicationToken)
     {
         var timeout = status == WorkerRunStatus.TimedOut;
         var response = WorkerResultAssembler.CreateIncomplete(
@@ -506,15 +528,17 @@ internal static class Program
             timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
-        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response));
+        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response), publicationToken);
     }
 
+    // A timed out run must still promote its project timeout result.
     internal static async Task PromotePreManifestProjectTimeoutAsync(
         string path,
         WorkerVerifyRequest request,
         CompilerManifestArtifact artifact,
         string expectedInputHash,
-        WorkerVersionSummary expectedVersions)
+        WorkerVersionSummary expectedVersions,
+        CancellationToken publicationToken)
     {
         WorkerVerifyResponse? response;
         try
@@ -571,7 +595,7 @@ internal static class Program
             response.Summary.ElapsedMilliseconds);
         await AtomicFile.WriteUtf8Async(
                 path,
-                WorkerProtocolJson.SerializeCanonicalResponse(promoted))
+                WorkerProtocolJson.SerializeCanonicalResponse(promoted), publicationToken)
             .ConfigureAwait(false);
     }
 
@@ -588,7 +612,7 @@ internal static class Program
     {
         foreach (var error in errors)
         {
-            Console.Error.WriteLine(prefix + error.Code + ": " + error.Message);
+            Log.Error(prefix + error.Code + ": " + error.Message);
         }
     }
 }
@@ -652,20 +676,20 @@ internal sealed partial class LauncherArguments
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes, CancellationToken cancellationToken)
     {
-        return CreateRequest(out artifact, out artifactBytes, out _);
+        return CreateRequest(out artifact, out artifactBytes, out _, cancellationToken);
     }
 
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes,
-        out WorkerInputSnapshot preparedInput)
+        out WorkerInputSnapshot preparedInput, CancellationToken cancellationToken)
     {
         ValidateDistinctPaths(
             Boolean("cache-enabled", true) ? OptionalFullPath("cache-directory") : null);
         var compilerManifest = CreateCompilerManifestReference(
             out var validated,
-            out artifactBytes);
+            out artifactBytes, cancellationToken);
         artifact = validated.Manifest;
         var request = ProjectRequest(compilerManifest);
         preparedInput = ArtifactValidator.Bind(request, validated, WorkerCacheIdentity.Current);
@@ -697,8 +721,11 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         ];
-        var paths = candidates.OfType<string>().ToArray();
-        if (paths.Distinct(StringComparer.Ordinal).Count() != paths.Length)
+        // Linux reports canonical publication aliases through its structured
+        // failure path; Windows rejects filesystem aliases during admission.
+        var paths = candidates.OfType<string>().Select(static path =>
+            OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path).ToArray();
+        if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
                 "SharpProof I/O paths must be distinct.");
@@ -718,17 +745,17 @@ internal sealed partial class LauncherArguments
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
-        out ValidatedArtifact artifact, out byte[] bytes)
+        out ValidatedArtifact artifact, out byte[] bytes, CancellationToken cancellationToken)
     {
         var path = FullPath("compiler-manifest");
-        bytes = ReadCompilerManifest(path);
-        artifact = ArtifactValidator.Decode(bytes);
+        bytes = ReadCompilerManifest(path, cancellationToken);
+        artifact = ArtifactValidator.Decode(bytes, expectedDigest: null, cancellationToken);
         return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
-    internal static byte[] ReadCompilerManifest(string path)
+    internal static byte[] ReadCompilerManifest(string path, CancellationToken cancellationToken)
     {
-        return CompilerManifestArtifactFile.ReadAllBytes(path);
+        return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, cancellationToken);
     }
 
     private string FullPath(string key)

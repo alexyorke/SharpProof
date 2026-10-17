@@ -94,7 +94,7 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
             Assert.That(configuration.Features, Is.EqualTo(SharpProofFeatures.Effects));
             Assert.That(configuration.InvalidConfigurationValues, Is.Empty);
             Assert.That(additional.Path, Is.EqualTo("configuration.txt"));
-            Assert.That(additional.GetText().ToString(), Is.EqualTo("ordinary additional input"));
+            Assert.That(additional.GetText(TestContext.CurrentContext.CancellationToken).ToString(), Is.EqualTo("ordinary additional input"));
         }
     }
 
@@ -104,7 +104,7 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
 
         public override string Path => "configuration.txt";
 
-        public override SourceText GetText(CancellationToken cancellationToken = default)
+        public override SourceText GetText(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return _text;

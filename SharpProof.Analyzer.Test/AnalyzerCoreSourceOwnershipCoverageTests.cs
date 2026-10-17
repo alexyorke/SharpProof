@@ -23,7 +23,7 @@ public sealed class AnalyzerCoreSourceOwnershipCoverageTests
             : owner;
         Assert.That(suppliedCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(suppliedCompilation.ContainsSyntaxTree(tree), Is.EqualTo(!foreign));
-        var (body, gap) = AdvisoryLowering.Lower(suppliedCompilation, method, declaration, CancellationToken.None);
+        var (body, gap) = AdvisoryLowering.Lower(suppliedCompilation, method, declaration, TestContext.CurrentContext.CancellationToken);
         if (foreign)
         {
             Assert.That(body, Is.Null);

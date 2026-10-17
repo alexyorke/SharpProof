@@ -2,6 +2,11 @@ namespace SharpProof.Host;
 
 internal static class PublicationPaths
 {
+    internal static StringComparer Comparer => OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+    internal static StringComparison Comparison => OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
     internal static void ValidateWorkerRuntime(IEnumerable<string> paths, string? workerPath)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -19,7 +24,7 @@ internal static class PublicationPaths
         var directories = new[] { Path.GetDirectoryName(worker)!,
             Path.GetDirectoryName(PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker)) ??
                 throw new InvalidDataException("The worker runtime link target must name a file.") }
-            .Distinct(StringComparer.Ordinal).ToArray();
+            .Distinct(Comparer).ToArray();
         foreach (var path in paths)
         {
             var member = PublicationLease.CanonicalMember(path);
@@ -36,6 +41,6 @@ internal static class PublicationPaths
     internal static bool IsWithin(string path, string directory)
     {
         var root = Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar;
-        return string.Equals(path, directory, StringComparison.Ordinal) || path.StartsWith(root, StringComparison.Ordinal);
+        return string.Equals(path, directory, Comparison) || path.StartsWith(root, Comparison);
     }
 }

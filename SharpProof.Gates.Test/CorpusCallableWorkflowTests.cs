@@ -21,7 +21,7 @@ public sealed class CorpusCallableWorkflowTests
             CorpusVariant.Baseline, "effects", CorpusVerdict.Proven, CorpusSupport.Supported, source);
 
         var error = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
-            await CorpusGate.ObserveCaseAsync(item, CancellationToken.None)));
+            await CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(error!.Message, Is.EqualTo(expected));
     }

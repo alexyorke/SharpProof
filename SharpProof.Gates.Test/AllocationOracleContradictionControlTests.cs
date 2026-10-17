@@ -20,20 +20,20 @@ public sealed class AllocationOracleContradictionControlTests
     [Test]
     public async Task EscapingObjectRejectsForgedPositiveAllocationProof()
     {
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(Subject), CancellationToken.None, allocations: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(Subject), TestContext.CurrentContext.CancellationToken, allocations: true);
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         var measured = Measure(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var target = discovery.Targets.Values.Single();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var preparation = preparations.Single();
-        var evidence = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         using var oracle = new NativeAllocationWitnessOracle(compilation);
-        var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, CancellationToken.None);
+        var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, TestContext.CurrentContext.CancellationToken);
         await TestContext.Progress.WriteLineAsync($"escaping-object; noInlining=true; directBytes32={measured.Bytes}; directIL={measured.Il}; " +
             $"oracle={observation.RuntimeOracle}; oracleBytes32={observation.AllocatedBytes}; ILOracle={observation.IlOracle}");
         Assert.That(measured.Bytes, Is.GreaterThan(0));

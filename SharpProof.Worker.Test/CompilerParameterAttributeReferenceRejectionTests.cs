@@ -13,6 +13,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
+using SharpProof.Logging;
 
 namespace SharpProof.Worker.Test;
 
@@ -176,10 +177,10 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             }
 
             var references = CompilerCompilationCapture.CaptureReferences(consumer.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(consumer, references);
             TotalIlBody? decoded = null;
-            Assert.DoesNotThrow((Action)(() => decoded = provider.Resolve(method, CancellationToken.None)));
+            Assert.DoesNotThrow((Action)(() => decoded = provider.Resolve(method, TestContext.CurrentContext.CancellationToken)));
             if (shipped)
             {
                 Assert.That(decoded, Is.Not.Null);
@@ -207,7 +208,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             Assert.That(libraryResult, Is.EqualTo(7));
             Assert.That(consumerResult, Is.EqualTo(7));
 
-            Console.WriteLine(JsonSerializer.Serialize(new
+            new RepositoryLogger(Console.Out, Console.Error).Info(JsonSerializer.Serialize(new
             {
                 Case = kind.ToString(),
                 ConsumerHasForeignCompilerReference = consumerHasForeignReference,

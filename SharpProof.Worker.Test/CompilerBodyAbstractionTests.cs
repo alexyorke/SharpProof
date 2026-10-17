@@ -42,7 +42,7 @@ public sealed class CompilerBodyAbstractionTests
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => checks[check.ClaimId] = check, CancellationToken.None);
+            check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
         Assert.That(checks.Values.Count(check => check.Evidence.Outcome is ProvenOutcome), Is.EqualTo(1));
         var unknown = checks.Values.Single(check => check.Evidence.Outcome is not ProvenOutcome);
         Assert.That(unknown.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
@@ -81,8 +81,8 @@ public sealed class CompilerBodyAbstractionTests
                 instructions[1].A = total.Parameters[0].Current;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("object")]
@@ -123,7 +123,7 @@ public sealed class CompilerBodyAbstractionTests
         using var project = new ShadowTestProject(metadata.CreateArtifact());
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => checks[check.ClaimId] = check, CancellationToken.None);
+            check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
         Assert.That(checks, Has.Count.EqualTo(2));
         if (string.IsNullOrEmpty(initialization))
         {

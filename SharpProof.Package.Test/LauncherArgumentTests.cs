@@ -237,7 +237,7 @@ public sealed class LauncherArgumentTests
             Is.True);
 
         Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
+            (Action)(() => parsed.CreateRequest(out _, out _, TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<FileNotFoundException>());
     }
 
@@ -318,7 +318,7 @@ public sealed class LauncherArgumentTests
         }
 
         Assert.That(
-            (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+            (Action)(() => LauncherArguments.ReadCompilerManifest(path, TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());
     }
 
@@ -344,7 +344,7 @@ public sealed class LauncherArgumentTests
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         Assert.That(
-            (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+            (Action)(() => LauncherArguments.ReadCompilerManifest(path, TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());
         stopwatch.Stop();
         Assert.That(
@@ -1547,7 +1547,7 @@ public sealed class LauncherArgumentTests
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
         Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
+            (Action)(() => parsed.CreateRequest(out _, out _, TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<ArgumentException>());
     }
 

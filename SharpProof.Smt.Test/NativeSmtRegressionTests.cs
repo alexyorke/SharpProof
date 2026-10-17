@@ -33,7 +33,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(((ProvenOutcome)outcome).Core.Length, Is.EqualTo(1));
@@ -61,7 +61,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var value = ((RefutedOutcome)outcome).Model.Assignments[variable].Integer;
@@ -95,7 +95,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(
@@ -121,7 +121,7 @@ public sealed class NativeSmtRegressionTests
             [boolean, integer]);
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(query.ModelVariables, Has.Length.EqualTo(3));
@@ -163,7 +163,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
@@ -209,7 +209,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
@@ -269,7 +269,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
@@ -297,7 +297,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
@@ -332,7 +332,7 @@ public sealed class NativeSmtRegressionTests
         var query = new VerificationQuery(factory, [input],
             new Goal(factory, goal, ProofDiagnosticKind.Precondition, new SourceLocationId(0)));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(((RefutedOutcome)outcome).Model.Assignments[variable].String,
             Is.EqualTo("leftright"));
@@ -367,7 +367,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(
@@ -398,7 +398,7 @@ public sealed class NativeSmtRegressionTests
     {
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = new VerificationQuery(factory, [], new Goal(factory, goal, diagnosticKind, new SourceLocationId(0)));
-        Assert.That(await new ProofKernel(backend).VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -447,7 +447,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
 
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
@@ -568,9 +568,9 @@ public sealed class NativeSmtRegressionTests
         using var backend = new CallableSolverSession(factory,
             new IrSmtBackendOptions(queryLimit));
 
-        _ = await backend.CheckAsync(expensive, CancellationToken.None);
+        _ = await backend.CheckAsync(expensive, TestContext.CurrentContext.CancellationToken);
         var afterExpensive = backend.ConsumedResourceCount;
-        _ = await backend.CheckAsync(inexpensive, CancellationToken.None);
+        _ = await backend.CheckAsync(inexpensive, TestContext.CurrentContext.CancellationToken);
         var inexpensiveCost = backend.ConsumedResourceCount - afterExpensive;
 
         using (Assert.EnterMultipleScope())
@@ -598,7 +598,7 @@ public sealed class NativeSmtRegressionTests
                 ["first"] = 2,
                 ["second"] = 1
             },
-            "goal", new SmtQueryResourceMeter(1_000_000, CancellationToken.None));
+            "goal", new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken));
 
         var malformed = new[]
         {
@@ -608,7 +608,7 @@ public sealed class NativeSmtRegressionTests
         var failure = CallableSolverSession.DecodeCore(
             malformed,
             new Dictionary<string, int>(StringComparer.Ordinal),
-            "goal", new SmtQueryResourceMeter(1_000_000, CancellationToken.None));
+            "goal", new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken));
 
         using (Assert.EnterMultipleScope())
         {
@@ -709,7 +709,7 @@ public sealed class NativeSmtRegressionTests
                 System.Reflection.BindingFlags.NonPublic)!;
 
         await queryGate.WaitAsync();
-        var check = backend.CheckAsync(query, CancellationToken.None);
+        var check = backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
         var dispose = Task.Run(backend.Dispose);
         try
         {
@@ -751,7 +751,7 @@ public sealed class NativeSmtRegressionTests
             [boolean, text]);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var result = await backend.CheckAsync(query, CancellationToken.None);
+        var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(result.Model!.Assignments[text].Type, Is.EqualTo(factory.StringType));
@@ -766,7 +766,7 @@ public sealed class NativeSmtRegressionTests
         var factory = query.Factory;
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var result = await backend.CheckAsync(query, CancellationToken.None);
+        var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -787,7 +787,7 @@ public sealed class NativeSmtRegressionTests
         var factory = query.Factory;
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions(queryLimit));
 
-        var result = await backend.CheckAsync(query, CancellationToken.None);
+        var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -825,7 +825,7 @@ public sealed class NativeSmtRegressionTests
                 new SourceLocationId(0)));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions(queryLimit));
 
-        var result = await backend.CheckAsync(query, CancellationToken.None);
+        var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -846,9 +846,9 @@ public sealed class NativeSmtRegressionTests
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
         var supported = await backend.CheckAsync(
-            Query(factory, variable, atBoundary), CancellationToken.None);
+            Query(factory, variable, atBoundary), TestContext.CurrentContext.CancellationToken);
         var unsupported = await backend.CheckAsync(
-            Query(factory, variable, beyondBoundary), CancellationToken.None);
+            Query(factory, variable, beyondBoundary), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(supported.Status, Is.Not.EqualTo(BackendCheckStatus.Unknown));
         Assert.That(unsupported.Status, Is.EqualTo(BackendCheckStatus.Unknown));

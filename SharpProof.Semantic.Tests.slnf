@@ -2,6 +2,7 @@
   "solution": {
     "path": "SharpProof.slnx",
     "projects": [
+      "eng\\ConsoleLoggingAnalyzer.Test\\ConsoleLoggingAnalyzer.Test.csproj",
       "SharpProof.Analyzer.Test\\SharpProof.Analyzer.Test.csproj",
       "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj",
       "SharpProof.Attributes.Test\\SharpProof.Attributes.Test.csproj",

@@ -30,9 +30,9 @@ public sealed class MetadataInvocationBindingInvariantTests
         Assert.That(invocation.Arguments.Select(argument => argument.Parameter!.Ordinal), Is.EquivalentTo(ExpectedOrdinals));
         Assert.That(invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == 1).ArgumentKind, Is.EqualTo(secondKind));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        var body = provider.Resolve(invocation.TargetMethod, CancellationToken.None);
+        var body = provider.Resolve(invocation.TargetMethod, TestContext.CurrentContext.CancellationToken);
         Assert.That(body, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(body!.Method, invocation.TargetMethod), Is.True);
         Assert.That(body.Method.Parameters, Has.Length.EqualTo(2));
@@ -41,7 +41,7 @@ public sealed class MetadataInvocationBindingInvariantTests
             Assert.That(SymbolEqualityComparer.Default.Equals(argument.Parameter!.ContainingSymbol, body.Method), Is.True);
         }
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), TestContext.CurrentContext.CancellationToken), out var preparations, TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(preparation => preparation.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total;
         Assert.That(total, Is.Not.Null);
         var owned = total!;
@@ -79,10 +79,10 @@ public sealed class MetadataInvocationBindingInvariantTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(compilation, references);
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context, static _ => true,
-            provider.Resolve, CancellationToken.None);
+            provider.Resolve, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         Assert.That(lowering.Abstentions, Is.Not.Empty);

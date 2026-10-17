@@ -100,3 +100,103 @@ finally {
 }
 
 Write-Output $payloadDirectory
+
+$windows = $z3.windows
+$windowsArchive = Join-Path $resolvedDownload "z3-$($z3.version)-x64-win.zip"
+$windowsExtractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-win-extract"
+try {
+    if (-not (Test-Path -LiteralPath $windowsArchive -PathType Leaf)) {
+        Invoke-WebRequest -Uri ([string]$windows.archiveUrl) -OutFile $windowsArchive
+    }
+    Assert-Sha256 $windowsArchive ([string]$windows.archiveSha256) 'Windows Z3 archive'
+
+    if (Test-Path -LiteralPath $windowsExtractRoot) {
+        Remove-Item -LiteralPath $windowsExtractRoot -Recurse -Force
+    }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($windowsArchive, $windowsExtractRoot)
+
+    $windowsLibrary = Join-Path $windowsExtractRoot ([string]$windows.archiveLibraryPath)
+    $windowsManaged = Join-Path $windowsExtractRoot ([string]$windows.archiveManagedAssemblyPath)
+    if (-not (Test-Path -LiteralPath $windowsLibrary -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $windowsManaged -PathType Leaf)) {
+        throw 'The verified Windows Z3 archive did not contain the catalog-owned payload paths.'
+    }
+
+    Assert-Equal ([int64](Get-Item -LiteralPath $windowsLibrary).Length) ([int64]$windows.libraryBytes) 'libz3.dll byte length'
+    Assert-Equal ([int64](Get-Item -LiteralPath $windowsManaged).Length) ([int64]$windows.managedAssemblyBytes) 'Windows Microsoft.Z3.dll byte length'
+    Assert-Sha256 $windowsLibrary ([string]$windows.librarySha256) 'libz3.dll'
+    Assert-Sha256 $windowsManaged ([string]$windows.managedAssemblySha256) 'Windows Microsoft.Z3.dll'
+
+    $windowsPayloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/win-x64"
+    [System.IO.Directory]::CreateDirectory($windowsPayloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $windowsLibrary -Destination (Join-Path $windowsPayloadDirectory 'libz3.dll') -Force
+    Copy-Item -LiteralPath $windowsManaged -Destination (Join-Path $windowsPayloadDirectory 'Microsoft.Z3.dll') -Force
+
+    $windowsManifest = [ordered]@{
+        schemaVersion = 1
+        platform = 'windows/amd64'
+        version = [string]$z3.version
+        sourceUrl = [string]$windows.archiveUrl
+        files = @(
+            [ordered]@{
+                name = 'libz3.dll'
+                bytes = [int64]$windows.libraryBytes
+                sha256 = [string]$windows.librarySha256
+            },
+            [ordered]@{
+                name = 'Microsoft.Z3.dll'
+                bytes = [int64]$windows.managedAssemblyBytes
+                sha256 = [string]$windows.managedAssemblySha256
+            }
+        )
+    }
+    $windowsManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $windowsPayloadDirectory 'payload.json') -Encoding utf8NoBOM
+}
+finally {
+    foreach ($temporaryPath in @($windowsExtractRoot, $windowsArchive)) {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Recurse -Force
+        }
+    }
+}
+
+Write-Output $windowsPayloadDirectory
+
+foreach ($architecture in @('arm64', 'x64')) {
+    $mac = $catalog.macos.$architecture
+    $rid = "osx-$architecture"
+    $archivePath = Join-Path $resolvedDownload "z3-$($z3.version)-$rid.zip"
+    $extractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-$rid-extract"
+    try {
+        if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            Invoke-WebRequest -Uri ([string]$mac.archiveUrl) -OutFile $archivePath
+        }
+        Assert-Sha256 $archivePath ([string]$mac.archiveSha256) "$rid Z3 archive"
+        if (Test-Path -LiteralPath $extractRoot) {
+            Remove-Item -LiteralPath $extractRoot -Recurse -Force
+        }
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
+        $sourceLibrary = Join-Path $extractRoot ([string]$mac.archiveLibraryPath)
+        $sourceManaged = Join-Path $extractRoot ([string]$mac.archiveManagedAssemblyPath)
+        if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
+            throw "The verified $rid Z3 archive did not contain the catalog-owned payload paths."
+        }
+        Assert-Equal ([int64](Get-Item -LiteralPath $sourceLibrary).Length) ([int64]$mac.libraryBytes) "$rid libz3.dylib byte length"
+        Assert-Equal ([int64](Get-Item -LiteralPath $sourceManaged).Length) ([int64]$mac.managedAssemblyBytes) "$rid Microsoft.Z3.dll byte length"
+        Assert-Sha256 $sourceLibrary ([string]$mac.librarySha256) "$rid libz3.dylib"
+        Assert-Sha256 $sourceManaged ([string]$mac.managedAssemblySha256) "$rid Microsoft.Z3.dll"
+        $destination = Join-Path $resolvedDestination "z3/$($z3.version)/$rid"
+        [System.IO.Directory]::CreateDirectory($destination) | Out-Null
+        Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $destination 'libz3.dylib') -Force
+        Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $destination 'Microsoft.Z3.dll') -Force
+    }
+    finally {
+        foreach ($temporaryPath in @($extractRoot, $archivePath)) {
+            if (Test-Path -LiteralPath $temporaryPath) {
+                Remove-Item -LiteralPath $temporaryPath -Recurse -Force
+            }
+        }
+    }
+    Write-Output $destination
+}

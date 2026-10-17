@@ -26,18 +26,18 @@ public sealed partial class WorkerTests
     {
         using var project = TestProject.Create(BoundedIdentitySubjectSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var first = await worker.VerifyAsync(request, snapshot, CancellationToken.None);
+        var first = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
 
         request.CompilerManifest.Sha256 = new string('f', 64);
-        var mismatched = await worker.VerifyAsync(request, snapshot, CancellationToken.None);
+        var mismatched = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(mismatched.FailureReason, Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
 
         request.CompilerManifest.Sha256 = snapshot.ArtifactDigest;
         request.Budgets.MethodRlimit++;
         File.Delete(request.CompilerManifest.Path);
-        var changedBudget = await worker.VerifyAsync(request, snapshot, CancellationToken.None);
+        var changedBudget = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(changedBudget.RunStatus, Is.EqualTo(WorkerRunStatus.Complete),
@@ -60,8 +60,8 @@ public sealed partial class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var first = await worker.VerifyAsync(request);
-        var second = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
@@ -202,7 +202,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(new CountingBackend(
             BackendCheckResult.Unsatisfiable([])));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -222,7 +222,7 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         request.Budgets.QueryRlimit++;
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
         Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
@@ -236,7 +236,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         var authoritative = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+            await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(
             project.SourcePaths.Single(),
             TautologySource.Replace(
@@ -250,7 +250,7 @@ public sealed partial class WorkerTests
             return backend;
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -298,7 +298,7 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var claim = response.Manifest.Claims.Single();
         var result = AssertClaimVerdict(
             response,
@@ -342,8 +342,8 @@ public sealed partial class WorkerTests
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var first = await worker.VerifyAsync(request);
-        var response = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Proven,
@@ -396,7 +396,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single();
         var preconditions = result.Assumptions.Where(
             static assumption =>
@@ -440,7 +440,7 @@ public sealed partial class WorkerTests
                 BackendFailureReason.ResourceLimit));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
@@ -490,7 +490,7 @@ public sealed partial class WorkerTests
                 BackendFailureReason.ResourceLimit));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -560,7 +560,7 @@ public sealed partial class WorkerTests
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             response.ClaimResults,
             Has.Length.EqualTo(2),
@@ -657,7 +657,7 @@ public sealed partial class WorkerTests
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var maybeNull = response.ClaimResults.Single(result =>
             GetCallableId(response, result).Contains(
                 ".MaybeNull(",
@@ -699,7 +699,7 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Refuted,
@@ -883,7 +883,7 @@ public sealed partial class WorkerTests
             using var worker = new SharpProofWorker(new CountingBackend(
                 BackendCheckResult.Unsatisfiable([])));
             return await worker.VerifyAsync(
-                project.CreateRequest(cacheEnabled: false));
+                project.CreateRequest(cacheEnabled: false), cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
 
         WorkerClaimResult ClaimFor(
@@ -1043,7 +1043,7 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Proven);
@@ -1087,7 +1087,7 @@ public sealed partial class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = new SharpProofWorker(new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var effectClaims = response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.Effect)
             .Select(claim => response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId)).ToArray();
         using (Assert.EnterMultipleScope())
@@ -1163,7 +1163,7 @@ public sealed partial class WorkerTests
         request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1200,8 +1200,8 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var first = await worker.VerifyAsync(request);
-        var second = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1240,8 +1240,8 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var first = await worker.VerifyAsync(request);
-        var second = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var results = second.ClaimResults
             .OrderBy(
                 static result =>
@@ -1339,7 +1339,7 @@ public sealed partial class WorkerTests
             TautologySource + "\nMissingType invalid;\n");
         var request = project.CreateRequest(cacheEnabled: true);
         var authoritative = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+            await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -1348,7 +1348,7 @@ public sealed partial class WorkerTests
                 BackendCheckResult.Unsatisfiable([]));
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1380,7 +1380,7 @@ public sealed partial class WorkerTests
                 BackendCheckResult.Unsatisfiable([]));
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1418,15 +1418,15 @@ public sealed partial class WorkerTests
             WorkerProtocolJson.ComputeSha256(bytes);
 
         var deserializeException = CaptureJson(() =>
-            CompilerManifestArtifactJson.Deserialize(json));
+            CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var snapshotException = CaptureIOException(() => WorkerInputSnapshot.Load(
             request,
             WorkerCacheIdentity.Current,
-            CancellationToken.None));
+            TestContext.CurrentContext.CancellationToken));
         using var worker = new SharpProofWorker(
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1518,7 +1518,7 @@ public sealed partial class WorkerTests
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1545,7 +1545,7 @@ public sealed partial class WorkerTests
             () => throw new AssertionException(
                 "An oversized manifest must fail before backend creation."));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1565,10 +1565,10 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+            await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         artifact.Compilation.CompilerVersion = "0.0.0.0";
         var bytes = System.Text.Encoding.UTF8.GetBytes(
-            CompilerManifestArtifactJson.Serialize(artifact));
+            CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
         request.CompilerManifest.Sha256 =
             WorkerProtocolJson.ComputeSha256(bytes);
@@ -1579,7 +1579,7 @@ public sealed partial class WorkerTests
             return new CountingNativeBackend();
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1606,7 +1606,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(
             () => throw new DllNotFoundException("test backend"));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1635,7 +1635,7 @@ public sealed partial class WorkerTests
             () => throw new InvalidOperationException(
                 "test lane construction failure"));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1673,7 +1673,7 @@ public sealed partial class WorkerTests
                 BackendCheckResult.Unsatisfiable([]));
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1699,7 +1699,7 @@ public sealed partial class WorkerTests
         using (var first = new SharpProofWorker(firstBackend))
         {
             Assert.That(
-                (await first.VerifyAsync(request)).Summary.CacheStatus,
+                (await first.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken)).Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Written));
         }
 
@@ -1711,7 +1711,7 @@ public sealed partial class WorkerTests
                 BackendCheckResult.Unsatisfiable([]));
         });
 
-        var response = await second.VerifyAsync(request);
+        var response = await second.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1758,23 +1758,23 @@ public sealed partial class WorkerTests
         var baseline = WorkerInputSnapshot.Load(
             request,
             baselineIdentity,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var tool = WorkerInputSnapshot.Load(
             request,
             changedTool,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var binary = WorkerInputSnapshot.Load(
             request,
             changedBinary,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var specs = WorkerInputSnapshot.Load(
             request,
             changedSpecs,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var specContent = WorkerInputSnapshot.Load(
             request,
             changedSpecContent,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var artifactBytes = await File.ReadAllBytesAsync(
             request.CompilerManifest.Path);
         var sharedHash = CompilerArtifactInputHash.Compute(
@@ -1836,8 +1836,8 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var firstWorker = SharpProofWorker.Create(request.Budgets);
         using var secondWorker = SharpProofWorker.Create(request.Budgets);
-        var first = await firstWorker.VerifyAsync(request);
-        var second = await secondWorker.VerifyAsync(request);
+        var first = await firstWorker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await secondWorker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(first.Errors, Is.Empty);
         Assert.That(first.ClaimResults.Length, Is.EqualTo(2));
@@ -1895,7 +1895,7 @@ public sealed partial class WorkerTests
         }
 
         using var worker = new SharpProofWorker(backend);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
                 error.Code)));
@@ -1915,7 +1915,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
@@ -2054,7 +2054,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(8));
@@ -2095,7 +2095,7 @@ public sealed partial class WorkerTests
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
@@ -2110,7 +2110,7 @@ public sealed partial class WorkerTests
         var snapshot = WorkerInputSnapshot.Load(
             request,
             WorkerCacheIdentity.Current,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
             .Total!.Clauses.Where(static clause =>
                 clause.Kind == CompilerContractKind.Assume)
@@ -2118,7 +2118,7 @@ public sealed partial class WorkerTests
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var record = response.ClaimResults.Single();
         Assert.That(
@@ -2159,8 +2159,8 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var first = await worker.VerifyAsync(request);
-        var response = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Proven,
@@ -2220,7 +2220,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var contradictory = new[]
         {
             Result("ByteImpossible"),
@@ -2289,7 +2289,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(3));
@@ -2353,7 +2353,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -2397,7 +2397,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
@@ -2457,7 +2457,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             response.Errors,
@@ -2494,7 +2494,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -2530,7 +2530,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -2572,7 +2572,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -2603,7 +2603,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         _ = AssertClaimVerdict(
@@ -2641,7 +2641,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -2702,14 +2702,14 @@ public sealed partial class WorkerTests
         var lowerer = new CompilerCallableLowerer(
             compilation,
             new IrFactory());
-        var preparation = lowerer.Prepare(target);
+        var preparation = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             preparation.Total,
             Is.Not.Null);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var result = AssertClaimVerdict(
@@ -2773,7 +2773,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         foreach (var methodName in new[]
@@ -2842,7 +2842,7 @@ public sealed partial class WorkerTests
             declaredMaxStack: 1);
         var compilation = project.CreateCompilation();
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
     }
@@ -2908,7 +2908,7 @@ public sealed partial class WorkerTests
             .OfType<IMethodSymbol>()
             .Single();
         var provider = new CompilerTotalIlBodyProvider(compilation, null);
-        Assert.That(provider.Resolve(method, CancellationToken.None), Is.Null);
+        Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
 
     [Test]
@@ -2939,15 +2939,15 @@ public sealed partial class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+            await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var manifestJson = await File.ReadAllTextAsync(request.CompilerManifest.Path);
-        var canonicalJson = CompilerManifestArtifactJson.Serialize(artifact);
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson);
+        var canonicalJson = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(canonicalJson, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(canonicalJson, Is.EqualTo(manifestJson));
         Assert.That(roundTrip.Callables.Single().Total, Is.Not.Null);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
@@ -2998,7 +2998,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -3044,7 +3044,7 @@ public sealed partial class WorkerTests
             """);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         foreach (var result in response.ClaimResults)
@@ -3191,7 +3191,7 @@ public sealed partial class WorkerTests
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
-            var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName]);
+            var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
                 .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
@@ -3300,7 +3300,7 @@ public sealed partial class WorkerTests
                  })
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
-            var preparation = lowerer.Prepare(targets[targetName]);
+            var preparation = lowerer.Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
                 .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
@@ -3311,7 +3311,7 @@ public sealed partial class WorkerTests
             compilation,
             new IrFactory());
         var widePreparation = wideLowerer.Prepare(
-            targets["VerifyManyParameters"]);
+            targets["VerifyManyParameters"], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             widePreparation.Total!.IsBodyAbstraction || widePreparation.Total.Program.Blocks
                 .SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Any(),
@@ -3351,7 +3351,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -3394,7 +3394,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var result = AssertClaimVerdict(
@@ -3413,18 +3413,18 @@ public sealed partial class WorkerTests
         using var withoutPackWorker = SharpProofWorker.Create(
             withoutRequest.Budgets);
         var withoutPack = await withoutPackWorker.VerifyAsync(
-            withoutRequest);
+            withoutRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var withRequest = project.CreateRequest(
             cacheEnabled: false,
             specificationPacks: ["dotnet.scalar"]);
         var withArtifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(withRequest.CompilerManifest.Path));
+            await File.ReadAllTextAsync(withRequest.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var totalArtifact = withArtifact.Callables.Single().Total;
         using var withPackWorker = SharpProofWorker.Create(
             withRequest.Budgets);
         var withPack = await withPackWorker.VerifyAsync(
-            withRequest);
+            withRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(withoutPack.Errors, Is.Empty);
         Assert.That(withPack.Errors, Is.Empty);
@@ -3452,7 +3452,7 @@ public sealed partial class WorkerTests
 
         withArtifact.Callables.Single().Total!.Graph.Semantics = IrExecutionSemantics.Legacy;
         Assert.That(
-            new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact)),
+            new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());
     }
 
@@ -3475,14 +3475,14 @@ public sealed partial class WorkerTests
         project.UseNetCoreReferencePack();
         var disabledRequest = project.CreateRequest(cacheEnabled: false);
         using var disabledWorker = SharpProofWorker.CreateNative(disabledRequest.Budgets);
-        var disabled = await disabledWorker.VerifyAsync(disabledRequest);
+        var disabled = await disabledWorker.VerifyAsync(disabledRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(disabled.Errors, Is.Empty);
         Assert.That(disabled.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(disabled.ClaimResults.Single().ProofCore, Is.Empty);
 
         var enabledRequest = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
         using var enabledWorker = SharpProofWorker.CreateNative(enabledRequest.Budgets);
-        var enabled = await enabledWorker.VerifyAsync(enabledRequest);
+        var enabled = await enabledWorker.VerifyAsync(enabledRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(enabled.Errors, Is.Empty);
         Assert.That(enabled.ClaimResults.Single().Outcome, Is.EqualTo(expected));
         Assert.That(enabled.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
@@ -3505,7 +3505,7 @@ public sealed partial class WorkerTests
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
         using var worker = SharpProofWorker.CreateNative(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }
@@ -3526,7 +3526,7 @@ public sealed partial class WorkerTests
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, specificationPacks: ["dotnet.scalar"]);
         using var worker = SharpProofWorker.CreateNative(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
@@ -3571,7 +3571,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         // Math.Sign is opaque; the modeled Math.Abs alone proves the result.
@@ -3597,7 +3597,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -3691,7 +3691,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(6));
@@ -3764,7 +3764,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -3806,7 +3806,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         _ = AssertClaimVerdict(
@@ -3834,7 +3834,7 @@ public sealed partial class WorkerTests
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
@@ -3859,7 +3859,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -3906,7 +3906,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
@@ -3953,7 +3953,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -3991,7 +3991,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         var record = AssertClaimVerdict(
@@ -4025,7 +4025,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         _ = AssertClaimVerdict(
@@ -4061,7 +4061,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
@@ -4095,7 +4095,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
@@ -4158,7 +4158,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
@@ -4183,7 +4183,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         _ = AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
@@ -4210,18 +4210,18 @@ public sealed partial class WorkerTests
         var enabled = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var firstWorker = new SharpProofWorker(backend);
-        var first = await firstWorker.VerifyAsync(enabled);
+        var first = await firstWorker.VerifyAsync(enabled, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
-        var second = await firstWorker.VerifyAsync(enabled);
+        var second = await firstWorker.VerifyAsync(enabled, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(backend.CallCount, Is.EqualTo(firstQueries));
         AssertSemanticallyEquivalent(first, second);
 
         var disabled = project.CreateRequest(cacheEnabled: false);
         using var disabledBackend = new CountingNativeBackend();
         using var disabledWorker = new SharpProofWorker(disabledBackend);
-        var withoutCache = await disabledWorker.VerifyAsync(disabled);
+        var withoutCache = await disabledWorker.VerifyAsync(disabled, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertSemanticallyEquivalent(first, withoutCache);
     }
 
@@ -4234,8 +4234,8 @@ public sealed partial class WorkerTests
             BackendCheckResult.Unknown(
                 BackendFailureReason.ResourceLimit));
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        var second = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(backend.CallCount, Is.EqualTo(1));
         Assert.That(
@@ -4269,7 +4269,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(
             new CountingBackend(BackendCheckResult.Unknown(backendReason)));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4295,7 +4295,7 @@ public sealed partial class WorkerTests
             new CountingBackend(BackendCheckResult.Unknown(
                 BackendFailureReason.Incomplete)));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var claim = response.ClaimResults.Single();
 
         using (Assert.EnterMultipleScope())
@@ -4322,7 +4322,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(
             new ThrowingBackend("Injected unexpected backend failure."));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4347,7 +4347,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
         Assert.That(response.FailureReason,
@@ -4362,7 +4362,7 @@ public sealed partial class WorkerTests
     {
         using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         var assembled = AssembleFatalAndTimedOut(request, snapshot, reverseRecords);
         var response = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(assembled))!;
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
@@ -4551,7 +4551,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
@@ -4559,7 +4559,7 @@ public sealed partial class WorkerTests
             project.CacheDirectory,
             "*.sharp-proof-cache.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
-        var second = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
@@ -4572,7 +4572,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
@@ -4591,7 +4591,7 @@ public sealed partial class WorkerTests
             cacheFile,
             envelope.Replace(current, stale, StringComparison.Ordinal));
 
-        var second = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         AssertSemanticallyEquivalent(first, second);
@@ -4605,11 +4605,11 @@ public sealed partial class WorkerTests
         request.Cache.MaximumBytes = 1;
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
-        var second = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4633,7 +4633,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         request.Cache.MaximumBytes = 1;
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
-        await worker.VerifyAsync(request);
+        await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(File.Exists(unrelatedPath), Is.True);
     }
@@ -4652,7 +4652,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         request.Cache.MaximumBytes = 1;
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
-        await worker.VerifyAsync(request);
+        await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4674,8 +4674,8 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
-        var cached = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var cached = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         _ = AssertClaimVerdict(response, WorkerClaimOutcome.Refuted);
         using (Assert.EnterMultipleScope())
@@ -4709,7 +4709,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.QueryRlimit = 1;
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         _ = AssertClaimVerdict(
             response,
@@ -4729,7 +4729,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(
             backend,
             () => backend.ConsumedResourceCount);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         WorkerClaimOutcome[] expectedStatuses = [
             WorkerClaimOutcome.Proven,
             WorkerClaimOutcome.Proven,
@@ -4756,7 +4756,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(
             () => new CoordinatedBackend(coordination));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4783,7 +4783,7 @@ public sealed partial class WorkerTests
             return backend;
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         _ = AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         using (Assert.EnterMultipleScope())
@@ -4833,7 +4833,7 @@ public sealed partial class WorkerTests
             return backend;
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4864,7 +4864,7 @@ public sealed partial class WorkerTests
         var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(() => backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
         Assert.That(
@@ -4884,9 +4884,9 @@ public sealed partial class WorkerTests
         var backend = new ConcurrentRunBackend();
         using var worker = new SharpProofWorker(backend);
 
-        var first = worker.VerifyAsync(request);
+        var first = worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await backend.FirstEntered.WaitAsync(TimeSpan.FromSeconds(10));
-        var second = worker.VerifyAsync(request);
+        var second = worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var secondEnteredBeforeRelease = ReferenceEquals(
             await Task.WhenAny(
                 backend.SecondEntered,
@@ -4920,7 +4920,7 @@ public sealed partial class WorkerTests
                 ? new DelayingBackend()
                 : new CountingNativeBackend());
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4963,7 +4963,7 @@ public sealed partial class WorkerTests
                 : new InvalidOperationException("replacement creation failed");
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5047,7 +5047,7 @@ public sealed partial class WorkerTests
             };
         });
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5102,7 +5102,7 @@ public sealed partial class WorkerTests
             }
             return second;
         });
-        var verification = worker.VerifyAsync(request);
+        var verification = worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         try
         {
             await second.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -5130,7 +5130,7 @@ public sealed partial class WorkerTests
         request.Budgets.ProjectWallTimeMilliseconds = 1_000;
         using var worker = new SharpProofWorker(new DelayingBackend());
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5175,7 +5175,7 @@ public sealed partial class WorkerTests
                 ? new DelayingBackend()
                 : new CountingNativeBackend());
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5232,7 +5232,7 @@ public sealed partial class WorkerTests
                 ? new DelayingBackend()
                 : new CountingNativeBackend());
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5260,7 +5260,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodRlimit = request.Budgets.QueryRlimit;
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
@@ -5284,7 +5284,7 @@ public sealed partial class WorkerTests
             backend,
             readConsumedResourceCount: null);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
@@ -5304,7 +5304,7 @@ public sealed partial class WorkerTests
         request.Budgets.MethodRlimit = 12;
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(backend.CallCount, Is.EqualTo(2));
@@ -5320,13 +5320,13 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
 
         request.Budgets.MethodRlimit--;
-        var second = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
@@ -5405,13 +5405,13 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodWallTimeMilliseconds = 1000;
         request.Budgets.ProjectWallTimeMilliseconds = 1000;
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
         var expiredStart = System.Diagnostics.Stopwatch.GetTimestamp() -
             2 * System.Diagnostics.Stopwatch.Frequency;
 
-        var response = await worker.VerifyAsync(request, snapshot, CancellationToken.None, expiredStart);
+        var response = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken, expiredStart);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5436,7 +5436,7 @@ public sealed partial class WorkerTests
         var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -5458,7 +5458,7 @@ public sealed partial class WorkerTests
         methodRequest.Budgets.ProjectWallTimeMilliseconds = 1_000;
         using (var worker = new SharpProofWorker(new DelayingBackend()))
         {
-            var response = await worker.VerifyAsync(methodRequest);
+            var response = await worker.VerifyAsync(methodRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(
                 response.ClaimResults.Single().Reason,
                 Is.EqualTo(WorkerClaimReason.MethodTimeout));
@@ -5479,7 +5479,7 @@ public sealed partial class WorkerTests
         projectRequest.Budgets.MaxParallelism = 1;
         using var projectWorker = new SharpProofWorker(
             static () => new DelayingBackend());
-        var projectResponse = await projectWorker.VerifyAsync(projectRequest);
+        var projectResponse = await projectWorker.VerifyAsync(projectRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (projectResponse.Manifest.Callables.Length == 0 && projectResponse.Manifest.Claims.Length == 0)
         {
             using (Assert.EnterMultipleScope())
@@ -5600,7 +5600,7 @@ public sealed partial class WorkerTests
             maximumExpressionDepth: maximumExpressionDepth);
         using var defaultBackend = backend == null ? new CountingNativeBackend() : null;
         using var worker = new SharpProofWorker(backend ?? defaultBackend!);
-        return await worker.VerifyAsync(request);
+        return await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private static WorkerClaimManifestEntry GetClaim(
@@ -6350,10 +6350,10 @@ public sealed partial class WorkerTests
                 features,
                 discovery,
                 maximumExpressionDepth,
-                CancellationToken.None,
+                TestContext.CurrentContext.CancellationToken,
                 specificationPacks: specificationPacks);
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
             var path = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest-" + Guid.NewGuid().ToString("N") +

@@ -14,7 +14,7 @@ public sealed class PortableTotalExecutionTests
     public void TotalExceptionEdgesHavocOriginsAndSourceSpansRoundTrip()
     {
         var graph = CreateGraph();
-        var decoded = PortableIrGraphCodec.Decode(graph);
+        var decoded = PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var json = JsonSerializer.Serialize(graph, WorkerProtocolJson.SharedOptions);
         Assert.That(decoded.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(decoded.Factory.GetTypeInfo(decoded.Factory.IntegerType).Width, Is.EqualTo(32));
@@ -26,7 +26,7 @@ public sealed class PortableTotalExecutionTests
         Assert.That((span.Document, span.Start, span.Length), Is.EqualTo(("Subject.cs", 23, 7)));
         Assert.That(result.ConsumedApproximation, Is.False);
         Assert.That(JsonSerializer.Serialize(PortableIrGraphCodec.Encode(decoded.Factory,
-            decoded.Program, decoded.Roots).Graph, WorkerProtocolJson.SharedOptions), Is.EqualTo(json));
+            decoded.Program, decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph, WorkerProtocolJson.SharedOptions), Is.EqualTo(json));
     }
 
     [TestCase("semantics")]
@@ -98,7 +98,7 @@ public sealed class PortableTotalExecutionTests
         }
         Assert.Throws<InvalidDataException>((Action)(() =>
         {
-            _ = PortableIrGraphCodec.Decode(graph);
+            _ = PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }));
     }
 
@@ -122,6 +122,6 @@ public sealed class PortableTotalExecutionTests
         builder.Throw(entry, factory.CreateOperation("arithmetic", new IrSourceSpan("Subject.cs", 23, 7)),
             IrExceptionKind.Overflow, exit);
         builder.ExceptionalExit(exit, factory.CreateOperation());
-        return PortableIrGraphCodec.Encode(builder.Build(), []).Graph;
+        return PortableIrGraphCodec.Encode(builder.Build(), [], cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
     }
 }

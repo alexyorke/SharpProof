@@ -898,7 +898,7 @@ public static class FrontendDifferentialOracle
 
     public static FrontendDifferentialResult Compare(
         GeneratedCSharpCase generated,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (generated == null)
         {
@@ -910,7 +910,7 @@ public static class FrontendDifferentialOracle
 
     public static ImmutableArray<FrontendDifferentialResult> CompareBatch(
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (!HasValidBatch(generatedCases))
         {
@@ -950,7 +950,7 @@ public static class FrontendDifferentialOracle
     internal static ImmutableArray<FrontendDifferentialResult> CompareSourceBatch(
         string source,
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (!HasValidBatch(generatedCases))
         {
@@ -1090,7 +1090,7 @@ public static class FrontendDifferentialOracle
 
     public static ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
         IReadOnlyList<FrontendSemanticEdgeCase> cases,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (cases == null)
         {
@@ -1860,7 +1860,7 @@ public static class CSharpStructuralShrinker
     public static GeneratedCSharpCase Minimize(
         GeneratedCSharpCase generated,
         Func<GeneratedCSharpCase, bool> preservesMismatch,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (generated == null)
         {

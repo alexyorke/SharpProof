@@ -21,7 +21,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         using var project = CreateProject(source, "EffectProjectionAdmission");
         var target = project.Snapshot.Callables.Single();
         var claim = target.EffectClaims.Single();
-        var actualEffect = await NativeEffectSiteVerifier.VerifyPurityAsync(target, project.Request.Budgets);
+        var actualEffect = await NativeEffectSiteVerifier.VerifyPurityAsync(target, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEffect.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualEffect.Reason, Is.EqualTo(WorkerClaimReason.None));
         var valid = NativeEffectClaims.Project(target, claim.ClaimId, actualEffect);
@@ -31,10 +31,10 @@ public sealed class ActualNativeProjectionAdmissionTests
 
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, project.Request.Budgets.QueryRlimit,
             project.Request.Budgets.MethodRlimit);
-        var actualEntry = await solver.VerifyEntryAsync();
+        var actualEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actualEntry.ExceptionWitness, Is.Null);
@@ -60,10 +60,10 @@ public sealed class ActualNativeProjectionAdmissionTests
         var target = project.Snapshot.Callables.Single();
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, project.Request.Budgets.QueryRlimit,
             project.Request.Budgets.MethodRlimit);
-        var actualEntry = await solver.VerifyEntryAsync();
+        var actualEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
         var requires = target.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)
@@ -72,7 +72,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var valid = TotalCallableVerifier.ProjectEntry(actualEntry, requires);
         Assert.That(valid.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(valid.Reason, Is.EqualTo(WorkerClaimReason.None));
-        var actualBody = await solver.VerifyEnsuresAsync(0);
+        var actualBody = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualBody.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualBody.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actualBody.Core.Any(label => label.StartsWith("input:disjoint:", StringComparison.Ordinal)), Is.True);
@@ -102,7 +102,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         {
             TotalCallableClaimCheck? actual = null;
             await TotalCallableVerifier.VerifyAsync(target, project.Request.Budgets,
-                check => actual = check, CancellationToken.None);
+                check => actual = check, TestContext.CurrentContext.CancellationToken);
             Assert.That(actual, Is.Not.Null);
             Assert.That(actual!.Checked, Is.True);
             Assert.That(actual.Enrolled, Is.True);
@@ -128,7 +128,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         return new ShadowTestProject(artifact);
     }
 

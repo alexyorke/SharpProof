@@ -15,7 +15,7 @@ public sealed class OrdinaryTransactionRollbackWorkflowTests
         var error = Assert.ThrowsAsync<IOException>((Func<Task>)(async () =>
             await CorpusFileTransaction.WriteAllAsync(temporary.FullName,
                 [new CorpusFileUpdate(first, "first\n"), new CorpusFileUpdate(second, "second\n")],
-                CancellationToken.None, beforePublish: index =>
+                TestContext.CurrentContext.CancellationToken, beforePublish: index =>
                 {
                     if (index == 1)
                     {
@@ -42,7 +42,7 @@ public sealed class OrdinaryTransactionRollbackWorkflowTests
         var markerPath = Path.Combine(temporary.FullName, ".sharpproof-corpus-transaction.json");
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await CorpusFileTransaction.WriteAllAsync(temporary.FullName,
-                [new CorpusFileUpdate(destination, "replacement\n")], CancellationToken.None,
+                [new CorpusFileUpdate(destination, "replacement\n")], TestContext.CurrentContext.CancellationToken,
                 beforePublish: index =>
                 {
                     Assert.That(index, Is.Zero);

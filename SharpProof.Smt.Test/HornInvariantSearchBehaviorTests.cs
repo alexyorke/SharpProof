@@ -11,7 +11,7 @@ public sealed class HornInvariantSearchBehaviorTests
     public async Task BoundedCounterProducesKernelProvableSafetyProposal()
     {
         var (factory, counter, relation, states, clauses) = CounterSystem();
-        var proposals = HornInvariantSearch.Propose(factory, clauses, states, 1_000_000, CancellationToken.None);
+        var proposals = HornInvariantSearch.Propose(factory, clauses, states, 1_000_000, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(proposals, Does.ContainKey(relation));
         var invariant = proposals[relation];
@@ -23,8 +23,8 @@ public sealed class HornInvariantSearchBehaviorTests
             [Assume(factory, Equal(factory, factory.Variable(counter), factory.Integer(0)))], invariant);
         var safety = Query(factory, [Assume(factory, invariant)], nonnegative);
 
-        Assert.That(await kernel.VerifyAsync(initialization), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(safety), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(initialization, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(safety, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -36,7 +36,7 @@ public sealed class HornInvariantSearchBehaviorTests
         var unsafeClauses = clauses.Take(2).Append(Query(factory,
             [Assume(factory, Relation(factory, relation, factory.Variable(counter)))], falseGoal)).ToArray();
 
-        var proposals = HornInvariantSearch.Propose(factory, unsafeClauses, states, 1_000_000, CancellationToken.None);
+        var proposals = HornInvariantSearch.Propose(factory, unsafeClauses, states, 1_000_000, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(proposals, Is.Empty);
     }

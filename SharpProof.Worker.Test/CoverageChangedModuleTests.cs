@@ -77,7 +77,7 @@ public sealed class CoverageChangedModuleTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["SHARPPROOF_CHANGED_ROOT"] = root;
         invocation.Environment["SHARPPROOF_CHANGED_GENERATED"] = compilerGenerated ? "true" : "false";
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var document = JsonDocument.Parse(result.Output);
         var value = document.RootElement;
@@ -93,7 +93,8 @@ public sealed class CoverageChangedModuleTests
 
     [TestCase("unmapped", 0, 0, 2, 0, 0)]
     [TestCase("ordinary-overlap", 2, 2, 0, 0, 0)]
-    [TestCase("generated-overlap", 2, 2, 0, 0, 0)]
+    // A generated PDB range cannot make a pure declaration coverable.
+    [TestCase("generated-overlap", 0, 0, 0, 0, 2)]
     [TestCase("direct-zero", 2, 2, 0, 0, 0)]
     [TestCase("linked-mixed", 1, 1, 1, 0, 0)]
     [TestCase("unqualified", 2, 2, 0, 0, 0)]
@@ -190,7 +191,7 @@ public sealed class CoverageChangedModuleTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["SHARPPROOF_CHANGED_ROOT"] = root;
         invocation.Environment["SHARPPROOF_CHANGED_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var document = JsonDocument.Parse(result.Output);
         var value = document.RootElement;

@@ -35,18 +35,18 @@ public sealed class CorpusGateTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
             SharpProof.Worker.Protocol.WorkerFeatureSet.All,
-            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
         var body = batch.Callers.Single().Body;
         var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId,
-            SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, CancellationToken.None);
-        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+            SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, TestContext.CurrentContext.CancellationToken);
+        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body], TestContext.CurrentContext.CancellationToken);
         Assert.That(match.Expected, Is.EqualTo(1));
         Assert.That(match.Matched, Is.EqualTo(1));
         Assert.That(match.Failures, Is.Empty);
         var missing = CorpusGate.MatchNativeContractCalls(compilation,
-            [detached.Body with { CallPreconditions = [] }]);
+            [detached.Body with { CallPreconditions = [] }], TestContext.CurrentContext.CancellationToken);
         Assert.That(missing.Expected, Is.EqualTo(1));
         Assert.That(missing.Matched, Is.Zero);
         Assert.That(missing.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
@@ -56,7 +56,7 @@ public sealed class CorpusGateTests
         var wrongSite = factory.CreateOperation("coverage-negative",
             new SharpProof.Ir.IrSourceSpan(span.Document, span.Start + 1, span.Length));
         var substituted = CorpusGate.MatchNativeContractCalls(compilation,
-            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }]);
+            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }], TestContext.CurrentContext.CancellationToken);
         Assert.That(substituted.Expected, Is.EqualTo(1));
         Assert.That(substituted.Matched, Is.Zero);
         Assert.That(substituted.Failures, Has.Some.StartsWith("UnexpectedNativeObligation:"));
@@ -99,8 +99,8 @@ public sealed class CorpusGateTests
                 new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest);
             var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 SharpProof.Worker.Protocol.WorkerFeatureSet.All,
-                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-                SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+                SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
             Assert.That(System.Text.Json.JsonSerializer.Serialize(
                 new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest),
                 Is.EqualTo(originalManifest), item.Id);
@@ -114,9 +114,9 @@ public sealed class CorpusGateTests
             Assert.That(body.CallPreconditions, Has.Length.EqualTo(1), item.Id);
             var encoded = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!;
             var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(
-                body.CallableId, encoded, CancellationToken.None);
+                body.CallableId, encoded, TestContext.CurrentContext.CancellationToken);
             Assert.That(detached.Body.Program.Factory, Is.Not.SameAs(body.Program.Factory), item.Id);
-            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body], TestContext.CurrentContext.CancellationToken);
             Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Failures, Is.Empty, item.Id);
@@ -130,9 +130,9 @@ public sealed class CorpusGateTests
                 new(clauseSpan.Document, clauseSpan.Start, clauseSpan.Length));
             Assert.That(coverage.Matched, Is.EqualTo(1), nativeKey.ToString());
             var candidate = SharpProof.Worker.PassiveCallableArtifactAdapter.EnrollShadow(detached);
-            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, item.Id + ":" + reason);
+            Assert.That(SharpProof.Worker.PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, item.Id + ":" + reason);
             using var solver = new SharpProof.Worker.PassiveCallableSolver(plan!);
-            var result = await solver.VerifyCallPreconditionAsync(0);
+            var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(result.Reason, Is.EqualTo(SharpProof.Worker.Protocol.WorkerClaimReason.None), item.Id);
             var outcome = result.Outcome switch
             {
@@ -145,11 +145,11 @@ public sealed class CorpusGateTests
             Assert.That(outcome, Is.EqualTo(expected), item.Id + ":" + result.Reason);
             if (outcome == "Refuted")
             {
-                var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, CancellationToken.None);
+                var replay = plan!.ReplayCallPrecondition(0, result.EntryModel, TestContext.CurrentContext.CancellationToken);
                 Assert.That(replay, Is.Not.Null, item.Id);
                 Assert.That(result.CallPreconditionWitness, Is.EqualTo(replay), item.Id);
             }
-            var legacy = await CorpusGate.ObserveCaseAsync(item, CancellationToken.None);
+            var legacy = await CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken);
             Assert.That(legacy.ToCanonicalLine(), Is.EqualTo(frozen[item.Id]), item.Id + ": legacy changed");
         }
         Assert.That(rows.Count(static row => row.Outcome == "Proven"), Is.EqualTo(30));
@@ -427,7 +427,7 @@ public sealed class CorpusGateTests
                 new CorpusFileUpdate(first, "new-first\n"),
                 new CorpusFileUpdate(second, "new-second\n")
             ],
-            CancellationToken.None,
+            TestContext.CurrentContext.CancellationToken,
             index =>
             {
                 if (index == 1)
@@ -611,7 +611,7 @@ public sealed class CorpusGateTests
         var destination = Path.Combine(temporary.FullName, "existing.txt");
         File.WriteAllText(destination, "original");
         Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
-            temporary.FullName, [new CorpusFileUpdate(destination, null!)], CancellationToken.None);
+            temporary.FullName, [new CorpusFileUpdate(destination, null!)], TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<ArgumentNullException>(write);
         Assert.That(File.ReadAllText(destination), Is.EqualTo("original"));
         Assert.That(Directory.GetFiles(temporary.FullName), Is.EqualTo(new[] { destination }));
@@ -894,7 +894,7 @@ public sealed class CorpusGateTests
         CorpusGateResult result;
         try
         {
-            result = await CorpusGate.RunAsync(root);
+            result = await CorpusGate.RunAsync(root, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         catch (InvalidOperationException exception) when (exception.Data["SharpProof.Corpus.WorkerFailure"] is string diagnostics)
         {
@@ -1021,7 +1021,7 @@ public sealed class CorpusGateTests
         };
         var cases = new[] { baseline, renamed, temporary, trivia };
         var observations = await Task.WhenAll(cases.Select(item =>
-            CorpusGate.ObserveCaseAsync(item, CancellationToken.None)));
+            CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken)));
         var failures = CorpusGate.ValidateMetamorphicConsistency(
             [.. cases],
             [.. observations]);
@@ -1194,7 +1194,7 @@ public sealed class IndependentPinnedRequiresCensusTests
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
         var document = OpenSourceCorpusCatalog.Load(root);
         Assert.That(document.Methods, Has.Length.EqualTo(200));
-        var oss = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
+        var oss = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         var ossRows = Census(oss, out var ossDeclarations, out var ossDeclaredRequires);
         Assert.That(ossRows, Is.Empty);
         Assert.That(ossDeclaredRequires, Is.Zero);

@@ -214,7 +214,7 @@ param(
 [Source](../../SharpProof.Gates/Program.cs)
 
 ```text
-Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
+Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
 ```
 

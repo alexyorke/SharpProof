@@ -16,7 +16,7 @@ public sealed class WorkerVcFieldFreshnessSoundnessTests
             "Contract.Ensures(Contract.Result<int>() == 7); var fresh = new int[1]; " + replacement +
             " return box.Data[0]; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
