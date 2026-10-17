@@ -263,27 +263,7 @@ internal static partial class SemanticClaimIdentity
             .FirstOrDefault(syntax => declaration != null &&
                 syntax.SyntaxTree == declaration.SyntaxTree &&
                 syntax.Span.Contains(declaration.Span));
-        if (declaration == null || owner == null)
-        {
-            writer.Add(-1);
-            return;
-        }
-        var path = new Stack<int>();
-        for (var current = declaration; !HasSameSite(current, owner); current = current.Parent!)
-        {
-            if (current.Parent == null)
-            {
-                writer.Add(-1);
-                return;
-            }
-            path.Push(current.Parent.ChildNodes().TakeWhile(
-                child => !HasSameSite(child, current)).Count());
-        }
-        writer.Add(path.Count);
-        foreach (var ordinal in path)
-        {
-            writer.Add(ordinal);
-        }
+        CompilerOwnedSyntaxPath.Write(writer, declaration, owner);
     }
 
     private static void WriteParameterRole(
