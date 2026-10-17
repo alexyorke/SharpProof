@@ -118,6 +118,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Host.dll",
         "tools/net9/SharpProof.Ir.dll",
+        "tools/net9/SharpProof.Logging.dll",
         "tools/net9/SharpProof.Smt.dll",
         "tools/net9/SharpProof.Specs.dll",
         "tools/net9/SharpProof.Verify.dll",

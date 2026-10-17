@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />
   <Project Path="SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj" />
   <Project Path="SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj" />
   <Project Path="SharpProof.Analyzer/SharpProof.Analyzer.csproj" />
@@ -25,6 +26,7 @@
   <Project Path="SharpProof.Host/SharpProof.Host.csproj" />
   <Project Path="SharpProof.Ir.Test/SharpProof.Ir.Test.csproj" />
   <Project Path="SharpProof.Ir/SharpProof.Ir.csproj" />
+  <Project Path="SharpProof.Logging/SharpProof.Logging.csproj" />
   <Project Path="SharpProof.Package.Test/SharpProof.Package.Test.csproj" />
   <Project Path="SharpProof.Package/SharpProof.Package.csproj" />
   <Project Path="SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj" />

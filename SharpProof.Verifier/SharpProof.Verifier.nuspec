@@ -31,6 +31,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Logging.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Host.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.dll" target="tools\net9" />

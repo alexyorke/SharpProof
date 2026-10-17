@@ -1,3 +1,4 @@
+using SharpProof.Logging;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
@@ -14,6 +15,7 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class Program
 {
+    private static RepositoryLogger Log => new(Console.Out, Console.Error);
     // Refuted contracts are semantic verifier failures. Keep their transport
     // identity separate from incomplete analysis and assumption diagnostics so
     // the build task can preserve the source location and claim-specific code.
@@ -24,7 +26,7 @@ internal static class Program
     {
         if (TrustedChildEnvironment.FindUnsafeRuntimeVariable() is { } variable)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof launcher refused unsafe runtime environment variable " +
                 variable + ".");
             return 125;
@@ -40,7 +42,7 @@ internal static class Program
         args = ArgumentNullGuard.NotNull(args, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "Usage: SharpProof.Worker " + WorkerInvocationArguments.Command + " " +
                 WorkerInvocationArguments.RequestOption + " <path> " +
                 WorkerInvocationArguments.ResultOption + " <path> " +
@@ -76,7 +78,7 @@ internal static class Program
         catch (PlatformNotSupportedException exception)
         {
             var failure = ClassifyLauncherFailure(exception);
-            Console.Error.WriteLine(failure.ConsoleMessage);
+            Log.Error(failure.ConsoleMessage);
             return failure.ExitCode;
         }
         catch (Exception exception) when (
@@ -85,7 +87,7 @@ internal static class Program
                 InvalidDataException or JsonException or KeyNotFoundException or
                 InvalidOperationException)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
             return 2;
@@ -119,7 +121,7 @@ internal static class Program
                 not OperationCanceledException)
         {
             var failure = ClassifyLauncherFailure(exception);
-            Console.Error.WriteLine(failure.ConsoleMessage);
+            Log.Error(failure.ConsoleMessage);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
                 failure.Code, failure.Message).ConfigureAwait(false);
@@ -156,7 +158,7 @@ internal static class Program
                     UnauthorizedAccessException or ArgumentException or OperationCanceledException or
                     OverflowException)
             {
-                Console.Error.WriteLine(
+                Log.Error(
                     "SharpProof worker result could not be published.");
                 return 3;
             }
@@ -238,7 +240,7 @@ internal static class Program
             exception is ArgumentException or IOException or InvalidDataException or
                 UnauthorizedAccessException or JsonException)
         {
-            Console.Error.WriteLine(
+            Log.Error(
                 "SharpProof worker result is unavailable or malformed.");
             return 3;
         }
@@ -286,7 +288,7 @@ internal static class Program
             var vacuity = result.Vacuity == WorkerVacuityKind.None
                 ? string.Empty
                 : " [vacuous: " + result.Vacuity + "]";
-            Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
+            Log.Info("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
                 LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason + vacuity);
             if (result.Outcome == WorkerClaimOutcome.Refuted)
             {
@@ -328,7 +330,7 @@ internal static class Program
         var incompleteError = (incompleteCount != 0 || projectTimedOut) &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
-        Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
+        Log.Info("SharpProof summary " + JsonSerializer.Serialize(
             new
             {
                 response.RunStatus,
@@ -339,7 +341,7 @@ internal static class Program
         if (response.RunStatus != WorkerRunStatus.Complete &&
             !timeoutAttributedToCoverage)
         {
-            Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
+            Log.Error("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
             return LauncherPresentation.ExitCode(
                 response.RunStatus,
@@ -363,7 +365,7 @@ internal static class Program
         // the structured diagnostic channel. The shared transport validator
         // owns the accepted code set; this line remains schema-compatible when
         // the launcher is paired with an older host during package bootstrap.
-        Console.Error.WriteLine(
+        Log.Error(
             VerifierDiagnosticTransport.Prefix + JsonSerializer.Serialize(new
             {
                 schema = 1,
@@ -378,7 +380,7 @@ internal static class Program
             ? "SharpProof"
             : claim.Location.Path + FormattableString.Invariant(
                 $"({claim.Location.Line},{claim.Location.Column})");
-        Console.Out.WriteLine(prefix + ": error " +
+        Log.Info(prefix + ": error " +
             RefutedContractDiagnosticCode + ": " + message);
     }
 
@@ -421,11 +423,11 @@ internal static class Program
         var diagnostic = prefix + ": " + severity + " " + id + ": " + message;
         if (severity == "info")
         {
-            Console.Out.WriteLine(diagnostic);
+            Log.Info(diagnostic);
             return;
         }
 
-        Console.Error.WriteLine(VerifierDiagnosticTransport.Serialize(
+        Log.Error(VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
                 severity,
                 id,
@@ -433,7 +435,7 @@ internal static class Program
                 location.Line,
                 location.Column,
                 message)));
-        Console.Out.WriteLine(diagnostic);
+        Log.Info(diagnostic);
     }
 
     // Cooperating publishers/invalidation hold all stable member leases. The
@@ -588,7 +590,7 @@ internal static class Program
     {
         foreach (var error in errors)
         {
-            Console.Error.WriteLine(prefix + error.Code + ": " + error.Message);
+            Log.Error(prefix + error.Code + ": " + error.Message);
         }
     }
 }

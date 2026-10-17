@@ -1,3 +1,4 @@
+using SharpProof.Logging;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
@@ -7,6 +8,7 @@ namespace SharpProof.Gates;
 
 internal static class Program
 {
+    private static RepositoryLogger Log => new(Console.Out, Console.Error);
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
@@ -18,7 +20,7 @@ internal static class Program
     [SuppressMessage(
         "Performance",
         "CA1849:Call async methods when in an async method",
-        Justification = "The gate writes short console diagnostics synchronously before returning its process exit code.")]
+        Justification = "The gate writes short logger diagnostics synchronously before returning its process exit code.")]
     private static async Task<int> Main(string[] args)
     {
         try
@@ -34,15 +36,15 @@ internal static class Program
                 var result = await NativeEffectOracleGate.RunAsync(root, maximumMethods, allocations: command == "allocation-oracle",
                     purity: command == "purity-oracle", capabilities: command == "capability-oracle",
                     summary: command == "effectcontract-oracle").ConfigureAwait(false);
-                Console.WriteLine(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
+                Log.Info(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
             if (command == "corpus")
             {
                 var wallTime = System.Diagnostics.Stopwatch.StartNew();
                 var result = await CorpusGate.RunAsync(root).ConfigureAwait(false);
-                Console.Error.WriteLine($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
-                Console.WriteLine(
+                Log.Error($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
+                Log.Info(
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
@@ -50,16 +52,16 @@ internal static class Program
             {
                 await CorpusGate.WriteActualSnapshotAsync(root)
                     .ConfigureAwait(false);
-                Console.WriteLine("Updated the canonical corpus snapshot.");
+                Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
             return 2;
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine(exception);
+            Log.Error(exception);
             return 1;
         }
     }

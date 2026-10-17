@@ -13,6 +13,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
+using SharpProof.Logging;
 
 namespace SharpProof.Worker.Test;
 
@@ -207,7 +208,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             Assert.That(libraryResult, Is.EqualTo(7));
             Assert.That(consumerResult, Is.EqualTo(7));
 
-            Console.WriteLine(JsonSerializer.Serialize(new
+            new RepositoryLogger(Console.Out, Console.Error).Info(JsonSerializer.Serialize(new
             {
                 Case = kind.ToString(),
                 ConsumerHasForeignCompilerReference = consumerHasForeignReference,
