@@ -100,3 +100,42 @@ finally {
 }
 
 Write-Output $payloadDirectory
+
+foreach ($architecture in @('arm64', 'x64')) {
+    $mac = $catalog.macos.$architecture
+    $rid = "osx-$architecture"
+    $archivePath = Join-Path $resolvedDownload "z3-$($z3.version)-$rid.zip"
+    $extractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-$rid-extract"
+    try {
+        if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            Invoke-WebRequest -Uri ([string]$mac.archiveUrl) -OutFile $archivePath
+        }
+        Assert-Sha256 $archivePath ([string]$mac.archiveSha256) "$rid Z3 archive"
+        if (Test-Path -LiteralPath $extractRoot) {
+            Remove-Item -LiteralPath $extractRoot -Recurse -Force
+        }
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
+        $sourceLibrary = Join-Path $extractRoot ([string]$mac.archiveLibraryPath)
+        $sourceManaged = Join-Path $extractRoot ([string]$mac.archiveManagedAssemblyPath)
+        if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
+            throw "The verified $rid Z3 archive did not contain the catalog-owned payload paths."
+        }
+        Assert-Equal ([int64](Get-Item -LiteralPath $sourceLibrary).Length) ([int64]$mac.libraryBytes) "$rid libz3.dylib byte length"
+        Assert-Equal ([int64](Get-Item -LiteralPath $sourceManaged).Length) ([int64]$mac.managedAssemblyBytes) "$rid Microsoft.Z3.dll byte length"
+        Assert-Sha256 $sourceLibrary ([string]$mac.librarySha256) "$rid libz3.dylib"
+        Assert-Sha256 $sourceManaged ([string]$mac.managedAssemblySha256) "$rid Microsoft.Z3.dll"
+        $destination = Join-Path $resolvedDestination "z3/$($z3.version)/$rid"
+        [System.IO.Directory]::CreateDirectory($destination) | Out-Null
+        Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $destination 'libz3.dylib') -Force
+        Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $destination 'Microsoft.Z3.dll') -Force
+    }
+    finally {
+        foreach ($temporaryPath in @($extractRoot, $archivePath)) {
+            if (Test-Path -LiteralPath $temporaryPath) {
+                Remove-Item -LiteralPath $temporaryPath -Recurse -Force
+            }
+        }
+    }
+    Write-Output $destination
+}

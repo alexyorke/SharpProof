@@ -24,6 +24,10 @@ public static class ContainerContract
 
     public static ContainerContractInfo ValidateRequired()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return MacOsHostContract.ValidateRequired();
+        }
         RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
@@ -137,6 +141,10 @@ public static class ContainerContract
 
     public static string ResolveZ3LibraryRequired()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return MacOsHostContract.ResolveZ3LibraryRequired();
+        }
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
         return stream.Name;
@@ -144,6 +152,10 @@ public static class ContainerContract
 
     internal static string GetZ3LibrarySha256Required()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return MacOsHostContract.GetZ3LibrarySha256Required();
+        }
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
         return contract.Z3LibrarySha256;
@@ -151,6 +163,10 @@ public static class ContainerContract
 
     internal static IntPtr LoadZ3LibraryRequired()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return MacOsHostContract.LoadZ3LibraryRequired();
+        }
         RequireLinuxZ3Loader(OperatingSystem.IsLinux());
 
         var contract = ValidateRequired();
