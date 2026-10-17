@@ -615,7 +615,7 @@ try {
         $fixtureClasses = @(
             'CompilerCaptureFreshnessControlTests',
             'CompilerCaptureFreshnessRegressionTests',
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'NaNPublicBuildWorkflowAuditTests',
             'VerificationPublicationNullArgumentTests',
             'FinalCompilationProbeTests')
