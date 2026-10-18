@@ -75,8 +75,13 @@ access kind and value domains satisfy the production guard.
   array reads, full-content Swap, effects and CLR/IR faults are verified. This
   signature gap was closed by implementation/test commit `8a3dd8a39` (4,976 worker,
   1,843 frontend and 468 Gates tests pass; changed trusted code is 304/304 covered).
-  Unrelated or unbound type parameters, generic defaults/operators without scalar
-  semantics, ref/out signatures, reference/non-SZ arrays and mutable/captured or
+  Defaults of these parameter-specialized scalar types now produce exact zero/false
+  values, including stores to generic arrays. Commit `b087332db` verifies 80 native
+  proof/refutation cases, ten CLR/IR scalar-boundary cases and effect/fallback
+  controls; 1,287 selected worker, 1,853 frontend and 468 Gates tests pass, with
+  changed trusted code 308/308 covered. Unrelated or unbound type parameters,
+  defaults without established scalar specialization, generic operators, ref/out
+  signatures, reference/non-SZ arrays and mutable/captured or
   otherwise unproven interface receiver representations remain open. Closed scalar
   type arguments without validated parameter evidence do not supply those models.
   Generic local IList/ICollection Count branches
