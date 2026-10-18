@@ -22,44 +22,20 @@ runs:
       with:
         name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
         path: nupkgs
-    # Restore image layers from the GitHub Actions cache instead of pulling the
-    # five pinned base images from MCR in every job; those pulls occasionally
-    # took 15 minutes per job. BuildKit's gha cache backend reads the job's
-    # cache service URL and runtime token, which only JavaScript actions see,
-    # so export them for the build step. Only default-branch runs write the
-    # cache, so pull requests share one entry instead of each branch storing
-    # its own multi-gigabyte copy.
-    - name: Expose the Actions cache service to BuildKit
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-      with:
-        script: |
-          for (const name of ['ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL', 'ACTIONS_CACHE_URL', 'ACTIONS_CACHE_SERVICE_V2']) {
-            if (process.env[name]) {
-              core.exportVariable(name, process.env[name]);
-            }
-          }
+    # The default docker driver writes the image straight into the daemon.
+    # A buildx layer cache needs the docker-container driver, whose extra
+    # tarball export and load cost more than the base-image pulls it saves.
     - name: Build the pinned Linux amd64 toolchain
       shell: bash
-      env:
-        SHARPPROOF_WRITE_IMAGE_CACHE: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
       run: |
         set -euo pipefail
-        # The default docker driver cannot import or export external caches.
-        docker buildx create --name sharpproof-tooling --driver docker-container --use >/dev/null
-        cache_to=()
-        if [[ "${SHARPPROOF_WRITE_IMAGE_CACHE}" == true ]]; then
-          cache_to=(--cache-to "type=gha,scope=sharpproof-tooling,mode=min,ignore-error=true")
-        fi
         docker buildx build \
           --platform linux/amd64 \
           --file eng/container/Dockerfile \
           --target toolchain \
           --load \
-          --provenance=false \
           --tag "${COMPOSE_PROJECT_NAME}-tooling:local" \
           --build-arg USER_UID=1000 \
           --build-arg USER_GID=1000 \
-          --cache-from "type=gha,scope=sharpproof-tooling" \
-          "${cache_to[@]}" \
           --progress plain \
           .

@@ -20,63 +20,6 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
-  dotnet-api-inventory:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-      - name: Check pinned .NET API inventory and support evidence
-        run: >-
-          docker compose run --rm tooling test
-          -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj
-          -TestFilter FullyQualifiedName~DotnetApiInventoryTests
-      - name: Require executed test evidence for every modeled catalog facet
-        if: ${{ !cancelled() }}
-        run: >-
-          docker compose run --rm tooling test
-          -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj
-          -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
-      - name: Rank API gaps in original corpus targets and samples
-        if: ${{ !cancelled() }}
-        run: >-
-          docker compose run --rm tooling test
-          -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj
-          -TestFilter FullyQualifiedName~ApiUsageRankingTests
-      - name: Require executed evidence and usage reports
-        if: ${{ !cancelled() }}
-        run: |
-          test -s artifacts/api-coverage/catalog-test-evidence.json
-          test -s artifacts/api-coverage/intrinsic-test-evidence.json
-          test -s artifacts/api-coverage/usage-ranking.json
-      - name: Publish API coverage summary
-        if: always()
-        run: |
-          if [[ -f artifacts/api-coverage/report.md ]]; then
-            cat artifacts/api-coverage/report.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-          for report in catalog-test-evidence intrinsic-test-evidence usage-ranking; do
-            if [[ -f "artifacts/api-coverage/$report.md" ]]; then
-              cat "artifacts/api-coverage/$report.md" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
-      - name: Upload complete API inventory and delta
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dotnet-api-inventory-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/api-coverage
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
   canonical-main:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -157,6 +100,53 @@ jobs:
       - name: Apply SharpProof to every tracked project
         run: docker compose run --rm tooling self-apply -Configuration Release
 
+      # The API inventory runs here rather than on its own runner: it adds
+      # about two minutes to a job well inside the canonical-main critical
+      # path, and saves a runner slot and a tooling image build per run.
+      - name: Check pinned .NET API inventory and support evidence
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling test
+          -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj
+          -TestFilter FullyQualifiedName~DotnetApiInventoryTests
+      - name: Require executed test evidence for every modeled catalog facet
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling test
+          -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj
+          -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
+      - name: Rank API gaps in original corpus targets and samples
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling test
+          -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj
+          -TestFilter FullyQualifiedName~ApiUsageRankingTests
+      - name: Require executed evidence and usage reports
+        if: ${{ !cancelled() }}
+        run: |
+          test -s artifacts/api-coverage/catalog-test-evidence.json
+          test -s artifacts/api-coverage/intrinsic-test-evidence.json
+          test -s artifacts/api-coverage/usage-ranking.json
+      - name: Publish API coverage summary
+        if: always()
+        run: |
+          if [[ -f artifacts/api-coverage/report.md ]]; then
+            cat artifacts/api-coverage/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          for report in catalog-test-evidence intrinsic-test-evidence usage-ranking; do
+            if [[ -f "artifacts/api-coverage/$report.md" ]]; then
+              cat "artifacts/api-coverage/$report.md" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Upload complete API inventory and delta
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dotnet-api-inventory-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/api-coverage
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
@@ -165,7 +155,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory]
+    needs: [canonical-main, canonical-gates, self-application]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -173,10 +163,9 @@ jobs:
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
-          SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
         run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success ]]; then
-            echo "Canonical jobs, self-application, or API inventory failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
+            echo "Canonical jobs, or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1
           fi
 
