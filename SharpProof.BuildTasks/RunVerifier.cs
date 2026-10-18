@@ -249,16 +249,28 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     internal static string ResolveDotNetHost(string executable)
     {
+        ArgumentNullException.ThrowIfNull(executable);
+        return ResolveDotNetHost(executable, Environment.ProcessPath,
+            typeof(object).Assembly.Location, System.Reflection.Assembly.GetEntryAssembly()?.Location);
+    }
+
+    internal static string ResolveDotNetHost(
+        string executable, string? currentProcessPath, string runtimeAssemblyPath, string? entryAssemblyPath)
+    {
+        ArgumentNullException.ThrowIfNull(executable);
+        ArgumentNullException.ThrowIfNull(runtimeAssemblyPath);
         if (string.IsNullOrWhiteSpace(executable))
         {
             throw new InvalidOperationException(
                 "SharpProof verifier host must name the direct dotnet muxer.");
         }
 
-        var currentHost = Environment.ProcessPath ??
+        var currentHost = currentProcessPath ??
             throw new InvalidOperationException(
                 "SharpProof verifier could not identify its current dotnet muxer.");
-        var trusted = ValidateDotNetInstallation(currentHost);
+        var trusted = DotNetMuxer.IsFileName(Path.GetFileName(currentHost), OperatingSystem.IsWindows())
+            ? ValidateDotNetInstallation(currentHost)
+            : ResolveMSBuildRuntimeMuxer(currentHost, runtimeAssemblyPath, entryAssemblyPath);
         if (string.Equals(executable, "dotnet", StringComparison.Ordinal))
         {
             return trusted;
@@ -271,6 +283,67 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 "SharpProof verifier host must match the trusted current dotnet muxer.");
         }
         return configured;
+    }
+
+    private static string ResolveMSBuildRuntimeMuxer(
+        string currentProcessPath, string runtimeAssemblyPath, string? entryAssemblyPath)
+    {
+        ArgumentNullException.ThrowIfNull(currentProcessPath);
+        ArgumentNullException.ThrowIfNull(runtimeAssemblyPath);
+        var isWindows = OperatingSystem.IsWindows();
+        var comparison = DotNetMuxer.PathComparison(isWindows);
+        if (!Path.IsPathFullyQualified(currentProcessPath) ||
+            !string.Equals(Path.GetFileName(currentProcessPath), isWindows ? "MSBuild.exe" : "MSBuild", comparison) ||
+            !Path.IsPathFullyQualified(runtimeAssemblyPath) ||
+            string.IsNullOrWhiteSpace(entryAssemblyPath) || !Path.IsPathFullyQualified(entryAssemblyPath))
+        {
+            throw new InvalidOperationException("SharpProof verifier host must name the direct dotnet muxer or its SDK MSBuild task host.");
+        }
+
+        // The loaded runtime and entry assembly are process facts, not MSBuild
+        // properties or inherited environment hints. Anchor the apphost to both.
+        var coreLibrary = CanonicalInstallationFile(runtimeAssemblyPath);
+        var framework = new FileInfo(coreLibrary).Directory?.Parent;
+        var shared = framework?.Parent;
+        var installation = shared?.Parent;
+        if (!string.Equals(Path.GetFileName(coreLibrary), "System.Private.CoreLib.dll", comparison) ||
+            framework?.Name != "Microsoft.NETCore.App" || shared?.Name != "shared" || installation is null)
+        {
+            throw new InvalidOperationException("SharpProof verifier task host must use an installed shared .NET runtime.");
+        }
+
+        var appHost = CanonicalInstallationFile(currentProcessPath);
+        var entryAssembly = CanonicalInstallationFile(entryAssemblyPath);
+        var sdkDirectory = new FileInfo(appHost).Directory;
+        var sdkCollection = sdkDirectory?.Parent;
+        if (!string.Equals(Path.GetFileName(appHost), isWindows ? "MSBuild.exe" : "MSBuild", comparison) ||
+            sdkCollection?.Name != "sdk" ||
+            !string.Equals(sdkCollection.Parent?.FullName, installation.FullName, comparison) ||
+            !string.Equals(entryAssembly, Path.Combine(sdkDirectory!.FullName, "MSBuild.dll"), comparison))
+        {
+            throw new InvalidOperationException("SharpProof verifier task host must belong to its shared runtime's SDK installation.");
+        }
+
+        var muxer = ValidateDotNetInstallation(CanonicalInstallationFile(
+            Path.Combine(installation.FullName, isWindows ? "dotnet.exe" : "dotnet")));
+        if (!string.Equals(Path.GetDirectoryName(muxer), installation.FullName, comparison))
+        {
+            throw new InvalidOperationException("SharpProof verifier task host muxer must belong to its shared runtime installation.");
+        }
+        return muxer;
+    }
+
+    private static string CanonicalInstallationFile(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        // Installation files are read-only inputs, so publication-only NTFS
+        // restrictions do not apply. Still resolve every parent and leaf link.
+        var file = new FileInfo(PublicationLease.CanonicalMember(path, isWindows: false));
+        if (!file.Exists)
+        {
+            throw new InvalidOperationException("SharpProof verifier runtime installation members must exist.");
+        }
+        return file.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? file.FullName;
     }
 
     private bool WaitForExitOrCancellation(Process process, int timeoutMilliseconds)

@@ -40,7 +40,7 @@ types, runtime APIs, deployment systems, or application dependencies are support
 ## Build-machine and deployment Windows versions
 
 The verifier requires a supported .NET 10 installation, either Core MSBuild or the
-Windows MSBuild 18+ task-host integration described below, a native x64 or ARM64
+Windows x64 MSBuild 18+ task-host integration described below, a native x64 or ARM64
 execution environment, and the filesystem prerequisites in the
 [host support matrix](preview-support.md). Microsoft lists the supported Windows
 editions and versions in its [.NET installation table](https://learn.microsoft.com/en-us/dotnet/core/install/windows).
@@ -75,7 +75,7 @@ See Microsoft's
 | IDE / project | Current boundary |
 | --- | --- |
 | Modern SDK-style C# project, built with `dotnet build` | Target matrix above; one main-package reference |
-| Visual Studio 2026 / Windows MSBuild 18+ | Full verification uses the .NET 10 out-of-process task host; exact-artifact MSBuild.exe qualification covers the scenarios below, with CI completion required |
+| Visual Studio 2026 / Windows x64 MSBuild 18+ | Full verification uses the .NET 10 out-of-process task host; require a successful completed exact-artifact MSBuild.exe qualification run for the scenarios below |
 | Visual Studio 2022 / MSBuild 17.14 | Explicit advisory-only operation with a compatible SDK/Roslyn host; default strict verification requires upgrading the build host |
 | Visual Studio 2019 and older | Existing analyzer compiler minimum is not met; no compatibility promise |
 | Classic non-SDK project or `packages.config` | Not covered by the one-reference SDK-style tests; requires separate package import/compiler integration |
@@ -84,10 +84,12 @@ Full-framework Windows MSBuild 18+ launches the four verifier tasks through
 `UsingTask` declarations with `Runtime="NET"` and `TaskHostFactory`, while the
 `dotnet` CLI retains its Core MSBuild execution path. The package requires a
 compatible .NET 10 SDK/runtime on that machine and rejects older full-framework
-MSBuild for default strict verification. This uses Microsoft's out-of-process
+MSBuild for default strict verification. The SDK MSBuild apphost and loaded runtime
+must belong to the same .NET installation; custom split SDK/runtime layouts are
+rejected. This uses Microsoft's out-of-process
 [.NET task host for VS 2026](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-10/sdk#use-net-msbuild-tasks-with-net-framework-msbuild).
 
-The host qualification workflow has two distinct modes:
+The x64 host qualification workflow has two distinct modes:
 
 - MSBuild 17.14 with SDK 9.0.300 explicitly selects advisory-only analysis and
   checks portable behavior. This does not run or qualify the default verifier.
@@ -97,11 +99,12 @@ The host qualification workflow has two distinct modes:
   application on CLR 4, and checks clean behavior. The full-host path is tested
   separately from the corresponding `dotnet build` consumer.
 
-Review the actual SDK/MSBuild.exe version, source SHA, architecture, and completed
-CI job evidence. The Windows 2022 VS 17 and Windows 2025/VS 2026 VS 18 job definitions
-describe qualification scenarios; their presence is not a passed qualification run.
-The expanded Visual Studio CLI matrix remains pending until its exact-artifact jobs
-complete successfully.
+Review the actual SDK/MSBuild.exe version, source SHA, architecture, and successful
+completed exact-artifact CI run. The Windows 2022 VS 17 and Windows 2025/VS 2026 VS 18
+jobs run on x64; their definitions describe qualification scenarios, not outcomes.
+The ARM64 full-framework task-host bridge is implemented but is not separately
+qualified by these jobs. Native Windows ARM64 proof coverage uses Core MSBuild and
+does not establish that the ARM64 full-framework host path has been exercised.
 
 Design-time builds do not run proofs. These checks qualify command-line build hosts,
 not interactive Visual Studio diagnostic discovery, code-fix menus, or typing latency.

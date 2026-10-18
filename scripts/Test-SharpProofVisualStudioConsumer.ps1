@@ -139,12 +139,15 @@ public static class Subject {
             'Consumer.csproj', '-t:Restore', '-nologo', '/nodeReuse:false', '-p:RestoreConfigFile=NuGet.Config')
         if ($restore.ExitCode -ne 0) { throw 'Visual Studio 17 portable consumer restore failed.' }
         $buildArguments = @('Consumer.csproj', '-t:Rebuild', '-p:Configuration=Release', '-nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
+        # Full MSBuild prints the compiler's /warnaserror+:CODE switches even
+        # when compilation succeeds. Match emitted diagnostics, not bare IDs.
+        $analyzerFailureDiagnostic = '\b(?:warning|error)[ \t]+(?:CS8032|CS8034|CS9057|CS8785|AD0001)[ \t]*:'
         $passing = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments $buildArguments
-        if ($passing.ExitCode -ne 0 -or $passing.Output -match '\b(CS8032|CS8034|CS9057|CS8785|AD0001)\b') { throw 'Visual Studio 17 portable analyzer passing control failed or could not load its analyzer.' }
+        if ($passing.ExitCode -ne 0 -or $passing.Output -match $analyzerFailureDiagnostic) { throw 'Visual Studio 17 portable analyzer passing control failed or could not load its analyzer.' }
         [IO.File]::WriteAllText($sourcePath, $validSource.Replace('Positive(1);', 'Positive(-1);'), $encoding)
         $negative = Invoke-VisualStudioMSBuild -Directory $consumer -Arguments $buildArguments
-        if ($negative.ExitCode -eq 0 -or $negative.Output -notmatch '\berror SP0027\b' -or
-            $negative.Output -match '\b(CS8032|CS8034|CS9057|CS8785|AD0001)\b') { throw 'Visual Studio 17 did not report the precondition violation through the real portable analyzer.' }
+        if ($negative.ExitCode -eq 0 -or $negative.Output -notmatch '\berror[ \t]+SP0027[ \t]*:' -or
+            $negative.Output -match $analyzerFailureDiagnostic) { throw 'Visual Studio 17 did not report the precondition violation through the real portable analyzer.' }
         if (Test-Path -LiteralPath (Join-Path $consumer 'obj/Release/net48/SharpProof/result.json')) { throw 'The advisory-only Visual Studio 17 control unexpectedly ran full verification.' }
         Write-Host 'Visual Studio 17 Full MSBuild portable analysis passed: SDK 9.0.300, passing control, and SP0027 negative control. Full verification and interactive IDE behavior are not asserted.'
     }
