@@ -1600,3 +1600,19 @@ as violations merely because they could be given a named constant.
 
 The tool review's suggested MoveToImmutable for an unconstrained entry builder
 was rejected: capacity need not equal count. Publication must use ToImmutable.
+
+
+## Optional CLI acceptance fixture integration
+
+Exact pushed commit 77f76ca97 failed optional CLI qualification in CI run
+39169170159, job 117798439704. The log reports CS8852 in the C# program generated
+by eng/scripts/Test-SharpProofToolConsumer.ps1: it assigns CacheStatus and four
+WorkerVersionSummary properties after construction. These protocol snapshots are
+now init-only. IMM-M008 records the required compatibility correction: construct
+Summary and Versions inside the response initializer, retaining all existing
+fixture values and the explicit manifest sealing contract. This generated reader
+fixture is an API consumer adapter, not a mutable program subject.
+
+CodeQL C#, Actions and Python checks succeeded on exact pushed commit 77f76ca97.
+The previous Python no-code failure is therefore historical and does not describe
+the current head.
