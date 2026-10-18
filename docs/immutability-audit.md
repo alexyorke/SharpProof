@@ -1654,3 +1654,28 @@ automatically exclusions: immutable roots or builders can preserve their behavio
 Reference/alias identity must be retained at the element level, which does not by
 itself require a mutable outer cache. No broad agent exclusion is accepted
 without coordinator evidence.
+
+
+## Fixture ownership follow-up inventory
+
+The coordinator inspected these additional sites and their consumers before edits:
+
+| ID | Current file / member | Correction | Status |
+| --- | --- | --- | --- |
+| IMM-M009 | Frontend.Tests/AuthenticImplicitContractReferenceApiTests.AuthenticMissingReferenceResolver.Requests | Keep resolver reference identity and constructor guards; record requests in a private immutable-array builder and expose frozen snapshots. | Open |
+| IMM-M010 | Frontend.Tests/BulkFrontendCallsActiveSessionBoundaryTests observer lists | Use scoped immutable-array builders for prepared/entered method records; preserve callback order and reverse Leave order. | Open |
+| IMM-M011 | Worker.Tests/LongFuzz/LongFuzzSession counters | Use private immutable dictionary builders with Ordinal keys; retain scalar counters/resource clocks and freeze sorted statistics at publication. | Open |
+| IMM-M012 | Worker.Tests/WorkerTests.TestProject._additionalReferencePaths | Use a construction-owned immutable-array builder and snapshot before constructing metadata references. | Open |
+| IMM-M013 | Worker.Tests/WorkerTcbEdgeCaseTests.ScriptedBackend queue | Copy constructor inputs into an immutable queue and dequeue the immutable root; preserve result order, cancellation checks and call counting. | Open |
+| IMM-M014 | Worker/Vc/NativeEffectSiteVerifier readFlags | Declare the unchanged WorkerEffectSet constant as const; AnyStateReads is already a compile-time enum constant, with one read and no mutation/ref/capture/nameof-sensitive use. | Open |
+
+Both current and exact-master full package cohorts now pass 384 tests with one
+platform skip. The optional CLI acceptance workflow passes after packing exact
+commit 5bacb4c2d and installing/running that feed. A canonical Release semantic
+cohort is running separately, following the PR workflow's separation from package
+tests. The earlier all-project failure remains recorded while build interference
+is investigated; it has not reproduced in either isolated or full package runs.
+
+The literal comparison now covers 2,618 raw/interpolated tokens across 552 changed
+C# files, all unchanged. The increase reflects the newly changed tool/frontend
+files entering the comparison, not rewritten program text.
