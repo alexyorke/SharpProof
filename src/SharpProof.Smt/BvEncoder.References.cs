@@ -29,14 +29,15 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
-            if (!member.ParameterTypes.IsEmpty || member.ReturnType != factory.IntegerType || factory.GetString(member.Name) != IrFieldSites.Prefix + "list:count")
-            { continue; }
-            foreach (var observed in field.Value.Values)
+            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) == IrFieldSites.Prefix + "list:count")
             {
-                meter.Consume();
-                var count = owner.Own(context.MkApp(_fields[field.Key], observed.Owner));
-                var size = owner.Own(context.MkBVAND((BitVecExpr)count, owner.Own(context.MkBV(int.MaxValue, 32))));
-                bounds.Add(owner.Own(context.MkBVULE(size, owner.Own(context.MkBV(MaximumSmallReference, 32)))));
+                foreach (var observed in field.Value.Values)
+                {
+                    meter.Consume();
+                    var count = owner.Own(context.MkApp(_fields[field.Key], observed.Owner));
+                    var size = owner.Own(context.MkBVAND((BitVecExpr)count, owner.Own(context.MkBV(int.MaxValue, 32))));
+                    bounds.Add(owner.Own(context.MkBVULE(size, owner.Own(context.MkBV(MaximumSmallReference, 32)))));
+                }
             }
         }
         return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));

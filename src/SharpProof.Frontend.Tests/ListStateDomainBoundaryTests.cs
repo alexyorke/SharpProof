@@ -147,10 +147,11 @@ public sealed class ListStateDomainBoundaryTests
     [TestCase("data.Count", 255)]
     [TestCase("Get().Count", 0)]
     [TestCase("data[Index()]", 0)]
+    [TestCase("Static", 0)]
     public void ListClausesDeclineUnsupportedReceiversIndexesAndDepth(string expression, int depth)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.List<int> data) { return " + expression + "; } static System.Collections.Generic.List<int> Get() => null; static int Index() => 0; }");
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.List<int> data) { return " + expression + "; } static System.Collections.Generic.List<int> Get() => null; static int Index() => 0; static int Static => 0; }");
         var compilation = CSharpCompilation.Create("ListClauseBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
