@@ -4,19 +4,19 @@ public sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = new(ExternalIdentityBucketKeyComparer.Instance);
-    private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
-    private readonly List<string> _strings = [];
-    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
-    private readonly List<IrTypeInfo> _types = [];
-    private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
-    private readonly List<IrVariableInfo> _variables = [];
-    private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
-    private readonly List<IrMemberInfo> _members = [];
-    private readonly List<IrOperationInfo> _operations = [];
-    private readonly Dictionary<StructuralKey, IrTerm> _termIds = new(StructuralKeyComparer.Instance);
-    private readonly List<IrTerm> _terms = [];
-    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
+    private ImmutableDictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = ImmutableDictionary.Create<ExternalIdentityBucketKey, ExternalIdentityBucket>(ExternalIdentityBucketKeyComparer.Instance);
+    private ImmutableDictionary<string, IrStringId> _stringIds = ImmutableDictionary.Create<string, IrStringId>(StringComparer.Ordinal);
+    private ImmutableList<string> _strings = [];
+    private ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>.Empty;
+    private ImmutableList<IrTypeInfo> _types = [];
+    private ImmutableHashSet<IrTypeId> _closedSealedReferenceTypes = [];
+    private ImmutableList<IrVariableInfo> _variables = [];
+    private ImmutableDictionary<StructuralKey, IrMemberId> _memberIds = ImmutableDictionary.Create<StructuralKey, IrMemberId>(StructuralKeyComparer.Instance);
+    private ImmutableList<IrMemberInfo> _members = [];
+    private ImmutableList<IrOperationInfo> _operations = [];
+    private ImmutableDictionary<StructuralKey, IrTerm> _termIds = ImmutableDictionary.Create<StructuralKey, IrTerm>(StructuralKeyComparer.Instance);
+    private ImmutableList<IrTerm> _terms = [];
+    private ImmutableDictionary<IrTypeId, IrValue> _emptyArrays = ImmutableDictionary<IrTypeId, IrValue>.Empty;
     private readonly long _scope;
     private int _identityCount;
 
@@ -118,23 +118,17 @@ public sealed class IrFactory
             else
             {
                 bucket = new ExternalIdentityBucket<T>();
-                _externalIdentityBuckets.Add(bucketKey, bucket);
+                _externalIdentityBuckets = _externalIdentityBuckets.Add(bucketKey, bucket);
             }
         }
 
         var comparedCount = 0;
         while (true)
         {
-            ExternalIdentityEntry<T>[] candidates;
+            ImmutableArray<ExternalIdentityEntry<T>> candidates;
             lock (_gate)
             {
-                var candidateCount = bucket.Entries.Count - comparedCount;
-                candidates = new ExternalIdentityEntry<T>[candidateCount];
-                bucket.Entries.CopyTo(
-                    comparedCount,
-                    candidates,
-                    0,
-                    candidateCount);
+                candidates = bucket.Entries.Skip(comparedCount).ToImmutableArray();
             }
 
             foreach (var candidate in candidates)
@@ -154,7 +148,7 @@ public sealed class IrFactory
                 }
 
                 var id = CreateIdentityCore();
-                bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id));
+                bucket.Entries = bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id));
                 return id;
             }
         }
@@ -196,7 +190,7 @@ public sealed class IrFactory
             if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference)
             { throw new ArgumentException("A certificate requires a Total nominal reference type.", nameof(type)); }
-            _closedSealedReferenceTypes.Add(type);
+            _closedSealedReferenceTypes = _closedSealedReferenceTypes.Add(type);
         }
     }
 
@@ -259,7 +253,7 @@ public sealed class IrFactory
         {
             GetTypeInfoCore(type, nameof(type));
             var id = new IrVarId(_scope, _variables.Count);
-            _variables.Add(new IrVariableInfo(id, InternStringCore(name), type));
+            _variables = _variables.Add(new IrVariableInfo(id, InternStringCore(name), type));
             return id;
         }
     }
@@ -307,8 +301,8 @@ public sealed class IrFactory
 
             var nameId = InternStringCore(name);
             var id = new IrMemberId(_scope, _members.Count);
-            _memberIds.Add(key, id);
-            _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
+            _memberIds = _memberIds.Add(key, id);
+            _members = _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
             return id;
         }
     }
@@ -328,7 +322,7 @@ public sealed class IrFactory
         {
             var id = new OperationId(_scope, _operations.Count);
             var descriptionId = string.IsNullOrWhiteSpace(description) ? (IrStringId?)null : InternStringCore(description!);
-            _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
+            _operations = _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
             return id;
         }
     }
@@ -546,7 +540,7 @@ public sealed class IrFactory
         {
             EmptyArray(type);
             if (!_emptyArrays.TryGetValue(type, out var value))
-            { _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            { _emptyArrays = _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
             return value;
         }
     }
@@ -929,8 +923,8 @@ public sealed class IrFactory
         }
 
         var id = new IrStringId(_scope, _strings.Count);
-        _stringIds.Add(value, id);
-        _strings.Add(value);
+        _stringIds = _stringIds.Add(value, id);
+        _strings = _strings.Add(value);
         return id;
     }
 
@@ -977,8 +971,8 @@ public sealed class IrFactory
         shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
-        _typeIds.Add(key, id);
-        _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
+        _typeIds = _typeIds.Add(key, id);
+        _types = _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
         return id;
     }
 
@@ -1064,8 +1058,8 @@ public sealed class IrFactory
 
         var id = new IrId(_scope, _terms.Count);
         var term = create(id, state);
-        _termIds.Add(key, term);
-        _terms.Add(term);
+        _termIds = _termIds.Add(key, term);
+        _terms = _terms.Add(term);
         return term;
     }
 
@@ -1082,9 +1076,9 @@ public sealed class IrFactory
 
     private sealed class ExternalIdentityBucket<T> : ExternalIdentityBucket where T : notnull
     {
-        public List<ExternalIdentityEntry<T>> Entries
+        public ImmutableList<ExternalIdentityEntry<T>> Entries
         {
-            get;
+            get; set;
         } = [];
     }
 

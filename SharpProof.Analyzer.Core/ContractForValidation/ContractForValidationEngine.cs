@@ -15,14 +15,19 @@ internal static class ContractForValidationEngine
             return [];
         }
 
-        var diagnostics = new List<Diagnostic>();
+        var diagnostics = ImmutableList<Diagnostic>.Empty;
+        void Report(Diagnostic diagnostic)
+        {
+            diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
+            diagnostics = diagnostics.Add(diagnostic);
+        }
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
             foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                diagnostics.Add(Diagnostic.Create(
+                Report(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget,
                     ContractForCompanionValidator.GetSourceLocation(
                         candidate, compilation, Location.None),
@@ -35,7 +40,7 @@ internal static class ContractForValidationEngine
             contractFor,
             compilation,
             candidates,
-            diagnostics,
+            Report,
             includeTree,
             cancellationToken);
         var relationships = ContractForSymbolMatcher
@@ -44,20 +49,20 @@ internal static class ContractForValidationEngine
                     compilation,
                     cancellationToken),
                 cancellationToken);
-        var accepted = ImmutableArray.CreateBuilder<ResolvedCompanion>();
+        var accepted = ImmutableList<ResolvedCompanion>.Empty;
         foreach (var companion in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (ContractForCompanionValidator.ValidateRelationship(
+            if (ContractForCompanionValidator.ReportRelationship(
                     companion,
                     relationships,
-                    diagnostics))
+                    Report))
             {
-                accepted.Add(companion);
+                accepted = accepted.Add(companion);
             }
         }
 
-        companions = accepted.ToImmutable();
+        companions = accepted.ToImmutableArray();
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
@@ -68,15 +73,15 @@ internal static class ContractForValidationEngine
             cancellationToken.ThrowIfCancellationRequested();
             if (!overlapping.Contains(companion))
             {
-                ContractForCompanionValidator.Validate(
+                ContractForCompanionValidator.ReportValidation(
                     companion,
                     compilation,
                     clauses,
-                    diagnostics,
+                    Report,
                     cancellationToken);
                 continue;
             }
-            diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
+            Report(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
 
@@ -96,7 +101,7 @@ internal static class ContractForValidationEngine
         var selections = ContractSelectionInventory.ForCompilation(
             compilation);
 
-        var candidates = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+        var candidates = ImmutableList<INamedTypeSymbol>.Empty;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -119,7 +124,7 @@ internal static class ContractForValidationEngine
                     symbol.GetAttributes().Any(
                         selections.IsContractForCandidate))
                 {
-                    candidates.Add(symbol);
+                    candidates = candidates.Add(symbol);
                 }
             }
         }
@@ -144,7 +149,7 @@ internal static class ContractForValidationEngine
                 StringComparer.Ordinal)];
     }
 
-    private static HashSet<ResolvedCompanion> FindOverlappingCompanions(
+    private static ImmutableHashSet<ResolvedCompanion> FindOverlappingCompanions(
         ImmutableArray<ResolvedCompanion> companions,
         ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> discovered,
         CancellationToken cancellationToken)
@@ -153,7 +158,7 @@ internal static class ContractForValidationEngine
 
         RepositoryParameterGuard.ThrowIfInvalid(companions.IsDefault, nameof(companions));
         RepositoryParameterGuard.ThrowIfInvalid(discovered.IsDefault, nameof(discovered));
-        var overlapping = new HashSet<ResolvedCompanion>();
+        var overlapping = ImmutableHashSet<ResolvedCompanion>.Empty;
         foreach (var source in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -164,7 +169,7 @@ internal static class ContractForValidationEngine
                         candidate.ContractTarget,
                         (source.Target, source.IsOpenTarget)))))
             {
-                overlapping.Add(source);
+                overlapping = overlapping.Add(source);
             }
         }
         return overlapping;
@@ -174,7 +179,7 @@ internal static class ContractForValidationEngine
         INamedTypeSymbol contractFor,
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
-        List<Diagnostic> diagnostics,
+        Action<Diagnostic> diagnostics,
         Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
@@ -183,7 +188,7 @@ internal static class ContractForValidationEngine
         contractFor = RepositoryParameterGuard.NotNull(contractFor, nameof(contractFor));
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
-        var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
+        var result = ImmutableList<ResolvedCompanion>.Empty;
         foreach (var companion in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -200,7 +205,7 @@ internal static class ContractForValidationEngine
                         fallback,
                         cancellationToken)
                     : fallback;
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
@@ -213,14 +218,14 @@ internal static class ContractForValidationEngine
                 cancellationToken);
             if (!ContractForSymbolMatcher.TryGetTarget(attribute, out var target))
             {
-                diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
+                diagnostics(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
                     attributeLocation, companion.Name));
                 continue;
             }
-            result.Add(new ResolvedCompanion(
+            result = result.Add(new ResolvedCompanion(
                 companion, target.Target, attributeLocation, target.IsOpen));
         }
-        return result.ToImmutable();
+        return result.ToImmutableArray();
     }
 
     private static Location GetAttributeLocation(

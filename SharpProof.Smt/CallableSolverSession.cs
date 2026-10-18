@@ -12,9 +12,9 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213", Justification = "The native runner drains checks and invokes DisposeOwned before releasing its context.")]
     private readonly Z3ExpressionOwner _owner = new();
     private readonly BvEncoder _encoder;
-    private readonly Dictionary<Assumption, BoolExpr> _assumptions = [];
-    private readonly Dictionary<VerificationQuery, BoolExpr> _goals = [];
-    private readonly Dictionary<VerificationQuery, BoolExpr> _smallReferences = [];
+    private ImmutableDictionary<Assumption, BoolExpr> _assumptions = ImmutableDictionary<Assumption, BoolExpr>.Empty;
+    private ImmutableDictionary<VerificationQuery, BoolExpr> _goals = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
+    private ImmutableDictionary<VerificationQuery, BoolExpr> _smallReferences = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
     private long _consumedResourceCount;
     private int _assertedReferenceFacts;
 
@@ -56,8 +56,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         try
         {
             _encoder.ValidateQuery(query, meter, cancellationToken);
-            var active = new Dictionary<string, int>(StringComparer.Ordinal);
-            var selectors = new List<Expr>(query.Assumptions.Length + 1);
+            var active = ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+            var selectors = ImmutableList<Expr>.Empty;
             for (var index = 0; index < query.Assumptions.Length; index++)
             {
                 meter.Consume();
@@ -67,13 +67,13 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     var predicate = _encoder.EncodeBoolean(assumption.Predicate, meter);
                     selector = _owner.Own(_runner.Context.MkBoolConst("a" + _assumptions.Count.ToString(CultureInfo.InvariantCulture)));
                     _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, predicate)));
-                    _assumptions.Add(assumption, selector);
+                    _assumptions = _assumptions.AddUnique(assumption, selector);
                 }
                 var name = selector.ToString();
                 if (!active.ContainsKey(name))
                 {
-                    active.Add(name, index);
-                    selectors.Add(selector);
+                    active = active.AddUnique(name, index);
+                    selectors = selectors.Add(selector);
                 }
             }
             if (!_goals.TryGetValue(query, out var goalSelector))
@@ -83,9 +83,9 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 goalSelector = _owner.Own(_runner.Context.MkBoolConst("g" + _goals.Count.ToString(CultureInfo.InvariantCulture)));
                 _solver.Assert(_owner.Own(_runner.Context.MkImplies(goalSelector,
                     _owner.Own(_runner.Context.MkNot(goal)))));
-                _goals.Add(query, goalSelector);
+                _goals = _goals.AddUnique(query, goalSelector);
             }
-            selectors.Add(goalSelector);
+            selectors = selectors.Add(goalSelector);
             while (_assertedReferenceFacts < _encoder.ReferenceFacts.Count)
             {
                 meter.Consume();
@@ -97,11 +97,11 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 // Prefer replayable string/array witnesses after the original
                 // query is SAT. A failed preference retries the unbounded
                 // query, so this bound can never prove a claim.
-                selectors.Add(smallReferences);
+                selectors = selectors.Add(smallReferences);
                 status = Check(selectors, meter);
                 if (status != Status.SATISFIABLE)
                 {
-                    selectors.RemoveAt(selectors.Count - 1);
+                    selectors = selectors.RemoveAt(selectors.Count - 1);
                     status = Check(selectors, meter);
                 }
             }
@@ -119,7 +119,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         }
     }
 
-    private Status Check(List<Expr> selectors, SmtQueryResourceMeter meter)
+    private Status Check(ImmutableList<Expr> selectors, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         selectors = RepositoryParameterGuard.NotNull(selectors, nameof(selectors));
@@ -143,7 +143,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         { return null; }
         var selector = _owner.Own(_runner.Context.MkBoolConst("s" + _smallReferences.Count.ToString(CultureInfo.InvariantCulture)));
         _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, bound)));
-        _smallReferences.Add(query, selector);
+        _smallReferences = _smallReferences.AddUnique(query, selector);
         return selector;
     }
 
@@ -154,7 +154,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         core = RepositoryParameterGuard.NotNull(core, nameof(core));
         goal = RepositoryParameterGuard.NotNull(goal, nameof(goal));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        var indices = new HashSet<int>();
+        var indices = ImmutableHashSet<int>.Empty;
         try
         {
             foreach (var expression in core)
@@ -169,7 +169,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     }
                     if (active.TryGetValue(name, out var index))
                     {
-                        indices.Add(index);
+                        indices = indices.Add(index);
                         continue;
                     }
                 }

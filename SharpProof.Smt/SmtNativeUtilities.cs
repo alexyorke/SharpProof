@@ -146,13 +146,13 @@ internal static class SmtNativeUtilities
     // Rebuild a native application from its recursively decoded children in Args order.
     // The caller owns native traversal, terminal/state admission and resource accounting.
     internal static IrTerm? ReconstructHornApplication(
-        IrFactory factory, Expr expression, IrTerm?[] operands)
+        IrFactory factory, Expr expression, ImmutableArray<IrTerm?> operands)
     {
         expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (operands.Any(operand => operand == null))
         { return null; }
-        var terms = operands.Select(operand => operand!).ToArray();
+        var terms = operands.Select(operand => operand!).ToImmutableArray();
         var kind = expression.FuncDecl.DeclKind;
         return kind switch
         {
@@ -192,7 +192,7 @@ internal static class SmtNativeUtilities
         };
     }
 
-    internal static IrTerm? Fold(IrFactory factory, IrBinaryOperator @operator, IrTerm[] terms)
+    internal static IrTerm? Fold(IrFactory factory, IrBinaryOperator @operator, ImmutableArray<IrTerm> terms)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (terms.Length == 0)
@@ -244,6 +244,27 @@ internal static class SmtNativeUtilities
     private static IrTerm Like(IrFactory factory, IrTerm term, IrTypeId type)
     { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); term = RepositoryParameterGuard.NotNull(term, nameof(term)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
 
+    internal static ImmutableArray<IrValue> WithArrayObservations(
+        IrFactory factory, IrTypeId elementType, ImmutableArray<IrValue> elements,
+        ImmutableDictionary<int, IrValue> observed)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(elementType.IsDefault, nameof(elementType));
+        RepositoryParameterGuard.ThrowIfInvalid(elements.IsDefault, nameof(elements));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        foreach (var entry in observed)
+        {
+            if (entry.Key < 0 || entry.Key >= elements.Length)
+            { throw new UnsupportedIrEncodingException(); }
+            var value = entry.Value.Type == elementType ? entry.Value
+                : factory.CreateIntegerValueFromBits(elementType, entry.Value.IntegerBits);
+            elements = elements.SetItem(entry.Key, value);
+        }
+        return elements;
+    }
+
+    // This explicitly in-place API retains partial writes on failure, as tested
+    // by ArrayValueOverlayTests. Production witness construction uses copies.
     internal static void ApplyArrayObservations(IrFactory factory, IrTypeId elementType,
         IrValue[] elements, Dictionary<int, IrValue> observed)
     {

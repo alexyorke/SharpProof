@@ -5,7 +5,8 @@ namespace SharpProof.Smt;
 // condition.
 internal sealed partial class BvEncoder
 {
-    private readonly Dictionary<IrMemberId, FuncDecl> _fields = [];
+    private ImmutableDictionary<IrMemberId, FuncDecl> _fields = ImmutableDictionary<IrMemberId, FuncDecl>.Empty;
+    private ImmutableList<KeyValuePair<IrMemberId, FuncDecl>> _fieldOrder = ImmutableList<KeyValuePair<IrMemberId, FuncDecl>>.Empty;
 
     private Expr EncodeFieldRead(IrOpaqueTerm read, SmtQueryResourceMeter meter)
     {
@@ -23,7 +24,8 @@ internal sealed partial class BvEncoder
                     : throw new UnsupportedIrEncodingException();
                 field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, sort);
             }
-            _fields.Add(read.Member, field);
+            _fields = _fields.AddUnique(read.Member, field);
+            _fieldOrder = _fieldOrder.Add(new(read.Member, field));
         }
         return owner.Own(context.MkApp(field, receiver));
     }
@@ -37,7 +39,7 @@ internal sealed partial class BvEncoder
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
         reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        foreach (var field in _fields.ToArray())
+        foreach (var field in _fieldOrder)
         {
             meter.Consume();
             using var application = context.MkApp(field.Value, reference);
@@ -49,7 +51,7 @@ internal sealed partial class BvEncoder
 
     private void DisposeFields()
     {
-        foreach (var field in _fields.Values)
+        foreach (var field in _fieldOrder.Select(static field => field.Value))
         { field.Dispose(); }
     }
 }

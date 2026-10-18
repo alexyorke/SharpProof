@@ -7,10 +7,10 @@ public sealed partial class ContractBinder
     private readonly ContractIntrinsicValidator _intrinsics;
     private readonly ContractCanonicalization _canonicalization;
     private readonly ContractClauseInventoryBuilder _clauseInventory;
-    private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _bindings =
-        new(SymbolEqualityComparer.IncludeNullability);
-    private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
-        new(SymbolEqualityComparer.IncludeNullability);
+    private ImmutableDictionary<IMethodSymbol, ContractBindingResult> _bindings =
+        ImmutableDictionary.Create<IMethodSymbol, ContractBindingResult>(SymbolEqualityComparer.IncludeNullability);
+    private ImmutableDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
+        ImmutableDictionary.Create<IMethodSymbol, ContractBindingResult>(SymbolEqualityComparer.IncludeNullability);
     private readonly EffectiveContractSourceResolver _contractSources;
 
     public ContractBinder(
@@ -97,7 +97,7 @@ public sealed partial class ContractBinder
             target,
             implementationBody,
             requiresOnly: false,
-            cache: _bindings,
+            cache: ref _bindings,
             cancellationToken: cancellationToken);
     }
 
@@ -121,7 +121,7 @@ public sealed partial class ContractBinder
             target,
             implementationBody,
             requiresOnly: true,
-            cache: _requiresBindings,
+            cache: ref _requiresBindings,
             cancellationToken: cancellationToken);
     }
 
@@ -135,7 +135,7 @@ public sealed partial class ContractBinder
             target,
             implementationBody: null,
             requiresOnly: true,
-            cache: _requiresBindings,
+            cache: ref _requiresBindings,
             cancellationToken: cancellationToken);
     }
 
@@ -158,13 +158,13 @@ public sealed partial class ContractBinder
         IMethodSymbol target,
         IOperation? implementationBody,
         bool requiresOnly,
-        ConcurrentDictionary<IMethodSymbol, ContractBindingResult> cache,
+        ref ImmutableDictionary<IMethodSymbol, ContractBindingResult> cache,
         CancellationToken cancellationToken)
     {
         cache = RepositoryParameterGuard.NotNull(cache, nameof(cache));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return implementationBody == null
-            ? cache.GetOrAdd(
+            ? ImmutableInterlocked.GetOrAdd(ref cache,
                 target,
                 value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (BindCore(value, null, requiresOnly, cancellationToken)))
             : BindCore(target, implementationBody, requiresOnly, cancellationToken);
@@ -270,17 +270,22 @@ public sealed partial class ContractBinder
         {
             return ContractBindingResult.Fail(substituted.Failure);
         }
-        var clauses = substituted.Clauses.ToBuilder();
+        var clauses = substituted.Clauses.ToImmutableList();
+        void AppendClause(BoundContractClause clause)
+        {
+            clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
+            clauses = clauses.Add(clause);
+        }
 
         var attributeFailure = BindClosedAttributes(
-            target, canonical, requiresOnly, clauses);
+            target, canonical, requiresOnly, AppendClause);
         if (attributeFailure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(attributeFailure);
         }
 
         return ContractBindingResult.Success(new BoundMethodContracts(
-            target, source, clauses.ToImmutable(), canonical.ToBoundVariables(), usesCompanion));
+            target, source, clauses.ToImmutableArray(), canonical.ToBoundVariables(), usesCompanion));
     }
 
     private static bool HasRequiresPlacementErrors(
@@ -340,7 +345,7 @@ public sealed partial class ContractBinder
         IMethodSymbol target,
         ContractCanonicalVariables variables,
         bool requiresOnly,
-        ImmutableArray<BoundContractClause>.Builder clauses)
+        Action<BoundContractClause> clauses)
     {
         clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
@@ -381,7 +386,7 @@ public sealed partial class ContractBinder
         IrTerm? value,
         string valueName,
         BoundContractKind kind,
-        ImmutableArray<BoundContractClause>.Builder clauses)
+        Action<BoundContractClause> clauses)
     {
 
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
@@ -397,7 +402,7 @@ public sealed partial class ContractBinder
         }
         foreach (var clause in bound.Clauses)
         {
-            clauses.Add(new BoundContractClause(clause.Kind, clause.Condition, clause.SourceOperation,
+            clauses(new BoundContractClause(clause.Kind, clause.Condition, clause.SourceOperation,
                 BoundContractEvidence.ClosedAttribute, clause.DiagnosticText, clause.SourceSyntax));
         }
         return ContractBindingFailure.None;

@@ -133,6 +133,7 @@ public sealed class FloatingPredicateBoundaryAuditTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var hasTotal = artifact.Callables.Single().Total != null;
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);

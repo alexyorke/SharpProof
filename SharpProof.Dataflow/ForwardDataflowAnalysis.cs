@@ -180,14 +180,14 @@ public static class ForwardDataflowAnalysis
 
         var blockCount = graph.Blocks.Length;
         var bottom = domain.Bottom;
-        var inputs = Enumerable.Repeat(bottom, blockCount).ToArray();
-        var outputs = Enumerable.Repeat(bottom, blockCount).ToArray();
-        var updateCounts = new int[blockCount];
-        inputs[graph.EntryBlockId] = initialState;
+        var inputs = Enumerable.Repeat(bottom, blockCount).ToImmutableList();
+        var outputs = Enumerable.Repeat(bottom, blockCount).ToImmutableList();
+        var updateCounts = Enumerable.Repeat(0, blockCount).ToImmutableList();
+        inputs = inputs.SetItem(graph.EntryBlockId, initialState);
 
         var pending = FindReachableBlocks(graph);
-        var changedOutputs = new List<int>();
-        var affected = new SortedSet<int>();
+        var changedOutputs = ImmutableList<int>.Empty;
+        var affected = ImmutableSortedSet<int>.Empty;
         var iterations = 0;
         while (pending.Count != 0)
         {
@@ -199,9 +199,9 @@ public static class ForwardDataflowAnalysis
             iterations++;
 
             var batch = pending.ToImmutableArray();
-            pending.Clear();
+            pending = pending.Clear();
 
-            changedOutputs.Clear();
+            changedOutputs = changedOutputs.Clear();
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
@@ -222,8 +222,8 @@ public static class ForwardDataflowAnalysis
                         : domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
-                    outputs[blockId] = monotoneOutput;
-                    changedOutputs.Add(blockId);
+                    outputs = outputs.SetItem(blockId, monotoneOutput);
+                    changedOutputs = changedOutputs.Add(blockId);
                 }
             }
             if (changedOutputs.Count == 0)
@@ -231,12 +231,12 @@ public static class ForwardDataflowAnalysis
                 continue;
             }
 
-            affected.Clear();
+            affected = affected.Clear();
             foreach (var blockId in changedOutputs)
             {
                 foreach (var successor in graph.GetSuccessors(blockId))
                 {
-                    affected.Add(successor);
+                    affected = affected.Add(successor);
                 }
             }
 
@@ -265,11 +265,11 @@ public static class ForwardDataflowAnalysis
                     throw new InvalidOperationException("Domain widening must be an upper bound.");
                 }
 
-                updateCounts[blockId]++;
+                updateCounts = updateCounts.SetItem(blockId, updateCounts[blockId] + 1);
                 if (!shouldWiden || !domain.AreEquivalent(inputs[blockId], updated))
                 {
-                    inputs[blockId] = updated;
-                    pending.Add(blockId);
+                    inputs = inputs.SetItem(blockId, updated);
+                    pending = pending.Add(blockId);
                 }
             }
         }
@@ -302,21 +302,23 @@ public static class ForwardDataflowAnalysis
         }
     }
 
-    private static SortedSet<int> FindReachableBlocks<T>(
+    private static ImmutableSortedSet<int> FindReachableBlocks<T>(
         DataflowGraph<T> graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var reachable = new SortedSet<int> { graph.EntryBlockId };
-        var pending = new Stack<int>();
-        pending.Push(graph.EntryBlockId);
-        while (pending.Count != 0)
+        var reachable = ImmutableSortedSet.Create(graph.EntryBlockId);
+        var pending = ImmutableStack<int>.Empty;
+        pending = pending.Push(graph.EntryBlockId);
+        while (!pending.IsEmpty)
         {
-            var blockId = pending.Pop();
+            var blockId = pending.Peek();
+            pending = pending.Pop();
             foreach (var successor in graph.GetSuccessors(blockId))
             {
-                if (reachable.Add(successor))
+                if (!reachable.Contains(successor))
                 {
-                    pending.Push(successor);
+                    reachable = reachable.Add(successor);
+                    pending = pending.Push(successor);
                 }
             }
         }

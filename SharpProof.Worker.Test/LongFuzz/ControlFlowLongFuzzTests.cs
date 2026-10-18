@@ -392,6 +392,7 @@ public sealed class ControlFlowLongFuzzTests
             var artifact = CompilerManifestArtifactProducer.Create(final, "/project", "net9.0", WorkerFeatureSet.All, discovery,
                 WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             using var project = new ShadowTestProject(artifact);
+            artifact = project.Artifact;
             using var worker = SharpProofWorker.Create(project.Request.Budgets);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             if (response.Errors.Length > 0)

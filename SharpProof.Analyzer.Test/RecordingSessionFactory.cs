@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
@@ -8,19 +8,19 @@ namespace SharpProof.Analyzer.Test;
 internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
 {
     private int _createCount;
-    private readonly ConcurrentDictionary<
+    private ImmutableDictionary<
         string,
         AnalyzerSemanticOutcome> _outcomes =
-        new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, int> _outcomeCounts =
-        new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<MethodIdentity, AnalyzerSemanticOutcome>
-        _methodOutcomes = new();
+        ImmutableDictionary.Create<string, AnalyzerSemanticOutcome>(StringComparer.Ordinal);
+    private ImmutableDictionary<string, int> _outcomeCounts =
+        ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+    private ImmutableDictionary<MethodIdentity, AnalyzerSemanticOutcome>
+        _methodOutcomes = ImmutableDictionary<MethodIdentity, AnalyzerSemanticOutcome>.Empty;
 
-    internal ConcurrentDictionary<string, AnalyzerSemanticOutcome> Outcomes =>
-        _outcomes;
-    internal ConcurrentDictionary<string, int> OutcomeCounts =>
-        _outcomeCounts;
+    internal ImmutableDictionary<string, AnalyzerSemanticOutcome> Outcomes =>
+        Volatile.Read(ref _outcomes);
+    internal ImmutableDictionary<string, int> OutcomeCounts =>
+        Volatile.Read(ref _outcomeCounts);
     internal int CreateCount => Volatile.Read(ref _createCount);
     internal AnalyzerSemanticOutcome GetNamedOutcome(string name)
     {
@@ -30,11 +30,11 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
             .Value;
     }
 
-    internal IEnumerable<AnalyzerSemanticOutcome> GetOutcomes(MethodKind kind)
+    internal ImmutableArray<AnalyzerSemanticOutcome> GetOutcomes(MethodKind kind)
     {
         return _methodOutcomes
             .Where(pair => pair.Key.Kind == kind)
-            .Select(static pair => pair.Value);
+            .Select(static pair => pair.Value).ToImmutableArray();
     }
     internal AnalyzerSession? Session
     {
@@ -57,16 +57,16 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
             (method, outcome) =>
             {
                 System.ArgumentNullException.ThrowIfNull(method);
-                _methodOutcomes.AddOrUpdate(
+                ImmutableInterlocked.AddOrUpdate(ref _methodOutcomes,
                     MethodIdentity.Create(method),
                     outcome,
                     (_, current) =>
                         AnalyzerSemanticOutcomes.Combine(current, outcome));
-                _outcomeCounts.AddOrUpdate(
+                ImmutableInterlocked.AddOrUpdate(ref _outcomeCounts,
                     method.Name,
                     1,
                     static (_, current) => current + 1);
-                _outcomes.AddOrUpdate(
+                ImmutableInterlocked.AddOrUpdate(ref _outcomes,
                     method.Name,
                     outcome,
                     (_, current) =>

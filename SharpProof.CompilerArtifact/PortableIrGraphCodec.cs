@@ -441,7 +441,7 @@ internal static partial class PortableIrGraphCodec
         private readonly EncodingTable<IrMemberId, PortableIrMember> _members;
         private readonly EncodingTable<OperationId, PortableIrOperation> _operations;
         private readonly EncodingTable<IrId, PortableIrTerm> _terms;
-        private readonly Dictionary<IrId, int> _termDepths = [];
+        private ImmutableDictionary<IrId, int> _termDepths = ImmutableDictionary<IrId, int>.Empty;
         private IrBasicBlock[] _blocks = [];
         private Dictionary<IrBlockId, int> _blockIndices = [];
         private Dictionary<IrInstructionId, int> _instructionIndices = [];
@@ -660,7 +660,9 @@ internal static partial class PortableIrGraphCodec
             {
                 return existing;
             }
-            if (IrTermAnalysis.GetDepth(term, _termDepths) > MaximumGraphDepth)
+            var depth = IrTermAnalysis.GetDepth(term, _termDepths);
+            _termDepths = depth.Memo;
+            if (depth.Value > MaximumGraphDepth)
             {
                 throw Bad("Portable IR term depth exceeds the supported limit.");
             }

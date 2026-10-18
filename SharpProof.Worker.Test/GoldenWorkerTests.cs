@@ -390,6 +390,7 @@ public sealed class GoldenWorkerTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact, cacheEnabled: true);
+        artifact = project.Artifact;
         return await NativeVc(project);
     }
 

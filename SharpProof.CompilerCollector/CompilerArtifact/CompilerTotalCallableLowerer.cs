@@ -5,12 +5,12 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerTotalCallableLowerer
 {
     internal static CompilerTotalEntryPreparation? PrepareEntry(CSharpCompilation compilation,
-        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
+        ManifestCallableTarget target, IReadOnlyList<CompilerSyntaxTreeSnapshot> capturedTrees, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees)).ToImmutableArray();
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -34,15 +34,15 @@ internal static class CompilerTotalCallableLowerer
     }
 
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
-        ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        ManifestCallableTarget target, IReadOnlyList<CompilerSyntaxTreeSnapshot> capturedTrees,
+        IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees)).ToImmutableArray();
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -161,9 +161,9 @@ internal static class CompilerTotalCallableLowerer
 
     // Captured snapshots are indexed by compilation tree ordinal; a mismatch
     // is a caller contract violation, not an admission decision.
-    private static void RequireCapturedTrees(CSharpCompilation compilation, CompilerSyntaxTreeSnapshot[] capturedTrees)
+    private static void RequireCapturedTrees(CSharpCompilation compilation, IReadOnlyList<CompilerSyntaxTreeSnapshot> capturedTrees)
     {
-        if (capturedTrees.Length != compilation.SyntaxTrees.Length)
+        if (capturedTrees.Count != compilation.SyntaxTrees.Length)
         {
             throw new ArgumentException(
                 "Captured source snapshots must match the compilation syntax trees.",
@@ -174,14 +174,14 @@ internal static class CompilerTotalCallableLowerer
     // Rebuild the bounded source census inside this batch. Callers cannot
     // provide a forged owner or bypass the all-tree contract-binding guard.
     internal static CompilerShadowPreparationBatch PrepareShadowCallers(CSharpCompilation compilation,
-        WorkerFeatureSet features, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        WorkerFeatureSet features, IReadOnlyList<CompilerSyntaxTreeSnapshot> capturedTrees,
+        IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees)).ToImmutableArray();
         if (enableMetadataRequires && capturedReferences == null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference)))
@@ -189,7 +189,7 @@ internal static class CompilerTotalCallableLowerer
         var trees = compilation.SyntaxTrees.ToArray();
         if (trees.Length > CompilerArtifactLimits.MaximumInstructions)
         { return new([], [new(0, 0, 0, "InventoryBudget")]); }
-        if (trees.Length != capturedTrees.Length)
+        if (trees.Length != capturedTrees.Count)
         { return new([], [new(0, 0, 0, "SourceSnapshotMismatch")]); }
         // Hashing materializes UTF-8; syntax-node limits do not bound comments.
         const int maximumTreeCharacters = 4_194_304;
@@ -215,7 +215,7 @@ internal static class CompilerTotalCallableLowerer
         var published = discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))
             .ToImmutableHashSet(StringComparer.Ordinal);
         // Use producer-owned paths instead of caller-supplied reporting metadata.
-        var authoritativeTrees = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken);
+        var authoritativeTrees = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray();
         var initializationFree = CreateShadowInitializationPredicate(compilation, cancellationToken);
         foreach (var owner in inventory.Owners.OrderBy(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.CallableId), StringComparer.Ordinal))
         {
@@ -236,11 +236,11 @@ internal static class CompilerTotalCallableLowerer
     }
 
     private static CompilerTotalCallablePreparation? PrepareShadow(CSharpCompilation compilation,
-        CompilerPotentialCallOwner owner, CompilerSyntaxTreeSnapshot[] capturedTrees,
-        CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
+        CompilerPotentialCallOwner owner, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
+        IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         Func<INamedTypeSymbol, bool> initializationFree, CancellationToken cancellationToken, out string reason, bool enableMetadataRequires = false)
     {
-        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        RepositoryParameterGuard.ThrowIfInvalid(capturedTrees.IsDefault, nameof(capturedTrees));
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         reason = "UnsupportedBody";
@@ -294,7 +294,7 @@ internal static class CompilerTotalCallableLowerer
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
-        ControlFlowGraph graph, TotalLoweringContext context, CompilerReferenceSnapshot[]? capturedReferences,
+        ControlFlowGraph graph, TotalLoweringContext context, IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
         Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
     {

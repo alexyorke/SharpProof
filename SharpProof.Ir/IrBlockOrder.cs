@@ -20,12 +20,11 @@ internal static class IrBlockOrder
         spend = RepositoryParameterGuard.NotNull(spend, nameof(spend));
 
         var blockCapacity = program.Blocks.Length;
-        var states = new byte[blockCapacity];
-        var pending = new Stack<(IrBlockId Block, bool Exit)>(blockCapacity);
-        var result = new IrBlockId[blockCapacity];
-        var resultCount = 0;
-        pending.Push((program.Entry, false));
-        while (pending.Count != 0)
+        var states = Enumerable.Repeat((byte)0, blockCapacity).ToImmutableList();
+        var pending = ImmutableStack<(IrBlockId Block, bool Exit)>.Empty;
+        var result = ImmutableList<IrBlockId>.Empty;
+        pending = pending.Push((program.Entry, false));
+        while (!pending.IsEmpty)
         {
             if (!spend(1))
             {
@@ -33,11 +32,12 @@ internal static class IrBlockOrder
                 return default;
             }
 
-            var frame = pending.Pop();
+            var frame = pending.Peek();
+            pending = pending.Pop();
             if (frame.Exit)
             {
-                states[frame.Block.Value] = 2;
-                result[resultCount++] = frame.Block;
+                states = states.SetItem(frame.Block.Value, 2);
+                result = result.Add(frame.Block);
 
                 continue;
             }
@@ -55,52 +55,19 @@ internal static class IrBlockOrder
                 return default;
             }
 
-            states[frame.Block.Value] = 1;
-            pending.Push((frame.Block, true));
-            block.ControlFlow.Accept(SuccessorVisitor.Instance, pending);
+            states = states.SetItem(frame.Block.Value, 1);
+            pending = pending.Push((frame.Block, true));
+            pending = block.Terminator switch
+            {
+                IrBranchInstruction branch => pending.Push((branch.WhenFalse, false)).Push((branch.WhenTrue, false)),
+                IrGotoInstruction go => pending.Push((go.Target, false)),
+                IrThrowInstruction thrown => pending.Push((thrown.Target, false)),
+                _ => pending
+            };
         }
 
-        Array.Reverse(result, 0, resultCount);
         failure = IrAcyclicOrderFailure.None;
-        return ImmutableArray.Create(result, 0, resultCount);
+        return result.Reverse().ToImmutableArray();
     }
 
-    private sealed class SuccessorVisitor : IIrTerminatorVisitor<Stack<(IrBlockId Block, bool Exit)>>
-    {
-        internal static SuccessorVisitor Instance { get; } = new();
-
-        public void Visit(IrBranchInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
-        {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-            state = RepositoryParameterGuard.NotNull(state, nameof(state));
-            state.Push((instruction.WhenFalse, false));
-            state.Push((instruction.WhenTrue, false));
-        }
-
-        public void Visit(IrGotoInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
-        {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-            state = RepositoryParameterGuard.NotNull(state, nameof(state));
-            state.Push((instruction.Target, false));
-        }
-
-        public void Visit(IrThrowInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
-        {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-            state = RepositoryParameterGuard.NotNull(state, nameof(state));
-            state.Push((instruction.Target, false));
-        }
-
-        public void Visit(IrReturnInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
-        {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-            state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        }
-
-        public void Visit(IrExceptionalExitInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
-        {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-            state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        }
-    }
 }

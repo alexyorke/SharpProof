@@ -3046,13 +3046,13 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         var artifact = await CompilerManifestArtifact.ReadAsync(
             request.CompilerManifest.Path);
-        var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes);
+        var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes.ToArray());
         workerPath ??= WorkerOutputPath();
         var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(
             workerPath,
             ContainerContract.GetZ3LibrarySha256Required());
         var expectedInputHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute(artifact.Bytes), WorkerCacheIdentity.CurrentToolIdentity,
+            request, ArtifactDigest.Compute(artifact.Bytes.ToArray()), WorkerCacheIdentity.CurrentToolIdentity,
             WorkerCacheIdentity.Current.ToolVersion, workerBinarySha256,
             WorkerCacheIdentity.Current.ApiSpecIdentity,
             WorkerCacheIdentity.Current.ApiSpecVersion,
@@ -3105,8 +3105,8 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     private sealed record CompilerManifestArtifact(
-        byte[] Bytes, string ProjectDirectory, WorkerFeatureSet Features,
-        string ManifestHash, string[] ClaimPaths)
+        ImmutableArray<byte> Bytes, string ProjectDirectory, WorkerFeatureSet Features,
+        string ManifestHash, ImmutableArray<string> ClaimPaths)
     {
         internal static async Task<CompilerManifestArtifact> ReadAsync(string path)
         {
@@ -3117,7 +3117,7 @@ public sealed class WorkerMsBuildIntegrationTests
             var root = document.RootElement;
             var manifest = root.GetProperty("manifest");
             var artifact = new CompilerManifestArtifact(
-                bytes,
+                bytes.ToImmutableArray(),
                 root.GetProperty("compilation").GetProperty("projectDirectory").GetString() ?? string.Empty,
                 root.GetProperty("features").Deserialize<WorkerFeatureSet>(WorkerProtocolJson.Options),
                 manifest.GetProperty("hash").GetString() ?? string.Empty,
@@ -3133,10 +3133,10 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             return artifact;
         }
-        public byte[] Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
+        public ImmutableArray<byte> Bytes { get; init; } = Bytes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Bytes)) : Bytes;
         public string ProjectDirectory { get; init; } = ProjectDirectory ?? throw new System.ArgumentNullException(nameof(ProjectDirectory));
         public string ManifestHash { get; init; } = ManifestHash ?? throw new System.ArgumentNullException(nameof(ManifestHash));
-        public string[] ClaimPaths { get; init; } = ClaimPaths ?? throw new System.ArgumentNullException(nameof(ClaimPaths));
+        public ImmutableArray<string> ClaimPaths { get; init; } = ClaimPaths.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(ClaimPaths)) : ClaimPaths;
     }
     private sealed class ConsumerProject : IDisposable
     {

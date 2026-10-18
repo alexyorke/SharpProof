@@ -13,7 +13,7 @@ internal static class ContractClauseSubstitution
         RepositoryParameterGuard.RequireInitialized(sourceClauses.IsDefault, nameof(sourceClauses), "Array must be initialized.");
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
+        var clauses = ImmutableList<BoundContractClause>.Empty;
         foreach (var clause in sourceClauses)
         {
             IrTerm condition;
@@ -25,7 +25,7 @@ internal static class ContractClauseSubstitution
             {
                 return new([], ContractBindingFailure.UnsupportedExpression);
             }
-            clauses.Add(new BoundContractClause(
+            clauses = clauses.Add(new BoundContractClause(
                 clause.Kind,
                 condition,
                 clause.SourceOperation,
@@ -33,7 +33,7 @@ internal static class ContractClauseSubstitution
                 clause.DiagnosticText,
                 clause.SourceSyntax));
         }
-        return new(clauses.ToImmutable(), ContractBindingFailure.None);
+        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
     }
 }
 

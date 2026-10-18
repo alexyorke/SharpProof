@@ -10,6 +10,36 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class DictionaryAnalyzerConfigurationContractTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ExplicitComparerSnapshotsAnOpaqueReadOnlyDictionary(bool ignoreCase)
+    {
+        var comparer = ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var producer = new Dictionary<string, string>(comparer) { ["CaseKey"] = "captured" };
+        IReadOnlyDictionary<string, string> opaque =
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(producer);
+        var options = new DictionaryAnalyzerConfigOptions(opaque, comparer);
+        producer["CaseKey"] = "changed";
+        producer["added"] = "later";
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(options.TryGetValue("CaseKey", out var captured), Is.True);
+            Assert.That(captured, Is.EqualTo("captured"));
+            Assert.That(options.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
+            Assert.That(options.TryGetValue("added", out _), Is.False);
+        }
+    }
+
+    [Test]
+    public void TupleOptionsRejectIdenticalCaseInsensitiveDuplicates()
+    {
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new DictionaryAnalyzerConfigOptions(("key", "value"), ("KEY", "value"));
+        }));
+    }
+
     [Test]
     public void TupleOptionsParseMixedCaseKeysAndValuesAndReportMissingKeys()
     {

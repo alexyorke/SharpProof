@@ -170,24 +170,26 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         return new GeneratedIrCase(term, variables, category);
     }
 
-    private static HashSet<IrVarId> CollectVariables(IrTerm root)
+    private static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
         System.ArgumentNullException.ThrowIfNull(root);
-        var variables = new HashSet<IrVarId>();
-        var visited = new HashSet<IrId>();
-        var pending = new Stack<IrTerm>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var variables = ImmutableHashSet<IrVarId>.Empty;
+        var visited = ImmutableHashSet<IrId>.Empty;
+        var pending = ImmutableStack<IrTerm>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
-            if (!visited.Add(current.Id))
+            var current = pending.Peek();
+            pending = pending.Pop();
+            if (visited.Contains(current.Id))
             {
                 continue;
             }
+            visited = visited.Add(current.Id);
 
             if (current is IrVariableTerm variable)
             {
-                variables.Add(variable.Variable);
+                variables = variables.Add(variable.Variable);
             }
 
             switch (current)
@@ -195,34 +197,34 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
                 case IrOpaqueTerm opaque:
                     if (opaque.Receiver is { } receiver)
                     {
-                        pending.Push(receiver);
+                        pending = pending.Push(receiver);
                     }
                     for (var index = 0; index < opaque.Arguments.Length; index++)
                     {
-                        pending.Push(opaque.Arguments[index]);
+                        pending = pending.Push(opaque.Arguments[index]);
                     }
                     break;
                 case IrUnaryTerm unary:
-                    pending.Push(unary.Operand);
+                    pending = pending.Push(unary.Operand);
                     break;
                 case IrBinaryTerm binary:
-                    pending.Push(binary.Left);
-                    pending.Push(binary.Right);
+                    pending = pending.Push(binary.Left);
+                    pending = pending.Push(binary.Right);
                     break;
                 case IrConditionalTerm conditional:
-                    pending.Push(conditional.Condition);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.WhenFalse);
+                    pending = pending.Push(conditional.Condition);
+                    pending = pending.Push(conditional.WhenTrue);
+                    pending = pending.Push(conditional.WhenFalse);
                     break;
                 case IrCastTerm cast:
-                    pending.Push(cast.Operand);
+                    pending = pending.Push(cast.Operand);
                     break;
                 case IrLengthTerm length:
-                    pending.Push(length.Value);
+                    pending = pending.Push(length.Value);
                     break;
                 case IrSequenceAccessTerm access:
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
+                    pending = pending.Push(access.Sequence);
+                    pending = pending.Push(access.Index);
                     break;
             }
         }

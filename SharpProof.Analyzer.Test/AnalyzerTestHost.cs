@@ -209,7 +209,7 @@ internal static class AnalyzerTestHost
 
     internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
@@ -222,7 +222,7 @@ internal static class AnalyzerTestHost
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> values,
         CancellationToken cancellationToken,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,

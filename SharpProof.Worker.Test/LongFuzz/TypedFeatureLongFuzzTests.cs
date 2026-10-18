@@ -125,6 +125,7 @@ public sealed class TypedFeatureLongFuzzTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
@@ -225,9 +226,10 @@ public sealed class TypedFeatureLongFuzzTests
         public ImmutableArray<ClrRun> Runs { get; init; } = Runs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Runs)) : Runs;
     }
 
-    private static ClrResult RunClr(string source, int[] inputs)
+    private static ClrResult RunClr(string source, ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
@@ -246,16 +248,16 @@ public sealed class TypedFeatureLongFuzzTests
         {
             image.Position = 0;
             var method = context.LoadFromStream(image).GetType("C")!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = new List<ClrRun>(inputs.Length);
+            var runs = ImmutableList<ClrRun>.Empty;
             foreach (var input in inputs)
             {
                 try
                 {
-                    runs.Add(new(input, (int)method.Invoke(null, [input])!, null));
+                    runs = runs.Add(new(input, (int)method.Invoke(null, [input])!, null));
                 }
                 catch (TargetInvocationException exception)
                 {
-                    runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
+                    runs = runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
                 }
             }
             return new(runs.ToImmutableArray(), null);
@@ -270,9 +272,9 @@ public sealed class TypedFeatureLongFuzzTests
         }
     }
 
-    private static int[] Inputs(int anchor)
+    private static ImmutableArray<int> Inputs(int anchor)
     {
-        return new[] { anchor, int.MinValue, -1, 0, 1, 2, int.MaxValue }.Distinct().ToArray();
+        return ImmutableArray.Create(anchor, int.MinValue, -1, 0, 1, 2, int.MaxValue).Distinct().ToImmutableArray();
     }
 
     private static string Format(ClrRun? run)

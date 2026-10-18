@@ -787,6 +787,7 @@ public sealed class ContractMatrixLongFuzzTests
         var effect = targetClaims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect &&
             claim.EffectContractKind == WorkerEffectContractKind.DoesNotThrow));
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
@@ -954,6 +955,7 @@ public sealed class ContractMatrixLongFuzzTests
             throw new InvalidOperationException("The Math.Abs case must use only the default BCL catalog.");
         }
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)

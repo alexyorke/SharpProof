@@ -586,13 +586,13 @@ public sealed class ScalarDifferentialMatrixTests
                     StringComparison.Ordinal)));
             var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
-            var execution = ExecuteIr(target, item.Inputs);
+            var execution = ExecuteIr(target, item.Inputs.ToArray());
             if (item.ExpectedException == null)
             {
                 using (Assert.EnterMultipleScope())
                 {
                     Assert.That(
-                        method.Invoke(null, item.Inputs),
+                        method.Invoke(null, item.Inputs.ToArray()),
                         Is.EqualTo(item.ExpectedResult),
                         item.MethodName);
                     AssertIntegerReturn(
@@ -610,7 +610,7 @@ public sealed class ScalarDifferentialMatrixTests
                 var thrown = Assert.Throws<TargetInvocationException>(
                     (Action)(() =>
                     {
-                        method.Invoke(null, item.Inputs);
+                        method.Invoke(null, item.Inputs.ToArray());
                     }),
                     item.MethodName);
                 using (Assert.EnterMultipleScope())
@@ -1067,43 +1067,43 @@ public sealed class ScalarDifferentialMatrixTests
     private sealed record ScalarCase(
         string MethodName,
         string TypeName,
-        object[] BoundaryValues)
+        ImmutableArray<object> BoundaryValues)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string TypeName { get; init; } = TypeName ?? throw new System.ArgumentNullException(nameof(TypeName));
-        public object[] BoundaryValues { get; init; } = BoundaryValues ?? throw new System.ArgumentNullException(nameof(BoundaryValues));
+        public ImmutableArray<object> BoundaryValues { get; init; } = BoundaryValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(BoundaryValues)) : BoundaryValues;
     }
 
     private sealed record WideningCase(
         string MethodName,
         string SourceType,
         string TargetType,
-        object[] BoundaryValues)
+        ImmutableArray<object> BoundaryValues)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string SourceType { get; init; } = SourceType ?? throw new System.ArgumentNullException(nameof(SourceType));
         public string TargetType { get; init; } = TargetType ?? throw new System.ArgumentNullException(nameof(TargetType));
-        public object[] BoundaryValues { get; init; } = BoundaryValues ?? throw new System.ArgumentNullException(nameof(BoundaryValues));
+        public ImmutableArray<object> BoundaryValues { get; init; } = BoundaryValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(BoundaryValues)) : BoundaryValues;
     }
 
     private sealed record ArithmeticCase(
         string MethodName,
         string Expression,
-        object[] Inputs,
+        ImmutableArray<object> Inputs,
         long? ExpectedResult,
         Type? ExpectedException,
         IrExceptionKind? ExpectedIrException)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
-        public object[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ImmutableArray<object> Inputs { get; init; } = Inputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
     }
 
     private sealed class DifferentialProject : IDisposable
     {
         private readonly TempDirectory _temporary;
         private readonly string _sourcePath;
-        private CompilerCallablePreparation[] _callables = [];
+        private ImmutableArray<CompilerCallablePreparation> _callables = [];
         private CSharpCompilation? _compilation;
 
         private DifferentialProject(TempDirectory temporary)

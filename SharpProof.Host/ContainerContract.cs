@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -98,21 +99,20 @@ public static class ContainerContract
             throw new InvalidDataException(
                 "The SharpProof container contract root is not a JSON object.");
         }
-        var required = new HashSet<string>(StringComparer.Ordinal)
-        {
+        var required = ImmutableHashSet.Create(StringComparer.Ordinal,
             "schemaVersion", "contractVersion", "platform", "dotnetSdkVersion",
             "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
             "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
             "powershellVersionLine", "powershellImageDigest", "z3Version",
-            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
-        };
+            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId");
         foreach (var property in actual.EnumerateObject())
         {
-            if (!required.Remove(property.Name))
+            if (!required.Contains(property.Name))
             {
                 throw new InvalidDataException(
                     $"The SharpProof container contract property '{property.Name}' is unknown or duplicated.");
             }
+            required = required.Remove(property.Name);
         }
         if (required.Count != 0)
         {

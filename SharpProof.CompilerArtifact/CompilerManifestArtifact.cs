@@ -262,7 +262,7 @@ internal static class CompilerManifestArtifactJson
             cancellationToken);
         compilation = artifact.Compilation with
         {
-            SpecificationPackIds = artifact.SpecificationPackIds.ToArray(),
+            SpecificationPackIds = artifact.SpecificationPackIds.ToImmutableArray(),
             SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion,
             SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256
         };

@@ -37,6 +37,7 @@ public sealed class Wave8ExceptionInitializationStoreTests
         else
         { Assert.That(native.Outcome, Is.Null); }
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

@@ -160,6 +160,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
         Assert.That(reachable.CollectionComplete, Is.True);
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

@@ -21,15 +21,17 @@ $runtimes = @(& dotnet --list-runtimes 2>$null)
 $configuration = $null
 $packages = @()
 $resolvedPackages = @()
-$packageIds = @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')
+New-Variable -Name packageIds -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')))
 if (-not [string]::IsNullOrWhiteSpace($Target)) {
     $project = (Resolve-Path -LiteralPath $Target).Path
     if ([IO.Path]::GetExtension($project) -ne '.csproj') { throw 'Doctor -Target must name one .csproj file.' }
     # Evaluation only: no restore, build, or target execution. Use trusted projects.
-    $propertyNames = @('TargetFramework', 'TargetFrameworks', 'NETCoreSdkVersion', 'MSBuildVersion',
-        'SharpProofProfile', 'SharpProofFeatures', 'SharpProofVerify', 'SharpProofVerifyPolicy',
-        'SharpProofAssumptionPolicy', 'SharpProofWorkerPath', 'SharpProofVerifyResultFile',
-        'SharpProofVerifySarifFile', 'IntermediateOutputPath', 'MSBuildProjectDirectory', 'ProjectAssetsFile')
+    New-Variable -Name propertyNames -Option Constant -Value (
+        [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('TargetFramework', 'TargetFrameworks', 'NETCoreSdkVersion', 'MSBuildVersion',
+                'SharpProofProfile', 'SharpProofFeatures', 'SharpProofVerify', 'SharpProofVerifyPolicy',
+                'SharpProofAssumptionPolicy', 'SharpProofWorkerPath', 'SharpProofVerifyResultFile',
+                'SharpProofVerifySarifFile', 'IntermediateOutputPath', 'MSBuildProjectDirectory', 'ProjectAssetsFile')))
     $arguments = @('msbuild', $project, '-nologo', "-getProperty:$($propertyNames -join ',')", '-getItem:PackageReference')
     if ($TargetFramework) { $arguments += "-p:TargetFramework=$TargetFramework" }
     $raw = (& dotnet @arguments 2>$null | Out-String)

@@ -88,13 +88,13 @@ public static class IrTermAnalysis
     public static int GetDepth(IrTerm root)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
-        var memo = new Dictionary<IrId, int>();
-        return GetDepth(root, memo);
+        var memo = ImmutableDictionary<IrId, int>.Empty;
+        return GetDepth(root, memo).Value;
     }
 
-    internal static int GetDepth(
+    internal static (int Value, ImmutableDictionary<IrId, int> Memo) GetDepth(
         IrTerm root,
-        Dictionary<IrId, int> memo)
+        ImmutableDictionary<IrId, int> memo)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));

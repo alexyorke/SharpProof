@@ -23,9 +23,9 @@ internal sealed class EffectiveContractSourceResolver
     private readonly ImmutableDictionary<INamedTypeSymbol,
         ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor>>
         _companionsByTarget;
-    private readonly ConcurrentDictionary<
+    private ImmutableDictionary<
         IMethodSymbol, EffectiveContractSourceResolution> _cache =
-        new(SymbolEqualityComparer.IncludeNullability);
+        ImmutableDictionary.Create<IMethodSymbol, EffectiveContractSourceResolution>(SymbolEqualityComparer.IncludeNullability);
 
     internal EffectiveContractSourceResolver(
         Compilation compilation,
@@ -67,7 +67,7 @@ internal sealed class EffectiveContractSourceResolver
 
         target = ContractClauseInventoryBuilder.NormalizeCallable(target);
         return implementationBody == null
-            ? _cache.GetOrAdd(
+            ? ImmutableInterlocked.GetOrAdd(ref _cache,
                 target,
                 value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ResolveUncached(value, cancellationToken)))
             : ResolveCore(target, implementationBody, cancellationToken);

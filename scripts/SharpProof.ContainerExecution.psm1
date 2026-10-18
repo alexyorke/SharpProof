@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$script:SharpProofSolutionTestTimeoutFallbackSeconds = 1800
+New-Variable -Scope Script -Name SharpProofSolutionTestTimeoutFallbackSeconds -Option ReadOnly -Value 1800
 $script:SharpProofAcceptanceContractCache = @{}
 
 function Get-SharpProofAcceptanceContract {

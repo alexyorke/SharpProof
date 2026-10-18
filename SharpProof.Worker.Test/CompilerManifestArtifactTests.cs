@@ -30,6 +30,29 @@ public sealed class CompilerManifestArtifactTests
         """;
 
     [Test]
+    public void ProjectPublicationBindsACopyWithoutRewritingProducerCompilation()
+    {
+        var artifact = CreateContractArtifact();
+        var compilation = artifact.Compilation;
+        var directory = compilation.ProjectDirectory;
+        using var project = new ShadowTestProject(artifact);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(
+            project.Artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Compilation, Is.SameAs(compilation));
+            Assert.That(compilation.ProjectDirectory, Is.EqualTo(directory));
+            Assert.That(project.Artifact, Is.Not.SameAs(artifact));
+            Assert.That(project.Artifact.Compilation, Is.Not.SameAs(compilation));
+            Assert.That(project.Artifact.Compilation.ProjectDirectory,
+                Is.EqualTo(Path.GetDirectoryName(project.Request.CompilerManifest.Path)));
+            Assert.That(WorkerProtocolJson.ComputeSha256(bytes),
+                Is.EqualTo(project.Request.CompilerManifest.Sha256));
+        }
+    }
+
+    [Test]
     public void SerializationCanonicalizesCopiesWithoutRewritingProducerCollections()
     {
         var artifact = CreateContractArtifact(
@@ -82,10 +105,13 @@ public sealed class CompilerManifestArtifactTests
     public void CallableDecodingCapturesAuthorityWithoutRewritingCompilation()
     {
         var artifact = CreateContractArtifact();
-        var compilation = artifact.Compilation;
-        compilation.SpecificationPackIds = ["producer-sentinel"];
-        compilation.SpecificationPackCatalogVersion = -1;
-        compilation.SpecificationPackCatalogSha256 = "producer-sentinel";
+        var compilation = artifact.Compilation with
+        {
+            SpecificationPackIds = ["producer-sentinel"],
+            SpecificationPackCatalogVersion = -1,
+            SpecificationPackCatalogSha256 = "producer-sentinel"
+        };
+        artifact = artifact with { Compilation = compilation };
         var originalIds = compilation.SpecificationPackIds;
 
         var prepared = CompilerManifestArtifactJson.DecodeCallables(artifact, TestContext.CurrentContext.CancellationToken).Single();
@@ -93,7 +119,7 @@ public sealed class CompilerManifestArtifactTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Compilation, Is.SameAs(compilation));
-            Assert.That(compilation.SpecificationPackIds, Is.SameAs(originalIds));
+            Assert.That(compilation.SpecificationPackIds.Equals(originalIds), Is.True);
             Assert.That(compilation.SpecificationPackIds, Has.Length.EqualTo(1));
             Assert.That(compilation.SpecificationPackIds[0], Is.EqualTo("producer-sentinel"));
             Assert.That(compilation.SpecificationPackCatalogVersion, Is.EqualTo(-1));
@@ -218,10 +244,14 @@ public sealed class CompilerManifestArtifactTests
             .Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.CallableId == callable.CallableId)
             .ToArray();
         Assert.That(claims, Is.Not.Empty);
-        artifact.Compilation.CompilerMvid =
-            Guid.NewGuid().ToString("D");
-        artifact.Compilation.CSharpCompilerMvid =
-            Guid.NewGuid().ToString("D");
+        artifact = artifact with
+        {
+            Compilation = artifact.Compilation with
+            {
+                CompilerMvid = Guid.NewGuid().ToString("D"),
+                CSharpCompilerMvid = Guid.NewGuid().ToString("D")
+            }
+        };
 
         var roundTrip = CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -327,7 +357,7 @@ public sealed class CompilerManifestArtifactTests
     public void CaseDistinctModulePathsRemainDistinct()
     {
         var artifact = CreateArtifact();
-        AddCaseVariantModule(artifact);
+        artifact = AddCaseVariantModule(artifact);
 
         AssertWellFormedCapture(artifact);
     }
@@ -551,10 +581,16 @@ public sealed class CompilerManifestArtifactTests
     public void AdditionalFilesPermitCaseDistinctPaths()
     {
         var artifact = CreateArtifact();
-        artifact.Compilation.AdditionalFiles = [
-            AdditionalFile("CASE.input", 'a'),
-            AdditionalFile("case.input", 'b')
-        ];
+        artifact = artifact with
+        {
+            Compilation = artifact.Compilation with
+            {
+                AdditionalFiles = [
+                    AdditionalFile("CASE.input", 'a'),
+                    AdditionalFile("case.input", 'b')
+                ]
+            }
+        };
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
@@ -999,7 +1035,7 @@ public sealed class CompilerManifestArtifactTests
         };
     }
 
-    private static void AddCaseVariantModule(
+    private static CompilerManifestArtifact AddCaseVariantModule(
         CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
@@ -1013,7 +1049,7 @@ public sealed class CompilerManifestArtifactTests
         var caseVariant = new string(characters);
         Assert.That(caseVariant, Is.Not.EqualTo(manifest.Path));
         Assert.That(caseVariant, Is.EqualTo(manifest.Path).IgnoreCase);
-        artifact.Compilation.References[0].Modules = [
+        var modules = ImmutableArray.Create<CompilerReferenceModuleSnapshot>(
             manifest,
             new CompilerReferenceModuleSnapshot
             {
@@ -1022,8 +1058,15 @@ public sealed class CompilerManifestArtifactTests
                 Path = caseVariant,
                 Sha256 = new string('a', 64),
                 SizeBytes = 1
+            });
+        return artifact with
+        {
+            Compilation = artifact.Compilation with
+            {
+                References = artifact.Compilation.References.SetItem(0,
+                    artifact.Compilation.References[0] with { Modules = modules })
             }
-        ];
+        };
     }
 
     private static CompilerDiagnosticArtifact Diagnostic(

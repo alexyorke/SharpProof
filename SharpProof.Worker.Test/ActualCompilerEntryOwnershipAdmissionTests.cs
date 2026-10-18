@@ -25,6 +25,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var targets = project.Snapshot.Callables.ToArray();
         Assert.That(targets, Has.Length.EqualTo(2));
         Assert.That(targets[0].Entry.CallableId, Is.Not.EqualTo(targets[1].Entry.CallableId));

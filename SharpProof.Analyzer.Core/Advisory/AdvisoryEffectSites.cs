@@ -62,7 +62,7 @@ internal static class AdvisoryEffectSites
         var escapes = Escaping(program);
         var factory = program.Factory;
         var sequenceReaders = IrSequenceReads.Readers(program);
-        var sites = ImmutableArray.CreateBuilder<AdvisoryEffectSite>();
+        var sites = ImmutableList<AdvisoryEffectSite>.Empty;
         foreach (var block in program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (reachable.Contains(block.Id))))
         {
             foreach (var instruction in block.Instructions)
@@ -70,28 +70,28 @@ internal static class AdvisoryEffectSites
                 cancellationToken.ThrowIfCancellationRequested();
                 var location = locate(instruction.Operation) ?? fallback;
                 if (sequenceReaders.Contains(instruction.Id))
-                { sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
+                { sites = sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
                 switch (instruction)
                 {
                     case IrAllocationInstruction:
-                        sites.Add(new(AdvisoryEffectSiteKind.Allocation, location));
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Allocation, location));
                         break;
                     case IrWriteInstruction write:
-                        sites.Add(new(AdvisoryEffectSiteKind.Write, location)
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Write, location)
                         { Region = IrWriteSites.IsObservable(factory, write) ? write.Region : IrWriteRegion.Local });
                         break;
                     case IrLockInstruction:
-                        sites.Add(new(AdvisoryEffectSiteKind.Lock, location));
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Lock, location));
                         break;
                     case IrCallInstruction { Receiver: null, Target: null } call:
-                        sites.Add(new(AdvisoryEffectSiteKind.Call, location) { Effects = IrOpaqueCallSite.Effects(factory, call.Operation) });
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Call, location) { Effects = IrOpaqueCallSite.Effects(factory, call.Operation) });
                         break;
                     case IrHavocInstruction { Origin: IrHavocOrigin.Approximation } havoc when ReadsState(factory, havoc.Operation):
-                        sites.Add(new(AdvisoryEffectSiteKind.Read, location)
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Read, location)
                         { Static = Describe(factory, havoc.Operation).StartsWith("StaticFieldReference@", StringComparison.Ordinal) });
                         break;
                     case IrThrowInstruction thrown:
-                        sites.Add(new(AdvisoryEffectSiteKind.Throw, location)
+                        sites = sites.Add(new(AdvisoryEffectSiteKind.Throw, location)
                         {
                             Exception = thrown.ExceptionKind,
                             Escapes = escapes.Contains(thrown.Target),
@@ -101,44 +101,53 @@ internal static class AdvisoryEffectSites
                 }
             }
         }
-        return new(sites.ToImmutable(), null);
+        return new(sites.ToImmutableArray(), null);
     }
 
     private static AdvisoryEffectAnalysis Gap(string reason)
     { reason = RepositoryParameterGuard.NotNull(reason, nameof(reason)); return new([], reason); }
 
-    private static HashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
+    private static ImmutableHashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
-        var reachable = new HashSet<IrBlockId>();
-        var pending = new Stack<IrBlockId>(roots);
-        while (pending.Count != 0)
+        var reachable = ImmutableHashSet<IrBlockId>.Empty;
+        var pending = ImmutableStack<IrBlockId>.Empty;
+        foreach (var root in roots)
+        { pending = pending.Push(root); }
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
-            if (!reachable.Add(current))
+            var current = pending.Peek();
+            pending = pending.Pop();
+            if (reachable.Contains(current))
             { continue; }
+            reachable = reachable.Add(current);
             foreach (var successor in Successors(program.GetBlock(current)))
-            { pending.Push(successor); }
+            { pending = pending.Push(successor); }
         }
         return reachable;
     }
 
-    private static HashSet<IrBlockId> Escaping(IrProgram program)
+    private static ImmutableHashSet<IrBlockId> Escaping(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var predecessors = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (Successors(block).Select(successor => successor.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(successor)) : ((successor, block.Id)))))
             .ToLookup(edge => edge.successor, edge => edge.Id);
-        var escaping = new HashSet<IrBlockId>();
-        var pending = new Stack<IrBlockId>(program.Blocks
-            .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id)));
-        while (pending.Count != 0)
+        var escaping = ImmutableHashSet<IrBlockId>.Empty;
+        var roots = program.Blocks
+            .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id));
+        var pending = ImmutableStack<IrBlockId>.Empty;
+        foreach (var root in roots)
+        { pending = pending.Push(root); }
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
-            if (!escaping.Add(current))
+            var current = pending.Peek();
+            pending = pending.Pop();
+            if (escaping.Contains(current))
             { continue; }
+            escaping = escaping.Add(current);
             foreach (var predecessor in predecessors[current])
-            { pending.Push(predecessor); }
+            { pending = pending.Push(predecessor); }
         }
         return escaping;
     }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
@@ -30,8 +29,8 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
     : IAnalyzerSessionFactory
     where TKey : notnull
 {
-    protected readonly ConcurrentDictionary<TKey, AnalyzerSemanticOutcome>
-        Outcomes = new((comparer ?? throw new System.ArgumentNullException(nameof(comparer))));
+    protected ImmutableDictionary<TKey, AnalyzerSemanticOutcome>
+        Outcomes = ImmutableDictionary.Create<TKey, AnalyzerSemanticOutcome>(comparer ?? throw new System.ArgumentNullException(nameof(comparer)));
 
     public AnalyzerSession Create(
         Compilation compilation,
@@ -53,12 +52,11 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        Outcomes.AddOrUpdate(
+        ImmutableInterlocked.AddOrUpdate(
+            ref Outcomes,
             key,
-            static (_, incoming) => incoming,
-            static (_, current, incoming) =>
-                AnalyzerSemanticOutcomes.Combine(current, incoming),
-            outcome);
+            outcome,
+            (_, current) => AnalyzerSemanticOutcomes.Combine(current, outcome));
     }
 }
 

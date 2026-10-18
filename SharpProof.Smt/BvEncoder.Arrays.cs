@@ -2,8 +2,10 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder
 {
-    private readonly Dictionary<IrTypeId, FuncDecl> _elements = [];
-    private readonly HashSet<IrSequenceAccessTerm> _arrayAccesses = [];
+    private ImmutableDictionary<IrTypeId, FuncDecl> _elements = ImmutableDictionary<IrTypeId, FuncDecl>.Empty;
+    private ImmutableList<FuncDecl> _elementOrder = ImmutableList<FuncDecl>.Empty;
+    private ImmutableHashSet<IrSequenceAccessTerm> _arrayAccesses = ImmutableHashSet<IrSequenceAccessTerm>.Empty;
+    private ImmutableList<IrSequenceAccessTerm> _arrayAccessOrder = ImmutableList<IrSequenceAccessTerm>.Empty;
 
     private Expr EncodeArrayAccess(IrSequenceAccessTerm access, SmtQueryResourceMeter meter)
     {
@@ -20,22 +22,27 @@ internal sealed partial class BvEncoder
             using var indexSort = context.MkBitVecSort(32);
             using Sort valueSort = info.Kind == IrTypeKind.Boolean ? context.MkBoolSort() : context.MkBitVecSort((uint)info.Width);
             element = context.MkFuncDecl("element" + _elements.Count.ToString(CultureInfo.InvariantCulture), [ReferenceSort, indexSort], valueSort);
-            _elements.Add(storageType, element);
+            _elements = _elements.AddUnique(storageType, element);
+            _elementOrder = _elementOrder.Add(element);
         }
         var length = (BitVecExpr)EncodeLength(array, meter);
         var valid = owner.Own(context.MkAnd(owner.Own(context.MkNot(owner.Own(context.MkEq(array, NullReference)))),
             owner.Own(context.MkBVSGE(index, owner.Own(context.MkBV(0, 32)))), owner.Own(context.MkBVSLT(index, length))));
         Expr empty = info.Kind == IrTypeKind.Boolean ? owner.Own(context.MkFalse()) : owner.Own(context.MkBV(0, (uint)info.Width));
-        _arrayAccesses.Add(access);
+        if (!_arrayAccesses.Contains(access))
+        {
+            _arrayAccesses = _arrayAccesses.Add(access);
+            _arrayAccessOrder = _arrayAccessOrder.Add(access);
+        }
         return owner.Own(context.MkITE(valid, owner.Own(context.MkApp(element, array, index)), empty));
     }
 
-    private Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
+    private ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        var observations = new Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>>();
-        foreach (var access in _arrayAccesses)
+        var observations = ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>>.Empty;
+        foreach (var access in _arrayAccessOrder)
         {
             meter.Consume();
             using var array = model.Evaluate(Encode(access.Sequence, meter), true);
@@ -48,8 +55,8 @@ internal sealed partial class BvEncoder
             var decoded = CreateValue(factory, access.Type, value) ?? throw new UnsupportedIrEncodingException();
             var key = (ArrayStorageType(access.Type), array.ToString());
             if (!observations.TryGetValue(key, out var elements))
-            { observations.Add(key, elements = []); }
-            elements[(int)number.UInt64] = decoded;
+            { elements = ImmutableDictionary<int, IrValue>.Empty; }
+            observations = observations.SetItem(key, elements.SetItem((int)number.UInt64, decoded));
         }
         return observations;
     }
@@ -63,16 +70,16 @@ internal sealed partial class BvEncoder
     }
 
     private IrValue DecodeArrayWitness(IrTypeId type, int count, string token,
-        Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> observations)
+        ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> observations)
     {
         observations = RepositoryParameterGuard.NotNull(observations, nameof(observations));
         token = RepositoryParameterGuard.NotNull(token, nameof(token));
         var elementType = factory.GetTypeInfo(type).ElementType
             ?? throw new UnsupportedIrEncodingException();
-        var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToArray();
+        var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToImmutableArray();
         if (observations.TryGetValue((ArrayStorageType(elementType), token), out var observed))
         {
-            SmtNativeUtilities.ApplyArrayObservations(factory, elementType, elements, observed);
+            elements = SmtNativeUtilities.WithArrayObservations(factory, elementType, elements, observed);
         }
         return factory.CreateSequenceValue(type, elements);
     }

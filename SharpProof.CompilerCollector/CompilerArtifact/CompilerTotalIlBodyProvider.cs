@@ -8,12 +8,12 @@ using System.Reflection.PortableExecutable;
 #pragma warning disable RS1035
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, CompilerReferenceSnapshot[]? references)
+internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot>? references)
 {
     private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
-    private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
-    private CompilerReferenceSnapshot[]? _capturedReferences = references;
+    private ImmutableDictionary<string, ImmutableArray<byte>> _images = ImmutableDictionary.Create<string, ImmutableArray<byte>>(StringComparer.Ordinal);
+    private ImmutableDictionary<string, TotalIlBody?> _bodies = ImmutableDictionary.Create<string, TotalIlBody?>(StringComparer.Ordinal);
+    private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references?.ToImmutableArray() ?? default;
 
     internal TotalIlBody? Resolve(IMethodSymbol method, CancellationToken cancellationToken)
     {
@@ -29,7 +29,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or
             BadImageFormatException or InvalidOperationException or OverflowException)
         { result = null; }
-        _bodies.Add(key, result);
+        _bodies = _bodies.Add(key, result);
         return result;
     }
 
@@ -82,8 +82,11 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         if (!_resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name, cancellationToken,
                 out var reference, out var backing, out var path) || _resolution.Resolve(reference) is not IAssemblySymbol assembly)
         { return null; }
-        _capturedReferences ??= CompilerCompilationCapture.CaptureReferences(compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
+        if (_capturedReferences.IsDefault)
+        {
+            _capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken).ToImmutableArray();
+        }
         var authority = _capturedReferences.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).FirstOrDefault(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path)));
         if (authority == null || authority.SizeBytes <= 0 || authority.SizeBytes > CompilerReferenceLimits.MaximumModuleBytes)
@@ -93,15 +96,15 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (stream.Length != authority.SizeBytes)
             { return null; }
-            bytes = new byte[(int)stream.Length];
-            FillExactly(stream, bytes, cancellationToken);
-            using var buffer = new MemoryStream(bytes, writable: false);
+            var input = new byte[(int)stream.Length];
+            FillExactly(stream, input, cancellationToken);
+            using var buffer = new MemoryStream(input, writable: false);
             if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
             { return null; }
-            _images.Add(path, bytes);
+            bytes = input.ToImmutableArray();
+            _images = _images.Add(path, bytes);
         }
-        using var immutableImage = new MemoryStream(bytes, writable: false);
-        using var pe = new PEReader(immutableImage);
+        using var pe = new PEReader(bytes);
         if (!pe.HasMetadata || pe.PEHeaders.CorHeader is not { } corHeader ||
             (corHeader.Flags & CorFlags.ILOnly) == 0 ||
             (corHeader.Flags & (CorFlags.Requires32Bit | CorFlags.NativeEntryPoint)) != 0 ||

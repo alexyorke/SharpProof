@@ -5,7 +5,7 @@ namespace SharpProof.Smt;
 // finalizer would make a long-lived backend's native footprint nondeterministic.
 internal sealed class Z3ExpressionOwner : IDisposable
 {
-    private readonly List<Expr> _expressions = [];
+    private ImmutableList<Expr> _expressions = ImmutableList<Expr>.Empty;
     private bool _disposed;
 
     internal int OwnedCount => _expressions.Count;
@@ -20,7 +20,7 @@ internal sealed class Z3ExpressionOwner : IDisposable
             throw new ObjectDisposedException(nameof(Z3ExpressionOwner));
         }
 
-        _expressions.Add(expression);
+        _expressions = _expressions.Add(expression);
         return expression;
     }
 
@@ -41,7 +41,7 @@ internal sealed class Z3ExpressionOwner : IDisposable
         }
         finally
         {
-            _expressions.Clear();
+            _expressions = _expressions.Clear();
         }
     }
 }

@@ -389,7 +389,7 @@ public sealed class CallableSolverSessionTests
             TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var solver = (Solver)typeof(CallableSolverSession).GetField("_solver", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
         var owner = (Z3ExpressionOwner)typeof(CallableSolverSession).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
-        var expressions = ((List<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToArray();
+        var expressions = ((IEnumerable<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToArray();
         Assert.That(expressions, Is.Not.Empty);
         Assert.That(NativeObject(solver), Is.Not.EqualTo(IntPtr.Zero));
         Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) != IntPtr.Zero)), Is.True);

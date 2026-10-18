@@ -31,6 +31,7 @@ public sealed class ActualNativePolicyBackendAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var target = project.Snapshot.Callables.Single();
         var budgets = project.Request.Budgets;
         Assert.That(budgets.QueryRlimit, Is.EqualTo(3_000_000));

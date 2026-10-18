@@ -17,7 +17,7 @@ internal static class ContractInvocationMaterialization
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         expressionBinder = ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
+        var clauses = ImmutableList<BoundContractClause>.Empty;
         foreach (var candidate in candidates)
         {
             if (requiresOnly && candidate.Kind != BoundContractKind.Requires)
@@ -38,7 +38,7 @@ internal static class ContractInvocationMaterialization
             {
                 return new([], ContractBindingFailure.NonBooleanCondition);
             }
-            clauses.Add(new BoundContractClause(
+            clauses = clauses.Add(new BoundContractClause(
                 candidate.Kind, expression.Term,
                 factory.CreateOperation("contract@" + invocation.Syntax.SpanStart.ToString(
                     System.Globalization.CultureInfo.InvariantCulture)),
@@ -46,7 +46,7 @@ internal static class ContractInvocationMaterialization
                 FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
                 invocation.Syntax.GetReference()));
         }
-        return new(clauses.ToImmutable(), ContractBindingFailure.None);
+        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
     }
 
     internal static string FormatDiagnosticSourceText(SyntaxNode syntax)

@@ -139,10 +139,8 @@ internal sealed class ContractCanonicalization(
                 {
                     return null;
                 }
-                var parameterTypes = ImmutableArray.CreateBuilder<ITypeSymbol>(
-                    signature.Parameters.Length);
-                var parameterRefKinds = ImmutableArray.CreateBuilder<RefKind>(
-                    signature.Parameters.Length);
+                var parameterTypes = ImmutableList<ITypeSymbol>.Empty;
+                var parameterRefKinds = ImmutableList<RefKind>.Empty;
                 foreach (var functionParameter in signature.Parameters)
                 {
                     var parameterType = Specialize(functionParameter.Type);
@@ -150,14 +148,14 @@ internal sealed class ContractCanonicalization(
                     {
                         return null;
                     }
-                    parameterTypes.Add(parameterType);
-                    parameterRefKinds.Add(functionParameter.RefKind);
+                    parameterTypes = parameterTypes.Add(parameterType);
+                    parameterRefKinds = parameterRefKinds.Add(functionParameter.RefKind);
                 }
                 return _compilation.CreateFunctionPointerTypeSymbol(
                     returnType,
                     signature.RefKind,
-                    parameterTypes.ToImmutable(),
-                    parameterRefKinds.ToImmutable(),
+                    parameterTypes.ToImmutableArray(),
+                    parameterRefKinds.ToImmutableArray(),
                     signature.CallingConvention,
                     signature.UnmanagedCallingConventionTypes);
             }
@@ -168,9 +166,7 @@ internal sealed class ContractCanonicalization(
                 return type;
             }
 
-            var arguments =
-                ImmutableArray.CreateBuilder<ITypeSymbol>(
-                    named.TypeArguments.Length);
+            var arguments = ImmutableList<ITypeSymbol>.Empty;
             foreach (var argument in named.TypeArguments)
             {
                 var specialized = Specialize(argument);
@@ -179,7 +175,7 @@ internal sealed class ContractCanonicalization(
                     return null;
                 }
 
-                arguments.Add(specialized);
+                arguments = arguments.Add(specialized);
             }
             var containing =
                 Specialize(named.ContainingType) as INamedTypeSymbol;

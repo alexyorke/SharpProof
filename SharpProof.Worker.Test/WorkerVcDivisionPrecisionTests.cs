@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.Json;
 using NUnit.Framework;
@@ -122,12 +123,12 @@ public sealed class WorkerVcDivisionPrecisionTests
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(WorkerClaimReason.None));
     }
 
-    private static WorkerClaimResult[] Postconditions(WorkerVerifyResponse response)
+    private static ImmutableArray<WorkerClaimResult> Postconditions(WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
         var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
     }
 
     private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds)

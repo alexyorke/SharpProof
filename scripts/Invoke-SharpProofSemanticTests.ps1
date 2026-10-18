@@ -214,41 +214,44 @@ $coverageEnabled -or $ArchitectureOnly -or (
 $semanticProjectShardingEnabled =
 $architectureShardingEnabled -and -not $ArchitectureOnly
 $workerClassPrefix = 'SharpProof.Worker.Test.'
-$workerDedicatedClasses = @(
-    'ClaimManifestBuilderTests',
-    'CompilerManifestArtifactTests')
+New-Variable -Name workerDedicatedClasses -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'ClaimManifestBuilderTests',
+            'CompilerManifestArtifactTests')))
 $claimFilter =
 'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[0]
 $manifestFilter =
 'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[1]
-$workerCoreClasses = @(
-    'WorkerTests',
-    'WorkerProgramTests',
-    'CompilerCallableLowererTests'
-)
+New-Variable -Name workerCoreClasses -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'WorkerTests',
+            'WorkerProgramTests',
+            'CompilerCallableLowererTests'
+        )))
 $workerCoreFilter = @($workerCoreClasses | ForEach-Object {
         'FullyQualifiedName~' + $workerClassPrefix + $_
     }) -join '|'
 $workerRemainderFilter = @(
-    $workerDedicatedClasses + $workerCoreClasses |
+    @($workerDedicatedClasses) + @($workerCoreClasses) |
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
 # The measured heavy classes account for about half of the remainder's test
 # time. Complementary filters keep every current and future test in one shard.
-$workerRemainderHeavyClasses = @(
-    'WorkerVcShadowSourceGateTests',
-    'NativeWorkerRoutingTests',
-    'TypedMetadataConversionTests',
-    'GoldenWorkerTests',
-    'CompilerTotalCallableArtifactTests',
-    'NativeAllocationEffectTests',
-    'NativePurityEffectTests',
-    'TypedMetadataCallTests',
-    'CompilerReachableSourceTests',
-    'NativeAliasingBoundaryTests',
-    'ScalarPatternFlowTests',
-    'BitwiseOperatorSemanticsTests')
+New-Variable -Name workerRemainderHeavyClasses -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'WorkerVcShadowSourceGateTests',
+            'NativeWorkerRoutingTests',
+            'TypedMetadataConversionTests',
+            'GoldenWorkerTests',
+            'CompilerTotalCallableArtifactTests',
+            'NativeAllocationEffectTests',
+            'NativePurityEffectTests',
+            'TypedMetadataCallTests',
+            'CompilerReachableSourceTests',
+            'NativeAliasingBoundaryTests',
+            'ScalarPatternFlowTests',
+            'BitwiseOperatorSemanticsTests')))
 $workerRemainderHeavyFilter = @(
     $workerRemainderHeavyClasses |
         ForEach-Object {

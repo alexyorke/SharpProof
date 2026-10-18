@@ -6,10 +6,14 @@ namespace SharpProof.Testing;
 
 internal static class ApiTestEvidence
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateJsonOptions()
     {
-        WriteIndented = true
-    };
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
     internal sealed record Row(string Api, string Facet, string Test, string EdgeInputs, string Status, string Detail)
     {
         public string Api { get; init; } = Api ?? throw new global::System.ArgumentNullException(nameof(Api));

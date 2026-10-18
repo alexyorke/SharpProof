@@ -27,6 +27,7 @@ public sealed class GoldenVcRegressionTests
             AssertDiamondJoinArtifact(artifact);
         }
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         if (depthLimited || entryDepthLimited)
         {
             project.Request.Budgets.MaximumExpressionDepth = maximumDepth;

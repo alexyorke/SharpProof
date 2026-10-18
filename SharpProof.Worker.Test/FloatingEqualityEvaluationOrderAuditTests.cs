@@ -117,6 +117,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         Assert.That(captured.Total, Is.Not.Null, "Expected retained compiler-captured Total for the floating-parameter method.");
         Assert.That(captured.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);

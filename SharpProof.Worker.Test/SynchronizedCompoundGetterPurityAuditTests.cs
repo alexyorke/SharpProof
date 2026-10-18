@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -325,6 +326,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
@@ -405,10 +407,10 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
         }
     }
 
-    private static DecodedInstruction[] ReadTargetIl(byte[] il)
+    private static ImmutableArray<DecodedInstruction> ReadTargetIl(byte[] il)
     {
         System.ArgumentNullException.ThrowIfNull(il, nameof(il));
-        var result = new List<DecodedInstruction>();
+        var result = ImmutableList<DecodedInstruction>.Empty;
         var offset = 0;
         while (offset < il.Length)
         {
@@ -432,9 +434,9 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             {
                 throw new InvalidOperationException("Unexpected Target opcode: " + opcode.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
             }
-            result.Add(new(start, opcode, token));
+            result = result.Add(new(start, opcode, token));
         }
-        return result.ToArray();
+        return result.ToImmutableArray();
     }
 
     private sealed record DecodedInstruction(int Offset, int Opcode, int? Token);

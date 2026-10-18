@@ -11,30 +11,47 @@ internal static class IrSequenceReads
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
         var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
-        var writes = new Dictionary<IrVarId, List<IrInstruction>>();
+        var writes = ImmutableDictionary<IrVarId, ImmutableList<IrInstruction>>.Empty;
         foreach (var instruction in instructions)
         {
             foreach (var variable in IrInstructionFacts.WrittenVariables(instruction))
             {
                 if (!writes.TryGetValue(variable, out var writers))
-                { writes.Add(variable, writers = []); }
-                writers.Add(instruction);
+                { writers = ImmutableList<IrInstruction>.Empty; }
+                writes = writes.SetItem(variable, writers.Add(instruction));
             }
         }
         // A fresh variable only ever holds a sequence this body allocated or
         // a literal.
-        var fresh = new HashSet<IrVarId>(writes.Where(pair => pair.Value.All(writer =>
-            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key));
-        while (fresh.RemoveWhere(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (writes[variable].Any(writer =>
-            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh))))) != 0)
-        { }
+        var fresh = writes.Where(pair => pair.Value.All(writer =>
+            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key).ToImmutableHashSet();
+        while (true)
+        {
+            var previous = fresh;
+            foreach (var variable in previous)
+            {
+                if (variable.IsDefault)
+                { RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable)); }
+                if (writes[variable].Any(writer =>
+                    writer is null ? throw new ArgumentNullException(nameof(writer)) :
+                    writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh)))
+                {
+                    fresh = fresh.Remove(variable);
+                }
+            }
+            if (fresh.Count == previous.Count)
+            { break; }
+        }
         var readers = ImmutableHashSet<IrInstructionId>.Empty;
         foreach (var instruction in instructions)
         {
-            var pending = new Stack<IrTerm>(IrInstructionFacts.ReadTerms(instruction));
-            while (pending.Count != 0)
+            var pending = ImmutableStack<IrTerm>.Empty;
+            foreach (var root in IrInstructionFacts.ReadTerms(instruction))
+            { pending = pending.Push(root); }
+            while (!pending.IsEmpty)
             {
-                var term = pending.Pop();
+                var term = pending.Peek();
+                pending = pending.Pop();
                 if (term is IrSequenceAccessTerm { Sequence: var accessed } && !IsLocal(accessed, fresh) ||
                     term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh) ||
                     IrFieldSites.IsFieldRead(program.Factory, term) && !IsLocal(((IrOpaqueTerm)term).Receiver!, fresh))
@@ -42,13 +59,13 @@ internal static class IrSequenceReads
                     readers = readers.Add(instruction.Id);
                     break;
                 }
-                IrTraversal.PushChildren(term, pending);
+                pending = IrTraversal.PushChildren(term, pending);
             }
         }
         return readers;
     }
 
-    private static bool IsLocal(IrTerm sequence, HashSet<IrVarId> fresh)
+    private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId> fresh)
     {
         fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
         sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));

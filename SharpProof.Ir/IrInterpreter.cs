@@ -241,7 +241,7 @@ public sealed class IrInterpreter(IrFactory factory)
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var result = term.Accept(EvaluationVisitor.Instance, (this, state));
-        state.Results.Add(term.Id, result);
+        state.Results = state.Results.Add(term.Id, result);
         return result;
     }
 
@@ -893,13 +893,15 @@ public sealed class IrInterpreter(IrFactory factory)
         failure = null;
         if (heap == null || state.Snapshots is not { Count: > 0 } snapshots)
         { return true; }
-        if (!IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
-            () => --state.SnapshotWork >= 0, state.SnapshotSelectors, out var selector, state.CancellationToken))
+        var selection = IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
+            () => --state.SnapshotWork >= 0, state.SnapshotSelectors, state.CancellationToken);
+        state.SnapshotSelectors = selection.Memo;
+        if (!selection.Success)
         {
             failure = Unsupported(IrUnsupportedReason.UnsupportedOperation, "Snapshot receiver selection is unsupported or exceeds its work limit.");
             return false;
         }
-        var selected = EvaluateCore(selector, state);
+        var selected = EvaluateCore(selection.Selector!, state);
         if (selected.Status != IrEvaluationStatus.Value)
         { failure = selected; return false; }
         if (selected.Value!.Boolean)
@@ -916,11 +918,11 @@ public sealed class IrInterpreter(IrFactory factory)
         internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
-        internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
+        internal ImmutableDictionary<IrId, IrEvaluationResult> Results { get; set; } = ImmutableDictionary<IrId, IrEvaluationResult>.Empty;
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; set; }
         internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots?.ToImmutableHashSet();
-        internal Dictionary<IrId, IrTerm> SnapshotSelectors { get; } = [];
+        internal ImmutableDictionary<IrId, IrTerm> SnapshotSelectors { get; set; } = ImmutableDictionary<IrId, IrTerm>.Empty;
         internal int SnapshotWork = 4096;
     }
 }

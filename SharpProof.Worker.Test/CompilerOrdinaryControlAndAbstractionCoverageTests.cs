@@ -53,6 +53,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         Assert.That(callable.Total, Is.Not.Null);
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

@@ -7,8 +7,8 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerCallableLowerer
 {
     private readonly CSharpCompilation _compilation;
-    private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
-    private readonly CompilerReferenceSnapshot[]? _capturedReferences;
+    private readonly ImmutableArray<CompilerSyntaxTreeSnapshot>? _capturedTrees;
+    private readonly ImmutableArray<CompilerReferenceSnapshot>? _capturedReferences;
     private readonly ContractBinder _contracts;
     private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
 
@@ -29,13 +29,13 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         IrFactory factory,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CompilerSyntaxTreeSnapshot[]? capturedTrees = null,
-        CompilerReferenceSnapshot[]? capturedReferences = null)
+        IReadOnlyList<CompilerSyntaxTreeSnapshot>? capturedTrees = null,
+        IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
-        _capturedTrees = capturedTrees;
-        _capturedReferences = capturedReferences;
+        _capturedTrees = capturedTrees?.ToImmutableArray();
+        _capturedReferences = capturedReferences?.ToImmutableArray();
         _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
     }
@@ -43,9 +43,9 @@ internal sealed class CompilerCallableLowerer
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-        var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken);
+        var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken).ToImmutableArray();
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
-            _capturedReferences, _specificationPackAuthority, cancellationToken);
+            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken);
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -45,16 +46,21 @@ public sealed class IrInstructionProjectionTests
         var old = factory.CreateVariable("old", type);
         var sequence = factory.Variable(old);
         var owner = factory.Cast(factory.ObjectType, factory.SequenceAccess(sequence, factory.Integer(0)));
-        var memo = new Dictionary<IrId, IrTerm>();
-        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old),
-            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out var selector, default), Is.True);
-        Assert.That(selector, Is.SameAs(factory.Boolean(true)));
+        var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
+        var selection = IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old),
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, default);
+        memo = selection.Memo;
+        Assert.That(selection.Success, Is.True);
+        Assert.That(selection.Selector, Is.SameAs(factory.Boolean(true)));
         var unsupported = factory.PureOpaque(factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "UnknownOwner", factory.ObjectType, true), null);
-        Assert.That(IrSnapshotReads.TrySelector(factory, unsupported, _ => false,
-            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out _, default), Is.False);
-        Assert.That(IrSnapshotReads.TrySelector(factory, factory.Null(factory.ObjectType), _ => true,
-            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, out selector, default), Is.True);
-        Assert.That(selector, Is.SameAs(factory.Boolean(false)));
+        selection = IrSnapshotReads.TrySelector(factory, unsupported, _ => false,
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, default);
+        memo = selection.Memo;
+        Assert.That(selection.Success, Is.False);
+        selection = IrSnapshotReads.TrySelector(factory, factory.Null(factory.ObjectType), _ => true,
+            guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => true, memo, default);
+        Assert.That(selection.Success, Is.True);
+        Assert.That(selection.Selector, Is.SameAs(factory.Boolean(false)));
     }
 }

@@ -1789,7 +1789,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> values,
         ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
         bool allowCompilationErrors = false)
     {
@@ -1955,8 +1955,8 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class TreeOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues,
-        IReadOnlyDictionary<string, string> treeValues)
+        Dictionary<string, string> globalValues,
+        Dictionary<string, string> treeValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
@@ -1980,7 +1980,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private sealed class ThrowingTreeOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
+        Dictionary<string, string> globalValues)
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =

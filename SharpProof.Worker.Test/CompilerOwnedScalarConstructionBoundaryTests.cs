@@ -94,6 +94,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
             Assert.That(total, Is.Null);
         }
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);

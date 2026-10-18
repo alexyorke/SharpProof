@@ -41,7 +41,7 @@ public sealed class MetadataClauseOriginTests
         {
             detached.CallPreconditions[0].MetadataClause = origin with { Minimum = -100 };
             detached.CallPreconditions = [];
-            references[0].Modules = [];
+            references[0] = references[0] with { Modules = [] };
             Assert.That(row.MetadataClause!.Minimum, Is.EqualTo(1));
             Assert.That(row.MetadataClause.ValueBlob, Is.EqualTo(origin.ValueBlob));
         }
@@ -114,8 +114,9 @@ public sealed class MetadataClauseOriginTests
                 references = [];
                 break;
             case "wrong-owner":
-                foreach (var reference in references)
-                { foreach (var module in reference.Modules) { module.Sha256 = new string('0', 64); } }
+                references = [.. references.Select(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
+                    reference with { Modules = [.. reference.Modules.Select(module => module is null ? throw new ArgumentNullException(nameof(module)) :
+                        module with { Sha256 = new string('0', 64) })] })];
                 break;
             case "remove-row":
                 dto.CallPreconditions = [];

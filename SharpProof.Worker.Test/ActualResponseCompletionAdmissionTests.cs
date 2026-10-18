@@ -163,6 +163,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         Assert.That(project.Request.Budgets.QueryRlimit, Is.EqualTo(3_000_000));
         Assert.That(project.Request.Budgets.MethodRlimit, Is.EqualTo(20_000_000));
         Assert.That(project.Request.Budgets.MaximumExpressionDepth, Is.EqualTo(64));

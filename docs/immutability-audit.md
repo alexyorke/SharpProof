@@ -632,75 +632,75 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-095 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:352` | `SourceCalls`: `CompilerSourceCallArtifact[]` | Open; coordinated migration |
 | MODEL-096 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:357` | `InstructionIndex`: `int` | Open; coordinated migration |
 | MODEL-097 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:358` | `CalleeBodyId`: `string` | Open; coordinated migration |
-| MODEL-098 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:20` | `ProjectDirectory`: `string` | Open; coordinated migration |
-| MODEL-099 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:22` | `AssemblyName`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-100 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:24` | `AssemblyIdentity`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-101 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:26` | `TargetFramework`: `string` | Open; coordinated migration |
-| MODEL-102 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:28` | `CompilerVersion`: `string` | Open; coordinated migration |
-| MODEL-103 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:30` | `CompilerMvid`: `string` | Open; coordinated migration |
-| MODEL-104 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:32` | `CSharpCompilerVersion`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-105 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:34` | `CSharpCompilerMvid`: `string` | Open; coordinated migration |
-| MODEL-106 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:36` | `SpecificationPackIds`: `string[]` | Open; coordinated migration |
-| MODEL-107 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:38` | `SpecificationPackCatalogVersion`: `int` | Open; coordinated migration |
-| MODEL-108 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:40` | `SpecificationPackCatalogSha256`: `string` | Open; coordinated migration |
-| MODEL-109 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:42` | `Options`: `CompilerCompilationOptionsSnapshot` | Open; coordinated migration |
-| MODEL-110 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:44` | `SyntaxTrees`: `CompilerSyntaxTreeSnapshot[]` | Open; coordinated migration |
-| MODEL-111 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:46` | `References`: `CompilerReferenceSnapshot[]` | Init-only; retained mutable members remain under review |
-| MODEL-112 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:48` | `AdditionalFiles`: `CompilerAdditionalFileSnapshot[]` | Open; coordinated migration |
-| MODEL-113 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:63` | `OutputKind`: `CompilerOutputKind` | Init-only; retained mutable members remain under review |
-| MODEL-114 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:64` | `MainTypeName`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-115 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:65` | `OptimizationLevel`: `CompilerOptimizationLevel` | Init-only; retained mutable members remain under review |
-| MODEL-116 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:66` | `Platform`: `CompilerPlatform` | Init-only; retained mutable members remain under review |
-| MODEL-117 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:67` | `NullableContext`: `CompilerNullableContext` | Init-only; retained mutable members remain under review |
-| MODEL-118 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:68` | `MetadataImportOptions`: `CompilerMetadataImportOptions` | Init-only; retained mutable members remain under review |
-| MODEL-119 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:69` | `WarningLevel`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-120 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:70` | `GeneralDiagnosticOption`: `CompilerReportDiagnostic` | Init-only; retained mutable members remain under review |
-| MODEL-121 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:71` | `SpecificDiagnosticOptions`: `CompilerDiagnosticOptionSnapshot[]` | Init-only; retained mutable members remain under review |
-| MODEL-122 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:72` | `ReportSuppressedDiagnostics`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-123 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:73` | `CheckOverflow`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-124 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:74` | `AllowUnsafe`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-125 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:75` | `Deterministic`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-126 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:76` | `ReferencesSupersedeLowerVersions`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-127 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:77` | `AssemblyIdentityComparer`: `CompilerAssemblyIdentityComparer` | Init-only; retained mutable members remain under review |
-| MODEL-128 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:78` | `Usings`: `string[]` | Init-only; retained mutable members remain under review |
-| MODEL-129 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:79` | `ResolverPolicy`: `CompilerResolverPolicy` | Init-only; retained mutable members remain under review |
-| MODEL-130 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:84` | `Id`: `string` | Open; coordinated migration |
-| MODEL-131 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:85` | `ReportDiagnostic`: `CompilerReportDiagnostic` | Init-only; retained mutable members remain under review |
-| MODEL-132 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:90` | `SourceStart`: `int` | Open; coordinated migration |
-| MODEL-133 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:91` | `SourceLength`: `int` | Open; coordinated migration |
-| MODEL-134 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:92` | `MappedPath`: `string` | Open; coordinated migration |
-| MODEL-135 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:93` | `MappedLine`: `int` | Open; coordinated migration |
-| MODEL-136 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:94` | `MappedColumn`: `int` | Open; coordinated migration |
-| MODEL-137 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:95` | `CharacterOffset`: `int` | Open; coordinated migration |
-| MODEL-138 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:100` | `Path`: `string` | Open; coordinated migration |
-| MODEL-139 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:101` | `Sha256`: `string` | Open; coordinated migration |
-| MODEL-140 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:102` | `Encoding`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-141 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:103` | `ChecksumAlgorithm`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-142 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:104` | `RoslynChecksum`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-143 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:105` | `LineMapSha256`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-144 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:106` | `TextLength`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-145 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:107` | `LineMap`: `CompilerSourceLineMapEntry[]` | Open; coordinated migration |
-| MODEL-146 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:108` | `LanguageVersion`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-147 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:109` | `DocumentationMode`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-148 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:110` | `Kind`: `string` | Open; coordinated migration |
-| MODEL-149 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:111` | `PreprocessorSymbols`: `string[]` | Init-only; retained mutable members remain under review |
-| MODEL-150 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:112` | `EffectivePreprocessorSymbols`: `string[]` | Init-only; retained mutable members remain under review |
-| MODEL-151 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:113` | `Features`: `CompilerFeatureSnapshot[]` | Open; coordinated migration |
-| MODEL-152 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:118` | `Kind`: `string` | Open; coordinated migration |
-| MODEL-153 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:119` | `EmbedInteropTypes`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-154 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:120` | `HasRecursiveAliases`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-155 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:121` | `Aliases`: `string[]` | Init-only; retained mutable members remain under review |
-| MODEL-156 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:122` | `Identity`: `string` | Open; coordinated migration |
-| MODEL-157 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:123` | `Modules`: `CompilerReferenceModuleSnapshot[]` | Open; coordinated migration |
-| MODEL-158 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:128` | `Name`: `string` | Open; coordinated migration |
-| MODEL-159 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:129` | `Mvid`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-160 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:130` | `Path`: `string` | Open; coordinated migration |
-| MODEL-161 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:131` | `Sha256`: `string` | Open; coordinated migration |
-| MODEL-162 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:132` | `SizeBytes`: `long` | Init-only; retained mutable members remain under review |
-| MODEL-163 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:137` | `Path`: `string` | Open; coordinated migration |
-| MODEL-164 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:138` | `Sha256`: `string` | Open; coordinated migration |
-| MODEL-165 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:143` | `Key`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-166 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:144` | `Value`: `string` | Open; coordinated migration |
+| MODEL-098 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:20` | `ProjectDirectory`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-099 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:22` | `AssemblyName`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-100 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:24` | `AssemblyIdentity`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-101 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:26` | `TargetFramework`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-102 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:28` | `CompilerVersion`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-103 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:30` | `CompilerMvid`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-104 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:32` | `CSharpCompilerVersion`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-105 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:34` | `CSharpCompilerMvid`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-106 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:36` | `SpecificationPackIds`: `string[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-107 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:38` | `SpecificationPackCatalogVersion`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-108 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:40` | `SpecificationPackCatalogSha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-109 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:42` | `Options`: `CompilerCompilationOptionsSnapshot` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-110 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:44` | `SyntaxTrees`: `CompilerSyntaxTreeSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-111 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:46` | `References`: `CompilerReferenceSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-112 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:48` | `AdditionalFiles`: `CompilerAdditionalFileSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-113 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:63` | `OutputKind`: `CompilerOutputKind` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-114 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:64` | `MainTypeName`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-115 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:65` | `OptimizationLevel`: `CompilerOptimizationLevel` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-116 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:66` | `Platform`: `CompilerPlatform` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-117 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:67` | `NullableContext`: `CompilerNullableContext` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-118 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:68` | `MetadataImportOptions`: `CompilerMetadataImportOptions` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-119 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:69` | `WarningLevel`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-120 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:70` | `GeneralDiagnosticOption`: `CompilerReportDiagnostic` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-121 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:71` | `SpecificDiagnosticOptions`: `CompilerDiagnosticOptionSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-122 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:72` | `ReportSuppressedDiagnostics`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-123 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:73` | `CheckOverflow`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-124 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:74` | `AllowUnsafe`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-125 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:75` | `Deterministic`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-126 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:76` | `ReferencesSupersedeLowerVersions`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-127 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:77` | `AssemblyIdentityComparer`: `CompilerAssemblyIdentityComparer` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-128 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:78` | `Usings`: `string[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-129 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:79` | `ResolverPolicy`: `CompilerResolverPolicy` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-130 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:84` | `Id`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-131 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:85` | `ReportDiagnostic`: `CompilerReportDiagnostic` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-132 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:90` | `SourceStart`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-133 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:91` | `SourceLength`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-134 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:92` | `MappedPath`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-135 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:93` | `MappedLine`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-136 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:94` | `MappedColumn`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-137 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:95` | `CharacterOffset`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-138 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:100` | `Path`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-139 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:101` | `Sha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-140 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:102` | `Encoding`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-141 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:103` | `ChecksumAlgorithm`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-142 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:104` | `RoslynChecksum`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-143 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:105` | `LineMapSha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-144 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:106` | `TextLength`: `int` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-145 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:107` | `LineMap`: `CompilerSourceLineMapEntry[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-146 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:108` | `LanguageVersion`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-147 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:109` | `DocumentationMode`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-148 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:110` | `Kind`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-149 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:111` | `PreprocessorSymbols`: `string[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-150 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:112` | `EffectivePreprocessorSymbols`: `string[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-151 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:113` | `Features`: `CompilerFeatureSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-152 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:118` | `Kind`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-153 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:119` | `EmbedInteropTypes`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-154 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:120` | `HasRecursiveAliases`: `bool` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-155 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:121` | `Aliases`: `string[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-156 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:122` | `Identity`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-157 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:123` | `Modules`: `CompilerReferenceModuleSnapshot[]` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-158 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:128` | `Name`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-159 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:129` | `Mvid`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-160 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:130` | `Path`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-161 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:131` | `Sha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-162 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:132` | `SizeBytes`: `long` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-163 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:137` | `Path`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-164 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:138` | `Sha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-165 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:143` | `Key`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
+| MODEL-166 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:144` | `Value`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
 | MODEL-167 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:15` | `Semantics`: `IrExecutionSemantics` | Open; coordinated migration |
 | MODEL-168 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:16` | `HasProgram`: `bool` | Open; coordinated migration |
 | MODEL-169 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:17` | `Types`: `PortableIrType[]` | Open; coordinated migration |
@@ -858,41 +858,41 @@ refactor. Concurrent callback caches retain an explicit concurrency contract.
 
 | Site | Current construction | Status |
 | --- | --- | --- |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:114` | `var reachable = new HashSet<IrBlockId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:115` | `var pending = new Stack<IrBlockId>(roots);` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:132` | `var escaping = new HashSet<IrBlockId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:133` | `var pending = new Stack<IrBlockId>(program.Blocks` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:244` | `var reachable = new HashSet<IrBlockId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:245` | `var pending = new Stack<IrBlockId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:313` | `var owned = _program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().ToDictionary(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id));` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:314` | `var selected = new Dictionary<IrInstructionId, IrAssignInstruction>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:327` | `var ids = _program.Blocks.Select((b, i) => b is null ? throw new System.ArgumentNullException(nameof(b)) : ((b.Id, i))).ToDictionary(p => p.Id, p => p.i);` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:328` | `var blocks = new List<DataflowBlock<CoreIrAdvisoryState>>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:329` | `var edges = new List<DataflowEdge>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:432` | `var pending = new Stack<IrTerm>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:797` | `var seen = new HashSet<IrVarId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:834` | `var seen = new HashSet<IrVarId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:852` | `var seen = new HashSet<IrVarId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryLowering.cs:40` | `var paths = documents.ToDictionary(item => item.Tree, item => item.Path);` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:21` | `var reported = new HashSet<(Location Location, string Message)>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:91` | `var variables = new HashSet<IrVarId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:92` | `var terms = new Stack<IrTerm>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:99` | `var visited = new HashSet<IrId>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:120` | `var candidates = new List<IMethodSymbol>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:136` | `var scopes = new List<ISymbol> { symbol };` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/CompilerArtifact/CompilerExceptionTypeIdentity.cs:16` | `var argumentAssemblies = new List<string>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:137` | `var candidates = new List<(string Key, string Value)>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:72` | `var targetMatches = targets.ToDictionary(` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:76` | `var candidateMatches = candidates.ToDictionary(` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:95` | `var byTarget = targetMatches.ToDictionary(` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:99` | `var byCandidate = candidateMatches.ToDictionary(` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:106` | `var diagnosed = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs:18` | `var diagnostics = new List<Diagnostic>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs:156` | `var overlapping = new HashSet<ResolvedCompanion>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/OverridePreconditionDiagnostics.cs:72` | `var identities = right.Variables.ToDictionary(` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/OverridePreconditionDiagnostics.cs:87` | `var variables = new Dictionary<IrVarId, IrTerm>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/TotalBodyLowering.cs:76` | `var pending = new Stack<IOperation>();` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
-| `SharpProof.Analyzer.Core/TotalBodyLowering.cs:235` | `var pending = new Stack<IrTerm>(terms);` | Open; preserve traversal, equality, duplicate and diagnostic order semantics |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:114` | `var reachable = new HashSet<IrBlockId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:115` | `var pending = new Stack<IrBlockId>(roots);` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:132` | `var escaping = new HashSet<IrBlockId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryEffectSites.cs:133` | `var pending = new Stack<IrBlockId>(program.Blocks` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:244` | `var reachable = new HashSet<IrBlockId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:245` | `var pending = new Stack<IrBlockId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:313` | `var owned = _program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().ToDictionary(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id));` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:314` | `var selected = new Dictionary<IrInstructionId, IrAssignInstruction>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:327` | `var ids = _program.Blocks.Select((b, i) => b is null ? throw new System.ArgumentNullException(nameof(b)) : ((b.Id, i))).ToDictionary(p => p.Id, p => p.i);` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:328` | `var blocks = new List<DataflowBlock<CoreIrAdvisoryState>>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:329` | `var edges = new List<DataflowEdge>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:432` | `var pending = new Stack<IrTerm>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:797` | `var seen = new HashSet<IrVarId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:834` | `var seen = new HashSet<IrVarId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs:852` | `var seen = new HashSet<IrVarId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryLowering.cs:40` | `var paths = documents.ToDictionary(item => item.Tree, item => item.Path);` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:21` | `var reported = new HashSet<(Location Location, string Message)>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:91` | `var variables = new HashSet<IrVarId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:92` | `var terms = new Stack<IrTerm>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:99` | `var visited = new HashSet<IrId>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Advisory/AdvisoryRequiresDiagnostics.cs:120` | `var candidates = new List<IMethodSymbol>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:136` | `var scopes = new List<ISymbol> { symbol };` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/CompilerArtifact/CompilerExceptionTypeIdentity.cs:16` | `var argumentAssemblies = new List<string>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:137` | `var candidates = new List<(string Key, string Value)>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:72` | `var targetMatches = targets.ToDictionary(` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:76` | `var candidateMatches = candidates.ToDictionary(` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:95` | `var byTarget = targetMatches.ToDictionary(` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:99` | `var byCandidate = candidateMatches.ToDictionary(` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:106` | `var diagnosed = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs:18` | `var diagnostics = new List<Diagnostic>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs:156` | `var overlapping = new HashSet<ResolvedCompanion>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/OverridePreconditionDiagnostics.cs:72` | `var identities = right.Variables.ToDictionary(` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/OverridePreconditionDiagnostics.cs:87` | `var variables = new Dictionary<IrVarId, IrTerm>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/TotalBodyLowering.cs:76` | `var pending = new Stack<IOperation>();` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
+| `SharpProof.Analyzer.Core/TotalBodyLowering.cs:235` | `var pending = new Stack<IrTerm>(terms);` | Implemented; immutable persistent collections and ordered callback sink; analyzer 1,085 passed |
 
 ### Coordinator review limits
 
@@ -940,12 +940,12 @@ refactor. Concurrent callback caches retain an explicit concurrency contract.
   tokens unchanged across 226 changed C# files**. Subsequent edits changed only
   method-body style and the nonliteral replacement-validation implementation.
   Golden, sample, template and vendored sources have no changes.
-- Of the 312 inventoried model properties, 61 are now init-only, six budget
+- Of the 312 inventoried model properties, 93 are now init-only, six budget
   properties retain the explicit mutable-budget snapshot test contract, and
-  245 remain open for coordinated review/migration. Init-only collection
+  213 remain open for coordinated review/migration. Init-only collection
   properties still require deep immutability review; the inventory does not
   silently count retained arrays as immutable.
-- The strict analyzer local-state appendix retains 35 open construction sites.
+- The 35 sites in the strict analyzer local-state appendix are implemented; targeted analyzer tests passed (1,085).
   Other local worklists/builders are not blanket-exempt and remain part of the
   comprehensive follow-up review.
 - Per-project results and bounded run logs are exported under artifacts in this
@@ -958,3 +958,134 @@ all confirmed replaceable mutability is fixed, explicit mutable test subjects an
 external mutation contracts are evidenced, and the final source state passes the
 required gates. Unchecked candidates and coordinated model migration work remain
 visible; this document does not mark them absent or complete.
+
+### Strict follow-up inventory at f6e5ee08a
+
+The coordinator is recording the second read-only pass separately from verified
+implementation. Findings are hypotheses until traced in source and tested.
+No local collection, memo, builder, runtime buffer, or cache is exempt solely
+because it implements an algorithm. Native/framework mutation and mutation that
+is itself under test require an explicit boundary justification.
+
+| ID | Partition and exact targets | State |
+| --- | --- | --- |
+| FOLLOW-001 | DataflowGraph edge set, adjacency staging, Tarjan discovery/low-link/on-stack/result vectors and DFS stacks; ForwardDataflowAnalysis inputs/outputs/updateCounts, sorted pending/affected sets, ordered changedOutputs and reachability stack | Implemented with persistent immutable lists/sets/stacks; 118 tests passed |
+| FOLLOW-002 | IrFactory external identity candidate array under gate | Implemented immutable array snapshot; pending IR gate |
+| FOLLOW-003 | IrSequenceReads writer map/list, fresh set and term worklist | Implemented persistent map/list/set/stack; pending IR gate |
+| FOLLOW-004 | IrBlockOrder indexed states/result and stack; IrTraversal Any/CollectVariables/Traverse/FoldBottomUp; IrSnapshotReads worklist/memo; IrPrinter, IrSemanticTerms and IrSubstitution memo maps and opaque argument rewrite array | Open coordinated IR migration |
+| FOLLOW-005 | IrInterpreter EvaluationState retained Variables, Results and SnapshotSelectors; IrProgramInterpreter occurrence/replay/current maps and builders; IrProgramBuilder construction lists; IrFactory interning registries | Open per-use review; locks, identity, ordering and deliberate heap APIs must be preserved |
+| FOLLOW-006 | BvEncoder.cs, BvEncoder.Arrays/Fields/References/Strings: 19 collection fields and local depth/decoder/observation accumulators, text construction, array witness updates | Implemented persistent collections with separate declaration/witness encounter order; SMT 356 passed |
+| FOLLOW-007 | CallableSolverSession query caches/selectors/core indices; HornInvariantSearch maps/lists/recursive accumulators and retained Expr[]; Z3ExpressionOwner reverse disposal list | Implemented persistent maps/lists and ordered quantifier traversal; SMT 356 passed; native solver/assert/disposal and resource counters remain lifecycle boundaries |
+| FOLLOW-008 | SmtNativeUtilities retained/mutated managed arrays | Managed reconstruction arrays converted; explicitly in-place ApplyArrayObservations retained for partial-write tests; SMT 356 passed |
+| FOLLOW-009 | ContractExpressionBinder bound/receiver/pre-state sets, receiver order and substitution map | Implemented persistent sets/maps and separate receiver order; Contracts 640 passed |
+| FOLLOW-010 | ContractClauseInventoryBuilder found/directClauseCache/ordinals/counters/body and clause builders | Implemented persistent discovery/cache/ordinal collections; Contracts 640 passed |
+| FOLLOW-011 | ContractForSymbolMatcher buckets/byType/incoming/FIFO/accepted/symbol sets/type-layer stack/unmatched constraints and matched flags | Implemented persistent maps/queue/set/list with separate first-seen type order; Contracts 640 passed |
+| FOLLOW-012 | ContractVariableTransfer, TotalContractInvocationMaterialization local maps/sets; ClosedContractAttributeBinding, ContractClauseSubstitution, ContractInvocationMaterialization, ContractIntrinsicValidator, ContractCanonicalization, ContractBinder and TotalContractExpressionBinder accumulators | Implemented immutable accumulators and owned callback sinks; strict AddUnique and SetItem remain distinct; Contracts 640 passed |
+| FOLLOW-013 | WorkerMsBuildIntegrationTests CompilerManifestArtifact byte/string arrays | Implemented immutable arrays with hash boundary adapters; pending package gate |
+| FOLLOW-014 | TypedWidthLongFuzzTests GeneratedCase nested Inputs and ShiftTypes Counts/Values; ScalarDifferentialMatrixTests six object[] properties; TypedFeatureLongFuzzTests Inputs/RunClr | Open; reflection adapters must preserve argument shape/nulls/order |
+| FOLLOW-015 | SynchronizedCompoundGetterPurityAuditTests ReadTargetIl; WorkerTests CacheFiles/CreateRuntimeContractCases; WorkerVcShadowSourceGateTests QualificationCases/QualificationBaseline/AssertNativeResults; WorkerVcDivisionPrecisionTests, WorkerVcLoopTests, WorkerVcSourceCallTests postconditions; SemanticClaimRelativeSyntaxPathObservationTests IndependentPath; TotalProgramSourceReplayTests observation arrays | Open |
+| FOLLOW-016 | WellSortedIrGenerator CollectVariables; SequenceCardinalityDomainTests IReadOnlyList fixed fixture | Open; seeded random lifecycle and actual mutable subjects retained |
+| FOLLOW-017 | SharpProof.JsonDefaults.Indented and ApiTestEvidence.JsonOptions | Implemented MakeReadOnly with populated resolver; pending solution gate |
+| FOLLOW-018 | DictionaryAnalyzerConfigOptions retained dictionary facade | Implemented immutable snapshot; preserves Dictionary/ImmutableDictionary comparers; opaque inputs require an explicit comparer; three new regression cases; final Gates gate pending |
+| FOLLOW-019 | ContainerExecution timeout fallback; build.ps1 forcedConfigurations; Invoke-SharpProofContainer reusable commands; Doctor package/property names; SemanticTests class tables; PackageTests fixture groups | Implemented constant immutable arrays/map and ReadOnly module fallback; canonical parser/ordering/comparer/reimport probes passed |
+| FOLLOW-020 | VerificationPublication construction dictionaries and path binding/restoration | Open; MSBuild public setters/item arrays are external binding contracts |
+| FOLLOW-021 | AnalyzerGateHost concurrent outcomes/config map; NativeAllocationWitnessOracle collectible assembly cache | Open; persistent maps need atomic update/lock, losing native/context instances must not leak |
+| FOLLOW-022 | CorpusFileTransaction retained updates across awaits, duplicate/path sets and entries; AllocationIlOracle map/stack/visited/branch arrays; CompilerClrTypeMatcher and NativeExceptionWitnessOracle name stacks | Open |
+| FOLLOW-023 | CorpusGate sets/counters; NativeAllocationWitnessOracle and NativeStaticWriteWitnessOracle initial/alias maps; NativeCorpusVerifier lookup/outcomes; OpenSourceCorpusCatalog map/sets; OpenSourceCorpusImporter dedupe; OpenSourceCorpusRunner diagnostics and indexed assignment counters | Open; do not blanket-exempt algorithm counters |
+| FOLLOW-024 | Host TrustedChildEnvironment and Fuzz FiniteDomainSmtFuzzing/FrontendFuzzing/TotalProgramFuzzing retained snapshots | Unchecked detail; agent shell unavailable during final re-read; boundary-level lead only |
+| FOLLOW-025 | Compiler/portable/protocol 213 open model properties plus init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
+
+Follow-up coverage: IR/Dataflow 45 production files / 9,163 lines; SMT 13 files /
+2,043 lines; Contracts 25 files / 5,124 lines; S-Z/lowercase test/support 344 files.
+The infrastructure review covers 59 scripts, 54 non-vendored eng paths, 8
+BuildTasks paths, root/config/GitHub/transitive build definitions. eng/common is
+excluded and untouched. The Host/Fuzz detail gap is explicitly unchecked.
+
+### Follow-up implementation evidence
+
+- All 35 analyzer local sites are converted. Analyzer suite: 1,085 passed.
+- Dataflow indexed vectors, SCC worklists and sorted scheduling use persistent
+  collections. Dataflow suite: 118 passed.
+- IR traversal, shared bottom-up rewrite/depth memos, snapshot selectors, block
+  order, sequence-reader analysis and replay value/occurrence maps use immutable
+  collections. Partial selector memo entries survive budget exhaustion through
+  explicit returned state. IR suite: 471 passed before the final printer/free-set
+  cleanup, which requires the next gate.
+- CompilerCompilationModel now uses records/init and immutable collections for
+  options, trees, references, modules, feature rows and line maps. Producer/test
+  updates use record copies. CompilerTotalIlBodyProvider snapshots references,
+  caches immutable bytes and opens PEReader over immutable image data.
+  Targeted compiler/reporting/metadata/VC/companion Worker suite: 460 passed.
+- Contract discovery/binding accumulators and companion graph classification use
+  persistent collections with original comparers, FIFO/LIFO semantics and order.
+  Attribute callbacks append to one owned immutable list. Contracts: 640 passed.
+- SMT caches, native wrapper ownership list, authored-constant quantifier order,
+  model aliases, array observations and text decoding use persistent collections.
+  Separate immutable encounter-order lists preserve native declarations and
+  witness decisions. SMT: 356 passed, including native disposal checks.
+- The first broad Worker rerun ended with a Docker transport EOF before a final
+  result. It is not counted as a passed run. A subsequent targeted Worker run
+  completed successfully. Full final-suite verification remains required.
+- Follow-up S-Z helper changes include immutable postconditions, cached file lists,
+  runtime contract cases, decoded IL and generated-variable worklists; their
+  latest source awaits the broader solution/Worker gate.
+- The second A-H test detail pass was not received; the initial audit remains
+  recorded, and strict residual coverage is still open. No missing report is
+  counted as an absent violation.
+
+
+### Syntax residual inventory
+
+`docs/immutability-residuals.tsv` records syntax candidates from all tracked/new
+non-vendored C# files, including test harness code, while Roslyn parsing naturally
+excludes declarations inside embedded program strings. The unit is a source
+syntax site (path, line, column, kind), not an asserted defect. Storage, primary
+constructor inputs, array/read-only return shapes, allocations, and materializers
+are separate review sites; one logical storage migration may resolve several.
+Open rows are not confirmed violations and are not waived. Each needs source
+review and either a verified replacement or an explicit boundary/test rationale.
+Golden/sample/template program subjects are identified separately; eng/common
+remains excluded by its pinned byte-for-byte contract.
+
+The baseline's command surface has no `tooling layout` command. The attempted
+canonical invocation is recorded in artifacts/immutability-layout-command.log;
+the ordinary Architecture suite passed all five project/layout checks instead.
+No project was moved or introduced; the new helper is included in the existing
+IR project by its standard compile glob.
+
+### Follow-up checkpoint: persistent algorithms and publication ownership
+
+The coordinator checked all ten second-pass reports against current source.
+The A-H report was received and its remaining fixture/helper findings are open;
+the earlier note about a missing A-H report describes an earlier checkpoint.
+
+- Compiler compilation snapshot models now use records, init-only properties,
+  and immutable arrays. Producer rewrites use copies. The publication helper
+  exposes its published copy; 66 fixture setup sites now use that copy.
+  A regression verifies that publication does not rewrite the producer.
+- All 13 methods with the 42 publication hash failures from the first broad
+  follow-up run now pass in the 90-case targeted rerun.
+- IR traversal, substitution, depth and selector memo state are persistent.
+  Partial cache results are returned even on incomplete searches. Factory
+  registries and block drafts now use persistent collections under their
+  existing locking/lifecycle rules. The latest ordinary IR run passed 471 tests.
+- Contracts and Analyzer callback caches now use ImmutableInterlocked with their
+  original symbol/reference comparers; weak compilation ownership remains.
+  The coordinator and read-only peer review found no stale memo/atomic updates.
+- Scalar/typed fuzz retained case arrays are immutable, including nested input
+  rows. Reflection converts the immutable outer argument row at invocation.
+- Corpus transactions snapshot caller updates before awaits. Their paths,
+  duplicate sets and staged entries are persistent. Allocation IL traversal
+  and Host contract property validation now use persistent worklists/sets.
+- The syntax inventory was regenerated with flattened detail fields and added
+  return/primary-constructor coverage: 4,135 candidates across 845 paths from
+  1,806 parsed files at that scan. Twelve program-subject sites are excluded.
+  These counts are review candidates, not a claim that 4,123 defects remain.
+- Canonical formatting passed; exported changes were reviewed and applied.
+  The earlier broad run passed 18 unaffected projects, including Package
+  (336 passed, one existing skip). A fresh full ordinary run is in progress
+  against this checkpoint; its result is not yet counted as passed.
+
+Remaining work includes Portable/compiler artifact/protocol models, the detailed
+retained helper/input findings, and classification or replacement of remaining
+syntax sites. This checkpoint is not the comprehensive completion condition.

@@ -16,6 +16,7 @@ internal sealed class ShadowTestProject : IDisposable
         """;
 
     private readonly TempDirectory _directory = new("sharpproof-shadow-");
+    internal CompilerManifestArtifact Artifact { get; }
     internal WorkerVerifyRequest Request { get; }
     internal WorkerInputSnapshot Snapshot { get; }
     internal ShadowTestProject(string source, bool cacheEnabled = false)
@@ -28,7 +29,8 @@ internal sealed class ShadowTestProject : IDisposable
         System.ArgumentNullException.ThrowIfNull(artifact);
         try
         {
-            artifact.Compilation.ProjectDirectory = _directory.FullName;
+            Artifact = artifact with { Compilation = artifact.Compilation with { ProjectDirectory = _directory.FullName } };
+            artifact = Artifact;
             var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");
             File.WriteAllBytes(path, bytes);

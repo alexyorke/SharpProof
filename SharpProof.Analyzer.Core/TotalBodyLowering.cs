@@ -73,15 +73,16 @@ internal static class TotalBodyLowering
                 .GetOperation(syntax, cancellationToken);
             if (operation == null)
             { return false; }
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
+            var pending = ImmutableStack<IOperation>.Empty;
+            pending = pending.Push(operation);
             var remaining = MaximumWork;
-            while (pending.Count != 0)
+            while (!pending.IsEmpty)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (--remaining < 0)
                 { return false; }
-                var current = pending.Pop();
+                var current = pending.Peek();
+                pending = pending.Pop();
                 if (current is IInvocationOperation invocation && frame.IsSpecificationOperation(current))
                 {
                     if (!invocationEmission.IsElided(current))
@@ -92,7 +93,7 @@ internal static class TotalBodyLowering
                     continue;
                 }
                 foreach (var child in current.ChildOperations)
-                { pending.Push(child); }
+                { pending = pending.Push(child); }
             }
             frame.DiscardSpecificationAssumptions();
             return true;
@@ -232,10 +233,14 @@ internal static class TotalBodyLowering
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         terms = RepositoryParameterGuard.NotNull(terms, nameof(terms));
-        var pending = new Stack<IrTerm>(terms);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IrTerm>.Empty;
+        foreach (var term in terms)
+        { pending = pending.Push(term); }
+        while (!pending.IsEmpty)
         {
-            switch (pending.Pop())
+            var current = pending.Peek();
+            pending = pending.Pop();
+            switch (current)
             {
                 // IrFactory.SequenceAccess admits sequence types, never strings.
                 case IrSequenceAccessTerm access:
@@ -244,22 +249,22 @@ internal static class TotalBodyLowering
                 case IrOpaqueTerm:
                     return true;
                 case IrUnaryTerm unary:
-                    pending.Push(unary.Operand);
+                    pending = pending.Push(unary.Operand);
                     break;
                 case IrBinaryTerm binary:
-                    pending.Push(binary.Left);
-                    pending.Push(binary.Right);
+                    pending = pending.Push(binary.Left);
+                    pending = pending.Push(binary.Right);
                     break;
                 case IrConditionalTerm conditional:
-                    pending.Push(conditional.Condition);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.WhenFalse);
+                    pending = pending.Push(conditional.Condition);
+                    pending = pending.Push(conditional.WhenTrue);
+                    pending = pending.Push(conditional.WhenFalse);
                     break;
                 case IrCastTerm cast:
-                    pending.Push(cast.Operand);
+                    pending = pending.Push(cast.Operand);
                     break;
                 case IrLengthTerm length:
-                    pending.Push(length.Value);
+                    pending = pending.Push(length.Value);
                     break;
             }
         }

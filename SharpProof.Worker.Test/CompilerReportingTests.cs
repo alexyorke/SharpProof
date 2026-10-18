@@ -130,7 +130,7 @@ public sealed class CompilerReportingTests
     public void MappedColumnsAccountForLineDirectiveCharacterOffsets()
     {
         var tree = Tree("physical.cs");
-        tree.LineMap[0].CharacterOffset = 2;
+        tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { CharacterOffset = 2 }) };
         var location = Location();
         location.Column = 3;
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
@@ -158,37 +158,19 @@ public sealed class CompilerReportingTests
         System.ArgumentNullException.ThrowIfNull(malformed);
         var tree = Tree("physical.cs");
         var entry = tree.LineMap[0];
-        switch (malformed)
+        tree = malformed switch
         {
-            case "start":
-                entry.SourceStart = -1;
-                break;
-            case "length":
-                entry.SourceLength = tree.TextLength + 1;
-                break;
-            case "path":
-                entry.MappedPath = " ";
-                break;
-            case "line":
-                entry.MappedLine = -1;
-                break;
-            case "column":
-                entry.MappedColumn = int.MaxValue;
-                break;
-            case "offset":
-                entry.CharacterOffset = entry.SourceLength + 1;
-                break;
-            case "gap":
-                tree.LineMap = [entry, new CompilerSourceLineMapEntry { SourceStart = 2 }];
-                break;
-            case "missing":
-                tree.LineMap = [];
-                break;
-            case "first-line":
-                entry.SourceStart = 1;
-                entry.SourceLength = tree.TextLength - 1;
-                break;
-        }
+            "start" => tree with { LineMap = [entry with { SourceStart = -1 }] },
+            "length" => tree with { LineMap = [entry with { SourceLength = tree.TextLength + 1 }] },
+            "path" => tree with { LineMap = [entry with { MappedPath = " " }] },
+            "line" => tree with { LineMap = [entry with { MappedLine = -1 }] },
+            "column" => tree with { LineMap = [entry with { MappedColumn = int.MaxValue }] },
+            "offset" => tree with { LineMap = [entry with { CharacterOffset = entry.SourceLength + 1 }] },
+            "gap" => tree with { LineMap = [entry, new CompilerSourceLineMapEntry { SourceStart = 2 }] },
+            "missing" => tree with { LineMap = [] },
+            "first-line" => tree with { LineMap = [entry with { SourceStart = 1, SourceLength = tree.TextLength - 1 }] },
+            _ => tree
+        };
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
@@ -203,7 +185,7 @@ public sealed class CompilerReportingTests
         var location = Location();
         location.Start = tree.TextLength + 1;
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
-        tree.LineMap[0].MappedColumn = int.MaxValue;
+        tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { MappedColumn = int.MaxValue }) };
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
 

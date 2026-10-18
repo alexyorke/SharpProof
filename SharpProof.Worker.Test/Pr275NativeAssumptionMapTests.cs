@@ -29,6 +29,7 @@ public sealed class Pr275NativeAssumptionMapTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single();
         var entry = preparation.TotalEntry;
         Assert.That(entry, Is.Not.Null);

@@ -617,14 +617,15 @@ try {
                 -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
                 -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
                 -BucketCount $packageLayoutBucketCount)
-        $fixtureClasses = @(
-            'CompilerCaptureFreshnessControlTests',
-            'CompilerCaptureFreshnessRegressionTests',
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
-            'NaNPublicBuildWorkflowAuditTests',
-            'VerifierPackageDefaultsTests',
-            'VerificationPublicationNullArgumentTests',
-            'FinalCompilationProbeTests')
+        New-Variable -Name fixtureClasses -Option Constant -Value (
+            [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'CompilerCaptureFreshnessControlTests',
+                    'CompilerCaptureFreshnessRegressionTests',
+                    'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+                    'NaNPublicBuildWorkflowAuditTests',
+                    'VerifierPackageDefaultsTests',
+                    'VerificationPublicationNullArgumentTests',
+                    'FinalCompilationProbeTests')))
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         foreach ($name in @($workerClass, $packageLayoutClass,

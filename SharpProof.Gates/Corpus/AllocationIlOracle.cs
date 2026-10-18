@@ -22,7 +22,7 @@ internal static class AllocationIlOracle
         var bytes = body?.GetILAsByteArray();
         if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > 65536)
         { return true; }
-        var instructions = new Dictionary<int, (OpCode Op, int Next, int[] Targets)>();
+        var instructions = ImmutableDictionary<int, (OpCode Op, int Next, ImmutableArray<int> Targets)>.Empty;
         var cursor = 0;
         while (cursor < bytes.Length)
         {
@@ -43,25 +43,27 @@ internal static class AllocationIlOracle
                 _ => 4
             };
             var next = cursor + (int)size;
-            var targets = opcode.OperandType switch
+            ImmutableArray<int> targets = opcode.OperandType switch
             {
-                OperandType.ShortInlineBrTarget => new[] { next + unchecked((sbyte)bytes[cursor]) },
+                OperandType.ShortInlineBrTarget => [next + unchecked((sbyte)bytes[cursor])],
                 OperandType.InlineBrTarget => [next + BitConverter.ToInt32(bytes, cursor)],
                 OperandType.InlineSwitch => Enumerable.Range(0, BitConverter.ToInt32(bytes, cursor))
-                    .Select(index => next + BitConverter.ToInt32(bytes, cursor + 4 + 4 * index)).ToArray(),
+                    .Select(index => next + BitConverter.ToInt32(bytes, cursor + 4 + 4 * index)).ToImmutableArray(),
                 _ => []
             };
-            instructions.Add(offset, (opcode, next, targets));
+            instructions = instructions.Add(offset, (opcode, next, targets));
             cursor = next;
         }
-        var pending = new Stack<int>();
-        var seen = new HashSet<int>();
-        pending.Push(0);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<int>.Empty;
+        var seen = ImmutableHashSet<int>.Empty;
+        pending = pending.Push(0);
+        while (!pending.IsEmpty)
         {
-            var offset = pending.Pop();
-            if (!seen.Add(offset))
+            var offset = pending.Peek();
+            pending = pending.Pop();
+            if (seen.Contains(offset))
             { continue; }
+            seen = seen.Add(offset);
             var instruction = instructions[offset];
             if (instruction.Op == OpCodes.Newobj || instruction.Op == OpCodes.Newarr || instruction.Op == OpCodes.Box ||
                 instruction.Op == OpCodes.Throw || instruction.Op == OpCodes.Rethrow ||
@@ -71,15 +73,15 @@ internal static class AllocationIlOracle
             {
                 if (offset >= clause.TryOffset && offset < clause.TryOffset + clause.TryLength)
                 {
-                    pending.Push(clause.HandlerOffset);
+                    pending = pending.Push(clause.HandlerOffset);
                     if (clause.Flags == ExceptionHandlingClauseOptions.Filter)
-                    { pending.Push(clause.FilterOffset); }
+                    { pending = pending.Push(clause.FilterOffset); }
                 }
             }
             foreach (var target in instruction.Targets)
-            { pending.Push(target); }
+            { pending = pending.Push(target); }
             if (instruction.Op.FlowControl is not (FlowControl.Branch or FlowControl.Return or FlowControl.Throw) && instruction.Next < bytes.Length)
-            { pending.Push(instruction.Next); }
+            { pending = pending.Push(instruction.Next); }
         }
         return false;
     }

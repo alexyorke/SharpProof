@@ -347,6 +347,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Caller = callerPe
         });
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifactBytes = Encoding.UTF8.GetBytes(artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "compiler-artifact.json"), artifactJson);

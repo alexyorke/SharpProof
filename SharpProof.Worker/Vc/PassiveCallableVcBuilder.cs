@@ -696,12 +696,14 @@ internal sealed class PassiveCallableVcBuilder
             substitutions.Add(variable, replacement);
         }
         var consistent = true;
-        var snapshotSelectors = new Dictionary<IrId, IrTerm>();
+        var snapshotSelectors = ImmutableDictionary<IrId, IrTerm>.Empty;
         IrTerm Snapshot(IrTerm owner, Func<IrTerm, IrTerm> rewritten)
         {
-            if (IrSnapshotReads.TrySelector(_factory, owner, _oldInputs.ContainsKey, rewritten,
-                () => { Spend(); return true; }, snapshotSelectors, out var selector, _cancellationToken))
-            { return selector; }
+            var selection = IrSnapshotReads.TrySelector(_factory, owner, _oldInputs.ContainsKey, rewritten,
+                () => { Spend(); return true; }, snapshotSelectors, _cancellationToken);
+            snapshotSelectors = selection.Memo;
+            if (selection.Success)
+            { return selection.Selector!; }
             consistent = false;
             return _factory.Boolean(false);
         }

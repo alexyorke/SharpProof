@@ -70,12 +70,13 @@ function Invoke-Container(
     }
 }
 
-$forcedConfigurations = @{
-    quick    = 'Debug'
-    pr       = 'Release'
-    nightly  = 'Release'
-    security = 'Release'
-}
+New-Variable -Name forcedConfigurations -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableDictionary[string, string]]::Empty.
+    WithComparers([StringComparer]::OrdinalIgnoreCase).
+    Add('quick', 'Debug').
+    Add('pr', 'Release').
+    Add('nightly', 'Release').
+    Add('security', 'Release'))
 if ($forcedConfigurations.ContainsKey($BuildProfile)) {
     Invoke-Container $BuildProfile $forcedConfigurations[$BuildProfile]
     return

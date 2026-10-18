@@ -36,7 +36,7 @@ internal static class TotalContractInvocationMaterialization
         // Resolve actual interceptors while binding clauses, before body lowering
         // has populated the context's compilation (including companion frames).
         clauseContext.Compilation = resolution.Inventory.ImplementationBody.SemanticModel!.Compilation;
-        var replacements = new Dictionary<IrVarId, IrTerm>();
+        var replacements = ImmutableDictionary<IrVarId, IrTerm>.Empty;
         if (resolution.UsesCompanion)
         {
             for (var index = 0; index < context.Parameters.Length; index++)
@@ -45,9 +45,9 @@ internal static class TotalContractInvocationMaterialization
                 var target = context.Parameters[index];
                 if (factory.GetVariableInfo(source.Entry).Type != factory.GetVariableInfo(target.Entry).Type)
                 { return Fail(ContractBindingFailure.UnsupportedExpression); }
-                replacements.Add(source.Entry, factory.Variable(target.Entry));
-                replacements.Add(source.Current, factory.Variable(target.Current));
-                replacements.Add(source.PreState, factory.Variable(target.PreState));
+                replacements = replacements.AddUnique(source.Entry, factory.Variable(target.Entry));
+                replacements = replacements.AddUnique(source.Current, factory.Variable(target.Current));
+                replacements = replacements.AddUnique(source.PreState, factory.Variable(target.PreState));
             }
         }
         var intrinsicFailure = ValidateIntrinsics(intrinsics, resolution.Source, resolution.Inventory.ImplementationBody, requiresOnly);
@@ -64,10 +64,10 @@ internal static class TotalContractInvocationMaterialization
                     ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
                     : null)
         };
-        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new[] { binding.Entry, binding.Current, binding.PreState })));
+        var allowed = context.Inputs.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState))).ToImmutableHashSet();
         if (context.Result is { } resultVariable)
-        { allowed.Add(resultVariable); }
-        var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();
+        { allowed = allowed.Add(resultVariable); }
+        var clauses = ImmutableList<BoundTotalContractClause>.Empty;
         foreach (var occurrence in candidates.Where(occurrence =>
             !requiresOnly || occurrence.Kind == BoundContractKind.Requires))
         {
@@ -89,11 +89,11 @@ internal static class TotalContractInvocationMaterialization
             }
             if (expression.Value.Type != factory.BooleanType)
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
-            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), ContractInvocationMaterialization.FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
+            clauses = clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), ContractInvocationMaterialization.FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
                 resolution.UsesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation,
                 invocation.Syntax.GetReference()));
         }
-        return new(clauses.ToImmutable(), ContractBindingFailure.None);
+        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
 
         static TotalContractInvocationMaterializationResult Fail(ContractBindingFailure failure)
         {

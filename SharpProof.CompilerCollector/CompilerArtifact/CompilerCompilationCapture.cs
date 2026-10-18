@@ -37,13 +37,13 @@ internal static class CompilerCompilationCapture
                 // compilation-local identity instead of rejecting the input.
                 if (string.IsNullOrEmpty(tree.FilePath))
                 {
-                    snapshot.Path = $"<compiler-generated:{index}>";
+                    snapshot = snapshot with { Path = $"<compiler-generated:{index}>" };
                 }
                 // Different raw spellings can normalize to the same path.
                 // A real filename can also occupy a generated collision suffix.
                 while (!seenPaths.Add(snapshot.Path))
                 {
-                    snapshot.Path = $"{snapshot.Path}#{index}";
+                    snapshot = snapshot with { Path = $"{snapshot.Path}#{index}" };
                 }
 
                 return snapshot;
@@ -204,14 +204,14 @@ internal static class CompilerCompilationCapture
                 Deterministic = options.Deterministic,
                 ReferencesSupersedeLowerVersions = supersedes,
                 AssemblyIdentityComparer = CompilerOptionWireMappings.Map(options.AssemblyIdentityComparer),
-                Usings = options.Usings.ToArray(),
+                Usings = options.Usings,
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
-            SyntaxTrees = CaptureTrees(compilation, cancellationToken),
+            SyntaxTrees = CaptureTrees(compilation, cancellationToken).ToImmutableArray(),
             References = CaptureReferences(
                 compilation.References,
                 ReferenceCaptureLimits.Default,
-                cancellationToken),
+                cancellationToken).ToImmutableArray(),
             AdditionalFiles = [.. additionalFiles.Select(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (CaptureAdditionalFile(
                 file, normalizedProject, cancellationToken))).OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Path), StringComparer.Ordinal)
                 .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Sha256), StringComparer.Ordinal)]
@@ -267,7 +267,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             RoslynChecksum = HashEncoding.ToLowerHex(text.GetChecksum()),
             LineMapSha256 = CompilerReportingIdentity.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
-            LineMap = lineMap,
+            LineMap = lineMap.ToImmutableArray(),
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
@@ -406,7 +406,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
-            Modules = modules.ToArray()
+            Modules = modules.ToImmutableArray()
         };
     }
 

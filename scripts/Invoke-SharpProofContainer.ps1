@@ -52,9 +52,10 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
     throw 'SharpProof container commands require the canonical container contract.'
 }
 
-$reusableTestCommands = @(
-    'test', 'test-changed', 'semantic-tests', 'portable-tests',
-    'worker-tests', 'package-tests')
+New-Variable -Name reusableTestCommands -Option Constant -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'test', 'test-changed', 'semantic-tests', 'portable-tests',
+            'worker-tests', 'package-tests')))
 if ($NoBuild -and $Command -notin $reusableTestCommands) {
     throw (
         '-NoBuild is supported only for test commands that can reuse an ' +

@@ -39,6 +39,7 @@ public sealed class ActualNativeBackendLifecycleTests
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         Assert.That(project.Request.Cache.Enabled, Is.False);
         Assert.That(project.Request.Budgets.QueryRlimit, Is.EqualTo(3_000_000));
         Assert.That(project.Request.Budgets.MethodRlimit, Is.EqualTo(20_000_000));

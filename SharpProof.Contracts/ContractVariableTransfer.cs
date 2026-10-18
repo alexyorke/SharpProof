@@ -38,7 +38,7 @@ internal static class ContractVariableTransfer
         var parameters = destinationVariables
             .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
             .OrderBy(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal)).Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable)).ToImmutableArray();
-        var replacements = new Dictionary<IrVarId, IrVariableTerm>();
+        var replacements = ImmutableDictionary<IrVarId, IrVariableTerm>.Empty;
         foreach (var binding in sourceParameters)
         {
             IrVarId? canonicalVariable = null;
@@ -62,7 +62,7 @@ internal static class ContractVariableTransfer
             {
                 return null;
             }
-            replacements[binding.Variable] = factory.Variable(canonicalVariable.Value);
+            replacements = replacements.SetItem(binding.Variable, factory.Variable(canonicalVariable.Value));
         }
         if (sourceResult.HasValue)
         {
@@ -70,7 +70,7 @@ internal static class ContractVariableTransfer
             {
                 return null;
             }
-            replacements[sourceResult.Value] = factory.Variable(result.Value);
+            replacements = replacements.SetItem(sourceResult.Value, factory.Variable(result.Value));
         }
         foreach (var sourceReceiver in sourceReceivers)
         {
@@ -78,7 +78,7 @@ internal static class ContractVariableTransfer
             {
                 return null;
             }
-            replacements[sourceReceiver] = factory.Variable(receiver.Value);
+            replacements = replacements.SetItem(sourceReceiver, factory.Variable(receiver.Value));
         }
         foreach (var sourcePreState in sourcePreStates)
         {
@@ -87,7 +87,7 @@ internal static class ContractVariableTransfer
                 return null;
             }
             var canonicalPre = createPreState(current.Variable);
-            replacements[sourcePreState.Value] = factory.Variable(canonicalPre);
+            replacements = replacements.SetItem(sourcePreState.Value, factory.Variable(canonicalPre));
         }
         // Each insertion path stores factory.Variable's statically
         // guaranteed IrVariableTerm. No arbitrary replacement term is admitted.

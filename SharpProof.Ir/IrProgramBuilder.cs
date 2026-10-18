@@ -6,7 +6,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly long _scope = Interlocked.Increment(ref s_nextScope);
-    private readonly List<MutableBlock> _blocks = [];
+    private ImmutableList<BlockDraft> _blocks = [];
     private int _nextInstruction;
     private IrBlockId? _entry;
     private bool _built;
@@ -18,7 +18,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         var nameId = string.IsNullOrWhiteSpace(name)
             ? (IrStringId?)null
             : _factory.InternString(name!);
-        _blocks.Add(new MutableBlock(id, nameId));
+        _blocks = _blocks.Add(new BlockDraft(id, nameId));
         _entry ??= id;
         return id;
     }
@@ -264,7 +264,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 "A program must contain at least one block.");
         }
 
-        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(_blocks.Count);
+        var blocks = ImmutableArray<IrBasicBlock>.Empty;
         foreach (var block in _blocks)
         {
             if (block.Instructions.Count == 0 ||
@@ -274,14 +274,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     "Every program block must end in a control-flow terminator.");
             }
 
-            blocks.Add(block.Freeze());
+            blocks = blocks.Add(block.Freeze());
         }
         _built = true;
         return new IrProgram(
             _factory,
             _scope,
             _entry.Value,
-            blocks.MoveToImmutable());
+            blocks);
     }
 
     private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
@@ -473,7 +473,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         }
 
         _nextInstruction++;
-        block.Instructions.Add(instruction);
+        _blocks = _blocks.SetItem(blockId.Value, new BlockDraft(block.Id, block.Name, block.Instructions.Add(instruction)));
         return instruction;
     }
 
@@ -526,7 +526,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         }
     }
 
-    private MutableBlock GetBlock(IrBlockId id)
+    private BlockDraft GetBlock(IrBlockId id)
     {
         if (id.Scope != _scope)
         {
@@ -621,11 +621,11 @@ public sealed class IrProgramBuilder(IrFactory factory)
         }
     }
 
-    private sealed class MutableBlock(IrBlockId id, IrStringId? name)
+    private sealed class BlockDraft(IrBlockId id, IrStringId? name, ImmutableList<IrInstruction>? instructions = null)
     {
         internal IrBlockId Id { get; } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
         internal IrStringId? Name { get; } = name;
-        internal List<IrInstruction> Instructions { get; } = [];
+        internal ImmutableList<IrInstruction> Instructions { get; } = instructions ?? [];
 
         internal IrBasicBlock Freeze()
         {

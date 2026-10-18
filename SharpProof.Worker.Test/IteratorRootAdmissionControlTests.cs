@@ -89,6 +89,7 @@ public sealed class IteratorRootAdmissionControlTests
             var artifact = CompilerManifestArtifactProducer.Create(compilation, evidence, "net9.0", WorkerFeatureSet.All,
                 new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+            artifact = project.Artifact;
             var preparation = project.Snapshot.Callables.Single();
             var claim = artifact.Manifest.Claims.Single();
             var effectClaim = preparation.EffectClaims.Single();

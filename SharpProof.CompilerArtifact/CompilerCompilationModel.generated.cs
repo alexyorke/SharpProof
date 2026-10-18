@@ -4,6 +4,7 @@
 // </auto-generated>
 #nullable enable
 
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 
 namespace SharpProof.CompilerArtifact;
@@ -17,35 +18,35 @@ internal static class CompilerReferenceLimits
 
 internal sealed record CompilerCompilationSnapshot
 {
-    public string ProjectDirectory { get; set; } = string.Empty;
+    public string ProjectDirectory { get; init; } = string.Empty;
     [JsonIgnore]
     public string AssemblyName { get; init; } = string.Empty;
     [JsonIgnore]
     public string AssemblyIdentity { get; init; } = string.Empty;
     [JsonIgnore]
-    public string TargetFramework { get; set; } = string.Empty;
+    public string TargetFramework { get; init; } = string.Empty;
     [JsonIgnore]
-    public string CompilerVersion { get; set; } = string.Empty;
+    public string CompilerVersion { get; init; } = string.Empty;
     [JsonIgnore]
-    public string CompilerMvid { get; set; } = string.Empty;
+    public string CompilerMvid { get; init; } = string.Empty;
     [JsonIgnore]
     public string CSharpCompilerVersion { get; init; } = string.Empty;
     [JsonIgnore]
-    public string CSharpCompilerMvid { get; set; } = string.Empty;
+    public string CSharpCompilerMvid { get; init; } = string.Empty;
     [JsonIgnore]
-    public string[] SpecificationPackIds { get; set; } = [];
+    public ImmutableArray<string> SpecificationPackIds { get; init; } = [];
     [JsonIgnore]
-    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
     [JsonIgnore]
-    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
+    public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
     [JsonIgnore]
-    public CompilerCompilationOptionsSnapshot Options { get; set; } = new();
+    public CompilerCompilationOptionsSnapshot Options { get; init; } = new();
     [JsonIgnore]
-    public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
+    public ImmutableArray<CompilerSyntaxTreeSnapshot> SyntaxTrees { get; init; } = [];
     [JsonIgnore]
-    public CompilerReferenceSnapshot[] References { get; init; } = [];
+    public ImmutableArray<CompilerReferenceSnapshot> References { get; init; } = [];
     [JsonIgnore]
-    public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
+    public ImmutableArray<CompilerAdditionalFileSnapshot> AdditionalFiles { get; init; } = [];
 }
 
 internal enum CompilerReportDiagnostic
@@ -58,7 +59,7 @@ internal enum CompilerReportDiagnostic
     Suppress = 5
 }
 
-internal sealed class CompilerCompilationOptionsSnapshot
+internal sealed record CompilerCompilationOptionsSnapshot
 {
     public CompilerOutputKind OutputKind { get; init; }
     public string MainTypeName { get; init; } = string.Empty;
@@ -68,78 +69,78 @@ internal sealed class CompilerCompilationOptionsSnapshot
     public CompilerMetadataImportOptions MetadataImportOptions { get; init; }
     public int WarningLevel { get; init; }
     public CompilerReportDiagnostic GeneralDiagnosticOption { get; init; }
-    public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; init; } = [];
+    public ImmutableArray<CompilerDiagnosticOptionSnapshot> SpecificDiagnosticOptions { get; init; } = [];
     public bool ReportSuppressedDiagnostics { get; init; }
     public bool CheckOverflow { get; init; }
     public bool AllowUnsafe { get; init; }
     public bool Deterministic { get; init; }
     public bool ReferencesSupersedeLowerVersions { get; init; }
     public CompilerAssemblyIdentityComparer AssemblyIdentityComparer { get; init; }
-    public string[] Usings { get; init; } = [];
+    public ImmutableArray<string> Usings { get; init; } = [];
     public CompilerResolverPolicy ResolverPolicy { get; init; }
 }
 
-internal sealed class CompilerDiagnosticOptionSnapshot
+internal sealed record CompilerDiagnosticOptionSnapshot
 {
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
     public CompilerReportDiagnostic ReportDiagnostic { get; init; }
 }
 
-internal sealed class CompilerSourceLineMapEntry
+internal sealed record CompilerSourceLineMapEntry
 {
-    public int SourceStart { get; set; }
-    public int SourceLength { get; set; }
-    public string MappedPath { get; set; } = string.Empty;
-    public int MappedLine { get; set; }
-    public int MappedColumn { get; set; }
-    public int CharacterOffset { get; set; }
+    public int SourceStart { get; init; }
+    public int SourceLength { get; init; }
+    public string MappedPath { get; init; } = string.Empty;
+    public int MappedLine { get; init; }
+    public int MappedColumn { get; init; }
+    public int CharacterOffset { get; init; }
 }
 
-internal sealed class CompilerSyntaxTreeSnapshot
+internal sealed record CompilerSyntaxTreeSnapshot
 {
-    public string Path { get; set; } = string.Empty;
-    public string Sha256 { get; set; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public string Sha256 { get; init; } = string.Empty;
     public string Encoding { get; init; } = string.Empty;
     public string ChecksumAlgorithm { get; init; } = string.Empty;
     public string RoslynChecksum { get; init; } = string.Empty;
     public string LineMapSha256 { get; init; } = string.Empty;
     public int TextLength { get; init; }
-    public CompilerSourceLineMapEntry[] LineMap { get; set; } = [];
+    public ImmutableArray<CompilerSourceLineMapEntry> LineMap { get; init; } = [];
     public string LanguageVersion { get; init; } = string.Empty;
     public string DocumentationMode { get; init; } = string.Empty;
-    public string Kind { get; set; } = string.Empty;
-    public string[] PreprocessorSymbols { get; init; } = [];
-    public string[] EffectivePreprocessorSymbols { get; init; } = [];
-    public CompilerFeatureSnapshot[] Features { get; set; } = [];
+    public string Kind { get; init; } = string.Empty;
+    public ImmutableArray<string> PreprocessorSymbols { get; init; } = [];
+    public ImmutableArray<string> EffectivePreprocessorSymbols { get; init; } = [];
+    public ImmutableArray<CompilerFeatureSnapshot> Features { get; init; } = [];
 }
 
-internal sealed class CompilerReferenceSnapshot
+internal sealed record CompilerReferenceSnapshot
 {
-    public string Kind { get; set; } = string.Empty;
+    public string Kind { get; init; } = string.Empty;
     public bool EmbedInteropTypes { get; init; }
     public bool HasRecursiveAliases { get; init; }
-    public string[] Aliases { get; init; } = [];
-    public string Identity { get; set; } = string.Empty;
-    public CompilerReferenceModuleSnapshot[] Modules { get; set; } = [];
+    public ImmutableArray<string> Aliases { get; init; } = [];
+    public string Identity { get; init; } = string.Empty;
+    public ImmutableArray<CompilerReferenceModuleSnapshot> Modules { get; init; } = [];
 }
 
-internal sealed class CompilerReferenceModuleSnapshot
+internal sealed record CompilerReferenceModuleSnapshot
 {
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
     public string Mvid { get; init; } = string.Empty;
-    public string Path { get; set; } = string.Empty;
-    public string Sha256 { get; set; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public string Sha256 { get; init; } = string.Empty;
     public long SizeBytes { get; init; }
 }
 
-internal sealed class CompilerAdditionalFileSnapshot
+internal sealed record CompilerAdditionalFileSnapshot
 {
-    public string Path { get; set; } = string.Empty;
-    public string Sha256 { get; set; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public string Sha256 { get; init; } = string.Empty;
 }
 
-internal sealed class CompilerFeatureSnapshot
+internal sealed record CompilerFeatureSnapshot
 {
     public string Key { get; init; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
+    public string Value { get; init; } = string.Empty;
 }

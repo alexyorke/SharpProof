@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -162,7 +163,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
     }
 
     private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,
-        Action<BvEncoder, Model, SmtQueryResourceMeter, Dictionary<IrVarId, IrValue>> inspect, bool decode = true)
+        Action<BvEncoder, Model, SmtQueryResourceMeter, ImmutableDictionary<IrVarId, IrValue>> inspect, bool decode = true)
     {
         System.ArgumentNullException.ThrowIfNull(predicates, nameof(predicates));
         if (variable.IsDefault)
@@ -195,7 +196,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
             Assert.That(SmtNativeCheck.Run(solver, [goalSelector], meter), Is.EqualTo(Status.SATISFIABLE));
             using var model = solver.Model;
             Assert.That(model, Is.Not.Null);
-            var values = decode ? encoder.DecodeModel(query, model, meter)! : new Dictionary<IrVarId, IrValue>();
+            var values = decode ? encoder.DecodeModel(query, model, meter)! : ImmutableDictionary<IrVarId, IrValue>.Empty;
             if (decode)
             { Assert.That(values.Keys, Is.EquivalentTo(new[] { variable })); }
             inspect(encoder, model, meter, values);

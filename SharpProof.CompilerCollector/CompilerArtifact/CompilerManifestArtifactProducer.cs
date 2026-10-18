@@ -24,11 +24,12 @@ internal static class CompilerManifestArtifactProducer
                 specificationPacks.IsDefault ? [] : specificationPacks);
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
-        snapshot.SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds];
-        snapshot.SpecificationPackCatalogVersion =
-            specificationPackAuthority.SpecificationPackCatalogVersion;
-        snapshot.SpecificationPackCatalogSha256 =
-            specificationPackAuthority.SpecificationPackCatalogSha256;
+        snapshot = snapshot with
+        {
+            SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
+            SpecificationPackCatalogVersion = specificationPackAuthority.SpecificationPackCatalogVersion,
+            SpecificationPackCatalogSha256 = specificationPackAuthority.SpecificationPackCatalogSha256
+        };
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error &&
                 !item.IsSuppressed))
@@ -86,7 +87,7 @@ internal static class CompilerManifestArtifactProducer
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables,
             ReachableSource = diagnosticArtifacts.Length == 0
-                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
+                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees.ToArray(), specificationPackAuthority, cancellationToken)
                 : null
         };
         return artifact;

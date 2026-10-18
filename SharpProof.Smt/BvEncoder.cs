@@ -2,17 +2,17 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false)
 {
-    private readonly Dictionary<IrId, Expr> _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : [])));
-    private readonly Dictionary<IrVarId, Expr> _variables = [];
+    private ImmutableDictionary<IrId, Expr> _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : ImmutableDictionary<IrId, Expr>.Empty)));
+    private ImmutableDictionary<IrVarId, Expr> _variables = ImmutableDictionary<IrVarId, Expr>.Empty;
 
     internal void ValidateQuery(VerificationQuery query, SmtQueryResourceMeter meter, CancellationToken cancellationToken)
     {
-        var depths = new Dictionary<IrId, int>();
+        var depths = ImmutableDictionary<IrId, int>.Empty;
         foreach (var assumption in query.Assumptions)
         {
-            SmtEncodingDepth.Validate(assumption.Predicate, depths, meter, cancellationToken);
+            depths = SmtEncodingDepth.Validate(assumption.Predicate, depths, meter, cancellationToken);
         }
-        SmtEncodingDepth.Validate(query.Goal.Predicate, depths, meter, cancellationToken);
+        depths = SmtEncodingDepth.Validate(query.Goal.Predicate, depths, meter, cancellationToken);
         foreach (var variable in query.ModelVariables)
         {
             GetVariable(variable, meter);
@@ -35,7 +35,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             : throw new UnsupportedIrEncodingException();
         // A zero-length string input need not be the interned "" literal:
         // the CLR can allocate distinct empty strings (e.g. string.Copy("")).
-        _variables.Add(variable, expression);
+        _variables = _variables.AddUnique(variable, expression);
         return expression;
     }
 
@@ -73,7 +73,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 EncodeRelation(relation, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
-        _encoded.Add(term.Id, expression);
+        _encoded = _encoded.AddUnique(term.Id, expression);
         return expression;
     }
 
@@ -241,20 +241,21 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
 internal static class SmtEncodingDepth
 {
-    internal static void Validate(IrTerm root, Dictionary<IrId, int> maximumDepths,
+    internal static ImmutableDictionary<IrId, int> Validate(IrTerm root, ImmutableDictionary<IrId, int> maximumDepths,
         SmtQueryResourceMeter meter, CancellationToken cancellationToken)
     {
         maximumDepths = RepositoryParameterGuard.NotNull(maximumDepths, nameof(maximumDepths));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        var pending = new Stack<(IrTerm Term, int Depth)>();
-        var children = new Stack<IrTerm>();
-        pending.Push((root, 1));
-        while (pending.Count != 0)
+        var pending = ImmutableStack<(IrTerm Term, int Depth)>.Empty;
+        var children = ImmutableStack<IrTerm>.Empty;
+        pending = pending.Push((root, 1));
+        while (!pending.IsEmpty)
         {
             meter.Consume();
             cancellationToken.ThrowIfCancellationRequested();
-            var (term, depth) = pending.Pop();
+            var (term, depth) = pending.Peek();
+            pending = pending.Pop();
             if (depth > 256)
             {
                 throw new UnsupportedIrEncodingException();
@@ -263,13 +264,15 @@ internal static class SmtEncodingDepth
             {
                 continue;
             }
-            maximumDepths[term.Id] = depth;
-            children.Clear();
-            IrTraversal.PushChildren(term, children);
-            while (children.Count != 0)
+            maximumDepths = maximumDepths.SetItem(term.Id, depth);
+            children = ImmutableStack<IrTerm>.Empty;
+            children = IrTraversal.PushChildren(term, children);
+            while (!children.IsEmpty)
             {
-                pending.Push((children.Pop(), depth + 1));
+                pending = pending.Push((children.Peek(), depth + 1));
+                children = children.Pop();
             }
         }
+        return maximumDepths;
     }
 }

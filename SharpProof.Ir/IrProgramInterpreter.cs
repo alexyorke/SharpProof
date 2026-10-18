@@ -108,7 +108,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             }
         }
         var entry = program.Entry;
-        var occurrences = new Dictionary<IrInstructionId, int>();
+        var occurrences = ImmutableDictionary<IrInstructionId, int>.Empty;
         var state = new ExecutionState
         {
             Interpreter = this,
@@ -160,7 +160,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal CancellationToken CancellationToken;
         internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost;
         internal IrProgramReplayOptions? ReplayOptions;
-        internal Dictionary<IrInstructionId, int> Occurrences;
+        internal ImmutableDictionary<IrInstructionId, int> Occurrences;
         internal IrBlockId Current;
         internal int Steps;
         internal IrThrowInstruction? PendingException;
@@ -382,20 +382,20 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     internal sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
     {
-        private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-        private readonly HashSet<IrVarId> _approximations = [];
+        private ImmutableDictionary<IrVarId, IrValue> _values = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        private ImmutableHashSet<IrVarId> _approximations = ImmutableHashSet<IrVarId>.Empty;
         private bool _consumedApproximation;
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
-        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
+        internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations;
         internal IrHeap Heap { get; } = new();
         internal ImmutableHashSet<IrVarId> Snapshots { get; } = (snapshots ?? throw new System.ArgumentNullException(nameof(snapshots)));
-        internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
+        internal ImmutableDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
         {
             set
             {
-                _values[key] = value;
-                _approximations.Remove(key);
+                _values = _values.SetItem(key, value);
+                _approximations = _approximations.Remove(key);
             }
         }
         internal void ObserveRead(IrVarId key)
@@ -410,13 +410,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         {
             RepositoryParameterGuard.ThrowIfInvalid(key.IsDefault, nameof(key));
             value = RepositoryParameterGuard.NotNull(value, nameof(value));
-            _values.Add(key, value);
+            _values = _values.Add(key, value);
         }
         internal void Remove(IrVarId key)
         {
             RepositoryParameterGuard.ThrowIfInvalid(key.IsDefault, nameof(key));
-            _values.Remove(key);
-            _approximations.Remove(key);
+            _values = _values.Remove(key);
+            _approximations = _approximations.Remove(key);
         }
         internal void SetHavocValue(IrVarId key, IrValue value, IrHavocOrigin origin)
         {
@@ -425,12 +425,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             this[key] = value;
             if (origin == IrHavocOrigin.Approximation)
             {
-                _approximations.Add(key);
+                _approximations = _approximations.Add(key);
             }
         }
         internal ImmutableDictionary<IrVarId, IrValue> ToImmutable()
         {
-            return _values.ToImmutable();
+            return _values;
         }
     }
 }
@@ -651,7 +651,7 @@ public sealed partial class IrHavocInstruction
         if (state.ReplayOptions != null && this.HavocKind == IrHavocKind.Variables)
         {
             state.Occurrences.TryGetValue(this.Id, out var occurrence);
-            state.Occurrences[this.Id] = occurrence + 1;
+            state.Occurrences = state.Occurrences.SetItem(this.Id, occurrence + 1);
             foreach (var variable in this.Variables)
             {
                 var request = new IrHavocRequest(this.Id, this.Operation, variable, occurrence, this.Origin);

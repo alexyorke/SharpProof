@@ -524,7 +524,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         return references != null && references.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference != null && reference.Identity == origin.AssemblyIdentity &&
-            reference.Modules != null && reference.Modules.Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module != null &&
+            !reference.Modules.IsDefault && reference.Modules.Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module != null &&
                 module.Name == origin.ModuleName && module.Mvid == origin.ModuleMvid && module.Sha256 == origin.ImageSha256 &&
                 module.SizeBytes is > 0 and <= CompilerReferenceLimits.MaximumModuleBytes))));
     }

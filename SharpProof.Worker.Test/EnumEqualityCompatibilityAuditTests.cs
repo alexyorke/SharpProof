@@ -81,6 +81,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaredClaim.CallableId));
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;

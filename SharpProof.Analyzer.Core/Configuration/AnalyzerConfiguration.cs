@@ -134,18 +134,18 @@ internal sealed class AnalyzerConfiguration
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
-        var candidates = new List<(string Key, string Value)>();
-        foreach (var key in new[] {
+        var candidates = ImmutableList<(string Key, string Value)>.Empty;
+        foreach (var key in ImmutableArray.Create(
                      option.Key,
                      "build_property." + option.Key,
                      "build_property." + option.BuildPropertyName
-                 })
+                 ))
         {
             if (!options.TryGetValue(key, out var candidate))
             {
                 continue;
             }
-            candidates.Add((key, candidate));
+            candidates = candidates.Add((key, candidate));
         }
 
         var hasExplicitAnalyzerValue = candidates.Any(
@@ -171,14 +171,14 @@ internal sealed class AnalyzerConfiguration
                     candidate.Key,
                     candidate.Value))
             .Select(static candidate => candidate.Value.Trim())
-            .ToArray();
+            .ToImmutableArray();
         var effective = hasExplicitAnalyzerValue
             ? explicitAnalyzerValue
             : candidates.Count == 0
                 ? string.Empty
                 : candidates[0].Value;
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .ToImmutableArray();
         return (
             candidates.Count != 0,
             effective,
@@ -281,11 +281,11 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         out string value)
     {
-        foreach (var key in new[] {
+        foreach (var key in ImmutableArray.Create(
                      "sharpproof_mode",
                      "build_property.sharpproof_mode",
                      "build_property.SharpProofMode"
-                 })
+                 ))
         {
             if (options.TryGetValue(key, out var candidate) &&
                 !string.IsNullOrWhiteSpace(candidate))

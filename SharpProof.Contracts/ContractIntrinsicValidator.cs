@@ -25,7 +25,7 @@ internal sealed class ContractIntrinsicValidator
             return [];
         }
 
-        var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
+        var violations = ImmutableList<ContractIntrinsicViolation>.Empty;
         var operations = includeNestedCallables
             ? body.DescendantsAndSelf()
             : WalkCallableBoundary(body);
@@ -55,13 +55,13 @@ internal sealed class ContractIntrinsicValidator
                 : ClassifyMethodReference(context, isResult);
             if (violationKind != null)
             {
-                violations.Add(new(
+                violations = violations.Add(new(
                     operation,
                     context.Clause,
                     violationKind));
             }
         }
-        return violations.ToImmutable();
+        return violations.ToImmutableArray();
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> ValidateMemberInitializer(
@@ -73,13 +73,13 @@ internal sealed class ContractIntrinsicValidator
             return [];
         }
 
-        var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
+        var violations = ImmutableList<ContractIntrinsicViolation>.Empty;
         foreach (var operation in WalkCallableBoundary(initializer)
                      .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Syntax.SpanStart)))
         {
             if (operation is IAnonymousFunctionOperation anonymous)
             {
-                violations.AddRange(Validate(
+                violations = violations.AddRange(Validate(
                     anonymous.Symbol,
                     anonymous.Body,
                     includeNestedCallables: true));
@@ -93,14 +93,14 @@ internal sealed class ContractIntrinsicValidator
                 continue;
             }
 
-            violations.Add(new(
+            violations = violations.Add(new(
                 operation,
                 null,
                 isResult
                     ? ContractIntrinsicViolationClassification.ResultOutsideEnsures
                     : ContractIntrinsicViolationClassification.OldOutsideEnsures));
         }
-        return violations.ToImmutable();
+        return violations.ToImmutableArray();
     }
 
     private static IMethodSymbol? GetReferencedMethod(IOperation operation)
@@ -118,11 +118,12 @@ internal sealed class ContractIntrinsicValidator
         IOperation root)
     {
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        var pending = new Stack<IOperation>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var operation = pending.Pop();
+            var operation = pending.Peek();
+            pending = pending.Pop();
             yield return operation;
             if (operation != root &&
                 (operation is ILocalFunctionOperation or IAnonymousFunctionOperation))
@@ -132,7 +133,7 @@ internal sealed class ContractIntrinsicValidator
 
             foreach (var child in operation.ChildOperations.Reverse())
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
     }

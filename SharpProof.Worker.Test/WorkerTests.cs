@@ -1574,7 +1574,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(request.CompilerManifest.Path), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        artifact.Compilation.CompilerVersion = "0.0.0.0";
+        artifact = artifact with { Compilation = artifact.Compilation with { CompilerVersion = "0.0.0.0" } };
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
@@ -5668,11 +5668,11 @@ public sealed partial class WorkerTests
         return GetClaim(response, result).CallableId;
     }
 
-    private static string[] CacheFiles(TestProject project)
+    private static ImmutableArray<string> CacheFiles(TestProject project)
     {
         System.ArgumentNullException.ThrowIfNull(project);
         return Directory.Exists(project.CacheDirectory)
-            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
+            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json").ToImmutableArray()
             : [];
     }
 
@@ -5718,7 +5718,7 @@ public sealed partial class WorkerTests
         }
     }
 
-    private static RuntimeContractCase[] CreateRuntimeContractCases(
+    private static ImmutableArray<RuntimeContractCase> CreateRuntimeContractCases(
         int seed,
         int count)
     {
@@ -5726,7 +5726,7 @@ public sealed partial class WorkerTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(count)); }
 
         var random = new Random(seed);
-        var result = new RuntimeContractCase[count];
+        var result = ImmutableList<RuntimeContractCase>.Empty;
         for (var index = 0; index < count; index++)
         {
             var boundary = random.Next(-50, 51);
@@ -5747,7 +5747,7 @@ public sealed partial class WorkerTests
                 System.Globalization.CultureInfo.InvariantCulture);
             var boundaryLiteral = boundary.ToString(
                 System.Globalization.CultureInfo.InvariantCulture) + "L";
-            result[index] = (index % 8) switch
+            result = result.Add((index % 8) switch
             {
                 0 => new RuntimeContractCase(
                     name,
@@ -5813,9 +5813,9 @@ public sealed partial class WorkerTests
                     (_, actual) => actual < boundary,
                     WorkerClaimOutcome.Proven,
                     inputs)
-            };
+            });
         }
-        return result;
+        return result.ToImmutableArray();
     }
 
     private static string CreateRuntimeContractSource(

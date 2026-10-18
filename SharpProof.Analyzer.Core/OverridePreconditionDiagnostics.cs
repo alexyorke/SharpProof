@@ -69,7 +69,7 @@ internal static class OverridePreconditionDiagnostics
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        var identities = right.Variables.ToDictionary(
+        var identities = ImmutableDictionaryCapture.Create(right.Variables,
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((variable.Role, variable.Ordinal, factory.GetVariableInfo(variable.Variable).Type)),
             static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable));
         return NormalizeRequires(left, factory, identities).SequenceEqual(
@@ -79,12 +79,12 @@ internal static class OverridePreconditionDiagnostics
     private static ImmutableArray<IrTerm> NormalizeRequires(
         BoundMethodContracts contracts,
         IrFactory factory,
-        Dictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
+        ImmutableDictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
     {
         contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
-        var variables = new Dictionary<IrVarId, IrTerm>();
+        var variables = ImmutableDictionary<IrVarId, IrTerm>.Empty;
         foreach (var variable in contracts.Variables)
         {
             var type = factory.GetVariableInfo(variable.Variable).Type;
@@ -93,7 +93,10 @@ internal static class OverridePreconditionDiagnostics
             {
                 continue;
             }
-            variables.Add(variable.Variable, factory.Variable(identity));
+            var value = factory.Variable(identity);
+            if (variables.ContainsKey(variable.Variable))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + variable.Variable); }
+            variables = variables.Add(variable.Variable, value);
         }
         return [.. contracts.Clauses
             .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))

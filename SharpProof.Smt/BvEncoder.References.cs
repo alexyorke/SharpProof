@@ -5,8 +5,10 @@ internal sealed partial class BvEncoder
     private Sort? _referenceSort;
     private FuncDecl? _length;
     private Expr? _nullReference;
-    private readonly Dictionary<IrTypeId, Expr> _emptyArrays = [];
-    private readonly Dictionary<IrStringId, Expr> _stringLiterals = [];
+    private ImmutableDictionary<IrTypeId, Expr> _emptyArrays = ImmutableDictionary<IrTypeId, Expr>.Empty;
+    private ImmutableList<KeyValuePair<IrTypeId, Expr>> _emptyArrayOrder = ImmutableList<KeyValuePair<IrTypeId, Expr>>.Empty;
+    private ImmutableDictionary<IrStringId, Expr> _stringLiterals = ImmutableDictionary<IrStringId, Expr>.Empty;
+    private ImmutableList<KeyValuePair<IrStringId, Expr>> _stringLiteralOrder = ImmutableList<KeyValuePair<IrStringId, Expr>>.Empty;
     internal ImmutableList<BoolExpr> ReferenceFacts { get; private set; } = ImmutableList<BoolExpr>.Empty;
 
     private void AddReferenceFact(BoolExpr fact)
@@ -21,17 +23,17 @@ internal sealed partial class BvEncoder
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         query = RepositoryParameterGuard.NotNull(query, nameof(query));
-        var bounds = new List<BoolExpr>();
+        var bounds = ImmutableList<BoolExpr>.Empty;
         foreach (var variable in query.ModelVariables)
         {
             meter.Consume();
             if (factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.String or IrTypeKind.Sequence)
             {
-                bounds.Add(owner.Own(context.MkBVULE((BitVecExpr)EncodeLength(GetVariable(variable, meter), meter),
+                bounds = bounds.Add(owner.Own(context.MkBVULE((BitVecExpr)EncodeLength(GetVariable(variable, meter), meter),
                     owner.Own(context.MkBV(MaximumSmallReference, 32)))));
             }
         }
-        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));
+        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds.ToArray()));
     }
 
     private const int MaximumSmallReference = 64;
@@ -45,12 +47,13 @@ internal sealed partial class BvEncoder
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter),
             owner.Own(context.MkBV(factory.GetString(term.Value).Length, 32)))));
-        foreach (var literal in _stringLiterals.Values.Concat(_emptyArrays.Values))
+        foreach (var literal in _stringLiteralOrder.Select(static literal => literal.Value).Concat(_emptyArrayOrder.Select(static empty => empty.Value)))
         {
             meter.Consume();
             AddDistinctReferenceFact(value, literal);
         }
-        _stringLiterals.Add(term.Value, value);
+        _stringLiterals = _stringLiterals.AddUnique(term.Value, value);
+        _stringLiteralOrder = _stringLiteralOrder.Add(new(term.Value, value));
         if (_text != null)
         { AddLiteralText(value, factory.GetString(term.Value), meter); }
         return value;
@@ -85,18 +88,19 @@ internal sealed partial class BvEncoder
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
-        foreach (var previous in _emptyArrays)
+        foreach (var previous in _emptyArrayOrder)
         {
             meter.Consume();
             if (HaveDistinctScalarElements(term.Type, previous.Key))
             { AddDistinctReferenceFact(value, previous.Value); }
         }
-        foreach (var literal in _stringLiterals.Values)
+        foreach (var literal in _stringLiteralOrder.Select(static literal => literal.Value))
         {
             meter.Consume();
             AddDistinctReferenceFact(value, literal);
         }
-        _emptyArrays.Add(term.Type, value);
+        _emptyArrays = _emptyArrays.AddUnique(term.Type, value);
+        _emptyArrayOrder = _emptyArrayOrder.Add(new(term.Type, value));
         return value;
     }
 
@@ -144,38 +148,38 @@ internal sealed partial class BvEncoder
         return owner.Own(context.MkITE(owner.Own(context.MkEq(value, NullReference)), owner.Own(context.MkBV(0, 32)), length));
     }
 
-    internal Dictionary<IrVarId, IrValue> DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
+    internal ImmutableDictionary<IrVarId, IrValue> DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
         query = RepositoryParameterGuard.NotNull(query, nameof(query));
-        var values = new Dictionary<IrVarId, IrValue>();
-        var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
-        var certifiedTypes = new Dictionary<string, IrTypeId>(StringComparer.Ordinal);
-        var shared = new Dictionary<string, object>(StringComparer.Ordinal);
-        foreach (var empty in _emptyArrays)
+        var values = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var aliases = ImmutableDictionary<(IrTypeId Type, string Token), IrValue>.Empty;
+        var certifiedTypes = ImmutableDictionary.Create<string, IrTypeId>(StringComparer.Ordinal);
+        var shared = ImmutableDictionary.Create<string, object>(StringComparer.Ordinal);
+        foreach (var empty in _emptyArrayOrder)
         {
             meter.Consume();
             using var evaluated = model.Evaluate(empty.Value, true);
             var token = evaluated.ToString();
             var value = factory.CreateEmptyArrayValue(empty.Key);
             CertifyType(token, empty.Key);
-            aliases.Add((empty.Key, token), value);
+            aliases = aliases.AddUnique((empty.Key, token), value);
             if (!shared.ContainsKey(token))
-            { shared.Add(token, value); }
+            { shared = shared.AddUnique(token, value); }
         }
-        var identities = new Dictionary<string, object>(StringComparer.Ordinal);
+        var identities = ImmutableDictionary.Create<string, object>(StringComparer.Ordinal);
         string? emptyStringToken = null;
-        foreach (var literal in _stringLiterals)
+        foreach (var literal in _stringLiteralOrder)
         {
             meter.Consume();
             using var evaluated = model.Evaluate(literal.Value, true);
             var token = evaluated.ToString();
             var text = factory.GetString(literal.Key);
             CertifyType(token, factory.StringType);
-            aliases.Add((factory.StringType, token), factory.CreateStringValue(text));
+            aliases = aliases.AddUnique((factory.StringType, token), factory.CreateStringValue(text));
             if (!shared.ContainsKey(token))
-            { shared.Add(token, text); }
+            { shared = shared.AddUnique(token, text); }
             if (text.Length == 0)
             { emptyStringToken = token; }
         }
@@ -194,7 +198,7 @@ internal sealed partial class BvEncoder
             meter.Consume();
             using var evaluated = model.Evaluate(GetVariable(variable, meter), true);
             var value = Decode(factory.GetVariableInfo(variable).Type, evaluated);
-            values.Add(variable, value);
+            values = values.AddUnique(variable, value);
         }
         return values;
 
@@ -202,7 +206,7 @@ internal sealed partial class BvEncoder
         {
             if (certifiedTypes.TryGetValue(token, out var previous) && previous != type)
             { throw new UnsupportedIrEncodingException(); }
-            certifiedTypes[token] = type;
+            certifiedTypes = certifiedTypes.SetItem(token, type);
         }
 
         // An object decodes once per model token; its fields, references
@@ -235,13 +239,13 @@ internal sealed partial class BvEncoder
                 if (!identities.TryGetValue(token, out var identity))
                 {
                     if (shared.TryGetValue(token, out var view))
-                    { identities.Add(token, identity = view); }
+                    { identities = identities.AddUnique(token, identity = view); }
                     else
                     {
                         var state = new IrObjectState();
-                        identities.Add(token, identity = state);
+                        identities = identities.AddUnique(token, identity = state);
                         if (token != modelToken)
-                        { identities[modelToken] = state; }
+                        { identities = identities.SetItem(modelToken, state); }
                         FillObjectState(state, evaluated, model, meter, Decode);
                     }
                 }
@@ -256,7 +260,7 @@ internal sealed partial class BvEncoder
                     factory.GetTypeInfo(previous).Kind == IrTypeKind.Reference)
                 { throw new UnsupportedIrEncodingException(); }
                 if (!certifiedTypes.ContainsKey(token))
-                { certifiedTypes.Add(token, type); }
+                { certifiedTypes = certifiedTypes.AddUnique(token, type); }
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
                 // Completed EncodeLength values are BV32 numerals with a zero high bit.
                 var count = SmtNativeUtilities.ReadNonnegativeInt32(length)!.Value;
@@ -279,11 +283,11 @@ internal sealed partial class BvEncoder
                     IrArrayStorage.CompatibleIntegerViews(factory, array.Type, type))
                 { value = IrValue.WithSequenceIdentity(value, array); }
                 if (!shared.ContainsKey(token))
-                { shared.Add(token, info.Kind == IrTypeKind.String ? value.String : value); }
+                { shared = shared.AddUnique(token, info.Kind == IrTypeKind.String ? value.String : value); }
             }
             // A cyclic object may already have aliased itself while its
             // fields decoded.
-            aliases[(type, token)] = value;
+            aliases = aliases.SetItem((type, token), value);
             return value;
         }
     }
@@ -308,7 +312,7 @@ internal sealed partial class BvEncoder
 
     internal void DisposeReferences()
     {
-        foreach (var element in _elements.Values)
+        foreach (var element in _elementOrder)
         { element.Dispose(); }
         _length?.Dispose();
         DisposeStrings();

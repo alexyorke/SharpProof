@@ -51,8 +51,8 @@ internal sealed class PackagedProductFeed : IDisposable
         System.ArgumentNullException.ThrowIfNull(source);
         System.ArgumentNullException.ThrowIfNull(symbolPackages);
         Source = source;
-        Packages = packages;
-        SymbolPackages = symbolPackages;
+        Packages = packages.ToImmutableArray();
+        SymbolPackages = symbolPackages.ToImmutableArray();
         _ownedDirectory = ownedDirectory;
     }
 
@@ -60,11 +60,11 @@ internal sealed class PackagedProductFeed : IDisposable
     {
         get;
     }
-    internal IReadOnlyList<PackagedPackage> Packages
+    internal ImmutableArray<PackagedPackage> Packages
     {
         get;
     }
-    internal IReadOnlyList<PackagedPackage> SymbolPackages
+    internal ImmutableArray<PackagedPackage> SymbolPackages
     {
         get;
     }

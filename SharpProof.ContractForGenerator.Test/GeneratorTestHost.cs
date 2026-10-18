@@ -73,7 +73,7 @@ internal static class GeneratorTestHost
 
     internal static AnalyzerRun RunAnalyzer(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        Dictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return new AnalyzerRun(CollectDiagnostics(
@@ -86,7 +86,7 @@ internal static class GeneratorTestHost
     internal static AnalyzerRun RunWithAnalyzer(
         CSharpCompilation compilation,
         DiagnosticAnalyzer analyzer,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        Dictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(analyzer);
@@ -100,7 +100,7 @@ internal static class GeneratorTestHost
     internal static GeneratorRun RunWithDefaultGenerator(
         CSharpCompilation compilation,
         GeneratorDriver? previousDriver = null,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        Dictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var driver = previousDriver ?? CreateDriver(globalOptions);
@@ -110,7 +110,7 @@ internal static class GeneratorTestHost
     internal static GeneratorRun RunWithGenerator(
         CSharpCompilation compilation,
         IIncrementalGenerator generator,
-        IReadOnlyDictionary<string, string>? globalOptions = null)
+        Dictionary<string, string>? globalOptions = null)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(generator);
@@ -123,7 +123,7 @@ internal static class GeneratorTestHost
     private static GeneratorRun RunCore(
         CSharpCompilation compilation,
         GeneratorDriver driver,
-        IReadOnlyDictionary<string, string>? globalOptions)
+        Dictionary<string, string>? globalOptions)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(driver);
@@ -145,7 +145,7 @@ internal static class GeneratorTestHost
 
     private static ImmutableArray<Diagnostic> CollectDiagnostics(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string>? globalOptions,
+        Dictionary<string, string>? globalOptions,
         DiagnosticAnalyzer? analyzer,
         IEnumerable<Diagnostic> existing)
     {
@@ -172,7 +172,7 @@ internal static class GeneratorTestHost
 
     private static ImmutableArray<Diagnostic> AnalyzeFinalCompilation(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string>? globalOptions,
+        Dictionary<string, string>? globalOptions,
         DiagnosticAnalyzer? analyzer)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -209,7 +209,7 @@ internal static class GeneratorTestHost
     }
 
     private static CSharpGeneratorDriver CreateDriver(
-        IReadOnlyDictionary<string, string>? globalOptions)
+        Dictionary<string, string>? globalOptions)
     {
         return CreateDriver(
             new ContractForValidatorGenerator(),
@@ -218,7 +218,7 @@ internal static class GeneratorTestHost
 
     private static CSharpGeneratorDriver CreateDriver(
         IIncrementalGenerator generator,
-        IReadOnlyDictionary<string, string>? globalOptions)
+        Dictionary<string, string>? globalOptions)
     {
         System.ArgumentNullException.ThrowIfNull(generator);
         return CSharpGeneratorDriver.Create(

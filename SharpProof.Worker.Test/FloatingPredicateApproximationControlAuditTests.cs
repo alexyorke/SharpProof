@@ -101,6 +101,7 @@ public sealed class FloatingPredicateApproximationControlAuditTests
         var hasTotal = artifact.Callables.Single().Total != null;
         Assert.That(hasTotal, Is.True, "The control requires an admitted compiler-captured total body.");
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
+        artifact = project.Artifact;
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, scenario + ".worker-response.json"), WorkerProtocolJson.SerializeResponse(response));

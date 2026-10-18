@@ -33,13 +33,14 @@ public static class HornInvariantSearch
         IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         private readonly SmtQueryResourceMeter _meter = (states is null ? throw new System.ArgumentNullException(nameof(states)) : (encoder is null ? throw new System.ArgumentNullException(nameof(encoder)) : (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : new(rlimit, cancellationToken))))));
-        private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
+        private ImmutableDictionary<string, IrTerm> _names = ImmutableDictionary.Create<string, IrTerm>(StringComparer.Ordinal);
+        private ImmutableDictionary<string, FuncDecl> _relations = ImmutableDictionary.Create<string, FuncDecl>(StringComparer.Ordinal);
+        private ImmutableDictionary<string, Expr> _integers = ImmutableDictionary.Create<string, Expr>(StringComparer.Ordinal);
         private int _unknownCount;
-        private readonly Dictionary<uint, Expr> _converted = [];
-        private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
+        private ImmutableDictionary<uint, Expr> _converted = ImmutableDictionary<uint, Expr>.Empty;
+        private ImmutableDictionary<string, Expr> _applications = ImmutableDictionary.Create<string, Expr>(StringComparer.Ordinal);
+        private ImmutableDictionary<string, (string Function, ImmutableArray<Expr> Arguments, uint Width)> _applied = ImmutableDictionary.Create<string, (string Function, ImmutableArray<Expr> Arguments, uint Width)>(StringComparer.Ordinal);
+        private ImmutableList<FuncDecl> _relationOrder = ImmutableList<FuncDecl>.Empty;
         private FuncDecl? _error;
 
         internal ImmutableDictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
@@ -47,12 +48,12 @@ public static class HornInvariantSearch
             clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
             var proposals = ImmutableDictionary<IrMemberId, IrTerm>.Empty;
             _error = context.MkFuncDecl("error", [], context.BoolSort);
-            var rules = new List<BoolExpr>();
+            var rules = ImmutableList<BoolExpr>.Empty;
             foreach (var clause in clauses)
             {
-                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToList();
+                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToImmutableList();
                 foreach (var (guards, head) in Heads(encoder.EncodeBoolean(clause.Goal.Predicate, _meter)))
-                { rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
+                { rules = rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
             }
             if (encoder.ReferenceFacts.Count != 0 || encoder.Relations!.Count == 0)
             { return proposals; }
@@ -63,15 +64,15 @@ public static class HornInvariantSearch
             using var interruptParameter = context.MkSymbol("ctrl_c");
             parameters.Add(interruptParameter, false);
             fixedpoint.Parameters = parameters;
-            foreach (var relation in _relations.Values)
+            foreach (var relation in _relationOrder)
             { fixedpoint.RegisterRelation(relation); }
             fixedpoint.RegisterRelation(_error);
             foreach (var converted in rules)
             {
                 var rule = Ackermann(converted);
-                var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-                CollectIntegerConstants(rule, constants);
-                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constants.Values], rule)));
+                var (constants, constantOrder) = CollectIntegerConstants(rule,
+                    ImmutableDictionary.Create<string, Expr>(StringComparer.Ordinal), ImmutableList<string>.Empty);
+                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constantOrder.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : constants[name])], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
             { return proposals; }
@@ -87,7 +88,7 @@ public static class HornInvariantSearch
                 var arguments = state.Select((term, ordinal) =>
                     ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (term is null ? throw new System.ArgumentNullException(nameof(term)) : (Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal])))))).ToArray();
                 for (var ordinal = 0; ordinal < state.Length; ordinal++)
-                { _names[arguments[ordinal].FuncDecl.Name.ToString()] = state[ordinal]; }
+                { _names = _names.SetItem(arguments[ordinal].FuncDecl.Name.ToString(), state[ordinal]); }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
                 if (Translate(Own(cover.SubstituteVars(arguments))) is { } invariant && invariant.Type == factory.BooleanType)
                 { proposals = proposals.SetItem(relation.Key, invariant); }
@@ -99,10 +100,10 @@ public static class HornInvariantSearch
         // requires equal unknowns for equal arguments (Ackermann's reduction).
         private BoolExpr Ackermann(BoolExpr rule)
         {
-            var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-            CollectIntegerConstants(rule, constants);
+            var (constants, _) = CollectIntegerConstants(rule,
+                ImmutableDictionary.Create<string, Expr>(StringComparer.Ordinal), ImmutableList<string>.Empty);
             var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToArray();
-            var congruence = new List<BoolExpr>();
+            var congruence = ImmutableList<BoolExpr>.Empty;
             // A bitvector unknown keeps its signed range.
             foreach (var name in applied)
             {
@@ -110,8 +111,8 @@ public static class HornInvariantSearch
                 {
                     var bound = System.Numerics.BigInteger.One << (int)(width - 1);
                     var value = (ArithExpr)constants[name];
-                    congruence.Add(Own(context.MkLe(Own(context.MkInt((-bound).ToString(CultureInfo.InvariantCulture))), value)));
-                    congruence.Add(Own(context.MkLt(value, Own(context.MkInt(bound.ToString(CultureInfo.InvariantCulture))))));
+                    congruence = congruence.Add(Own(context.MkLe(Own(context.MkInt((-bound).ToString(CultureInfo.InvariantCulture))), value)));
+                    congruence = congruence.Add(Own(context.MkLt(value, Own(context.MkInt(bound.ToString(CultureInfo.InvariantCulture))))));
                 }
             }
             for (var left = 0; left < applied.Length; left++)
@@ -122,7 +123,7 @@ public static class HornInvariantSearch
                     var (other, otherArguments, _) = _applied[applied[right]];
                     if (function != other || arguments.Length != otherArguments.Length)
                     { continue; }
-                    congruence.Add(Own(context.MkImplies(
+                    congruence = congruence.Add(Own(context.MkImplies(
                         Own(context.MkAnd([.. arguments.Select((argument, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkEq(argument, otherArguments[ordinal]))))))])),
                         Own(context.MkEq(constants[applied[left]], constants[applied[right]])))));
                 }
@@ -142,7 +143,7 @@ public static class HornInvariantSearch
             if (_converted.TryGetValue(expression.Id, out var converted))
             { return converted; }
             converted = IntegerCore(expression);
-            _converted[expression.Id] = converted;
+            _converted = _converted.SetItem(expression.Id, converted);
             return converted;
         }
 
@@ -164,7 +165,8 @@ public static class HornInvariantSearch
                 if (!_relations.TryGetValue(name, out var relation))
                 {
                     relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
-                    _relations.Add(name, relation);
+                    _relations = _relations.AddUnique(name, relation);
+                    _relationOrder = _relationOrder.Add(relation);
                 }
                 return Own(context.MkApp(relation, arguments));
             }
@@ -176,7 +178,7 @@ public static class HornInvariantSearch
                 if (!_integers.TryGetValue(name, out var integer))
                 {
                     integer = Own(context.MkIntConst(name));
-                    _integers.Add(name, integer);
+                    _integers = _integers.AddUnique(name, integer);
                 }
                 return integer;
             }
@@ -191,8 +193,8 @@ public static class HornInvariantSearch
                 {
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
                     application = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
-                    _applications.Add(key, application);
-                    _applied.Add(name, (function, operands, expression.Sort is BitVecSort sort ? sort.Size : 0));
+                    _applications = _applications.AddUnique(key, application);
+                    _applied = _applied.AddUnique(name, (function, operands.ToImmutableArray(), expression.Sort is BitVecSort sort ? sort.Size : 0));
                 }
                 return application;
             }
@@ -268,31 +270,31 @@ public static class HornInvariantSearch
         {
             if (!ContainsRelation(fact) || IsRelation(fact))
             { return fact; }
-            var applications = new List<Expr>();
-            Applications(fact, applications);
+            var applications = Applications(fact, ImmutableList<Expr>.Empty);
             var holds = applications.Select(_ => (Expr)Own(context.MkTrue())).ToArray();
             return Own(context.MkAnd([(BoolExpr)Own(fact.Substitute([.. applications], holds)), .. applications.Cast<BoolExpr>()]));
         }
 
-        private void Applications(Expr expression, List<Expr> applications)
+        private ImmutableList<Expr> Applications(Expr expression, ImmutableList<Expr> applications)
         {
             applications = RepositoryParameterGuard.NotNull(applications, nameof(applications));
             _meter.Consume();
             if (IsRelation(expression))
             {
                 if (!applications.Any(application => application is null ? throw new System.ArgumentNullException(nameof(application)) : (application.Equals(expression))))
-                { applications.Add(expression); }
-                return;
+                { applications = applications.Add(expression); }
+                return applications;
             }
             if (expression.IsApp)
             {
                 foreach (var argument in expression.Args)
-                { Applications(argument, applications); }
+                { applications = Applications(argument, applications); }
             }
+            return applications;
         }
 
         // The heads a goal requires, each with the guards under which it must hold.
-        private IEnumerable<(BoolExpr[] Guards, BoolExpr Head)> Heads(BoolExpr goal)
+        private IEnumerable<(ImmutableArray<BoolExpr> Guards, BoolExpr Head)> Heads(BoolExpr goal)
         {
             if (!ContainsRelation(goal))
             { return [([Own(context.MkNot(goal))], Own((BoolExpr)context.MkApp(_error!)))]; }
@@ -304,7 +306,7 @@ public static class HornInvariantSearch
             {
                 var guards = goal.Args.Where(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (!ContainsRelation(argument)))
                     .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToArray();
-                return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToArray(), head.Head))];
+                return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToImmutableArray(), head.Head))];
             }
             throw new UnsupportedIrEncodingException();
         }
@@ -312,20 +314,25 @@ public static class HornInvariantSearch
         // Collect free constants from authored integerized rules. Every node is
         // a Bool/Int application; nonrelation applications became fresh constants.
         // Quantification is added only after this traversal.
-        private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
+        private (ImmutableDictionary<string, Expr> Values, ImmutableList<string> Order) CollectIntegerConstants(
+            Expr expression, ImmutableDictionary<string, Expr> constants, ImmutableList<string> order)
         {
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             constants = RepositoryParameterGuard.NotNull(constants, nameof(constants));
+            order = RepositoryParameterGuard.NotNull(order, nameof(order));
             _meter.Consume();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
             {
-                constants[expression.FuncDecl.Name.ToString()] = expression;
-                return;
+                var name = expression.FuncDecl.Name.ToString();
+                if (!constants.ContainsKey(name))
+                { order = order.Add(name); }
+                return (constants.SetItem(name, expression), order);
             }
             foreach (var argument in expression.Args)
-            { CollectIntegerConstants(argument, constants); }
+            { (constants, order) = CollectIntegerConstants(argument, constants, order); }
+            return (constants, order);
         }
-
         // The IR meaning of a cover over boolean and bitvector state.
         private IrTerm? Translate(Expr expression)
         {
@@ -344,7 +351,7 @@ public static class HornInvariantSearch
             }
             if (literal is not null)
             { return literal; }
-            IrTerm?[] operands = [.. arguments.Select(Translate)];
+            ImmutableArray<IrTerm?> operands = [.. arguments.Select(Translate)];
             return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
     }
