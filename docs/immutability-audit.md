@@ -2053,3 +2053,14 @@ all random draws even when sequence values are not referenced, null/empty semant
 value identity and traversal order. CollectVariables visited/output sets are local
 construction guards and can use builders; its DFS stack remains immutable. Status:
 open before edits.
+## Differential oracle construction and identity inventory
+
+IMM-M034: Coordinator traced IrCSharpDifferentialOracle's variable rank/type maps,
+postorder term list, visited/DFS state, type memo and runtime identity trackers through
+private consumers. Use sorted/dictionary/array/hash builders with default ID comparers,
+immutable DFS stack preserving reverse child push order, and frozen variable/term
+snapshots before source generation. Runtime identity maps and nested compared-array
+sets may use scoped builders retaining ReferenceEqualityComparer.Instance; publish
+runtime arrays into the memo before recursive materialization exactly as before.
+Actual Array.CreateInstance/SetValue reflection subjects and StringBuilder output
+remain native construction adapters. Status: open before edits.
