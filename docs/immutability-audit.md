@@ -1984,3 +1984,20 @@ The mutable PushChildren stack remains an explicit SUT exception. Agent exclusio
 based only on scoped state, identity caches or local arrays are not accepted: outer
 builders can preserve identity, and immutable snapshots can preserve local read-only use.
 Further reviewed frontend/worker/corpus/script and test-host findings remain open.
+## Corpus observation and allocation cache construction inventory
+
+IMM-M030: Coordinator inspected OpenSourceCorpusRunner diagnostic buckets, native
+outcome/tree-target lookups, assignment-count vector and invalid-assignment projection.
+Use strict immutable map capture, scoped array builders, immutable nested arrays and
+frozen counts before validation. Keep tree reference equality and diagnostic order;
+widen the validation helper's input to IReadOnlyList<int> for existing array callers.
+
+NativeAllocationWitnessOracle input-slot maps, generic-choice vectors and per-invocation
+alias maps can use builders/immutable snapshots while retaining IrValue/runtime object
+identity and the original default object comparer. Its persistent assembly cache can
+use an immutable dictionary root with an ordered construction sidecar for unloading;
+keep resource handles mutable and preserve insertion/unload order, strict Add behavior,
+cache hits, failed-load cleanup and disposal reset. Reflection argument/type arrays
+remain explicit native API adapters. The coordinator rejects a blanket mutable-cache
+exclusion based solely on the presence of aliasing or resource lifecycle.
+Status: open before edits.
