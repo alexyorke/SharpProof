@@ -123,7 +123,7 @@ internal static partial class CSharpOperationSemantics
         { return CompoundShift(factory, operation, left, right, checkOverflow); }
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
             !TryBinary(operation.OperatorKind, out var kind) ||
-            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply) && !IsBitwise(kind))
+            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder) && !IsBitwise(kind))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var first = factory.GetTypeInfo(left.Type);
         var second = factory.GetTypeInfo(right.Type);
@@ -146,7 +146,9 @@ internal static partial class CSharpOperationSemantics
                     ? factory.GetOrCreateIntegerType(32, false) : factory.GetOrCreateIntegerType(32, true);
         var rule = IsBitwise(kind)
             ? Exact(factory.Binary(kind, factory.Cast(promoted, left), factory.Cast(promoted, right)))
-            : IntegerArithmetic(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right), operation.IsChecked);
+            : kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder
+                ? DivideOrRemainder(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right))
+                : IntegerArithmetic(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right), operation.IsChecked);
         var conversion = ConvertInteger(factory, rule.Value, left.Type, operation.IsChecked);
         return new(conversion.Value, [.. rule.Throws, .. conversion.Throws], conversion.Classification);
     }

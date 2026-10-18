@@ -654,13 +654,18 @@ public sealed partial class IrHavocInstruction
             state.Occurrences[this.Id] = occurrence + 1;
             foreach (var variable in this.Variables)
             {
-                var modeled = state.ReplayOptions.HavocValueProvider(new IrHavocRequest(
-                    this.Id, this.Operation, variable, occurrence, this.Origin));
+                var request = new IrHavocRequest(this.Id, this.Operation, variable, occurrence, this.Origin);
+                var concrete = this.Origin == IrHavocOrigin.Approximation
+                    ? state.ReplayOptions.ConcreteHavocValueProvider?.Invoke(request) : null;
+                var modeled = concrete ?? state.ReplayOptions.HavocValueProvider(request);
                 if (modeled == null || modeled.Type != state.Interpreter._factory.GetVariableInfo(variable).Type)
                 {
                     return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "The havoc model is missing or has the wrong type.");
                 }
-                state.Values.SetHavocValue(variable, modeled, this.Origin);
+                if (concrete != null)
+                { state.Values[variable] = modeled; }
+                else
+                { state.Values.SetHavocValue(variable, modeled, this.Origin); }
             }
             return null;
         }

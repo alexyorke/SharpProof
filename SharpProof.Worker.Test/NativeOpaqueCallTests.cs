@@ -117,18 +117,17 @@ public sealed class NativeOpaqueCallTests
         Assert.That(await PostconditionAsync(preparation), Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
-    [TestCase("System.Array.Sort(items); return items[0];")]
-    [TestCase("var first = items[0]; System.Array.Sort(items); return first;")]
-    public async Task OpaqueCallsMakeElementReadsApproximations(string body)
+    [TestCase("System.Array.Sort(items); return items[0];", WorkerClaimOutcome.Unknown)]
+    [TestCase("var first = items[0]; System.Array.Sort(items); return first;", WorkerClaimOutcome.Proven)]
+    public async Task OpaqueCallsOnlyInvalidateSubsequentElementReads(string body, WorkerClaimOutcome expected)
     {
-        // The callee may write any array, so no read may assume the entry value.
+        // The callee may write any array. Reads before the call keep their captured values.
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("public static int Target(int[] items) { " +
             "Contract.Requires(items != null && items.Length == 2 && items[0] == 2 && items[1] == 1); " +
             "Contract.Ensures(Contract.Result<int>() == 2); " + body + " }");
         var outcome = await PostconditionAsync(preparation);
-        Assert.That(outcome, Is.Not.EqualTo(WorkerClaimOutcome.Refuted));
-        Assert.That(outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(outcome, Is.EqualTo(expected));
     }
 
     [Test]

@@ -9,8 +9,7 @@ internal static partial class CSharpOperationSemantics
         return !method.IsStatic && method.Name == "CompareTo" && method.DeclaringSyntaxReferences.IsEmpty &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 && method.Parameters.Length == 1 &&
             method.Parameters[0].RefKind == RefKind.None &&
-            method.ContainingType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 or
-                SpecialType.System_UInt32 or SpecialType.System_UInt64 &&
+            IsComparisonIntegerType(method.ContainingType) &&
             SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ContainingType);
     }
 
@@ -29,17 +28,32 @@ internal static partial class CSharpOperationSemantics
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         return IsIntegerComparerDeclaration(invocation.TargetMethod) &&
-            invocation.TargetMethod.ContainingType.TypeArguments[0].SpecialType is
-                SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32 or SpecialType.System_UInt64 &&
-            invocation.Instance is IPropertyReferenceOperation
-            {
-                Instance: null, Arguments.Length: 0,
-                Property: { IsStatic: true, Name: "Default", GetMethod: { } getter }
-            } property && IsFrameworkCollectionMember(getter) &&
-            SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, invocation.TargetMethod.ContainingType) &&
-            SymbolEqualityComparer.Default.Equals(property.Type, invocation.TargetMethod.ContainingType);
+            invocation.Instance != null && IsDefaultIntegerComparer(invocation.Instance);
     }
 
+    internal static bool IsDefaultIntegerComparer(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return IsComparisonIntegerType(DefaultComparerElement(operation));
+    }
+
+    internal static bool IsComparisonIntegerType(ITypeSymbol? type)
+    {
+        return type != null && TryGetScalarInteger(type.SpecialType, out _);
+    }
+
+    internal static ITypeSymbol? DefaultComparerElement(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return operation is IPropertyReferenceOperation
+        {
+            Instance: null, Arguments.Length: 0,
+            Property: { IsStatic: true, Name: "Default", GetMethod: { } getter }
+        } property && IsFrameworkCollectionMember(getter) &&
+            property.Type is INamedTypeSymbol { TypeArguments.Length: 1 } type &&
+            type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
+            SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, type) ? type.TypeArguments[0] : null;
+    }
     internal static bool IsNonnegativeCollectionCount(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -68,6 +82,10 @@ internal static partial class CSharpOperationSemantics
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        // CoreLib's 8/16-bit CompareTo returns the promoted difference, not its sign.
+        // Both operand domains fit Int32, so this subtraction cannot overflow.
+        if (factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer, Width: < 32 })
+        { return factory.Binary(IrBinaryOperator.Subtract, factory.Cast(factory.IntegerType, left), factory.Cast(factory.IntegerType, right)); }
         return factory.Conditional(factory.Binary(IrBinaryOperator.LessThan, left, right), factory.Integer(-1),
             factory.Conditional(factory.Binary(IrBinaryOperator.GreaterThan, left, right), factory.Integer(1), factory.Integer(0)));
     }
