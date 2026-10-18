@@ -70,10 +70,16 @@ access kind and value domains satisfy the production guard.
 - Immutable scalar-array-backed IList<T> helpers now specialize returns of the
   same T, including method, local-function, containing-type and nested generic
   contexts. Native proofs/refutations and compiled CLR/IR boundary checks cover
-  the supported scalar types. Direct T[] and scalar T parameter signatures,
-  unrelated result type parameters and mutable/captured or otherwise unproven
-  receiver representations remain open; closed scalar type arguments alone do
-  not supply the missing evidence. Generic local IList/ICollection Count branches
+  the supported scalar types. Direct scalar SZ-array T[] and by-value scalar T
+  parameters now preserve typed storage through nested calls and reassignment;
+  array reads, full-content Swap, effects and CLR/IR faults are verified. This
+  signature gap was closed by implementation/test commit `8a3dd8a39` (4,976 worker,
+  1,843 frontend and 468 Gates tests pass; changed trusted code is 304/304 covered).
+  Unrelated or unbound type parameters, generic defaults/operators without scalar
+  semantics, ref/out signatures, reference/non-SZ arrays and mutable/captured or
+  otherwise unproven interface receiver representations remain open. Closed scalar
+  type arguments without validated parameter evidence do not supply those models.
+  Generic local IList/ICollection Count branches
   and full Swap postconditions retain source declaration/ordinal/assembly ownership,
   with native proofs/refutations and compiled CLR/IR normal/fault agreement.
 - Count >= 0 is weaker than a collection representation invariant. List/dictionary/
