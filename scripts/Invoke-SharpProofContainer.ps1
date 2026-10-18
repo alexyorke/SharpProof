@@ -596,8 +596,8 @@ switch ($Command) {
         # already enforces them, so shards and the gate skip them.
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
             -AdditionalBuildArguments @(
-                '-p:ContinuousIntegrationBuild=true',
-                '-p:RunAnalyzersDuringBuild=false')
+            '-p:ContinuousIntegrationBuild=true',
+            '-p:RunAnalyzersDuringBuild=false')
         $coverageShardArguments = @{
             ResultsDirectory = (Join-Path $repositoryRoot (
                     'artifacts/coverage/' + $CoveragePhase))
