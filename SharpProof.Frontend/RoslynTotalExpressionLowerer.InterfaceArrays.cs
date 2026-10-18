@@ -71,19 +71,50 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var guard = CSharpOperationSemantics.ArrayCollectionGuard(_factory, array.Value, index.Value);
         block = ApplyRule(operation, new TotalScalarRule(_factory.Boolean(true), [guard.Throws[0]], guard.Classification), block).Continuation;
         block = ArrayInterfaceBoundsEffects(property, operation, index.Value, guard.Throws[1].Condition, block);
-        block = ApplyRule(operation, guard, block).Continuation;
         if (stored is { } value)
         {
             _builder!.ElementStore(block, _context.Site(operation), array.Value, index.Value, value.Value);
             return new(value.Value, block, FrontendSubsetClassification.Exact);
         }
+        TotalBodyValue read;
         if (ApproximateElementReads)
         {
             var unknown = _context.Temporary(_context.Type(property.Type));
             _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
-            return new(_factory.Variable(unknown), block, FrontendSubsetClassification.Exact);
+            read = new(_factory.Variable(unknown), block, FrontendSubsetClassification.Exact);
         }
-        var read = new TotalBodyValue(_factory.SequenceAccess(array.Value, index.Value), block, FrontendSubsetClassification.Exact);
+        else
+        { read = new(_factory.SequenceAccess(array.Value, index.Value), block, FrontendSubsetClassification.Exact); }
+        if (operation is IIncrementOrDecrementOperation or ICompoundAssignmentOperation)
+        {
+            // A compound setter reads before its RHS. Capture that value even
+            // when the RHS writes the same cell or rebinds the receiver/index.
+            read = Pin(operation, read);
+            TotalBodyValue next;
+            if (operation is IIncrementOrDecrementOperation increment)
+            {
+                next = ApplyClassifiedRule(operation,
+                    CSharpOperationSemantics.Increment(_factory, increment, read.Value), read.Continuation);
+            }
+            else
+            {
+                var compound = (ICompoundAssignmentOperation)operation;
+                var right = LowerBodyValue(compound.Value, read.Continuation, depth + 1);
+                if (!right.Classification.IsExact)
+                { return Approximate(operation, right.Continuation, right.Classification.Abstention); }
+                next = ApplyClassifiedRule(operation,
+                    CSharpOperationSemantics.Compound(_factory, compound, read.Value, right.Value, _context.Compilation?.Options.CheckOverflow), right.Continuation);
+            }
+            if (next.Classification.IsExact)
+            {
+                // Both accessor calls use the captured receiver/index. Scalar
+                // SZ-array length and bounds cannot change between the calls.
+                _builder!.ElementStore(next.Continuation, _context.Site(operation), array.Value, index.Value, next.Value);
+                if (operation is IIncrementOrDecrementOperation { IsPostfix: true })
+                { return new(read.Value, next.Continuation, next.Classification); }
+            }
+            return next;
+        }
         return PinElementReads ? Pin(operation, read) : read;
     }
 
@@ -123,9 +154,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
         _builder.Havoc(invalid, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Writes, "interface-array:cache"),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, mayWrite);
         var cacheWrite = _builder.CreateBlock("interface-array:cache-write");
-        _builder.Branch(invalid, site, _factory.Variable(mayWrite), cacheWrite, continuation);
+        var boundsThrow = _builder.CreateBlock("interface-array:bounds-throw");
+        _builder.Branch(invalid, site, _factory.Variable(mayWrite), cacheWrite, boundsThrow);
         _builder.Write(cacheWrite, site, IrWriteRegion.Static);
-        _builder.Goto(cacheWrite, site, continuation);
+        _builder.Goto(cacheWrite, site, boundsThrow);
+        _builder.Throw(boundsThrow, site, IrExceptionKind.ArgumentOutOfRange,
+            ExceptionTarget?.Invoke(IrExceptionKind.ArgumentOutOfRange, site) ?? _exceptionalExit);
         return continuation;
     }
 

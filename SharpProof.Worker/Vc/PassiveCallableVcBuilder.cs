@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace SharpProof.Worker;
 
 // Passive scalar SSA: every constraint is derived from the owned original
@@ -12,11 +14,12 @@ internal sealed class PassiveCallableVcBuilder
         public IrTerm Reach { get; init; } = Reach ?? throw new System.ArgumentNullException(nameof(Reach));
         public ImmutableDictionary<IrVarId, IrTerm> State { get; init; } = State ?? throw new System.ArgumentNullException(nameof(State));
     }
-    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents)
+    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents, IrBlockId Block)
     {
         public IrTerm Reach { get; init; } = Reach ?? throw new System.ArgumentNullException(nameof(Reach));
         public ImmutableDictionary<IrVarId, IrTerm> State { get; init; } = State ?? throw new System.ArgumentNullException(nameof(State));
         public Heap Contents { get; init; } = Contents ?? throw new System.ArgumentNullException(nameof(Contents));
+        public IrBlockId Block { get; init; } = Block.IsDefault ? throw new System.ArgumentException("Block must be initialized.", nameof(Block)) : Block;
     }
     // The element and field stores made so far in program order, each under
     // its reach, over the entry contents; forgotten contents are unknown after
@@ -29,15 +32,17 @@ internal sealed class PassiveCallableVcBuilder
     // A store with no value represents a fresh object's scalar field defaults.
     // A missing target represents a heap invalidation at its exact reach and
     // program position; untaken branches cannot erase another path's contents.
-    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly)> Stores)
+    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly, IrBlockId Block)> Stores)
     {
-        public ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly)> Stores { get; init; } = Stores.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Stores)) : Stores;
+        public ImmutableArray<(IrTerm Reach, IrTerm? Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value, bool ElementsOnly, IrBlockId Block)> Stores { get; init; } = Stores.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Stores)) : Stores;
     }
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
     private readonly ImmutableHashSet<IrInstructionId> _stops;
     private readonly List<Assumption> _facts = [];
+    private readonly Dictionary<IrBlockId, BigInteger> _blockAncestors = [];
+    private IrBlockId _activeBlock;
     private readonly Dictionary<IrId, IrTerm> _entryFieldReferences = [];
     private readonly List<(IrTerm Reach, IrTerm Value, OperationId Site)> _freshReferences = [];
     private readonly Dictionary<ProofJustification, string> _labels = [];
@@ -47,7 +52,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<Exit> _returns = [];
     private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
-    private readonly List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> _writes = [];
+    private readonly List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
     private readonly Dictionary<IrInstructionId, int> _callMarkers;
@@ -100,7 +105,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<OperationId> _explicitSites = [];
     internal ImmutableArray<OperationId> ExplicitSites => [.. _explicitSites];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
-    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> Writes => [.. _writes];
+    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> Writes => [.. _writes];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
         [.. _callPreconditions];
@@ -209,6 +214,21 @@ internal sealed class PassiveCallableVcBuilder
             if (instructions > MaximumSteps)
             { throw new ConstructionLimitException(); }
         }
+        // A store on a sibling CFG path cannot affect this block's reads.
+        // Bitsets retain graph reachability without expanding path predicates.
+        foreach (var blockId in order)
+        {
+            Spend();
+            var ancestors = _blockAncestors.GetValueOrDefault(blockId) | (BigInteger.One << blockId.Value);
+            _blockAncestors[blockId] = ancestors;
+            // The acyclic-order check already validated each reachable terminator.
+            var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(blockId).Terminator).GetValueOrDefault();
+            foreach (var successor in new[] { successors.First, successors.Second })
+            {
+                if (successor is { } target)
+                { _blockAncestors[target] = _blockAncestors.GetValueOrDefault(target) | ancestors; }
+            }
+        }
         var entry = program.GetBlock(program.Entry).Instructions[0].Operation;
         var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var parameter in _candidate.Parameters)
@@ -232,6 +252,7 @@ internal sealed class PassiveCallableVcBuilder
         foreach (var blockId in order)
         {
             Spend();
+            _activeBlock = blockId;
             var block = program.GetBlock(blockId);
             var site = block.Instructions[0].Operation;
             var predecessors = _incoming[blockId];
@@ -309,7 +330,7 @@ internal sealed class PassiveCallableVcBuilder
                             {
                                 Spend(_heap.Stores.Length);
                                 var owner = allocated.Type == _factory.ObjectType ? allocated : _factory.Cast(_factory.ObjectType, allocated);
-                                _heap = _heap with { Stores = _heap.Stores.Add((reach, owner, null, null, null, false)) };
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, owner, null, null, null, false, blockId)) };
                             }
                             if (arrayLength != null)
                             { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
@@ -325,7 +346,7 @@ internal sealed class PassiveCallableVcBuilder
                                 if (zero != null)
                                 {
                                     Spend(_heap.Stores.Length);
-                                    _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, null, null, zero, false)) };
+                                    _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, null, null, zero, false, blockId)) };
                                 }
                             }
                             // The sequence encoder observes only scalar elements.
@@ -339,7 +360,7 @@ internal sealed class PassiveCallableVcBuilder
                                 // Initialization occurs after earlier heap invalidations.
                                 // Keep it in the ordered overlay, like an element store.
                                 Spend(_heap.Stores.Length);
-                                _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index], false)) };
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index], false, blockId)) };
                             }
                             var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence;
                             if (referenceObject)
@@ -379,17 +400,17 @@ internal sealed class PassiveCallableVcBuilder
                                 receiverWrite = storedTarget.Id == _factory.Cast(_factory.ObjectType, receiver).Id;
                             }
                             Spend(_heap.Stores.Length);
-                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement, false)) };
+                            _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement, false, blockId)) };
                         }
                         else if (write.Region == IrWriteRegion.Element)
-                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, true)) }; }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, true, blockId)) }; }
                         else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
-                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false, blockId)) }; }
                         if (!IrWriteSites.IsLoopCell(_factory, write))
                         {
                             _writes.Add((reach, write.Id,
                                 IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local,
-                                receiverWrite));
+                                receiverWrite, _facts.Count));
                         }
                         break;
                     case IrCallInstruction call:
@@ -403,7 +424,7 @@ internal sealed class PassiveCallableVcBuilder
                         var effects = IrOpaqueCallSite.Effects(_factory, call.Operation);
                         _opaqueCalls.Add((reach, effects));
                         if ((effects & IrOpaqueCallEffects.Writes) != 0)
-                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false, blockId)) }; }
                         break;
                     case IrAssignInstruction assign:
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
@@ -445,15 +466,23 @@ internal sealed class PassiveCallableVcBuilder
                         }
                         var assigned = Fresh(_factory.GetVariableInfo(assign.Target).Type);
                         Fact(Guard(reach, Equal(assigned, value)), assign.Operation, "write");
-                        // Forward only immutable atoms. The fresh write fact
-                        // and model identity remain available to the kernel;
-                        // compound evaluations keep their own SSA version.
-                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm ? value : assigned;
+                        // Rewritten array reads already denote a fixed heap snapshot.
+                        // Forward those atoms and one arithmetic term of frozen operands
+                        // to avoid bit-blasting duplicate arithmetic circuits.
+                        state[assign.Target] = value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm or
+                            IrSequenceAccessTerm { Sequence: IrVariableTerm, Index: IrVariableTerm or IrIntegerTerm } or
+                            IrBinaryTerm
+                        {
+                            Operator: IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder,
+                            Left: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm,
+                            Right: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm
+                        }
+                            ? value : assigned;
                         break;
                     case IrHavocInstruction havoc:
                         if (havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory &&
                             havoc.Origin == IrHavocOrigin.Approximation)
-                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false)) }; }
+                        { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false, blockId)) }; }
                         else if (havoc.HavocKind != IrHavocKind.Variables ||
                             havoc.Origin is not (IrHavocOrigin.Input or IrHavocOrigin.Approximation))
                         { return null; }
@@ -534,7 +563,7 @@ internal sealed class PassiveCallableVcBuilder
                             : returnedValue != null)
                         { return null; }
                         Spend(state.Count);
-                        _returns.Add(new(reach, state.ToImmutableDictionary(), returnedValue, _heap));
+                        _returns.Add(new(reach, state.ToImmutableDictionary(), returnedValue, _heap, blockId));
                         break;
                     default:
                         return null;
@@ -648,6 +677,7 @@ internal sealed class PassiveCallableVcBuilder
     {
         System.ArgumentNullException.ThrowIfNull(state);
         heap ??= _heap;
+        var readAncestors = _blockAncestors[returned?.Block ?? _activeBlock];
         if (!Term(root))
         { value = null!; return false; }
         var substitutions = new Dictionary<IrVarId, IrTerm>();
@@ -706,6 +736,8 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = entry;
             foreach (var store in heap.Stores)
             {
+                if ((readAncestors & (BigInteger.One << store.Block.Value)).IsZero)
+                { continue; }
                 if (store.Target == null)
                 {
                     if (!store.ElementsOnly)
@@ -741,6 +773,8 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
+                if ((readAncestors & (BigInteger.One << store.Block.Value)).IsZero)
+                { continue; }
                 if (store.Target == null)
                 {
                     read = _factory.Conditional(store.Reach, Fresh(original.Type), read);

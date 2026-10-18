@@ -391,6 +391,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             { IsRef: false, Target: IPropertyReferenceOperation arrayTarget } arrayStore &&
             ArrayCollectionBody(arrayTarget, operation, arrayStore.Value, block, depth) is { } arrayStored)
         { return arrayStored; }
+        if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation arrayIncrement } &&
+            ArrayCollectionBody(arrayIncrement, operation, null, block, depth) is { } arrayIncremented)
+        { return arrayIncremented; }
+        if (depth < 256 && operation is ICompoundAssignmentOperation { Target: IPropertyReferenceOperation arrayCompound } &&
+            ArrayCollectionBody(arrayCompound, operation, null, block, depth) is { } arrayCompounded)
+        { return arrayCompounded; }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }

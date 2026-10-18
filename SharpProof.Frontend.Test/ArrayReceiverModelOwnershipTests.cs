@@ -11,6 +11,33 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ArrayReceiverModelOwnershipTests
 {
+    [TestCase("++((System.Collections.Generic.IList<int>)values)[0]", 6)]
+    [TestCase("((System.Collections.Generic.IList<int>)values)[0] += 3", 8)]
+    public void ApproximateArrayInterfaceUpdatesRetainTheirMutation(string expression, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) { return " + expression + "; } }");
+        var compilation = CSharpCompilation.Create("ApproximateInterfaceUpdate", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+            Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!, context, static _ => true, null,
+            TestContext.CurrentContext.CancellationToken, opaqueCalls: true, approximateElementReads: true);
+        Assert.That(lowered.IsExact, Is.True);
+        var parameter = context.Parameters[0].Entry;
+        var array = factory.CreateSequenceValue(factory.GetVariableInfo(parameter).Type, [factory.CreateIntegerValue(17)]);
+        var writes = new List<IrWriteInstruction>();
+        var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
+            new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [parameter] = array }, 1000,
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(5)) { WriteObserver = writes.Add });
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
+        Assert.That(replay.ConsumedApproximation, Is.True);
+        Assert.That(writes.Count(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.Region == IrWriteRegion.Element && write.IsStore), Is.EqualTo(1));
+    }
     [TestCase(false)]
     [TestCase(true)]
     public void ArraySpecializationRequiresAnUnambiguousSourceModel(bool shared)

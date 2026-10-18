@@ -12,7 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
-    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
@@ -228,6 +228,21 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
+    // Witness search may ignore later facts: a concretely replayed write is
+    // already observable before the rest of the method executes. This query
+    // cannot establish purity, even when the first write is unreachable.
+    internal VerificationQuery? FirstPurityPrefixQuery()
+    {
+        foreach (var write in _writes)
+        {
+            if (write.Region != IrWriteRegion.Local)
+            {
+                return new(Factory, _entry.AddRange(_body.Take(write.FactCount)), new Goal(Factory,
+                    Factory.Unary(IrUnaryOperator.Not, write.Reach), ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+            }
+        }
+        return null;
+    }
     internal VerificationQuery PurityQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,

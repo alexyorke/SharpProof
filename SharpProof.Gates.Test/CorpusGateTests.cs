@@ -877,7 +877,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 document.Methods.Count(static method =>
                     method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Supported)),
-                Is.EqualTo(14));
+                Is.EqualTo(18));
             Assert.That(
                 document.Methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support)),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
@@ -920,17 +920,17 @@ public sealed class CorpusGateTests
             Assert.That(result.CaseCount, Is.EqualTo(462));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
-            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(14));
+            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(18));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(240));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(244));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(222));
+                Is.EqualTo(218));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(221));
+            Assert.That(result.UnknownCount, Is.EqualTo(217));
             Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(222));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(218));
             Assert.That(
                 result.UnknownReasons
                     .ToDictionary(
@@ -939,7 +939,7 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 121,
+                        ["SP0002"] = 117,
                         ["SP0016"] = 18,
                         ["SP0045"] = 9,
                         ["SP0046"] = 9,
