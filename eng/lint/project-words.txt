@@ -43,6 +43,7 @@ signedness
 slnx
 spcf
 sshfs
+syft
 tmpfs
 uncancellable
 unevaluable
