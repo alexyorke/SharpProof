@@ -42,13 +42,14 @@ pwsh -NoLogo -NoProfile -File scripts/Invoke-SharpProofDevCheck.ps1 -Configurati
 
 ## Canonical PR cohorts
 
-The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus`. [ci.yml](../.github/workflows/ci.yml) splits this unchanged universe across two jobs:
+The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus`. [ci.yml](../.github/workflows/ci.yml) splits this unchanged universe across parallel jobs:
 
-- `canonical-main` runs `pr -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining`, including package phases.
+- `canonical-main` runs `pr -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining -SkipPackageTests`. Its full Release solution build is the analyzer-enforcing build.
+- `canonical-package` runs the same package phase with `package-tests -Configuration Release -Fast` and the canonical filter. `-Fast` skips analyzers only in that build.
 - `canonical-gates` runs `semantic-tests -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates` with the canonical filter.
-- `build-and-test` requires both successful jobs, downloads their evidence into `artifacts/canonical-cohorts/remaining` and `gates`, then invokes `canonical-cohort-gate`.
+- `build-and-test` requires those jobs and self-application to succeed, downloads their evidence into `artifacts/canonical-cohorts/remaining` and `gates`, then invokes `canonical-cohort-gate`.
 
-`All` is the default cohort. `Remaining` and `Gates` require retained test results and the exact canonical filter. `pr` retains package phases and rejects Gates-only selection. `-SemanticCohort` and `-TestResultsDirectory` apply only to `pr`, `pr-gates`, and `semantic-tests`.
+`All` is the default cohort. `Remaining` and `Gates` require retained test results and the exact canonical filter. `pr` retains package phases unless `-SkipPackageTests` is given, and rejects Gates-only selection. `-SemanticCohort` and `-TestResultsDirectory` apply only to `pr`, `pr-gates`, and `semantic-tests`.
 
 Reconciliation checks actual NUnit discovery, TRX execution identities/outcomes, source identity, and the CI run/attempt evidence. The six existing Explicit LongFuzz skips have specific allowed identities and reasons; additional skipped tests fail reconciliation. Two independently successful job labels alone do not replace this gate. Sources: [semantic scheduler](../scripts/Invoke-SharpProofSemanticTests.ps1) and [cohort evidence validator](../scripts/SharpProof.CanonicalCohortEvidence.ps1).
 

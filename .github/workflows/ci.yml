@@ -32,10 +32,11 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Run the single-build non-Gates PR phases
+      # The package phase runs in canonical-package, in parallel.
+      - name: Run the single-build non-Gates semantic PR phases
         run: >-
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
-          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining
+          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining -SkipPackageTests
 
       - name: Upload container gate evidence
         if: always()
@@ -43,6 +44,42 @@ jobs:
         with:
           name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  canonical-package:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      # The package phase of pr, with the same Release configuration and
+      # canonical filter. -Fast skips analyzers in this build only;
+      # canonical-main's full solution build enforces them.
+      - name: Run the PR package phase
+        run: >-
+          docker compose run --rm tooling package-tests
+          -Configuration Release -Fast
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Upload package phase timing evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-package-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/timings
           if-no-files-found: warn
           retention-days: 14
 
@@ -157,17 +194,18 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application]
+    needs: [canonical-main, canonical-package, canonical-gates, self-application]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
         env:
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
+          SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
         run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
-            echo "Canonical jobs, or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
+            echo "Canonical jobs, or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1
           fi
 

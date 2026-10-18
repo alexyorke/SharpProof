@@ -18,6 +18,9 @@ param(
 
     [string]$TestResultsDirectory = '',
 
+    # CI runs the package phase of pr in a separate parallel job.
+    [switch]$SkipPackageTests,
+
     [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
@@ -67,6 +70,9 @@ if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
         $PSBoundParameters.ContainsKey('TestResultsDirectory')) -and
     $Command -notin @('pr', 'pr-gates', 'semantic-tests')) {
     throw 'Canonical cohort options are supported only for pr, pr-gates, and semantic-tests.'
+}
+if ($SkipPackageTests -and $Command -notin @('pr', 'pr-gates')) {
+    throw '-SkipPackageTests is supported only for pr and pr-gates.'
 }
 if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
@@ -300,7 +306,8 @@ switch ($Command) {
     }
     'pr' {
         & $PSCommandPath -Command 'pr-gates' -Configuration 'Release' `
-            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory
+            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory `
+            -SkipPackageTests:$SkipPackageTests
     }
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
@@ -412,8 +419,10 @@ switch ($Command) {
         Invoke-RequiredScript 'scripts/Invoke-SharpProofSemanticTests.ps1' `
             'PR semantic validation failed.' $semanticTestArguments
 
-        Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
-            'PR package validation failed.' $prTestArguments
+        if (-not $SkipPackageTests) {
+            Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
+                'PR package validation failed.' $prTestArguments
+        }
     }
     'test' {
         $targetName = [IO.Path]::GetFileName($Target)

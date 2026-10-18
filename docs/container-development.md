@@ -92,7 +92,7 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` is supported only by `pr` and `pr-gates`, for CI runs that execute the package phase in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
 
 After packing clean source, test the exported package bytes:
 
