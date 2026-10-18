@@ -92,6 +92,8 @@ method/local-function declarations supply schemes instantiated per call.
 | Constant/discard switch expressions | Preserve governing type; unify result arms |
 | Self-recursive methods | Solve monomorphic recursive references |
 | Resolved method and generic calls | Import signatures; instantiate generic parameters per call |
+| Named/reordered arguments and omitted optional defaults | Bind by Roslyn parameter identity rather than source position |
+| Extension calls and array-based params calls | Infer receiver/expanded element types; preserve selected definitions |
 | Local functions | Import schemes; compiler-check retained bodies/captures |
 | Fields, properties and instance calls | Retain receiver/member types conservatively |
 | Built-in arithmetic, comparisons, logic, bitwise/unary operators | Retain operand types and C# promotions |
@@ -107,7 +109,7 @@ method definitions inside the body are compared before/after to reject overload
 rebinding. Roslyn validates C# constraints; the engine does not invent them.
 
 The adapter explicitly skips mutation, loops, async, ref/out, nullable
-annotations, user-defined operators, extension/params/optional calls, null and
+annotations, user-defined operators, expanded non-array params collections, null and
 coalescing, existing generic root methods, instance root methods, attributes,
 unsupported patterns and other unimplemented syntax. It does not infer mutually
 recursive C# method groups or synthesize generic constraints. Imported signatures

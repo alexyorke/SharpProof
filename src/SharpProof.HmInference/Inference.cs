@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.HmInference;
 
@@ -194,16 +195,7 @@ public static class Inference
                     foreach (var parameter in lambdaParameters) environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
                     return HmType.Function(inputs, output);
                 case InvocationExpressionSyntax invocation:
-                    if (invocation.ArgumentList.Arguments.Any(a => a.NameColon is not null || a.RefKindKeyword != default))
-                        throw new InferenceException("Named and ref arguments are unsupported.");
-                    var called = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol
-                        ?? throw new InferenceException("Unresolved or dynamic invocation.");
-                    if (called.MethodKind != MethodKind.DelegateInvoke) return MethodCall(invocation, called);
-                    var function = Expression(invocation.Expression);
-                    var arguments = invocation.ArgumentList.Arguments.Select(a => Expression(a.Expression)).ToArray();
-                    var applied = HmType.Variable();
-                    HmType.Unify(function, HmType.Function(arguments, applied));
-                    return applied;
+                    return MethodCall(invocation);
                 case BinaryExpressionSyntax binary: return Binary(binary);
                 case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
                     if (model.GetSymbolInfo(unary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
@@ -297,16 +289,25 @@ public static class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);
         }
 
-        private HmType MethodCall(InvocationExpressionSyntax invocation, IMethodSymbol called)
+        private HmType MethodCall(InvocationExpressionSyntax invocation)
         {
-            if (called.ReducedFrom is not null || called.Parameters.Any(p => p.RefKind != RefKind.None || p.IsParams || p.IsOptional) ||
-                called.Parameters.Length != invocation.ArgumentList.Arguments.Count || called.ReturnsVoid)
-                throw new InferenceException("Extension, ref, params, optional and void calls are unsupported.");
+            var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation
+                ?? throw new InferenceException("Unresolved or dynamic invocation.");
+            var called = operation.TargetMethod;
+            if (called.Parameters.Any(p => p.RefKind != RefKind.None) || called.ReturnsVoid)
+                throw new InferenceException("Ref and void calls are unsupported.");
+            if (called.MethodKind == MethodKind.DelegateInvoke)
+            {
+                var inputs = called.Parameters.Select(_ => HmType.Variable()).ToArray();
+                var output = HmType.Variable();
+                HmType.Unify(Expression(invocation.Expression), HmType.Function(inputs, output));
+                BindArguments(operation, inputs);
+                return output;
+            }
             if (SymbolEqualityComparer.Default.Equals(called, currentMethod))
             {
-                var recursiveOutput = HmType.Variable();
-                HmType.Unify(currentFunction!, HmType.Function(invocation.ArgumentList.Arguments.Select(a => Expression(a.Expression)), recursiveOutput));
-                return recursiveOutput;
+                BindArguments(operation, currentFunction!.Arguments[..^1]);
+                return currentFunction.Arguments[^1];
             }
             if (!called.IsStatic && called.MethodKind != MethodKind.LocalFunction)
             {
@@ -319,10 +320,38 @@ public static class Inference
             var definition = called.IsGenericMethod ? called.ConstructedFrom : called;
             var variables = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             foreach (var parameter in definition.TypeParameters) variables.Add(parameter, HmType.Variable());
-            for (var i = 0; i < definition.Parameters.Length; i++)
-                HmType.Unify(Expression(invocation.ArgumentList.Arguments[i].Expression), CSharpTypes.Rigid(definition.Parameters[i].Type, variables));
+            BindArguments(operation, definition.Parameters.Select(p => CSharpTypes.Rigid(p.Type, variables)).ToArray());
             return CSharpTypes.Rigid(definition.ReturnType, variables);
         }
+
+        private void BindArguments(IInvocationOperation operation, HmType[] parameters)
+        {
+            foreach (var argument in operation.Arguments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var parameter = argument.Parameter ?? throw new InferenceException("Unbound argument.");
+                var expected = parameters[parameter.Ordinal];
+                // Omitted defaults are independent of the caller's expressions.
+                // In particular, default(T) must not pin a generic T to the type
+                // from the original constructed call.
+                if (argument.ArgumentKind == ArgumentKind.DefaultValue) continue;
+                if (parameter.IsParams && argument.ArgumentKind is not ArgumentKind.Explicit and not ArgumentKind.ParamArray)
+                    throw new InferenceException("Expanded non-array params collections are unsupported.");
+                if (argument.ArgumentKind == ArgumentKind.ParamArray)
+                {
+                    if (argument.Value is not IArrayCreationOperation { Initializer: not null } array)
+                        throw new InferenceException("Only array-based expanded params are supported.");
+                    var element = HmType.Variable();
+                    HmType.Unify(expected, new("[]", element));
+                    foreach (var value in array.Initializer.ElementValues)
+                        HmType.Unify(BoundExpression(value), element);
+                }
+                else HmType.Unify(BoundExpression(argument.Value), expected);
+            }
+        }
+
+        private HmType BoundExpression(IOperation value) => value.Syntax is ExpressionSyntax expression
+            ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");
     }
 
     private static SeparatedSyntaxList<ParameterSyntax> Parameters(this MethodDeclarationSyntax method) => method.ParameterList.Parameters;

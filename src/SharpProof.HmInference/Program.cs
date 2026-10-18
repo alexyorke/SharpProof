@@ -40,10 +40,10 @@ internal static class Program
         return diagnostics.Any(d => d.Id == "AD0001") ? 1 : 0;
     }
 
-    private static CSharpCompilation Compile(IEnumerable<SyntaxTree> trees) => CSharpCompilation.Create(
+    internal static CSharpCompilation Compile(IEnumerable<SyntaxTree> trees) => CSharpCompilation.Create(
         "HmInput", trees, References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-    private static MethodResult[] Results(CSharpCompilation compilation) => compilation.SyntaxTrees
+    internal static MethodResult[] Results(CSharpCompilation compilation) => compilation.SyntaxTrees
         .SelectMany(tree => tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Select(method => Inference.Analyze(method, compilation.GetSemanticModel(tree)))).ToArray();
 
@@ -104,7 +104,7 @@ internal static class Program
             ("Switch", "static int M(int tag,int x,int y) => tag switch { 0=>x, _=>y };", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"),
             ("Cast", "static long M(int x) => (long)x;", "Concrete", null),
             ("Default", "static int M(bool ignored) => default(int);", "Suggestion", "int M<T1>(T1 ignored)"),
-            ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Skipped", null),
+            ("ParamsCall", "static int M(int x) => Sum(x); static int Sum(params int[] xs) => 0;", "Concrete", null),
             ("Nullable", "static string? M(string? x) => x;", "Skipped", null),
             ("Loop", "static int M(int x) { while (x>0) x--; return x; }", "Skipped", null),
             ("ImplicitArray", "static int[] M(int x,int y) => new[] { x,y };", "Suggestion", "T1[] M<T1>(T1 x, T1 y)"),
@@ -174,6 +174,7 @@ internal static class Program
             throw new InvalidOperationException("Generalized methods failed runtime checks.");
         passed++;
         Console.WriteLine("PASS PolymorphicRuntime");
+        passed += await CallChecks.Run();
         passed += CoreChecks.Run();
         if (failures.Count != 0) throw new InvalidOperationException(string.Join("\n", failures));
         Console.WriteLine($"{passed} checks passed.");

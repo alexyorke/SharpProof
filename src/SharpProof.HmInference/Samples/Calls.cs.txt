@@ -1,0 +1,19 @@
+static class CallSamples
+{
+    public static int Named(int number, string text) => First(second: text, first: number);
+    public static int Optional(int value) => WithDefault(value);
+    public static int Params(int left, int right) => Head(left, right);
+    public static int ParamsArray(int[] values) => Head(values);
+    public static int Extension(int value) => value.Keep();
+    public static int ExtensionIndex(int[] values, int index) => values.At(index);
+
+    private static A First<A, B>(A first, B second) => first;
+    private static T WithDefault<T>(T value, T fallback = default) => value;
+    private static T Head<T>(params T[] values) => values[0];
+}
+
+static class SampleExtensions
+{
+    public static T Keep<T>(this T value) => value;
+    public static T At<T>(this T[] values, int index) => values[index];
+}
