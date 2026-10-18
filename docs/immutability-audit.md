@@ -2001,3 +2001,28 @@ cache hits, failed-load cleanup and disposal reset. Reflection argument/type arr
 remain explicit native API adapters. The coordinator rejects a blanket mutable-cache
 exclusion based solely on the presence of aliasing or resource lifecycle.
 Status: open before edits.
+## Corpus and consumer publication verification checkpoint
+
+IMM-M030 passes 150 targeted Gates tests with zero warnings/errors. Exact c21e6bcd3
+Release packaging and the consumer performance workflow completed successfully with
+15 measurement rows (three variants, restore plus four build scenarios), clean source
+and matching package repository commits. This validates builder publication and report
+shape; one iteration does not establish a performance improvement. Evidence:
+immutability-corpus-allocation-builders-tests.log, immutability-builders-package-pack.log,
+immutability-consumer-performance-runtime.log and its measurements.json.
+
+## Companion and advisory construction inventory
+
+IMM-M031: Coordinator traced ContractForCompanionValidator matching bucket construction
+and diagnostic membership. Replace repeated immutable map/array/set rebinding with
+scoped nested builders, strict initial key capture, symbol comparer preservation and
+frozen buckets before diagnostics. Preserve Diagnose-before-union in ambiguous target
+cases and membership-before-callback in mismatch/candidate cases.
+
+AdvisoryInterpreter reachable/selected sets/maps and graph blocks/edges are construction
+state; use builders and freeze at marker/graph publication. Run-owned gaps and marker
+observations may use fresh builders at existing reset boundaries, frozen in every
+returned result; preserve null resets and budget/cancellation behavior. ForgetOrigins
+must enumerate the original state while removing from a builder. Alias cycle guards
+may use hash builders. Persistent abstract-state dictionaries remain snapshots for
+joins. Status: open before edits.
