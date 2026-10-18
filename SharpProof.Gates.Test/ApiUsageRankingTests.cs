@@ -35,9 +35,9 @@ public sealed class ApiUsageRankingTests
     public void RankFrameworkApiUsageInSamplesAndOriginalCorpusTargets()
     {
         var root = RepositoryLayout.FindRoot();
-        var inventory = File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net9.0.tsv")).Select(line => line is null ? throw new global::System.ArgumentNullException(nameof(line)) : (line.Split('\t'))).ToDictionary(parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[0] + "\t" + parts[1]), parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[3]), StringComparer.Ordinal);
+        var inventory = File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")).Select(line => line is null ? throw new global::System.ArgumentNullException(nameof(line)) : (line.Split('\t'))).ToDictionary(parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[0] + "\t" + parts[1]), parts => parts is null ? throw new global::System.ArgumentNullException(nameof(parts)) : (parts[3]), StringComparer.Ordinal);
         var dotnetRoot = new DirectoryInfo(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()).Parent!.Parent!.Parent!;
-        var manifestPath = Path.Combine(root, "eng/api-coverage/net9.0.manifest.json");
+        var manifestPath = Path.Combine(root, "eng/api-coverage/net10.0.manifest.json");
         using var policy = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var pack = Path.Combine(dotnetRoot.FullName, "packs", policy.RootElement.GetProperty("pack").GetString()!, policy.RootElement.GetProperty("version").GetString()!, "ref", policy.RootElement.GetProperty("framework").GetString()!);
         var references = AnalyzerGateHost.CreateReferences([.. Directory.GetFiles(pack, "*.dll").Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), MetadataReference.CreateFromFile(typeof(Contract).Assembly.Location)]);
@@ -47,8 +47,8 @@ public sealed class ApiUsageRankingTests
         var corpusPath = Path.Combine(root, "SharpProof.Gates/Corpus/oss-methods.json");
         inputs.Add("SharpProof.Gates/Corpus/oss-methods.json", Hash(File.ReadAllText(corpusPath)));
         inputs.Add("SharpProof.Gates/Corpus/CorpusCatalog.cs", Hash(File.ReadAllText(Path.Combine(root, "SharpProof.Gates/Corpus/CorpusCatalog.cs"))));
-        inputs.Add("eng/api-coverage/net9.0.manifest.json", Hash(File.ReadAllText(manifestPath)));
-        inputs.Add("eng/api-coverage/net9.0.tsv", Hash(File.ReadAllText(Path.Combine(root, "eng/api-coverage/net9.0.tsv"))));
+        inputs.Add("eng/api-coverage/net10.0.manifest.json", Hash(File.ReadAllText(manifestPath)));
+        inputs.Add("eng/api-coverage/net10.0.tsv", Hash(File.ReadAllText(Path.Combine(root, "eng/api-coverage/net10.0.tsv"))));
         var corpus = OpenSourceCorpusCatalog.Load(root);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(corpus, TestContext.CurrentContext.CancellationToken).WithReferences(references);
         RequireCompilation(compilation);
@@ -97,6 +97,18 @@ public sealed class ApiUsageRankingTests
         }
 
         File.WriteAllText(Path.Combine(output, "usage-ranking.md"), report.ToString());
+        var backlog = File.ReadAllText(Path.Combine(root, "eng/api-coverage/gaps.md"));
+        foreach (var item in ranked)
+        {
+            Assert.That(backlog, Does.Contain($"| {item.api} | {item.access} | {item.sites} | {item.status} |"),
+                "Update the committed gap backlog for every new or changed ranked API/access row.");
+        }
+        foreach (var line in File.ReadAllLines(Path.Combine(root, "eng/api-coverage/net10.0.tsv")))
+        {
+            var parts = line.Split('\t');
+            if (parts[3] == "partially-modeled")
+            { Assert.That(backlog, Does.Contain("| " + parts[1] + " | " + parts[4] + " |"), "Every partially modeled declaration must retain its current facet evidence in the backlog."); }
+        }
         TestContext.Out.WriteLine($"Ranked {ranked.Length} framework APIs at {sites.Count} sites; unresolved: {gaps.Count}.");
         Assert.That(gaps, Is.Empty, "Unresolved sites must be investigated rather than silently omitted.");
     }
@@ -111,7 +123,7 @@ public sealed class ApiUsageRankingTests
         global::System.ArgumentNullException.ThrowIfNull(sites);
         global::System.ArgumentNullException.ThrowIfNull(gaps);
         var model = compilation.GetSemanticModel(region.SyntaxTree);
-        var knownArrays = KnownArrayReceiverSites(model, region);
+        var knownIntrinsics = KnownIntrinsicSites(model, region);
         foreach (var syntax in region.DescendantNodes().Where(node => node is null ? throw new global::System.ArgumentNullException(nameof(node)) : (node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or IdentifierNameSyntax)))
         {
             var symbol = model.GetSymbolInfo(syntax).Symbol;
@@ -154,11 +166,13 @@ public sealed class ApiUsageRankingTests
             }
 
             // A declaration-level partial model does not cover every call site.
-            if (symbol is IMethodSymbol declaration && CSharpOperationSemantics.IsIntegerComparerDeclaration(declaration) && model.GetOperation(syntax) is IInvocationOperation comparison && !CSharpOperationSemantics.IsDefaultIntegerComparison(comparison))
+            if (symbol is IMethodSymbol declaration && CSharpOperationSemantics.IsIntegerComparerDeclaration(declaration) && model.GetOperation(syntax) is IInvocationOperation comparison && !CSharpOperationSemantics.IsDefaultIntegerComparison(comparison) && !knownIntrinsics.Contains(syntax.SpanStart))
             {
                 status = "unmodeled-dispatch";
             }
 
+            if (model.GetOperation(syntax) is IPropertyReferenceOperation length && CSharpOperationSemantics.IsLength(length))
+            { status = "partially-modeled"; }
             var access = "call";
             if (symbol is IPropertySymbol)
             {
@@ -172,7 +186,7 @@ public sealed class ApiUsageRankingTests
                 };
                 if (operation is IPropertyReferenceOperation property && CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property))
                 {
-                    status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null && !knownArrays.Contains(syntax.SpanStart) ? "unmodeled-dispatch" : access == "read-write" ? "unmodeled-access" : "partially-modeled";
+                    status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null && !knownIntrinsics.Contains(syntax.SpanStart) ? "unmodeled-dispatch" : access == "read-write" ? "unmodeled-access" : "partially-modeled";
                 }
                 // Catalog property evidence resolves only the getter. The
                 // guarded array intrinsic above explicitly models simple stores.
@@ -232,6 +246,12 @@ public sealed class ApiUsageRankingTests
                 public static void Target<T>(System.Collections.Generic.Comparer<int> custom, T left, T right) {
                     _ = System.Collections.Generic.Comparer<int>.Default.Compare(1, 2);
                     _ = custom.Compare(1, 2);
+                    var alias = System.Collections.Generic.Comparer<int>.Default;
+                    _ = alias.Compare(1, 2);
+                    alias = custom;
+                    _ = alias.Compare(1, 2);
+                    var known = System.Collections.Generic.Comparer<int>.Default;
+                    _ = known.Compare(1, 2);
                     _ = System.Collections.Generic.Comparer<T>.Default.Compare(left, right);
                 }
             }
@@ -248,8 +268,8 @@ public sealed class ApiUsageRankingTests
         var gaps = new List<string>();
         Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
         Assert.That(gaps, Is.Empty);
-        Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call" && site.Status == "partially-modeled")), Is.EqualTo(1));
-        Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(2));
+        Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call" && site.Status == "partially-modeled")), Is.EqualTo(2));
+        Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(4));
     }
 
     [Test]
@@ -293,7 +313,29 @@ public sealed class ApiUsageRankingTests
         Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-access")), Is.EqualTo(1));
     }
 
-    private static HashSet<int> KnownArrayReceiverSites(SemanticModel model, SyntaxNode region)
+    [Test]
+    public void UsageScanCreditsContextualArrayLengthWithoutCreditingSystemArrayOrMultipleDimensions()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class UsageProbe {
+                public static void Target(int[] values, int[,] matrix, System.Array unknown) {
+                    _ = values.Length;
+                    _ = matrix.Length;
+                    _ = unknown.Length;
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var property = compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Length").OfType<IPropertySymbol>().Single();
+        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
+        { [property.ContainingAssembly.Name + "\t" + property.GetDocumentationCommentId()] = "unmodeled" };
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(1));
+        Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "unmodeled"), Is.EqualTo(2));
+    }
+    private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
         global::System.ArgumentNullException.ThrowIfNull(region);
@@ -309,6 +351,12 @@ public sealed class ApiUsageRankingTests
 
             var context = new TotalLoweringContext(new SharpProof.Ir.IrFactory(SharpProof.Ir.IrExecutionSemantics.Total), method);
             context.TrackArrayReceivers(graph);
+            context.TrackDefaultComparers(graph);
+            foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
+            {
+                if (context.IsDefaultIntegerComparison(invocation))
+                { known.Add(invocation.Syntax.SpanStart); }
+            }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null)

@@ -38,11 +38,10 @@ internal static class TotalBodyLowering
         if (!opaqueCalls || !lowering.IsExact || !MutatesElements(lowering.Program) ||
             !ReadsElements(context.Factory, BodyTerms(lowering.Program)))
         { return lowering; }
-        // A body whose only element writes are stores reads elements where it
-        // reads them; one that may write elements otherwise approximates them.
-        var unmodeled = UnmodeledElementWrites(context.Factory, lowering.Program);
+        // Every read is captured where it executes. The native heap records
+        // unknown writes at their own reach, rather than erasing earlier reads.
         return LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
-            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: unmodeled, pinElementReads: !unmodeled, cancellationToken);
+            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: true, cancellationToken);
     }
 
     private static FrontendProgramLoweringResult LowerOnce(CSharpCompilation compilation, ControlFlowGraph graph,
@@ -224,20 +223,6 @@ internal static class TotalBodyLowering
         return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
             instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction { Receiver: null, Target: null } or
                 IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter }));
-    }
-
-    // An opaque writer or an unmodeled element/field write may mutate arrays.
-    // Trusted calls without Writes retain their other effects without erasing
-    // array contents. Unspecified calls still carry All, including Writes.
-    internal static bool UnmodeledElementWrites(IrFactory factory, IrProgram program)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
-            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) :
-                (instruction is IrCallInstruction { Receiver: null, Target: null } call &&
-                    (IrOpaqueCallSite.Effects(factory, call.Operation) & IrOpaqueCallEffects.Writes) != 0 ||
-                instruction is IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter, IsStore: false }));
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)
