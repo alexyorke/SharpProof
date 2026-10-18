@@ -19,7 +19,7 @@ $catalog = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/toolchain.json') -Raw |
     ConvertFrom-Json
 $apiInventoryManifest = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'eng/api-coverage/net9.0.manifest.json') -Raw |
+    Join-Path $repositoryRoot 'eng/api-coverage/net10.0.manifest.json') -Raw |
     ConvertFrom-Json
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
@@ -390,7 +390,6 @@ Assert-Exact `
 
 Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API inventory generation SDK'
 Assert-Exact $catalog.dotnet.apiInventoryImage ("mcr.microsoft.com/dotnet/sdk:{0}-bookworm-slim" -f $catalog.dotnet.apiInventorySdkVersion) 'API inventory source image version'
-Assert-Exact $catalog.dotnet.apiInventoryPackVersion $apiInventoryManifest.version 'API inventory reference pack'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
 Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
 if ($AuthorityOnly) {
@@ -449,9 +448,14 @@ Assert-Exact `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
-    $apiInventoryPack = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($catalog.dotnet.apiInventoryPackVersion)/ref/$($apiInventoryManifest.framework)"
+    $apiInventoryPack = "/usr/share/dotnet/packs/$($apiInventoryManifest.pack)/$($apiInventoryManifest.version)/ref/$($apiInventoryManifest.framework)"
     if (-not (Test-Path -LiteralPath $apiInventoryPack -PathType Container)) {
-        throw "The reviewed API inventory reference pack is missing: $apiInventoryPack"
+        throw "The reviewed active API inventory reference pack is missing: $apiInventoryPack"
+    }
+    $compatibilityFramework = 'net{0}.0' -f ([version]$catalog.dotnet.apiInventoryPackVersion).Major
+    $compatibilityPack = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($catalog.dotnet.apiInventoryPackVersion)/ref/$compatibilityFramework"
+    if (-not (Test-Path -LiteralPath $compatibilityPack -PathType Container)) {
+        throw "The retained compatibility reference pack is missing: $compatibilityPack"
     }
     $markerPath = $env:SHARPPROOF_CONTAINER_CONTRACT
     if ([string]::IsNullOrWhiteSpace($markerPath)) {

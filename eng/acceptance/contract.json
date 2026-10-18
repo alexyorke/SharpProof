@@ -583,7 +583,7 @@
           "SharpProof.Gates/SharpProof.Gates.csproj",
           "SharpProof.Verifier/SharpProof.Verifier.nuspec",
           "eng/coverage/baseline.json",
-          "eng/api-coverage/net9.0.manifest.json",
+          "eng/api-coverage/net10.0.manifest.json",
           "eng/release/third-party-components.json",
           "scripts/Get-SharpProofDevCheckPlan.ps1",
           "scripts/Assert-SharpProofJsonProperties.ps1",
