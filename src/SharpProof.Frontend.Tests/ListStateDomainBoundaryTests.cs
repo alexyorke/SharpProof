@@ -32,6 +32,18 @@ public sealed class ListStateDomainBoundaryTests
         Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
     }
 
+    [TestCase("new System.Collections.Generic.List<int>()", true)]
+    [TestCase("incoming", false)]
+    public void LocalAssignmentReceiverUsesTheAssignedImplementation(string value, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var (model, syntax, graph, context) = Prepare("System.Collections.Generic.IList<int> incoming",
+            "System.Collections.Generic.IList<int> alias = null; return (alias = " + value + ").Count;");
+        context.TrackFreshLists(graph);
+        var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
+    }
+
     [TestCase("int", true)]
     [TestCase("long", true)]
     [TestCase("object", true)]

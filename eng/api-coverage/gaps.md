@@ -314,17 +314,22 @@ behavior; their selected normal growth path consumes approximation and grants no
 concrete growth replay authority. Remaining interfaces, opaque generic contents,
 compound updates, other List operations and precise growth behavior stay open.
 
-Canonical container validation passes 2,039 frontend tests, 983 selected worker
+Canonical container validation passes 2,041 frontend tests, 983 selected worker
 tests, 481 IR tests, 363 SMT tests, 640 contract tests, 29 inventory/evidence tests
 and eight usage-ranking tests. All 63 analyzer mode/effect controls pass, including capability evidence alongside
 unknown growth faults and allocation. Layout passes for all 59 projects. CI still
 requires aggregate and changed-code coverage plus platform/package consumers.
 
-The complete worker suite also passes all 5,505 tests, and the complete analyzer
+Worker verification includes the complete 5,505-test suite plus the receiver-assignment
+proof, and the complete analyzer
 suite passes all 1,134 tests. Effect-contract diagnostics
 retain the first source location and prefer a mutation/call summary at that same
 operation over its broad internal read site. A compiled read-only List control
 still reports the read violation; the existing mutation assertion is unchanged.
+
+Assignment-receiver controls distinguish assigning a fresh List to a local
+interface receiver from assigning an unknown incoming implementation. The native
+Count proof and both provenance controls retain the existing freshness path.
 
 ## Cross-cutting gaps previously identified
 

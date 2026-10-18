@@ -36,6 +36,14 @@ public sealed partial class NativeSpecifiedCallTests
             WorkerClaimOutcome.Proven, members: "private static int Use(System.Collections.Generic.List<int> data) { data.Add(23); return data.Count * 100 + data[0] + data[1]; }");
     }
 
+    [Test]
+    public async Task LocalAssignmentReceiverRetainsFreshListCount()
+    {
+        await CheckInterfaceArrayContract("",
+            "Contract.Ensures(Contract.Result<int>() == 0); System.Collections.Generic.IList<int> alias = null; return (alias = new System.Collections.Generic.List<int>()).Count;",
+            WorkerClaimOutcome.Proven);
+    }
+
     [TestCase("sbyte", "sbyte.MinValue")]
     [TestCase("byte", "byte.MaxValue")]
     [TestCase("short", "short.MinValue")]
