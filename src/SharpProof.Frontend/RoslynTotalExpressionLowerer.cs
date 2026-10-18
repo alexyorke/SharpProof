@@ -74,6 +74,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && operation is IPropertyReferenceOperation listProperty &&
+            ListClause(listProperty, state, depth) is { } listClause)
+        { return listClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation interfaceProperty &&
             ArrayCollectionClause(interfaceProperty, state, depth) is { } arrayProperty)
         { return arrayProperty; }

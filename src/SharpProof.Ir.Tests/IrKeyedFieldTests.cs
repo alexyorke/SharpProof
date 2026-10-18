@@ -5,6 +5,50 @@ namespace SharpProof.Ir.Test;
 public sealed class IrKeyedFieldTests
 {
     [TestCase(0L)]
+    [TestCase(long.MinValue)]
+    [TestCase(long.MaxValue)]
+    public void ObservedEntryCellsPreserveTypedKeysSnapshotsAndInvalidation(long bits)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var keyType = factory.GetOrCreateIntegerType(64, true);
+        var owner = factory.CreateVariable("owner", factory.ObjectType);
+        var old = factory.CreateVariable("old", factory.ObjectType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:map", factory.IntegerType, false, keyType);
+        var key = factory.CreateIntegerValue(keyType, bits);
+        var state = new IrObjectState().WithKeyedField(field, key, factory.CreateIntegerValue(23));
+        var value = factory.CreateReferenceValue(factory.ObjectType, state);
+        var variables = new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [owner] = value, [old] = value };
+        var interpreter = new IrInterpreter(factory);
+        var read = factory.PureOpaque(field, factory.Variable(owner), factory.Integer(keyType, bits));
+        Assert.That(interpreter.Evaluate(read, variables).Value!.Integer, Is.EqualTo(23));
+        var heap = new IrHeap();
+        Assert.That(interpreter.Evaluate(read, variables, null, heap, default).Value!.Integer, Is.EqualTo(23));
+        heap.StoreKeyedField(value, field, key, factory.CreateIntegerValue(31));
+        Assert.That(interpreter.Evaluate(read, variables, null, heap, default).Value!.Integer, Is.EqualTo(31));
+        var snapshot = factory.PureOpaque(field, factory.Variable(old), factory.Integer(keyType, bits));
+        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, [old]).Value!.Integer, Is.EqualTo(23));
+        Assert.That(state.TryRead(field, factory.CreateIntegerValue(0), out _), Is.False, "Key type participates in identity.");
+        Assert.That(state.TryRead(field, factory.CreateIntegerValue(keyType, bits == 0 ? 1 : 0), out _), Is.False);
+        heap.Invalidate();
+        Assert.That(interpreter.Evaluate(read, variables, null, heap, default).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(interpreter.Evaluate(snapshot, variables, null, heap, default, [old]).Value!.Integer, Is.EqualTo(23));
+    }
+
+    [Test]
+    public void ObservedEntryCellRejectsNonIntegerKeysAndWrongValueTypes()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var owner = factory.CreateVariable("owner", factory.ObjectType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:map", factory.IntegerType, false, factory.IntegerType);
+        var state = new IrObjectState();
+        Assert.Throws<ArgumentException>((Action)(() => state.WithKeyedField(field, factory.CreateBooleanValue(false), factory.CreateIntegerValue(1))));
+        state.WithKeyedField(field, factory.CreateIntegerValue(0), factory.CreateBooleanValue(true));
+        var read = factory.PureOpaque(field, factory.Variable(owner), factory.Integer(0));
+        var variables = new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [owner] = factory.CreateReferenceValue(factory.ObjectType, state) };
+        Assert.That(new IrInterpreter(factory).Evaluate(read, variables).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+    }
+
+    [TestCase(0L)]
     [TestCase(-1L)]
     [TestCase(long.MinValue)]
     [TestCase(long.MaxValue)]
