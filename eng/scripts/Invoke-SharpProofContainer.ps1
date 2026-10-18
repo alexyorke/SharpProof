@@ -758,16 +758,21 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
             throw 'Could not resolve the repository commit for package provenance.'
         }
+        $diagnostics = Join-Path $repositoryRoot 'artifacts/pack-diagnostics'
+        [IO.Directory]::CreateDirectory($diagnostics) | Out-Null
+        Write-Host "Pack diagnostics: $diagnostics"
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
         Invoke-SharpProofSolutionBuild `
             -BuildConfiguration 'Release' `
             -AdditionalBuildArguments @(
             '/p:GeneratePackageOnBuild=false',
+            "-bl:$(Join-Path $diagnostics 'build.binlog');ProjectImports=None",
             $repositoryCommitProperty)
         Invoke-SharpProofRequiredDotnet @(
             'pack', 'SharpProof.slnx', '--configuration', 'Release',
             '--output', $output, '--no-build', '--no-restore',
             '/p:GeneratePackageOnBuild=false',
+            "-bl:$(Join-Path $diagnostics 'pack.binlog');ProjectImports=None",
             $repositoryCommitProperty)
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `

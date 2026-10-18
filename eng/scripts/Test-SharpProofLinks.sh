@@ -3,8 +3,38 @@ set -eu
 
 report_path="${1:-/reports/report.md}"
 repository_root=$(pwd)
-lychee --config lychee.toml --root-dir "$repository_root" --no-progress \
-  --format markdown --output "$report_path" .
+# lychee 0.24.2 does not retry HTTP 503 responses via max_retries.
+# Retry the full audit only when every reported error is transient HTTP.
+# Require matching summary/detail counts so unrecognized failures fail closed.
+attempt=1
+while :; do
+  rm -f "$report_path"
+  if lychee --config lychee.toml --root-dir "$repository_root" --no-progress \
+    --format markdown --output "$report_path" .; then
+    break
+  else
+    audit_exit=$?
+  fi
+  if [ "$audit_exit" -ne 2 ] || [ ! -s "$report_path" ] || [ "$attempt" -ge 3 ]; then
+    exit "$audit_exit"
+  fi
+  if ! awk '
+    /Errors[[:space:]]*\|/ { split($0, fields, "|"); errors = fields[3] + 0 }
+    /\* \[/ { details++ }
+    /^\* \[(408|429|5[0-9][0-9])\] / { transient++ }
+    /(Timeouts|Unknown|Unsupported)[[:space:]]*\|/ {
+      split($0, fields, "|"); other += fields[3] + 0
+    }
+    END { exit !(errors > 0 && errors == details && errors == transient && other == 0) }
+  ' "$report_path"; then
+    exit "$audit_exit"
+  fi
+  cp "$report_path" "$report_path.attempt-$attempt.md"
+  delay=$((attempt * 5))
+  echo "Transient HTTP link failures; retrying the audit in $delay seconds (attempt $((attempt + 1))/3)." >&2
+  sleep "$delay"
+  attempt=$((attempt + 1))
+done
 test -s "$report_path"
 if grep -Eq 'Total[[:space:]]*\|[[:space:]]*0[[:space:]]*\|' "$report_path"; then
   echo 'No links were checked; refusing an empty successful audit.' >&2

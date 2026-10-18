@@ -53,6 +53,11 @@ The audit checks Markdown links and images, reference links, HTML hyperlinks,
 bare web URLs, relative and repository-root file paths, and heading/ID fragments.
 URLs inside code examples are included. It checks external HTTP(S) targets live,
 following redirects and retrying failures; HTTP errors and timeouts fail the job.
+Because the pinned lychee version does not retry HTTP 503 responses, the shared
+runner retries the full audit up to twice, waiting 5 then 10 seconds, only when
+every error is HTTP 408, 429, or 5xx. Persistent errors still fail. Failed attempt
+reports are retained alongside the final report; no error codes are accepted as
+successful links.
 It does not execute JavaScript or validate application-generated navigation, and
 email delivery and unsupported URL schemes are outside its scope.
 
