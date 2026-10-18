@@ -57,6 +57,38 @@ jobs:
           'pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofOfflineStackTraces.ps1
           -PackageSource artifacts/container-packages'
 
+      - name: Require full independent-path managed payload reproducibility
+        id: package-reproducibility
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofReproduciblePackages.ps1
+          -Scope Full -OutputDirectory artifacts/reproducibility'
+
+      - name: Summarize managed payload and raw ZIP comparisons separately
+        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path('artifacts/reproducibility/report.json').read_text())
+          archives = report.get('archiveComparisons', [])
+          equal_archives = sum(item['equal'] for item in archives)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('### Independent-path package reproduction\n\n')
+              summary.write(f"Source: `{report['sourceCommit']}`; scope: `{report['scope']}`.\n\n")
+              summary.write(f"Managed first-party DLL/PDB payloads: equal=`{report['managedPayloadsEqual']}`, entries=`{report['managedPayloadCount']}`. Equality is required.\n\n")
+              summary.write(f"Raw NuGet/SNuGet ZIP archives: equal=`{report['packageBytesEqual']}`, identical archives=`{equal_archives}/{len(archives)}`. Raw ZIP equality is measured separately and is not claimed by managed payload equality.\n")
+          PY
+
+      - name: Upload the independent-path reproduction report
+        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}
+          path: artifacts/reproducibility/report.json
+          if-no-files-found: error
+
       - name: Smoke test project templates against the exact package graph
         run: >-
           docker compose run --rm tooling dev -lc
