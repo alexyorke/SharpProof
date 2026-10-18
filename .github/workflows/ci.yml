@@ -64,10 +64,12 @@ jobs:
         with:
           download-packages: "false"
 
+      # -Fast skips analyzers in this build only; canonical-main's full
+      # solution build, required through build-and-test, enforces them.
       - name: Run the complete canonical Gates cohort
         run: >-
           docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
-          -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
+          -Configuration Release -Fast -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
       - name: Upload Gates cohort and timing evidence

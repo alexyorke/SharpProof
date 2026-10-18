@@ -243,9 +243,12 @@ function Invoke-SharpProofCoverageAuthorityBuild {
             } } | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
         Invoke-SharpProofRequiredDotnet @('restore', $filterPath, '--locked-mode')
+        # Analyzers do not change binaries or PDBs, and the canonical PR build
+        # already enforces them; skip them as the shards do.
         Invoke-SharpProofRequiredDotnet @(
             'build', $filterPath, '--configuration', 'Release', '--no-restore',
-            '-p:ContinuousIntegrationBuild=true')
+            '-p:ContinuousIntegrationBuild=true',
+            '-p:RunAnalyzersDuringBuild=false')
     }
     finally {
         foreach ($temporaryPath in @($filterPath, $selectionPath)) {
@@ -349,10 +352,13 @@ switch ($Command) {
 
         # Build the complete source tree once with the self lane disabled so
         # every analyzer and generator output is available as a stable input.
+        # Analyzer diagnostics are not needed here: each per-project
+        # self-application build below runs every analyzer again.
         Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
             'build', 'SharpProof.slnx', '--configuration', $Configuration,
             '--no-restore', '--nologo',
+            '-p:RunAnalyzersDuringBuild=false',
             '-p:SharpProofSelfApplication=false',
             '-p:SharpProofProfile=off',
             '-p:SharpProofVerify=false',
@@ -568,8 +574,12 @@ switch ($Command) {
         }
         # Identical sources in different private container workspaces must
         # produce the same MVID/PDB identity even outside GitHub Actions.
+        # Analyzers do not change those binaries and the canonical PR build
+        # already enforces them, so shards and the gate skip them.
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
-            -AdditionalBuildArguments @('-p:ContinuousIntegrationBuild=true')
+            -AdditionalBuildArguments @(
+                '-p:ContinuousIntegrationBuild=true',
+                '-p:RunAnalyzersDuringBuild=false')
         $coverageShardArguments = @{
             ResultsDirectory = (Join-Path $repositoryRoot (
                 'artifacts/coverage/' + $CoveragePhase))
