@@ -79,11 +79,16 @@ access kind and value domains satisfy the production guard.
   values, including stores to generic arrays. Commit `b087332db` verifies 80 native
   proof/refutation cases, ten CLR/IR scalar-boundary cases and effect/fallback
   controls; 1,287 selected worker, 1,853 frontend and 468 Gates tests pass, with
-  changed trusted code 308/308 covered. Unrelated or unbound type parameters,
-  defaults without established scalar specialization, generic operators, ref/out
-  signatures, reference/non-SZ arrays and mutable/captured or
-  otherwise unproven interface receiver representations remain open. Closed scalar
-  type arguments without validated parameter evidence do not supply those models.
+  changed trusted code 308/308 covered. Closed scalar method and containing-type
+  arguments now establish each declaration's own representation without value
+  parameter evidence, including distinct result parameters and nested generic
+  owners. Commit `56d140aa9` adds 120 native proof/refutation cases, eleven CLR/IR
+  boundary cases and method/owner budget sweeps; 1,406 selected worker, 1,866
+  frontend and 468 Gates tests pass, with changed trusted code 317/317 covered.
+  Unbound or unsupported non-scalar type arguments, generic operators, ref/out
+  signatures, reference/non-SZ arrays and mutable/captured or otherwise unproven
+  interface receiver representations remain open. Type specialization alone does
+  not establish collection contents, default/custom dispatch or callback effects.
   Generic local IList/ICollection Count branches
   and full Swap postconditions retain source declaration/ordinal/assembly ownership,
   with native proofs/refutations and compiled CLR/IR normal/fault agreement.
@@ -94,6 +99,9 @@ access kind and value domains satisfy the production guard.
   may be custom comparers, generic types without concrete evidence and mutable
   helper parameters still need dispatch/provenance work. Null-coalescing comparer
   selection in generic corpus sorts is a concrete next dataflow task.
+  A no-argument generic default-comparer matrix also exposes local type-parameter
+  recognition, exact small-integer comparison semantics and replay of wrong
+  contracts after opaque default-getter initialization as remaining gaps.
 - Catalog and audited-intrinsic evidence gates require executed behavioral probes
   and wrong-claim controls for modeled requirements. They do not automatically map
   every repository test to every possible supported behavior. New facets need an
