@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -44,7 +44,7 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
 
     public AnalyzerSession Create(
         Compilation compilation,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);

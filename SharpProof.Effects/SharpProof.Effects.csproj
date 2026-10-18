@@ -3,14 +3,15 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
     <PackageReference Include="Microsoft.CodeAnalysis.Common" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
+    <Compile Include="..\eng\shared\Polyfills\IsExternalInit.cs"
              Link="Polyfills\IsExternalInit.cs" />
-    <Compile Include="..\SharpProof.Specs\Polyfills\NullableAttributes.cs"
+    <Compile Include="..\eng\shared\Polyfills\NullableAttributes.cs"
              Link="Polyfills\NullableAttributes.cs" />
   </ItemGroup>
   <ItemGroup>

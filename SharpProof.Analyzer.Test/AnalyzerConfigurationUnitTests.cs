@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -18,11 +18,11 @@ public sealed class AnalyzerConfigurationUnitTests
             ("sharpproof_profile", "advisory"));
 
         var redundant =
-            AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+            CompilerConfiguration.GetInvalidTreeConfigurationValues(
                 tree,
                 sameGlobal);
         var local =
-            AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+            CompilerConfiguration.GetInvalidTreeConfigurationValues(
                 tree,
                 differentGlobal);
 
@@ -43,7 +43,7 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void ConflictingGlobalAliasesFailClosed()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(
+        var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("sharpproof_profile", "strict"),
@@ -59,7 +59,7 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void InvalidCurrentOptionDoesNotHideRetiredMode()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(
+        var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("sharpproof_profile", "everything"),
@@ -88,7 +88,7 @@ public sealed class AnalyzerConfigurationUnitTests
         var global = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "advisory"));
 
-        var invalid = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+        var invalid = CompilerConfiguration.GetInvalidTreeConfigurationValues(
             tree,
             global);
 

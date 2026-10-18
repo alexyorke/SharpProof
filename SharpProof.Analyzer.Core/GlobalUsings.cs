@@ -9,8 +9,6 @@ global using Microsoft.CodeAnalysis.Diagnostics;
 global using Microsoft.CodeAnalysis.FlowAnalysis;
 global using Microsoft.CodeAnalysis.Operations;
 global using Microsoft.CodeAnalysis.Text;
-global using SharpProof.Analyzer.Configuration;
-global using SharpProof.CompilerArtifact;
 global using SharpProof.ContractForValidation;
 global using SharpProof.Contracts;
 global using SharpProof.Effects;

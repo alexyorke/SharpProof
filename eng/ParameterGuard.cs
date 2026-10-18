@@ -6,6 +6,8 @@ namespace SharpProof.Internal.DefensiveCodingAnalyzer;
 namespace SharpProof.Internal.SharpProofAnalyzer;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_ANALYZER_CORE
 namespace SharpProof.Internal.SharpProofAnalyzerCore;
+#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_COMPILER_SEMANTICS
+namespace SharpProof.Internal.SharpProofCompilerSemantics;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_COMPILERARTIFACT
 namespace SharpProof.Internal.SharpProofCompilerArtifact;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_COMPILERCOLLECTOR
