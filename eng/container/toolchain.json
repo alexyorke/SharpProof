@@ -6,24 +6,27 @@
     "sdkVersion": "10.0.402",
     "baseImage": "mcr.microsoft.com/dotnet/sdk:10.0.402-noble",
     "baseImageDigest": "sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc",
-    "minimumSdkVersion": "9.0.300",
-    "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim",
-    "minimumSdkImageDigest": "sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8",
-    "minimumSdkFrameworkVersion": "8.0.16",
-    "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.410-bookworm-slim",
-    "minimumSdkFrameworkImageDigest": "sha256:b56053d0a8f4627047740941396e76cd9e7a9421c83b1d81b68f10e5019862d7",
+    "minimumSdkVersion": "9.0.319",
+    "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.319-bookworm-slim",
+    "minimumSdkImageDigest": "sha256:2f5eb32870b4c0074a3d5b5191a03553bcab7b74463a76a7c0a5f3ef65c90fe5",
+    "minimumSdkFrameworkVersion": "8.0.32",
+    "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.426-bookworm-slim",
+    "minimumSdkFrameworkImageDigest": "sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f",
     "apiInventorySdkVersion": "9.0.316",
     "apiInventoryPackVersion": "9.0.18",
     "apiInventoryImage": "mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim",
     "apiInventoryImageDigest": "sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a",
-    "testRuntimeVersion": "8.0.29",
+    "testRuntimeVersion": "8.0.32",
     "testRuntimeImage": "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim",
-    "testRuntimeImageDigest": "sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76"
+    "testRuntimeImageDigest": "sha256:60d11c2be381e7f90b8bd984472dd2432933858aba55087d5936980cf2071d5a"
   },
   "powershell": {
     "versionLine": "7.5",
-    "image": "mcr.microsoft.com/powershell:7.5-debian-12",
-    "imageDigest": "sha256:7ab5bd5ca6f95a3351fa0c6a1205237d57048c94542355aab55519a0861a9b25"
+    "image": "mcr.microsoft.com/powershell:7.5-ubuntu-24.04",
+    "imageDigest": "sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81",
+    "version": "7.5.12",
+    "archiveUrl": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz",
+    "archiveSha256": "db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd"
   },
   "scriptTools": {
     "psscriptAnalyzer": {

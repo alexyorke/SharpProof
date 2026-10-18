@@ -61,9 +61,18 @@ try {
     $toolSource = Join-Path $temporary 'tool'
     [IO.Directory]::CreateDirectory($toolSource) | Out-Null
     New-Package 'SharpProof.Tool' 'nupkg' 'unused' $toolSource
+    & (Join-Path $PSScriptRoot 'New-SharpProofPackageManifest.ps1') -PackageDirectory $toolSource
     & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit $commit
     $tool = Get-Content -LiteralPath (Join-Path $evidence 'tool-release-manifest.json') -Raw | ConvertFrom-Json
     if ($tool.packageId -cne 'SharpProof.Tool' -or $tool.sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Separate tool evidence is incomplete.' }
+    $extraTool = Join-Path $toolSource 'SharpProof.Tool.duplicate.nupkg'
+    Copy-Item -LiteralPath (Join-Path $toolSource 'SharpProof.Tool.1.0.0.nupkg') -Destination $extraTool
+    Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit $commit } 'exactly one separately qualified nupkg'
+    Remove-Item -LiteralPath $extraTool
+    $extraBinary = Join-Path $toolSource 'Unexpected.dll'
+    [IO.File]::WriteAllBytes($extraBinary, $native)
+    Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit $commit } 'Unexpected file'
+    Remove-Item -LiteralPath $extraBinary
     Assert-Rejected { & (Join-Path $PSScriptRoot 'New-SharpProofToolReleaseEvidence.ps1') -PackageSource $toolSource -OutputDirectory $evidence -RepositoryCommit ('b' * 40) } 'differs from the qualified release'
     $sbomPath = Join-Path $evidence 'sbom.spdx.json'
     $original = [IO.File]::ReadAllText($sbomPath)

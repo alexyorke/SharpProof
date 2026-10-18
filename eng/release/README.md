@@ -6,19 +6,25 @@
 2. Linux container and native Windows, macOS, and glibc Linux x64/ARM64 verifier consumers download those artifacts and run real proof and payload-integrity checks.
 3. Branches, pull requests, and tags run portable consumers on Linux, Windows, macOS ARM64, and macOS Intel against the exact packed artifacts. Tags additionally run exact-SHA security.
 4. A `v*` tag must exactly match `SharpProofPackageVersion` in [SharpProof.Release.props](../../SharpProof.Release.props).
-5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the package artifacts and pushes with duplicate skipping.
+5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the qualified package artifacts and signed evidence, verifies them before requesting feed credentials, and applies the destination feed's duplicate policy.
 
 `v1.0.0-preview.1` selects the private-preview environment/feed. Other matching release tags select nuget.org and NuGet OIDC login. Feed credentials stay in the configured secret/environment mechanism.
 
 Branch package checks do not run tag-only security or publication dependencies and do not publish. Do not report branch success as release qualification or public feed availability.
 
-Package artifacts are named `nuget-packages-<run-id>-<sha>`. Both container and portable consumers download that artifact into `nupkgs`; publication downloads the same artifact. Consumer jobs do not repack product source. Preserve the artifact's run and SHA when reviewing qualification. Duplicate skipping during push does not verify the bytes of a preexisting remote package.
+Package artifacts are named `nuget-packages-<run-id>-<sha>-<attempt>`. All consumers, provenance, and publication download the immutable artifact ID emitted by the package job into `nupkgs`. Artifacts are never overwritten; partial retries retain the package job's bound artifact identity. Consumer jobs do not repack product source. Preserve the artifact's run and SHA when reviewing qualification. Public-feed publication checks existing and newly published packages against qualified content while validating any NuGet repository-signature envelope separately from pre-upload archive hashes. Mismatched duplicate versions fail publication.
+
+The package job records packed nuspec IDs/versions and pre-upload SHA-512 hashes in `packages.tsv` and a release-only `packages.lock.json`. This lock-shaped identity inventory describes qualified release archives, not a consumer restore graph or the reviewed third-party component inventory. Preserve both the immutable artifact identity and its content evidence; artifact names or successful workflow definitions alone do not establish a qualified release.
 
 [third-party-components.json](third-party-components.json) records package components summarized in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt). [Native SMT packaging](../../docs/native-smt-packaging.md) describes layout and pinned payload checks.
 
 The three-package graph is internal to restore and publication: `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`. The standard consumer entrypoint is one `SharpProof` reference without activation properties or `PrivateAssets="all"`; strict full verification and exact-version API/analyzer dependencies are automatic. Verifier remains a compatibility entrypoint. Release qualification must exercise the minimal main-package consumer and a packed library's downstream consumer so runtime contract dependencies remain intact. Retain explicit portable-only advisory configurations and minimum compiler-host checks separately.
 
 Release qualification includes all six native OS/architecture combinations: Windows, macOS, and glibc Linux on x64/ARM64. Windows payloads link their C++ runtime statically and require no separate Visual C++ redistributable. Require the exact-artifact native ABI matrix to pass; compilation, import audits, and payload presence alone are insufficient. Native consumer builds require SDK 10.0.100+ and the .NET 10 runtime, with the host/filesystem and native runtime prerequisites in the [support matrix](../../docs/preview-support.md). Repository build/test/pack remains canonical-container-only. musl and other OS/CPU combinations are unsupported.
+
+## Security qualification
+
+See the [repository security runbook](../security/README.md) for exact-master test/coverage/image gates, immutable release tags, explicit publication approval, package SBOM/provenance verification, and image servicing. Tag only after all three exact-commit master push workflows have succeeded.
 
 ## Prepare release notes and upgrades
 
@@ -48,10 +54,10 @@ rejects any changed bytes or missing component. Synthetic regression fixtures
 exercise altered archives, omitted SBOM components, provenance mismatch and
 missing symbol packages. These checks run in the canonical Linux amd64 container.
 
-The public release job uses the SHA-pinned, official
-[actions/attest](https://github.com/actions/attest) action twice: release workflow
+After consumer and security qualification, the separate least-privilege provenance job uses the SHA-pinned, official
+[actions/attest](https://github.com/actions/attest) action twice for the core subjects: release workflow
 provenance for the packages/SBOM/manifest, and an SPDX SBOM attestation for the
-same five packages. Before NuGet upload,
+same five packages. The optional tool receives its own workflow provenance. The job retains the signed bundles and evidence as an immutable artifact; the publisher downloads that exact artifact without recreating attestations. Before requesting NuGet credentials,
 [Test-SharpProofReleaseAttestations.sh](../../scripts/Test-SharpProofReleaseAttestations.sh)
 uses `gh attestation verify` to check each subject against its signed bundle,
 the canonical repository, exact signer workflow, source commit, predicate type
@@ -106,10 +112,11 @@ Do not remove `.signature.p7s`, rewrite ZIPs, or treat a stripped archive hash a
 an equivalent signed-package verification. Duplicate-skipping upload still does
 not prove an existing feed package has the intended bytes.
 
+This release workflow requires unsigned original package archives; manifest generation rejects any `.signature.p7s` entry. Public-feed verification accepts only NuGet.org repository-primary signatures, uses SDK 10 signature verification with explicit SHA-256 certificate fingerprints obtained from the official repository, checks the repository service index, and compares NuGet content hashes. Wrong certificate pins, changed content, author-signed archives and repository-countersigned archives fail closed. A `trustedSigners` configuration alone does not enforce this policy; the explicit certificate pins do. Attributes assembly strong-name signing is a separate identity mechanism.
+
 ## Required account setup
 
-The public release environment must permit `contents: write`,
-`attestations: write` and `id-token: write` for the release job and allow the
+The provenance job needs `attestations: write` and `id-token: write`; the publisher needs `attestations: read`, `contents: write` and `id-token: write`. Account and environment policy must allow the
 pinned official action. Registry storage records are disabled, so
 `artifact-metadata: write` is not required. GitHub attestations are available for
 public repositories on current plans; private/internal repositories require

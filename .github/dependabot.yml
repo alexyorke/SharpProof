@@ -41,3 +41,18 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/eng/container"
+    schedule:
+      interval: "weekly"
+    groups:
+      toolchain-images:
+        patterns: ["*"]
+    # Keep minimum-host compatibility lines intentional; service their patches.
+    ignore:
+      - dependency-name: "mcr.microsoft.com/dotnet/sdk"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "mcr.microsoft.com/dotnet/runtime"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "mcr.microsoft.com/powershell"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

@@ -7,8 +7,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
-$files = @(Get-ChildItem -LiteralPath $PackageSource -File)
-if ($files.Count -ne 1 -or $files[0].Extension -cne '.nupkg') { throw 'Tool release requires exactly one separately qualified nupkg.' }
+$sourceFiles = @(Get-ChildItem -LiteralPath $PackageSource -File)
+$files = @($sourceFiles | Where-Object Extension -CEQ '.nupkg')
+if ($files.Count -ne 1) { throw 'Tool release requires exactly one separately qualified nupkg.' }
+$allowedSidecars = @('packages.tsv', 'packages.lock.json', 'Test-SharpProofPublishedPackages.sh')
+if (@($sourceFiles | Where-Object { $_.Extension -cne '.nupkg' -and $_.Name -cnotin $allowedSidecars }).Count -ne 0) {
+    throw 'Unexpected file in the separately qualified tool feed.'
+}
 if ($files[0].Name -cnotmatch '^[A-Za-z0-9_.+-]+\.nupkg$') { throw 'Unsafe optional tool package filename.' }
 $identity = Get-SharpProofPackageIdentity -Path $files[0].FullName -RequireRepository -RequireSingleIdentity
 $core = Get-Content -LiteralPath (Join-Path $OutputDirectory 'release-manifest.json') -Raw | ConvertFrom-Json
