@@ -41,7 +41,9 @@ public sealed class CompilerTotalCallRetirementTests
     [Test]
     public async Task ClosedGenericSourceFramesRemainIndependent()
     {
-        foreach (var target in new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values)
+        var targets = new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values.ToArray();
+        Assert.That(targets, Has.Length.EqualTo(2));
+        foreach (var target in targets)
         {
             var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
             await AssertProvesAsync(preparation);
@@ -101,6 +103,10 @@ public sealed class CompilerTotalCallRetirementTests
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
             check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);
+        // Excessive expansion either yields no Total body (nothing is published,
+        // so nothing can be proven) or only non-proven results.
+        if (results.Count == 0)
+        { Assert.That(preparation.Total, Is.Null, "Published nothing despite an admitted Total body."); }
         Assert.That(results.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome != WorkerClaimOutcome.Proven)), Is.True);
     }
 
@@ -199,7 +205,9 @@ public sealed class CompilerTotalCallRetirementTests
             WorkerBudgets.DefaultMaximumExpressionDepth,
             TestContext.CurrentContext.CancellationToken);
 
-        foreach (var preparation in CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken))
+        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(decoded, Has.Length.EqualTo(2));
+        foreach (var preparation in decoded)
         {
             Assert.That(preparation.Total, Is.Not.Null);
             await AssertProvesAsync(preparation);
