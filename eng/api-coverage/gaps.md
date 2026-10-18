@@ -83,7 +83,7 @@ have partial evidence.
 
 Follow-up commit `5a794ca6c` closes alias escape propagation for this slice.
 Escape exclusions follow every alias definition and CFG capture/join through a
-deduplicated worklist; publishing an alias also removes the original receiver's
+deduplicated work list; publishing an alias also removes the original receiver's
 ownership fact. Three direct provenance controls reproduced the previous gap;
 all nine frontend domain/depth controls now pass. Native alias publication stays
 Unknown, with a CLR probe showing that an escaped alias can change comparer state.
