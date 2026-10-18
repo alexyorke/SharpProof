@@ -22,6 +22,7 @@ try {
 finally { $archive.Dispose() }
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-tool-consumer-' + [guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($scratch)
+Copy-Item -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) 'global.json') -Destination (Join-Path $scratch 'global.json')
 $feed = [Security.SecurityElement]::Escape($PackageSource)
 $configuration = Join-Path $scratch 'NuGet.Config'
 [IO.File]::WriteAllText($configuration, "<configuration><packageSources><clear/><add key=`"exact-tool-feed`" value=`"$feed`"/></packageSources></configuration>")
@@ -48,23 +49,42 @@ try {
         [IO.Compression.ZipFileExtensions]::ExtractToFile($protocolEntries[0], $protocolPath)
     }
     finally { $archive.Dispose() }
-    Add-Type -Path $protocolPath
-    $response = [SharpProof.Worker.Protocol.WorkerVerifyResponse]::new()
-    $response.InputHash = 'a' * 64
-    $response.RunStatus = 'Failed'
-    $response.FailureReason = 'InputUnavailable'
-    $response.Summary.CacheStatus = 'Disabled'
-    $response.Summary.Versions.WorkerVersion = 'tool-consumer-fixture'
-    $response.Summary.Versions.ApiSpecVersion = 'tool-consumer-fixture'
-    $response.Summary.Versions.WorkerBinarySha256 = 'a' * 64
-    $response.Summary.Versions.ApiSpecContentSha256 = 'b' * 64
-    $failure = [SharpProof.Worker.Protocol.WorkerProtocolError]::new()
-    $failure.Code = 'input.unavailable'
-    $failure.Message = 'Stored reader fixture; no verification was performed.'
-    $response.Errors = @($failure)
-    [SharpProof.Worker.Protocol.WorkerProtocolJson]::SealManifest($response.Manifest)
-    if (-not [SharpProof.Worker.Protocol.WorkerProtocolJson]::Validate($response).IsValid) { throw 'The stored reader fixture violates the protocol.' }
-    [IO.File]::WriteAllText((Join-Path $scratch 'stored-result.json'), [SharpProof.Worker.Protocol.WorkerProtocolJson]::SerializeResponse($response))
+    # PowerShell can run on an older runtime than the tool. Execute the exact
+    # packaged protocol assembly in an isolated .NET 10 fixture process instead.
+    $fixture = Join-Path $scratch 'fixture'
+    [void][IO.Directory]::CreateDirectory($fixture)
+    $fixtureProject = Join-Path $fixture 'Fixture.csproj'
+    $escapedProtocol = [Security.SecurityElement]::Escape($protocolPath)
+    [IO.File]::WriteAllText($fixtureProject, @"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><Reference Include="SharpProof.Worker.Protocol"><HintPath>$escapedProtocol</HintPath></Reference></ItemGroup>
+</Project>
+"@)
+    $fixtureConfiguration = Join-Path $fixture 'NuGet.Config'
+    [IO.File]::WriteAllText($fixtureConfiguration, '<configuration><packageSources><clear/></packageSources></configuration>')
+    [IO.File]::WriteAllText((Join-Path $fixture 'Program.cs'), @'
+using SharpProof.Worker.Protocol;
+var response = new WorkerVerifyResponse
+{
+    InputHash = new string('a', 64),
+    RunStatus = WorkerRunStatus.Failed,
+    FailureReason = WorkerRunFailureReason.InputUnavailable,
+    Errors = [new() { Code = "input.unavailable", Message = "Stored reader fixture; no verification was performed." }]
+};
+response.Summary.CacheStatus = WorkerCacheStatus.Disabled;
+response.Summary.Versions.WorkerVersion = "tool-consumer-fixture";
+response.Summary.Versions.ApiSpecVersion = "tool-consumer-fixture";
+response.Summary.Versions.WorkerBinarySha256 = new string('a', 64);
+response.Summary.Versions.ApiSpecContentSha256 = new string('b', 64);
+WorkerProtocolJson.SealManifest(response.Manifest);
+if (!WorkerProtocolJson.Validate(response).IsValid)
+    throw new InvalidDataException("The stored reader fixture violates the protocol.");
+File.WriteAllText(args[0], WorkerProtocolJson.SerializeResponse(response));
+'@)
+    [void](Invoke-ToolCheck @('restore', $fixtureProject, '--configfile', $fixtureConfiguration))
+    [void](Invoke-ToolCheck @('run', '--project', $fixtureProject, '--configuration', 'Release', '--no-restore', '--',
+            (Join-Path $scratch 'stored-result.json')))
     $explanation = (Invoke-ToolCheck @('sharpproof', 'explain', 'stored-result.json', '--json')) | ConvertFrom-Json
     if ($explanation.scope -notmatch '^Stored evidence only' -or $explanation.runStatus -cne 'Failed' -or $explanation.errors.Count -ne 1) {
         throw 'Installed explain lost the stored evidence boundary or recorded failure.'
@@ -72,8 +92,24 @@ try {
     [IO.File]::WriteAllText((Join-Path $scratch 'invalid-result.json'), '{}')
     $invalid = @(& dotnet sharpproof explain invalid-result.json 2>&1)
     if ($LASTEXITCODE -ne 2 -or ($invalid -join "`n") -notmatch 'SharpProof:') { throw 'Installed tool accepted malformed evidence.' }
-    $executable = Join-Path $scratch '.config/dotnet-tools.json'
-    if (-not (Test-Path -LiteralPath $executable)) { throw 'Tool acceptance did not use a local manifest.' }
+    $manifests = @(
+        foreach ($relativeManifest in @('dotnet-tools.json', '.config/dotnet-tools.json')) {
+            $manifestPath = Join-Path $scratch $relativeManifest
+            if (Test-Path -LiteralPath $manifestPath -PathType Leaf) { $manifestPath }
+        }
+    )
+    if ($manifests.Count -ne 1) { throw 'Tool acceptance requires exactly one local manifest in the isolated consumer.' }
+    $manifest = Get-Content -LiteralPath $manifests[0] -Raw | ConvertFrom-Json -AsHashtable
+    if (-not $manifest.ContainsKey('tools') -or $manifest.tools -isnot [Collections.IDictionary]) {
+        throw 'Local tool manifest has no tool registrations.'
+    }
+    $toolKeys = @($manifest.tools.Keys | Where-Object { $_ -ieq 'SharpProof.Tool' })
+    if ($manifest.tools.Count -ne 1 -or $toolKeys.Count -ne 1) { throw 'Local manifest must register only SharpProof.Tool.' }
+    $registeredTool = $manifest.tools[$toolKeys[0]]
+    if ($registeredTool.version -cne $version -or @($registeredTool.commands).Count -ne 1 -or
+        $registeredTool.commands[0] -cne 'dotnet-sharpproof') {
+        throw 'Local manifest does not pin the exact installed SharpProof.Tool version and command.'
+    }
     Write-Host "Optional tool $version installed and executed from exact feed; consumer evidence: $scratch"
 }
 finally { Pop-Location }

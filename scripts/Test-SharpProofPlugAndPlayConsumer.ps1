@@ -134,6 +134,8 @@ function Write-ConsumerSource([string]$ReturnedExpression) {
 using SharpProof.Attributes;
 public static class Subject
 {
+    public static System.Type ContractAttributeType => typeof(ZeroAllocationsAttribute);
+
     public static long Identity(long value)
     {
         Contract.Ensures(Contract.Result<long>() == value);
@@ -275,8 +277,8 @@ public static class Program
     public static int Main()
     {
         var result = Subject.Identity(42);
-        var attributes = typeof(SharpProof.Attributes.ZeroAllocationsAttribute).Assembly.GetName().Name;
-        var token = System.BitConverter.ToString(typeof(SharpProof.Attributes.ZeroAllocationsAttribute).Assembly.GetName().GetPublicKeyToken()).Replace("-", "").ToLowerInvariant();
+        var attributes = Subject.ContractAttributeType.Assembly.GetName().Name;
+        var token = System.BitConverter.ToString(Subject.ContractAttributeType.Assembly.GetName().GetPublicKeyToken()).Replace("-", "").ToLowerInvariant();
         System.Console.WriteLine($"Subject.Identity={result}; Attributes={attributes}; Token={token}");
         System.Console.WriteLine($"RuntimeCore={typeof(object).Assembly.GetName().Name}; CLR={System.Environment.Version.Major}");
         return result == 42 && attributes == "SharpProof.Attributes" && token == "75825c3e099f5fac" ? 0 : 1;
