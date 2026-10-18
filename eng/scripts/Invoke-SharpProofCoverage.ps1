@@ -265,7 +265,7 @@ if ($CoveragePhase -in @('all', 'semantic-projects')) {
     try {
         $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
             -SourceDirectory (Join-Path $repositoryRoot (
-                'SharpProof.Fuzz.Test/bin/Release/net10.0')) `
+                'artifacts/bin/SharpProof.Fuzz.Tests/Release/net10.0')) `
             -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net10.0')
         [Environment]::SetEnvironmentVariable(
             'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')

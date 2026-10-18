@@ -89,6 +89,7 @@ foreach ($relative in $files) {
     $absolute = Join-Path $repositoryRoot $relative
     if ($relative -match '^eng/scripts/[^/]+\.(ps1|psm1)$') {
         $scriptText = Get-Content -LiteralPath $absolute -Raw
+        Require ($scriptText -notmatch '(?:SharpProof\.[A-Za-z0-9_.-]+|ConsoleLoggingAnalyzer|DefensiveCodingAnalyzer)[/\\]+(?:bin|obj)[/\\]') "Retired project-local output path in engineering script: $relative"
         foreach ($reference in [regex]::Matches($scriptText, 'Join-Path\s+\$PSScriptRoot\s+''([^'']+)''')) {
             $scriptTarget = Join-Path (Split-Path -Parent $absolute) $reference.Groups[1].Value
             Require (Test-Path -LiteralPath $scriptTarget) "Missing script-relative input in ${relative}: $($reference.Groups[1].Value)"
