@@ -80,8 +80,11 @@ rows changed; four previously unmodeled declarations now have partial evidence.
 Trusted-code coverage and exact-head CI remain required before merge readiness.
 
 This closes a semantic slice, not the Dictionary work item or its corpus sites.
-All ranked dictionary index reads, Add/ContainsKey calls and the index write still
-show unmodeled dispatch; the eight parameterless corpus constructions have an
+The 40 ranked index reads span 13 source files. Representative declarations in
+those files use `TVertex/int`, `int/TVertex`, `T/int`, `T/long`, nested graph/trie
+types, and `uint/BigInteger`; these need type, value-storage and comparer/callback
+models beyond primitive scalar state. All ranked dictionary index reads,
+Add/ContainsKey calls and the index write still show unmodeled dispatch; the eight parameterless corpus constructions have an
 unsupported key/value domain. Missing/duplicate-key paths retain opaque fallback
 and have explicit Unknown controls; their original proof probes remain preserved
 under `artifacts/api-coverage/open-gap-probes/`. Incoming or escaped references,
