@@ -16,6 +16,8 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class ApiUsageRankingTests
 {
+    private static readonly bool[] FreshDictionaryCalls = [true, false, false];
+    private static readonly bool[] FreshDictionaryIndexers = [true, true, false, false];
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -367,11 +369,11 @@ public sealed class ApiUsageRankingTests
         var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
         Assert.That(calls, Has.Length.EqualTo(3));
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
-            Is.EqualTo(new[] { true, false, false }));
+            Is.EqualTo(FreshDictionaryCalls));
         var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
         Assert.That(indexers, Has.Length.EqualTo(4));
         Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
-            Is.EqualTo(new[] { true, true, false, false }));
+            Is.EqualTo(FreshDictionaryIndexers));
     }
 
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
