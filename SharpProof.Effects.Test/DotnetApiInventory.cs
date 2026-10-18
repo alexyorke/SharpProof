@@ -5,6 +5,7 @@ using SharpProof.Frontend;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
+
 // Test infrastructure: the inventory observes the production resolver and intrinsic
 // predicates. It never grants support based on an API name alone.
 internal static class DotnetApiInventory
