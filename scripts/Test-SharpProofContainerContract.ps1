@@ -33,7 +33,7 @@ $devInitializer = Get-Content -LiteralPath (
 $directoryBuildTargets = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'Directory.Build.targets') -Raw
 $packages = [xml](Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'Directory.Packages.props') -Raw)
+        Join-Path $repositoryRoot 'Directory.Packages.props') -Raw)
 $packageProjects = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw |
     ConvertFrom-Json
@@ -59,8 +59,8 @@ function Assert-SingleMatchingLine {
         [Parameter(Mandatory = $true)][string]$Expected,
         [Parameter(Mandatory = $true)][string]$Name)
 
-    $matches = @($Lines | Where-Object { $_ -cmatch $Pattern })
-    if ($matches.Count -cne 1 -or $matches[0] -cne $Expected) {
+    $matchingLines = @($Lines | Where-Object { $_ -cmatch $Pattern })
+    if ($matchingLines.Count -cne 1 -or $matchingLines[0] -cne $Expected) {
         throw "$Name must occur exactly once as '$Expected'."
     }
 }
@@ -101,23 +101,23 @@ function Assert-DockerfileAuthority {
     $authorities = @(
         [pscustomobject]@{
             Argument = 'POWERSHELL_IMAGE'
-            Image = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
+            Image    = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
-            Image = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
+            Image    = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
-            Image = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
+            Image    = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
-            Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
+            Image    = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
-            Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
+            Image    = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
         })
 
     $firstFrom = -1
@@ -139,7 +139,7 @@ function Assert-DockerfileAuthority {
     foreach ($authority in $authorities) {
         $declarationsByArgument[$authority.Argument] = [pscustomobject]@{
             DeclarationCount = 0
-            First = $null
+            First            = $null
         }
     }
     for ($index = 0; $index -lt $lines.Count; $index++) {
@@ -149,7 +149,7 @@ function Assert-DockerfileAuthority {
             if ($declarations.DeclarationCount -eq 1) {
                 $declarations.First = [pscustomobject]@{
                     Index = $index
-                    Text = $lines[$index]
+                    Text  = $lines[$index]
                 }
             }
         }
@@ -205,30 +205,30 @@ function Assert-DockerfileAuthority {
     }
 
     Assert-SingleMatchingLine `
-            $toolchainLines `
-            '^ENV SHARPPROOF_REPO_ROOT=' `
-            'ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof' `
-            'dev repository root'
+        $toolchainLines `
+        '^ENV SHARPPROOF_REPO_ROOT=' `
+        'ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof' `
+        'dev repository root'
     Assert-SingleMatchingLine `
-            $toolchainLines `
-            '^WORKDIR ' `
-            'WORKDIR /workspace/SharpProof' `
-            'dev working directory'
+        $toolchainLines `
+        '^WORKDIR ' `
+        'WORKDIR /workspace/SharpProof' `
+        'dev working directory'
     Assert-SingleMatchingLine `
-            $toolchainLines `
-            '^USER ' `
-            'USER sharpproof' `
-            'dev user'
+        $toolchainLines `
+        '^USER ' `
+        'USER sharpproof' `
+        'dev user'
     Assert-SingleMatchingLine `
-            $toolchainLines `
-            '^ENTRYPOINT ' `
-            'ENTRYPOINT ["/usr/local/bin/sharpproof-container"]' `
-            'dev entrypoint'
+        $toolchainLines `
+        '^ENTRYPOINT ' `
+        'ENTRYPOINT ["/usr/local/bin/sharpproof-container"]' `
+        'dev entrypoint'
     Assert-SingleMatchingLine `
-            $toolchainLines `
-            '^CMD ' `
-            'CMD ["dev"]' `
-            'dev default command'
+        $toolchainLines `
+        '^CMD ' `
+        'CMD ["dev"]' `
+        'dev default command'
 }
 
 function Assert-ComposeAuthority {
@@ -432,7 +432,7 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $catalog.dotnet.minimumSdkFrameworkVersion `
         'Installed minimum-SDK framework version'
     $native = Join-Path `
-        ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
+    ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
         "z3/$($catalog.z3.version)/linux-x64/libz3.so"
     $information = Get-Item -LiteralPath $native
     Assert-Exact $information.Length $catalog.z3.libraryBytes 'Installed Z3 size'
@@ -450,7 +450,7 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $catalog.z3.managedAssemblySha256 `
         'Installed managed Z3 SHA-256 digest'
     $windowsNative = Join-Path `
-        ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
+    ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
         "z3/$($catalog.z3.version)/win-x64/libz3.dll"
     $windowsInformation = Get-Item -LiteralPath $windowsNative
     Assert-Exact $windowsInformation.Length $catalog.z3.windows.libraryBytes 'Installed Windows Z3 size'
@@ -483,11 +483,22 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
             'Microsoft.NETCore.App.Host.linux-x64')) {
         $packPath = Join-Path `
             "/usr/share/dotnet/packs/$pack" `
-            ([string]$catalog.dotnet.minimumSdkFrameworkVersion)
+        ([string]$catalog.dotnet.minimumSdkFrameworkVersion)
         if (-not (Test-Path -LiteralPath $packPath -PathType Container)) {
             throw "The minimum-SDK framework pack is missing: $packPath"
         }
     }
+}
+
+if ($env:SHARPPROOF_CONTAINER -ceq '1') {
+    Import-Module PSScriptAnalyzer -RequiredVersion $catalog.scriptTools.psscriptAnalyzer.version -Force
+    Assert-Exact (Get-Module PSScriptAnalyzer).Version.ToString() $catalog.scriptTools.psscriptAnalyzer.version 'PSScriptAnalyzer version'
+    $shellcheckVersion = & shellcheck --version
+    if ($LASTEXITCODE -ne 0 -or $shellcheckVersion -notcontains "version: $($catalog.scriptTools.shellcheck.version)") {
+        throw 'The pinned ShellCheck is not installed.'
+    }
+    Assert-Exact (& shfmt --version) "v$($catalog.scriptTools.shfmt.version)" 'shfmt version'
+    if ($LASTEXITCODE -ne 0) { throw 'The pinned shfmt is not installed.' }
 }
 
 Write-Host 'SharpProof container contract validation passed.'

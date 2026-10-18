@@ -28,7 +28,7 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Require repository C# formatting
+      - name: Require C#, PowerShell, and shell linting and formatting
         run: docker compose run --rm tooling format-check
 
   dotnet-api-inventory:

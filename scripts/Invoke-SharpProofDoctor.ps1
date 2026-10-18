@@ -40,9 +40,9 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
         $evaluation = $raw | ConvertFrom-Json
         $configuration = $evaluation.Properties
         $packages = @($evaluation.Items.PackageReference | Where-Object { $_.Identity -in $packageIds } | ForEach-Object {
-            $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
-            [ordered]@{ id = $_.Identity; version = $version }
-        })
+                $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
+                [ordered]@{ id = $_.Identity; version = $version }
+            })
         if ($packages.Count -eq 0) { Add-Check 'packages' 'warning' 'No direct SharpProof package references were evaluated.' 'Add SharpProof and restore the project; transitive references require inspection of the restored assets file.' }
         else { Add-Check 'packages' 'ok' "$($packages.Count) direct SharpProof package references found." }
         $assetsPath = $configuration.ProjectAssetsFile
@@ -55,11 +55,11 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
                 $assets = Get-Content -LiteralPath $assetsPath -Raw | ConvertFrom-Json -AsHashtable
                 if ($assets.Contains('libraries') -and $assets.libraries -is [Collections.IDictionary]) {
                     $resolvedPackages = @($assets.libraries.Keys | Sort-Object | ForEach-Object {
-                        $parts = $_ -split '/', 2
-                        if ($parts.Count -eq 2 -and $parts[0] -in $packageIds) {
-                            [ordered]@{ id = $parts[0]; version = $parts[1] }
-                        }
-                    })
+                            $parts = $_ -split '/', 2
+                            if ($parts.Count -eq 2 -and $parts[0] -in $packageIds) {
+                                [ordered]@{ id = $parts[0]; version = $parts[1] }
+                            }
+                        })
                 }
                 Add-Check 'resolved-packages' 'ok' "$($resolvedPackages.Count) SharpProof packages found in existing restored assets (including transitive references)." 'Restore again if package inputs have changed; doctor does not establish that existing assets are current.'
             }
@@ -74,12 +74,12 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
             Add-Check 'framework' 'warning' 'This is an outer multi-target evaluation.' 'Repeat doctor with -TargetFramework for each target framework.'
         }
         $verifyEnabled = $configuration.SharpProofVerify.Trim().ToLowerInvariant() -eq 'true'
-        $profile = $configuration.SharpProofProfile.Trim().ToLowerInvariant()
+        $verificationProfile = $configuration.SharpProofProfile.Trim().ToLowerInvariant()
         $allowedValues = [ordered]@{
-            SharpProofProfile = @('advisory', 'strict', 'off')
-            SharpProofFeatures = @('effects', 'contracts', 'all')
-            SharpProofVerify = @('true', 'false')
-            SharpProofVerifyPolicy = @('advisory', 'warn-on-unknown', 'require-proven')
+            SharpProofProfile          = @('advisory', 'strict', 'off')
+            SharpProofFeatures         = @('effects', 'contracts', 'all')
+            SharpProofVerify           = @('true', 'false')
+            SharpProofVerifyPolicy     = @('advisory', 'warn-on-unknown', 'require-proven')
             SharpProofAssumptionPolicy = @('allow', 'warn', 'error')
         }
         foreach ($property in $allowedValues.Keys) {
@@ -88,13 +88,13 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
                 Add-Check $property 'error' "The evaluated $property value is invalid." "Use one of: $($allowedValues[$property] -join ', ')."
             }
         }
-        if ($profile -eq 'strict' -and -not $verifyEnabled) {
+        if ($verificationProfile -eq 'strict' -and -not $verifyEnabled) {
             Add-Check 'strict-profile' 'error' 'SharpProofProfile=strict requires SharpProofVerify=true.' 'Enable verification or select advisory for optional verification.'
         }
-        if (-not $profile) {
+        if (-not $verificationProfile) {
             Add-Check 'configuration' 'warning' 'SharpProof profile was not evaluated; package imports may be unavailable.' 'Restore the consumer, then repeat doctor. This check does not restore.'
         }
-        if (-not $verifyEnabled -or $profile -eq 'off') {
+        if (-not $verifyEnabled -or $verificationProfile -eq 'off') {
             Add-Check 'verification' 'warning' 'Build verification is disabled.' 'Set SharpProofVerify=true and select a supported profile when proof execution is intended.'
         }
         else {
@@ -142,13 +142,13 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
 }
 else { Add-Check 'project' 'warning' 'No consumer project selected.' 'Pass -Target path/to/consumer.csproj to inspect effective configuration.' }
 $report = [ordered]@{
-    schemaVersion = 1
-    host = [ordered]@{ os = [Runtime.InteropServices.RuntimeInformation]::OSDescription; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); sdk = $sdk }
-    scope = 'Read-only SDK discovery and trusted-project evaluation; no restore, build, write probe, solver execution, or secret/environment collection.'
-    packages = $packages
+    schemaVersion    = 1
+    host             = [ordered]@{ os = [Runtime.InteropServices.RuntimeInformation]::OSDescription; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); sdk = $sdk }
+    scope            = 'Read-only SDK discovery and trusted-project evaluation; no restore, build, write probe, solver execution, or secret/environment collection.'
+    packages         = $packages
     resolvedPackages = $resolvedPackages
-    configuration = $configuration
-    checks = @($checks.ToArray())
+    configuration    = $configuration
+    checks           = @($checks.ToArray())
 }
 if ($Format -eq 'Json') { $report | ConvertTo-Json -Depth 12 }
 else {

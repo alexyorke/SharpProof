@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows -or
     [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64) {
+    [Runtime.InteropServices.Architecture]::X64) {
     throw 'Native proof acceptance requires Windows x64.'
 }
 if ([Environment]::Version.Major -lt 10) {
@@ -19,7 +19,7 @@ if ([Environment]::Version.Major -lt 10) {
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
 $packages = @(Get-ChildItem -LiteralPath $source -File |
-    Where-Object Extension -In @('.nupkg', '.snupkg'))
+        Where-Object Extension -In @('.nupkg', '.snupkg'))
 $identities = Get-SharpProofPackageIdentitySet -Files $packages
 $version = [string]$identities.Version
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -89,7 +89,7 @@ function Test-WindowsPublicationPaths {
     $validate = $lease.GetMethod('ValidateMembers', $flags)
     $member = Join-Path $consumer 'publication.json'
     Assert-NativeException {
-        $null = $validate.Invoke($null, [object[]]@(,[string[]]@($member, $member.ToUpperInvariant())))
+        $null = $validate.Invoke($null, [object[]]@(, [string[]]@($member, $member.ToUpperInvariant())))
     } ([ArgumentException])
     $acquire = $lease.GetMethod('Acquire', $flags)
     $acquireAsync = $lease.GetMethod('AcquireAsync', $flags)
@@ -107,11 +107,11 @@ function Test-WindowsPublicationPaths {
         $deadline.Dispose()
     }
     foreach ($path in @(
-        ($member + ':stream'),
-        (Join-Path $consumer 'alias~1.json'),
-        (Join-Path $consumer 'NUL.json'),
-        (Join-Path $consumer 'ambiguous. '),
-        '\\localhost\c$\publication.json')) {
+            ($member + ':stream'),
+            (Join-Path $consumer 'alias~1.json'),
+            (Join-Path $consumer 'NUL.json'),
+            (Join-Path $consumer 'ambiguous. '),
+            '\\localhost\c$\publication.json')) {
         Assert-NativeException {
             $null = $canonical.Invoke($null, [object[]]@($path))
         } ([ArgumentException])
@@ -131,7 +131,7 @@ function Test-WindowsPublicationPaths {
     $runtimeGuard = $paths.GetMethod('ValidateWorkerRuntime', $flags)
     Assert-NativeException {
         $null = $runtimeGuard.Invoke($null, [object[]]@(
-            [string[]]@((Join-Path (Split-Path $hostDll) 'result.json').ToUpperInvariant()), $hostDll))
+                [string[]]@((Join-Path (Split-Path $hostDll) 'result.json').ToUpperInvariant()), $hostDll))
     } ([ArgumentException])
 }
 

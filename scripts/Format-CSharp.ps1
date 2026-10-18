@@ -16,7 +16,7 @@ function Invoke-DotnetFormat {
     )
 
     $effectiveArguments =
-        [Collections.Generic.List[string]]::new($Arguments)
+    [Collections.Generic.List[string]]::new($Arguments)
     if ($VerifyNoChanges) {
         $effectiveArguments.Add('--verify-no-changes')
     }
