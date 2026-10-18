@@ -18,12 +18,12 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.List`1.Count | read | 18 | 10 | 0 | 18 | 0 | partially-modeled |
 | P:System.String.Chars(System.Int32) | read | 18 | 8 | 0 | 18 | 0 | partially-modeled |
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 16 | 11 | 0 | 16 | 0 | unmodeled |
-| P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | 5 | 0 | 16 | 0 | partially-modeled |
-| M:System.Collections.Generic.List`1.Add(`0) | call | 13 | 9 | 0 | 13 | 0 | partially-modeled |
+| P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | 5 | 0 | 16 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.Comparer`1.Default | read | 13 | 13 | 0 | 13 | 0 | unmodeled |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | 11 | 0 | 13 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 12 | 10 | 0 | 12 | 0 | unmodeled |
-| M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | unmodeled |
+| M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | partially-modeled |
+| M:System.Collections.Generic.List`1.Add(`0) | call | 10 | 7 | 0 | 10 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | 8 | 0 | 9 | 0 | unmodeled |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled |
@@ -48,6 +48,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.ArgumentNullException.#ctor(System.String) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | 2 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
+| M:System.Collections.Generic.List`1.Add(`0) | call | 3 | 2 | 0 | 3 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |
 | M:System.Convert.ToInt64(System.Int32) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |

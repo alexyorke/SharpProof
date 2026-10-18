@@ -290,13 +290,21 @@ those keys still need models. Native refutation remains Unknown without concrete
 initialization replay. See the
 [generic-key construction evidence](gaps.md#verified-default-construction-and-count-for-generic-keys).
 
+Fresh parameterless List instances also have shared Count, Add and scalar/reference
+indexed state through proven concrete/IList/ICollection aliases. CFG initializers
+use the same paths. Initialization/cache writes, possible growth allocation,
+unknown failure effects and bounds callbacks remain visible. Incoming receivers,
+subclasses, unsupported element domains, compound updates and other List operations
+keep conservative fallback. See the
+[owned List evidence and remaining gaps](gaps.md#verified-owned-list-state-and-interface-aliases).
+
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |
 | --- | ---: | --- |
-| `IList<T>.Item` | 56 reads, 13 writes | Array receivers tracked through aliases/captures/source helpers; model other concrete implementations |
+| `IList<T>.Item` | 56 reads, 13 writes | Scalar array receivers and fresh List aliases are supported; establish actual corpus receiver identity and other implementations |
 | `Dictionary<TKey,TValue>.Item` | 40 reads, 1 write | Key/value state plus arbitrary comparer callback effects and exceptions |
-| `ICollection<T>.Count` | 40 reads | Array receiver provenance implemented; resolve other concrete implementations |
+| `ICollection<T>.Count` | 40 reads | Scalar array and fresh exact List provenance implemented; establish the remaining corpus receivers |
 | `Array.Length` | 32 reads | Existing contextual array lowering; the absence of a blanket catalog row is not absence of all support |
 | `Comparer<T>.Compare` | 26 calls | Resolve comparer implementation and its callback behavior |
 | `Dictionary.Add / ContainsKey` | 22 calls each | Comparer callbacks, dictionary state, allocation, and exception conditions |
@@ -307,7 +315,7 @@ model, runtime and native regression tests, then update the reviewed inventory. 
 not assign interface or comparer-driven calls the effects of a convenient concrete
 implementation. Refresh the snapshot only after reviewing source/baseline changes.
 
-The List indexer's named exception set reaches the portable effect summary even
+For incoming List receivers, the indexer's named exception set reaches the portable effect summary even
 while its other effects remain Unknown. Native opaque-call IR currently retains only
 a may-throw bit, so a native AllowedExceptions claim for this getter remains Unknown;
 a regression test records that boundary. Importing exact exception types into native
