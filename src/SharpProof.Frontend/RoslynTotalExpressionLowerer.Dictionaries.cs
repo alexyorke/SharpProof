@@ -76,8 +76,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
             !_context.IsDefaultDictionary(instance))
         { return null; }
         var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
-        if (name is not ("Count" or "Item" or "Add" or "ContainsKey"))
-        { return null; }
         var arguments = invocation?.Arguments ?? property!.Arguments;
         var receiver = LowerBodyValue(instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
