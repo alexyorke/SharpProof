@@ -2107,3 +2107,14 @@ All consumers accept IReadOnlyDictionary. ElementGuardNarrowInput's first enviro
 is deliberately edited between evaluations: use a scoped builder and freeze separately
 for each interpreter call, retaining the shared sequence value identity. No embedded
 source or native mutable input arrays change. Status: open before edits.
+## Frontend reference memo and visit construction inventory
+
+IMM-M038: Coordinator inspected TypedReferenceProgramLoweringTests' two alias roots,
+private Value helper and input maps. Use nested scoped dictionary builders retaining
+default IrTypeId and ReferenceEqualityComparer.Instance inner equality; preserve
+lookup-before-materialization and strict Add after recursive values. Freeze the two
+interpreter input maps through strict capture. Its sequential shared/different model
+comparison can edit an owned builder and freeze per evaluation. Native input arrays
+remain mutation/identity subjects. CompilerElisionContinuationPlannerTests' local
+continuation set can use a hash builder and frozen snapshot before assertion/readout.
+Status: open before edits.
