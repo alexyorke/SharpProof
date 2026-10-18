@@ -1785,3 +1785,27 @@ Use indexed array builders and sorted-set builders, snapshot each sorted pending
 before clearing, and freeze final results. FindReachableBlocks can use a sorted-set
 builder while retaining the DFS immutable stack. Preserve domain callback order,
 widening thresholds, cycle ordering and exception checks. Status: open before edits.
+## Additional worker observation returns
+
+IMM-M022: Twelve return helpers in AliasOnlyConditionalAttributeAuditTests,
+CompilerOwnedMethodBodyGraphTests, ConditionalAttributeCompilerAuthorityBoundaryTests (2),
+ConditionalMetadataRejectionAuditTests, four Generic*TestedType* audit fixtures,
+LongFuzz/ControlFlowRetypeCompileRegressionTests, and WorkerVcShadowSourceGateTests (2)
+return mutable diagnostic/attribute/graph/IL/qualification/result arrays. Coordinator
+inspected helper bodies and consumers. Return initialized immutable snapshots, use
+scoped IL instruction builders, immutable opcode lookups, and retain native byte[]
+method-body and reflection arguments. JSON arrays and sequence ordering stay unchanged.
+Nested attribute parameter/argument projections can also be immutable. Status: open.
+
+IMM-M019 now passes parsing, plan ordering, duplicate JSON property rejection,
+doctor JSON/text and documentation drift/regeneration checks. The lint runner and its
+negative fixtures pass in the canonical lint image. Formatting checks 87 PowerShell
+and 19 shell files with zero formatted files. Evidence: immutability-script-builders-checks2.log
+and immutability-builder-script-format.log. The first tooling-only lint probe lacked
+actionlint; the verified run uses the repository's lint image. Status: implemented.
+
+IMM-M020 passes 55 companion tests. IMM-M021 passes 118 dataflow tests; a subsequent
+Worker dependency build found CA1868 on Contains-before-Add. It is corrected to the
+builder Add Boolean guard, preserving insertion and push order. The bounded worker/fuzz
+rerun is pending. Evidence: immutability-companion-builders-tests.log,
+immutability-dataflow-builders-tests.log, immutability-worker-observation-longfuzz-tests.log.
