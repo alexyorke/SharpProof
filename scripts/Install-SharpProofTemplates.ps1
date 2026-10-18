@@ -83,7 +83,7 @@ if ($Verify) {
             $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
             if ($result.runStatus -ne 'Complete' -or $result.failureReason -ne 'None' -or @($result.claimResults).Count -ne 1 -or
                 $result.claimResults[0].outcome -ne 'Proven' -or $result.claimResults[0].vacuity -ne 'None' -or
-                @($result.callableResults | Where-Object coverage -ne 'Complete').Count -gt 0) {
+                @($result.callableResults | Where-Object coverage -NE 'Complete').Count -gt 0) {
                 throw 'Verified template did not produce one complete Proven claim.'
             }
         }

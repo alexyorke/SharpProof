@@ -9,9 +9,9 @@ $ErrorActionPreference = 'Stop'
 
 if (-not $IsWindows -or
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64 -or
+    [Runtime.InteropServices.Architecture]::X64 -or
     [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64) {
+    [Runtime.InteropServices.Architecture]::X64) {
     throw 'The Windows native payload check requires a Windows x64 OS and process.'
 }
 

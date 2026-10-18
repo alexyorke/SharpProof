@@ -6,7 +6,8 @@ public static class Subject
         int i = 0;
         while (i < 2)
         {
-            try { x = 10 / x; }
+            try
+            { x = 10 / x; }
             catch (System.DivideByZeroException) { x = 1; }
             finally { i++; }
         }

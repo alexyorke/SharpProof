@@ -12,25 +12,25 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op1 Assign v5:int[width=32,signed=True] = v1 source=total-local-write-sites.cs:108+1
-  i6 op2 Assign v4:int[width=32,signed=True] = v5 source=total-local-write-sites.cs:100+9
-  i7 op2 Write Local source=total-local-write-sites.cs:100+9
-  i8 op3 Assign v6:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:119+7
-  i9 op4 Assign v7:int[width=32,signed=True] = (v6 + 1) source=total-local-write-sites.cs:119+7
-  i10 op5 Assign v4:int[width=32,signed=True] = v7 source=total-local-write-sites.cs:119+7
-  i11 op5 Write Local source=total-local-write-sites.cs:119+7
-  i12 op6 Assign v8:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:136+10
-  i13 op7 Assign v9:int[width=32,signed=True] = 2 source=total-local-write-sites.cs:145+1
-  i14 op8 Assign v10:int[width=32,signed=True] = (v8 + v9) source=total-local-write-sites.cs:136+10
-  i15 op9 Assign v4:int[width=32,signed=True] = v10 source=total-local-write-sites.cs:136+10
-  i16 op9 Write Local source=total-local-write-sites.cs:136+10
-  i17 op10 Assign v11:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:160+5
-  i18 op11 Assign v1:int[width=32,signed=True] = v11 source=total-local-write-sites.cs:156+9
-  i19 op11 Write Local source=total-local-write-sites.cs:156+9
-  i20 op12 Allocate t3:object source=total-local-write-sites.cs:175+12
-  i21 op14 Assign v12:int[width=32,signed=True] = v1 source=total-local-write-sites.cs:204+1
-  i22 op13 Assign v3:int[width=32,signed=True] = v12 source=total-local-write-sites.cs:204+1
-  i23 op13 Return v3 source=total-local-write-sites.cs:204+1
+  i5 op1 Assign v5:int[width=32,signed=True] = v1 source=total-local-write-sites.cs:tokens["x"]#2
+  i6 op2 Assign v4:int[width=32,signed=True] = v5 source=total-local-write-sites.cs:tokens["value","=","x"]#1
+  i7 op2 Write Local source=total-local-write-sites.cs:tokens["value","=","x"]#1
+  i8 op3 Assign v6:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:tokens["value","++"]#1
+  i9 op4 Assign v7:int[width=32,signed=True] = (v6 + 1) source=total-local-write-sites.cs:tokens["value","++"]#1
+  i10 op5 Assign v4:int[width=32,signed=True] = v7 source=total-local-write-sites.cs:tokens["value","++"]#1
+  i11 op5 Write Local source=total-local-write-sites.cs:tokens["value","++"]#1
+  i12 op6 Assign v8:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:tokens["value","+=","2"]#1
+  i13 op7 Assign v9:int[width=32,signed=True] = 2 source=total-local-write-sites.cs:tokens["2"]#1
+  i14 op8 Assign v10:int[width=32,signed=True] = (v8 + v9) source=total-local-write-sites.cs:tokens["value","+=","2"]#1
+  i15 op9 Assign v4:int[width=32,signed=True] = v10 source=total-local-write-sites.cs:tokens["value","+=","2"]#1
+  i16 op9 Write Local source=total-local-write-sites.cs:tokens["value","+=","2"]#1
+  i17 op10 Assign v11:int[width=32,signed=True] = v4 source=total-local-write-sites.cs:tokens["value"]#4
+  i18 op11 Assign v1:int[width=32,signed=True] = v11 source=total-local-write-sites.cs:tokens["x","=","value"]#1
+  i19 op11 Write Local source=total-local-write-sites.cs:tokens["x","=","value"]#1
+  i20 op12 Allocate t3:object source=total-local-write-sites.cs:tokens["new","object","(",")"]#1
+  i21 op14 Assign v12:int[width=32,signed=True] = v1 source=total-local-write-sites.cs:tokens["x"]#4
+  i22 op13 Assign v3:int[width=32,signed=True] = v12 source=total-local-write-sites.cs:tokens["x"]#4
+  i23 op13 Return v3 source=total-local-write-sites.cs:tokens["x"]#4
 block: b3 cfg:2
   i24 op0 Return void source=none
 block: b4 exceptional:exit

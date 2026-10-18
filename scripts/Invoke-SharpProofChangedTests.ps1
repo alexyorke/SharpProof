@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer `
     'Changed-project testing requires the canonical Linux container.'
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
@@ -173,7 +173,7 @@ foreach ($relativePath in $projectPaths) {
                 continue
             }
             $pendingImports.Push([IO.Path]::GetFullPath(
-                $importPath.Replace('\', '/'), (Split-Path -Parent $buildFile)))
+                    $importPath.Replace('\', '/'), (Split-Path -Parent $buildFile)))
         }
     }
     # Imported item paths are relative to the consuming project, whereas
@@ -217,20 +217,20 @@ foreach ($relativePath in $projectPaths) {
                 # A recursive directory wildcard also matches zero directories;
                 # ordinary wildcards cannot cross directory separators.
                 $pattern = [regex]::Escape($_).
-                    Replace('\*\*/', '(?:.*/)?').
-                    Replace('\*\*', '.*').
-                    Replace('\*', '[^/]*').
-                    Replace('\?', '[^/]')
+                Replace('\*\*/', '(?:.*/)?').
+                Replace('\*\*', '.*').
+                Replace('\*', '[^/]*').
+                Replace('\?', '[^/]')
                 [regex]::new('\A' + $pattern + '\z',
                     [Text.RegularExpressions.RegexOptions]::CultureInvariant)
             })
     $projects[$fullPath] = [pscustomobject]@{
-        FullPath = $fullPath
-        RelativePath = $relative
-        Directory = Split-Path -Parent $fullPath
-        References = $references
+        FullPath             = $fullPath
+        RelativePath         = $relative
+        Directory            = Split-Path -Parent $fullPath
+        References           = $references
         CompiledFilePatterns = $compiledFilePatterns
-        BuildFiles = $buildFiles
+        BuildFiles           = $buildFiles
     }
 }
 
@@ -280,14 +280,14 @@ foreach ($changedPath in $changedPaths) {
     }
     foreach ($project in $projects.Values) {
         $directoryPrefix = $project.Directory +
-            [IO.Path]::DirectorySeparatorChar
+        [IO.Path]::DirectorySeparatorChar
         if ($project.BuildFiles.Contains($fullChangedPath) -or
             $fullChangedPath.StartsWith(
                 $directoryPrefix,
                 [StringComparison]::Ordinal) -or
             @($project.CompiledFilePatterns | Where-Object {
-                $_.IsMatch($fullChangedPath.Replace('\', '/'))
-            }).Count -ne 0) {
+                    $_.IsMatch($fullChangedPath.Replace('\', '/'))
+                }).Count -ne 0) {
             [void]$changedProjectPaths.Add($project.FullPath)
         }
     }
@@ -306,12 +306,12 @@ else {
     foreach ($project in $projects.Values) {
         if (-not $reverseReferences.ContainsKey($project.FullPath)) {
             $reverseReferences[$project.FullPath] =
-                [Collections.Generic.List[string]]::new()
+            [Collections.Generic.List[string]]::new()
         }
         foreach ($reference in $project.References) {
             if (-not $reverseReferences.ContainsKey($reference)) {
                 $reverseReferences[$reference] =
-                    [Collections.Generic.List[string]]::new()
+                [Collections.Generic.List[string]]::new()
             }
             $reverseReferences[$reference].Add($project.FullPath)
         }
@@ -348,9 +348,9 @@ if ($projectInventoryIncomplete) {
 }
 
 $architectureProject = [IO.Path]::GetFullPath((Join-Path $repositoryRoot (
-    'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')))
+            'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')))
 $packageProject = [IO.Path]::GetFullPath((Join-Path $repositoryRoot (
-    'SharpProof.Package.Test/SharpProof.Package.Test.csproj')))
+            'SharpProof.Package.Test/SharpProof.Package.Test.csproj')))
 if (($scriptOrDocumentationImpact -or $globalImpact) -and
     $projects.ContainsKey($architectureProject)) {
     [void]$selected.Add($architectureProject)
@@ -409,7 +409,7 @@ if ($selectedRelative.Count -gt 0) {
             '.sharpproof-changed-' + [Guid]::NewGuid().ToString('N') + '.slnf')
         [pscustomobject]@{
             solution = [ordered]@{
-                path = 'SharpProof.slnx'
+                path     = 'SharpProof.slnx'
                 projects = $selectedRelative
             }
         } | ConvertTo-Json -Depth 4 |
@@ -429,18 +429,18 @@ if ($selectedRelative.Count -gt 0) {
                 -Quiet
         }
         $semanticFilter =
-            'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+        'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
         if ($directChangedProject) {
             $directChangedProjectIsArchitecture =
-                [IO.Path]::GetFileName($selectedRelative[0]) -ceq
-                    'SharpProof.ArchitectureTest.csproj'
+            [IO.Path]::GetFileName($selectedRelative[0]) -ceq
+            'SharpProof.ArchitectureTest.csproj'
             if (-not $NoBuild) {
                 $changedProjectBuildArguments = @(
                     'build', $selectedRelative[0],
                     '-c', $Configuration, '--no-restore')
                 if ($Fast) {
                     $changedProjectBuildArguments +=
-                        '-p:RunAnalyzersDuringBuild=false'
+                    '-p:RunAnalyzersDuringBuild=false'
                 }
                 Invoke-SharpProofRequiredDotnet `
                     -Arguments $changedProjectBuildArguments `
@@ -449,7 +449,7 @@ if ($selectedRelative.Count -gt 0) {
             }
             if ($directChangedProjectIsArchitecture) {
                 & (Join-Path $PSScriptRoot `
-                    'Invoke-SharpProofSemanticTests.ps1') `
+                        'Invoke-SharpProofSemanticTests.ps1') `
                     -Configuration $Configuration `
                     -NoBuild `
                     -ArchitectureOnly `
@@ -498,7 +498,7 @@ if ($selectedRelative.Count -gt 0) {
 
 if ($runPackageTests) {
     $packageArguments = @{
-        Configuration = $Configuration
+        Configuration  = $Configuration
         TimeoutSeconds = $TimeoutSeconds
     }
     if ($NoBuild) {

@@ -140,9 +140,9 @@ function Get-SharpProofTcbPaths {
                 # Keep it classified and subject to changed-TCB coverage checks.
                 if ($path -ceq 'scripts/SharpProof.SymbolPackageValidator.cs' -and
                     @($Contract.trustedComputingBase.components | Where-Object {
-                        $_.name -ceq 'releaseAuthorityDerivedLeaves' -and
-                        @($_.paths) -ccontains $path
-                    }).Count -eq 1 -and
+                            $_.name -ceq 'releaseAuthorityDerivedLeaves' -and
+                            @($_.paths) -ccontains $path
+                        }).Count -eq 1 -and
                     (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'SharpProof.SymbolPackageValidator.cs') -PathType Leaf)) {
                     continue
                 }

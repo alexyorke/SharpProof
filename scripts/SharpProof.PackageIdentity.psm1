@@ -7,7 +7,7 @@ $SharpProofPackageIds = @(
     'SharpProof.Verifier'
 ) | Sort-Object
 
-$SharpProofPackagePushOrder = @(
+$script:SharpProofPackagePushOrder = @(
     'SharpProof.Attributes',
     'SharpProof',
     'SharpProof.Verifier'
@@ -22,9 +22,9 @@ function Get-SharpProofNuspecMetadata {
     $archive = [IO.Compression.ZipFile]::OpenRead($Path)
     try {
         $entries = @($archive.Entries | Where-Object {
-            $_.FullName.EndsWith(
-                '.nuspec', [StringComparison]::OrdinalIgnoreCase)
-        })
+                $_.FullName.EndsWith(
+                    '.nuspec', [StringComparison]::OrdinalIgnoreCase)
+            })
         if ($entries.Count -ne 1) {
             throw "Package '$Path' must contain exactly one nuspec."
         }
@@ -90,17 +90,17 @@ function Get-SharpProofPackageIdentity {
         $repositoryCommit = $repository.GetAttribute('commit')
         if ($RequireRepository -and
             ($repositoryType -ne 'git' -or
-             $repositoryUrl -ne 'https://github.com/alexyorke/SharpProof' -or
-             $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$')) {
+            $repositoryUrl -ne 'https://github.com/alexyorke/SharpProof' -or
+            $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$')) {
             throw "Package '$Path' has invalid repository metadata."
         }
     }
 
     return [pscustomobject][ordered]@{
-        Id = $id.InnerText
-        Version = $version.InnerText
-        Path = $Path
-        RepositoryUrl = $repositoryUrl
+        Id               = $id.InnerText
+        Version          = $version.InnerText
+        Path             = $Path
+        RepositoryUrl    = $repositoryUrl
         RepositoryCommit = if ($null -eq $repositoryCommit) {
             $null
         }
@@ -122,7 +122,7 @@ function Get-SharpProofPackageIdentitySet {
     $identities = @(
         $Files | ForEach-Object {
             [pscustomobject][ordered]@{
-                File = $_
+                File     = $_
                 Identity = Get-SharpProofPackageIdentity `
                     -Path $_.FullName `
                     -RequireRepository:$RequireRepository
@@ -155,8 +155,8 @@ function Get-SharpProofPackageIdentitySet {
     }
 
     return [pscustomobject][ordered]@{
-        Identities = $identities
-        Version = [string]$versions[0]
+        Identities        = $identities
+        Version           = [string]$versions[0]
         RepositoryCommits = @(
             $identities |
                 ForEach-Object { $_.Identity.RepositoryCommit } |

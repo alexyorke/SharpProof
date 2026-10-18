@@ -95,13 +95,13 @@ try {
             '<UnitTestResult testId="architecture-' + $_ + '" outcome="Passed" />'
         }) -join ''
     $architectureReceipt = '<TestRun><ResultSummary><Counters total="5" failed="0" error="0" />' +
-        '<CollectorDataEntries><Collector collectorDisplayName="Code Coverage" /></CollectorDataEntries></ResultSummary>' +
-        '<TestDefinitions>' + $definitions + '</TestDefinitions><Results>' + $results + '</Results></TestRun>'
+    '<CollectorDataEntries><Collector collectorDisplayName="Code Coverage" /></CollectorDataEntries></ResultSummary>' +
+    '<TestDefinitions>' + $definitions + '</TestDefinitions><Results>' + $results + '</Results></TestRun>'
     $architectureReceiptPath = Join-Path $architectureRoot 'architecture.trx'
     [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt)
     $architectureExpected = @([pscustomobject]@{
-            Name = 'architecture'
-            Target = 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
+            Name         = 'architecture'
+            Target       = 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
             EvidenceKind = 'ArchitectureOnly'
         })
     $architectureCompleted = @([pscustomobject]@{ Test = $architectureExpected[0]; ExitCode = 0 })

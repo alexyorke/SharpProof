@@ -20,6 +20,12 @@ Use a unique Compose project name when independent worktrees share a directory b
 
 Lowering fixtures record typed program structure, mode, types, variables, blocks, instructions, terminators, source evidence, and abstentions. The current worker uses Total IR; fixtures can deliberately exercise narrower or unsupported lowering cases.
 
+Lowering source locations use token anchors, for example `source=example.cs:tokens["x","+","1"]#2`: the second occurrence of that exact token sequence in the fixture. Anchors follow the code when whitespace, comments, or unrelated declarations move it. Token spelling, document identity, and exact token boundaries remain checked; identical expressions at different locations have distinct occurrence numbers. Inserting another identical sequence before an anchor deliberately changes its occurrence number and requires reviewing the mapping. Whitespace inside a literal remains significant. This uses Roslyn's [separation of syntax tokens and trivia](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-analysis), without storing absolute character offsets in snapshots.
+
+Every lowering case also runs after adding a heading and normalizing its indentation and line breaks. It must match the same expectation with updates disabled during normal verification. Focused anchor tests cover repeated expressions, incorrect or widened mappings, literal content, and invalid boundaries/documents.
+
+Operation descriptions such as `SimpleAssignment@96` encode a starting offset too. Their snapshots keep the operation kind and anchor its starting token instead; descriptions without a source offset remain literal.
+
 Worker fixtures record request binding, run/claim outcomes, reasons, cache behavior, and launcher boundaries. A `golden-scenario` directive selects a test driver where needed. Replay fixtures can construct explicit IR to exercise a boundary independently of source lowering.
 
 Analyzer fixtures record code, effective severity, mapped location, and message. Formatters omit timings, absolute temporary paths, and arbitrary solver model choices. Assertions should preserve meaningful evidence rather than incidental output.
