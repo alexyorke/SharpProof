@@ -37,6 +37,36 @@ creation, refresh, duplicate suppression, closed/merged PR reuse, ownership
 refusal, file boundaries and a default branch race. These fixtures never contact
 GitHub or alter the repository's branches.
 
+## Link audit after merges
+
+The combined [repository quality check](../.github/workflows/quality.yml) includes
+the link audit on pull requests, pushes to `master` (including merges), and before
+release publication. The [standalone link check](../.github/workflows/links.yml)
+also runs weekly and supports manual dispatch. Both audit the whole
+checkout, including hidden source directories, using [lychee](https://lychee.cli.rs/).
+[lychee.toml](../lychee.toml) lists the Markdown, HTML, CSS, reStructuredText, and
+plain-text formats scanned. Git metadata and ignored build outputs are excluded.
+Program source and structured data are not parsed as documents: their strings can
+contain URI identifiers, incomplete URL prefixes, and synthetic test inputs.
+
+The audit checks Markdown links and images, reference links, HTML hyperlinks,
+bare web URLs, relative and repository-root file paths, and heading/ID fragments.
+URLs inside code examples are included. It checks external HTTP(S) targets live,
+following redirects and retrying failures; HTTP errors and timeouts fail the job.
+It does not execute JavaScript or validate application-generated navigation, and
+email delivery and unsupported URL schemes are outside its scope.
+
+Failures are grouped by source file in `artifacts/lint/links.md` in the combined
+quality artifact, or in the standalone Actions job summary and
+`link-report-<commit>-<attempt>` artifact, retained for 14 days. This job only
+reports: it never fixes links, commits changes, or opens pull requests. Existing
+broken links, illustrative URLs, or sites blocking automated requests can cause
+failures and require human review. No domains or error status codes are silently
+allowlisted.
+
+See [repository quality gates](../eng/lint/README.md) for the required Markdown
+style, spelling, workflow, script, and package compatibility checks.
+
 ## Automatic update pull requests
 
 [Documentation maintenance](../.github/workflows/docs-maintenance.yml) generates
