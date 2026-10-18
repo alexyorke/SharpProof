@@ -70,6 +70,10 @@ $$
     }
     Write-Host 'PSScriptAnalyzer rejects its negative fixture.'
 
+    $output = @(& node (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofLinkRetries.mjs') 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Link retry regressions failed: $($output -join ' ')" }
+    Write-Host ($output -join "`n")
+
     # Exercise the production runner too: native findings must become a failed
     # structured result and a nonzero process exit, not just console output.
     $runnerRoot = Join-Path $scratchRoot 'runner'
