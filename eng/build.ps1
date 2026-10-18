@@ -3,7 +3,7 @@ $legacyProfiles = @('quick', 'check', 'pr', 'nightly', 'security', 'coverage',
     'build', 'test', 'test-changed', 'pack', 'samples', 'corpus',
     'fuzz-nightly', 'package-consumers', 'dependency-audit')
 if ($args.Count -gt 0 -and
-    ([string]$args[0] -in $legacyProfiles -or [string]$args[0] -eq '-Profile')) {
+    ([string]$args[0] -in $legacyProfiles -or [string]$args[0] -in @('-Profile', '-BuildProfile'))) {
     & (Join-Path $PSScriptRoot 'Invoke-SharpProof.ps1') @args
     exit $LASTEXITCODE
 }

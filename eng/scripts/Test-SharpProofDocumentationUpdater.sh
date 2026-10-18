@@ -9,19 +9,25 @@ fixture_root=$(mktemp -d "$repository/artifacts/docs-updater-tests.XXXXXX")
 cleanup() {
   case "$fixture_root" in
     "$repository"/artifacts/docs-updater-tests.*) rm -rf -- "$fixture_root" ;;
-    *) echo 'Unexpected updater fixture path; refusing cleanup.' >&2; return 1 ;;
+    *)
+      echo 'Unexpected updater fixture path; refusing cleanup.' >&2
+      return 1
+      ;;
   esac
 }
 trap cleanup EXIT
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
 unset GH_TOKEN GITHUB_TOKEN
-fail() { echo "Updater lifecycle regression failed ($scenario): $*" >&2; exit 1; }
+fail() {
+  echo "Updater lifecycle regression failed ($scenario): $*" >&2
+  exit 1
+}
 equal() { [[ "$1" == "$2" ]] || fail "expected [$2], got [$1]"; }
 remote_head() { git --git-dir="$case_root/remote.git" rev-parse "refs/heads/$1"; }
 
 # Deliberately supports only the publication API contract. Unexpected commands fail.
 mkdir -p "$fixture_root/bin"
-cat > "$fixture_root/bin/gh" <<'MOCK'
+cat > "$fixture_root/bin/gh" << 'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 arg_value() {
@@ -122,7 +128,10 @@ run_updater() {
     bash "$updater"
   ) > "$case_root/output" 2>&1 || result=$?
   if [[ "$expected" == success ]]; then
-    if ((result != 0)); then tail -n 20 "$case_root/output" >&2; fail "updater exited $result"; fi
+    if ((result != 0)); then
+      tail -n 20 "$case_root/output" >&2
+      fail "updater exited $result"
+    fi
   else
     ((result != 0)) || fail 'unowned branch was accepted'
   fi

@@ -8,40 +8,40 @@ block: b0 entry
 block: b1 cfg:0
   i2 op0 Goto b2 source=none
 block: b2 cfg:1
-  i3 op1 Allocate t5:<no-assembly>::System.Int16[] -> v2:<no-assembly>::System.Int16[][width=0,signed=False] length=2 elements=[1, -2] source=total-constant-array-collection.cs:138+7
-  i4 op2 Assign v1:<no-assembly>::System.Int16[][width=0,signed=False] = v2 source=total-constant-array-collection.cs:129+16
-  i5 op2 Write Local source=total-constant-array-collection.cs:129+16
-  i6 op4 Assign v3:<no-assembly>::System.Int16[][width=0,signed=False] = v1 source=total-constant-array-collection.cs:162+6
-  i7 op5 Assign v4:int[width=32,signed=True] = 0 source=total-constant-array-collection.cs:169+1
-  i8 op6 Branch (v3 == (("<no-assembly>::System.Int16[]"#t5)null)) ? b5 : b6 source=total-constant-array-collection.cs:162+9
+  i3 op1 Allocate t5:<no-assembly>::System.Int16[] -> v2:<no-assembly>::System.Int16[][width=0,signed=False] length=2 elements=[1, -2] source=total-constant-array-collection.cs:tokens["[","1",",","-","2","]"]#1
+  i4 op2 Assign v1:<no-assembly>::System.Int16[][width=0,signed=False] = v2 source=total-constant-array-collection.cs:tokens["values","=","[","1",",","-","2","]"]#1
+  i5 op2 Write Local source=total-constant-array-collection.cs:tokens["values","=","[","1",",","-","2","]"]#1
+  i6 op4 Assign v3:<no-assembly>::System.Int16[][width=0,signed=False] = v1 source=total-constant-array-collection.cs:tokens["values"]#2
+  i7 op5 Assign v4:int[width=32,signed=True] = 0 source=total-constant-array-collection.cs:tokens["0"]#1
+  i8 op6 Branch (v3 == (("<no-assembly>::System.Int16[]"#t5)null)) ? b5 : b6 source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
 block: b3 cfg:2
   i25 op0 Return void source=none
 block: b4 exceptional:exit
   i0 op0 ExceptionalExit source=none
 block: b5 throw
-  i9 op6 Throw NullReference -> b4 source=total-constant-array-collection.cs:162+9
+  i9 op6 Throw NullReference -> b4 source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
 block: b6 normal
-  i10 op7 Branch ((v4 < 0) || (v4 >= len(v3))) ? b7 : b8 source=total-constant-array-collection.cs:162+9
+  i10 op7 Branch ((v4 < 0) || (v4 >= len(v3))) ? b7 : b8 source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
 block: b7 throw
-  i11 op7 Throw IndexOutOfRange -> b4 source=total-constant-array-collection.cs:162+9
+  i11 op7 Throw IndexOutOfRange -> b4 source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
 block: b8 normal
-  i12 op8 Assign v5:short[width=16,signed=True] = v3[v4] source=total-constant-array-collection.cs:162+9
-  i13 op9 Assign v6:int[width=32,signed=True] = (("int"#t1)v5) source=total-constant-array-collection.cs:162+9
-  i14 op10 Assign v7:<no-assembly>::System.Int16[][width=0,signed=False] = v1 source=total-constant-array-collection.cs:174+6
-  i15 op11 Assign v8:int[width=32,signed=True] = 1 source=total-constant-array-collection.cs:181+1
-  i16 op12 Branch (v7 == (("<no-assembly>::System.Int16[]"#t5)null)) ? b9 : b10 source=total-constant-array-collection.cs:174+9
+  i12 op8 Assign v5:short[width=16,signed=True] = v3[v4] source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
+  i13 op9 Assign v6:int[width=32,signed=True] = (("int"#t1)v5) source=total-constant-array-collection.cs:tokens["values","[","0","]"]#1
+  i14 op10 Assign v7:<no-assembly>::System.Int16[][width=0,signed=False] = v1 source=total-constant-array-collection.cs:tokens["values"]#3
+  i15 op11 Assign v8:int[width=32,signed=True] = 1 source=total-constant-array-collection.cs:tokens["1"]#2
+  i16 op12 Branch (v7 == (("<no-assembly>::System.Int16[]"#t5)null)) ? b9 : b10 source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
 block: b9 throw
-  i17 op12 Throw NullReference -> b4 source=total-constant-array-collection.cs:174+9
+  i17 op12 Throw NullReference -> b4 source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
 block: b10 normal
-  i18 op13 Branch ((v8 < 0) || (v8 >= len(v7))) ? b11 : b12 source=total-constant-array-collection.cs:174+9
+  i18 op13 Branch ((v8 < 0) || (v8 >= len(v7))) ? b11 : b12 source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
 block: b11 throw
-  i19 op13 Throw IndexOutOfRange -> b4 source=total-constant-array-collection.cs:174+9
+  i19 op13 Throw IndexOutOfRange -> b4 source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
 block: b12 normal
-  i20 op14 Assign v9:short[width=16,signed=True] = v7[v8] source=total-constant-array-collection.cs:174+9
-  i21 op15 Assign v10:int[width=32,signed=True] = (("int"#t1)v9) source=total-constant-array-collection.cs:174+9
-  i22 op16 Assign v11:int[width=32,signed=True] = (v6 + v10) source=total-constant-array-collection.cs:162+21
-  i23 op3 Assign v0:int[width=32,signed=True] = v11 source=total-constant-array-collection.cs:162+21
-  i24 op3 Return v0 source=total-constant-array-collection.cs:162+21
+  i20 op14 Assign v9:short[width=16,signed=True] = v7[v8] source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
+  i21 op15 Assign v10:int[width=32,signed=True] = (("int"#t1)v9) source=total-constant-array-collection.cs:tokens["values","[","1","]"]#1
+  i22 op16 Assign v11:int[width=32,signed=True] = (v6 + v10) source=total-constant-array-collection.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
+  i23 op3 Assign v0:int[width=32,signed=True] = v11 source=total-constant-array-collection.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
+  i24 op3 Return v0 source=total-constant-array-collection.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
 term: ir3 Variable type=t5:<no-assembly>::System.Int16[] width=0 signed=False value=v2
 term: ir4 Variable type=t5:<no-assembly>::System.Int16[] width=0 signed=False value=v1
 term: ir5 Variable type=t5:<no-assembly>::System.Int16[] width=0 signed=False value=v3

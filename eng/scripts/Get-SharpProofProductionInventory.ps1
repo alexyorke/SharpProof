@@ -78,7 +78,7 @@ function Get-InventoryParallelism {
     if ($null -eq $automation -or
         $null -eq $automation.Value -or
         $null -eq $automation.Value.PSObject.Properties[
-            'productionInventoryMaxParallelism']) {
+        'productionInventoryMaxParallelism']) {
         return 1
     }
 
@@ -106,7 +106,8 @@ function Get-MsBuildQueries {
     $dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
     $dotnetPath = if ($null -eq $dotnetTarget) {
         $dotnetItem.FullName
-    } else { $dotnetTarget.FullName }
+    }
+    else { $dotnetTarget.FullName }
     $sdkVersionOutput = @(& $dotnetPath --version)
     if ($LASTEXITCODE -ne 0 -or $sdkVersionOutput.Count -ne 1) {
         throw 'Production inventory could not resolve the active .NET SDK.'
@@ -134,7 +135,7 @@ function Get-MsBuildQueries {
         }
     }
     $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
-        Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
+            Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
     if ($references.Count -eq 0) {
         throw 'Production inventory SDK reference pack is empty.'
     }
@@ -156,8 +157,8 @@ function Get-MsBuildQueries {
                 $projectRelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
             [pscustomobject][ordered]@{
                 projectRelativePath = $projectRelativePath
-                projectPath = $projectPath
-                arguments = @($projectPath, '-nologo', "-p:Configuration=$Configuration",
+                projectPath         = $projectPath
+                arguments           = @($projectPath, '-nologo', "-p:Configuration=$Configuration",
                     '-p:DesignTimeBuild=false',
                     '-getProperty:MSBuildProjectName,SharpProofProductionProject,AssemblyName,TargetFramework,TargetPath,LangVersion,DefineConstants,Nullable,ImplicitUsings,AllowUnsafeBlocks,DebugType,EnableDefaultCompileItems',
                     '-getItem:Compile,Analyzer,AdditionalFiles')
@@ -166,10 +167,10 @@ function Get-MsBuildQueries {
         $requestPath = Join-Path $temporaryPath 'request.json'
         $responsePath = Join-Path $temporaryPath 'response.json'
         [IO.File]::WriteAllText($requestPath, ([pscustomobject]@{
-                sdkPath = $sdkPath; dotnetPath = $dotnetPath; queries = @($queries)
-            } | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+                    sdkPath = $sdkPath; dotnetPath = $dotnetPath; queries = @($queries)
+                } | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
         $hostOutput = @(& $dotnetPath exec --runtimeconfig $runtimeConfigPath `
-            $hostPath $requestPath $responsePath 2>&1)
+                $hostPath $requestPath $responsePath 2>&1)
         if ($LASTEXITCODE -ne 0) {
             throw ('Production inventory MSBuild evaluation process failed: ' +
                 ($hostOutput -join [Environment]::NewLine))
@@ -359,10 +360,10 @@ function Get-PortablePdbModule {
                 $sourceHash = [Convert]::ToHexString($pdb.GetBlobBytes($pdbDocument.Hash)).ToLowerInvariant()
                 if (-not $documentStates.TryGetValue($relativePath, [ref]$documentState)) {
                     $documentState = [pscustomobject]@{
-                        SequencePoints = [Collections.Generic.HashSet[int]]::new()
+                        SequencePoints      = [Collections.Generic.HashSet[int]]::new()
                         SequencePointRanges = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
                         SourceHashAlgorithm = $sourceHashAlgorithm
-                        SourceHash = $sourceHash
+                        SourceHash          = $sourceHash
                     }
                     $documentStates.Add($relativePath, $documentState)
                 }
@@ -387,21 +388,21 @@ function Get-PortablePdbModule {
         $documents = foreach ($path in @($documentStates.Keys | Sort-Object)) {
             $documentState = $documentStates[$path]
             [pscustomobject][ordered]@{
-                path = $path
+                path                = $path
                 sourceHashAlgorithm = $documentState.SourceHashAlgorithm
-                sourceHash = $documentState.SourceHash
-                sequencePoints = @($documentState.SequencePoints | Sort-Object)
+                sourceHash          = $documentState.SourceHash
+                sequencePoints      = @($documentState.SequencePoints | Sort-Object)
                 sequencePointRanges = @($documentState.SequencePointRanges.Values | Sort-Object startLine, endLine)
             }
         }
         return [pscustomobject][ordered]@{
-            project = $ProjectName
-            assemblyName = $assemblyName
-            assemblyPath = Resolve-RepositoryPath -Candidate $AssemblyPath -Description 'assembly'
-            moduleMvid = $mvid
-            pdbPath = Resolve-RepositoryPath -Candidate $PdbPath -Description 'PDB'
+            project         = $ProjectName
+            assemblyName    = $assemblyName
+            assemblyPath    = Resolve-RepositoryPath -Candidate $AssemblyPath -Description 'assembly'
+            moduleMvid      = $mvid
+            pdbPath         = Resolve-RepositoryPath -Candidate $PdbPath -Description 'PDB'
             pdbCodeViewGuid = $codeView.Guid.ToString('D')
-            documents = @($documents)
+            documents       = @($documents)
         }
     }
     finally {
@@ -462,23 +463,23 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     }
     $constants = @((Get-PropertyValue -Properties $query.Properties -Name 'DefineConstants').Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
     $projectRecord = [pscustomobject][ordered]@{
-        name = $projectName
-        projectPath = Resolve-RepositoryPath -Candidate $projectPath -Description 'project'
-        assemblyName = Get-PropertyValue -Properties $query.Properties -Name 'AssemblyName'
-        targetFramework = Get-PropertyValue -Properties $query.Properties -Name 'TargetFramework'
-        parseOptions = [pscustomobject][ordered]@{
-            languageVersion = Get-PropertyValue -Properties $query.Properties -Name 'LangVersion'
+        name             = $projectName
+        projectPath      = Resolve-RepositoryPath -Candidate $projectPath -Description 'project'
+        assemblyName     = Get-PropertyValue -Properties $query.Properties -Name 'AssemblyName'
+        targetFramework  = Get-PropertyValue -Properties $query.Properties -Name 'TargetFramework'
+        parseOptions     = [pscustomobject][ordered]@{
+            languageVersion     = Get-PropertyValue -Properties $query.Properties -Name 'LangVersion'
             preprocessorSymbols = @($constants)
-            nullable = Get-PropertyValue -Properties $query.Properties -Name 'Nullable'
-            implicitUsings = Get-PropertyValue -Properties $query.Properties -Name 'ImplicitUsings'
-            allowUnsafeBlocks = Get-PropertyValue -Properties $query.Properties -Name 'AllowUnsafeBlocks'
+            nullable            = Get-PropertyValue -Properties $query.Properties -Name 'Nullable'
+            implicitUsings      = Get-PropertyValue -Properties $query.Properties -Name 'ImplicitUsings'
+            allowUnsafeBlocks   = Get-PropertyValue -Properties $query.Properties -Name 'AllowUnsafeBlocks'
         }
-        compile = @($compileRecords)
+        compile          = @($compileRecords)
         generatorOptions = [pscustomobject][ordered]@{
-            debugType = Get-PropertyValue -Properties $query.Properties -Name 'DebugType'
+            debugType                 = Get-PropertyValue -Properties $query.Properties -Name 'DebugType'
             enableDefaultCompileItems = Get-PropertyValue -Properties $query.Properties -Name 'EnableDefaultCompileItems'
         }
-        targetPath = Get-PropertyValue -Properties $query.Properties -Name 'TargetPath'
+        targetPath       = Get-PropertyValue -Properties $query.Properties -Name 'TargetPath'
     }
     [void]$projects.Add($projectRecord)
     foreach ($item in @($query.Items.Analyzer)) {
@@ -493,7 +494,7 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
             }
             else {
                 [IO.Path]::GetFullPath((Join-Path `
-                    $resolvedRepositoryRoot $normalizedAnalyzerPath))
+                            $resolvedRepositoryRoot $normalizedAnalyzerPath))
             }
             if ($resolvedAnalyzerPath.StartsWith(
                     $repositoryPrefix,
@@ -514,8 +515,8 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
 }
 $sortedProjects = @($projects | Sort-Object name)
 $generatorInputs = [pscustomobject][ordered]@{
-    sourceScripts = @($generatorSourceRecords)
-    analyzers = @($analyzerRecords | Sort-Object project, identity, path)
+    sourceScripts   = @($generatorSourceRecords)
+    analyzers       = @($analyzerRecords | Sort-Object project, identity, path)
     additionalFiles = @($additionalFileRecords | Sort-Object project, path)
 }
 $modules = [Collections.Generic.List[object]]::new()

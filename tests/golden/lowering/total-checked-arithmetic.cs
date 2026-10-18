@@ -9,7 +9,8 @@ public static class Subject
         Contract.Ensures(Contract.Result<int>() == checked(Contract.Old(x) + 1) && x == 7);
         try
         {
-            try { return checked(x += x++); }
+            try
+            { return checked(x += x++); }
             catch (System.OverflowException) { return x; }
         }
         finally { x = 7; }

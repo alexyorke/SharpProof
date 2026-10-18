@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $resolvedUpstream = (Resolve-Path -LiteralPath $UpstreamRoot).Path
 $repositoryRoot = (Resolve-Path -LiteralPath (
-    Join-Path $PSScriptRoot '..\..\..')).Path
+        Join-Path $PSScriptRoot '..\..\..')).Path
 $wrapper = Join-Path $repositoryRoot 'eng\scripts\Invoke-SharpProofDotnet.ps1'
 $project = Join-Path $repositoryRoot 'src\SharpProof.Gates\SharpProof.Gates.csproj'
 $variableName = 'SHARPPROOF_OSS_CORPUS_SOURCE'

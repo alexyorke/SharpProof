@@ -6,15 +6,15 @@ function ConvertTo-SharpProofTrxName {
     # VSTest 18.8.1 XmlPersistence.RemoveInvalidXmlChar serializes UTF-16 code units.
     # Apply its one-way encoding to discovery only; preserve raw receipt names.
     return [regex]::Replace($Name, '[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', {
-        param($match)
-        '\u' + ([int][char]$match.Value[0]).ToString('x4', [Globalization.CultureInfo]::InvariantCulture)
-    })
+            param($match)
+            '\u' + ([int][char]$match.Value[0]).ToString('x4', [Globalization.CultureInfo]::InvariantCulture)
+        })
 }
 
 function Get-SharpProofTrxDiscoveryNames {
     param([object[]]$Discovery)
 
-    $rawNames = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    $rawNames = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
     foreach ($case in $Discovery) {
         $rawName = $case.assembly + '|' + $case.fullyQualifiedName
         $encodedName = $case.assembly + '|' + (ConvertTo-SharpProofTrxName -Name $case.fullyQualifiedName)
@@ -64,19 +64,19 @@ function Read-SharpProofCanonicalCases {
             }
             $errorMessage = $result.SelectSingleNode('*[local-name()="Output"]/*[local-name()="ErrorInfo"]/*[local-name()="Message"]')
             $cases.Add([ordered]@{
-                assembly = $assembly
-                testId = [string]$result.testId
-                executionId = $execution
-                framework = $framework
-                task = $task
-                trx = $relativeTrx
-                className = [string]$method.className
-                methodName = [string]$method.name
-                displayName = [string]$result.testName
-                outcome = [string]$result.outcome
-                reason = $(if ($null -eq $errorMessage) { '' } else { [string]$errorMessage.InnerText })
-                fullyQualifiedName = [string]$method.className + '.' + [string]$method.name
-            })
+                    assembly           = $assembly
+                    testId             = [string]$result.testId
+                    executionId        = $execution
+                    framework          = $framework
+                    task               = $task
+                    trx                = $relativeTrx
+                    className          = [string]$method.className
+                    methodName         = [string]$method.name
+                    displayName        = [string]$result.testName
+                    outcome            = [string]$result.outcome
+                    reason             = $(if ($null -eq $errorMessage) { '' } else { [string]$errorMessage.InnerText })
+                    fullyQualifiedName = [string]$method.className + '.' + [string]$method.name
+                })
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical cohort has no actual TRX cases.' }
@@ -130,7 +130,7 @@ function Read-SharpProofCanonicalDiscovery {
             $name = [string]$test.fullname
             if (-not $selectedNames.Contains($name)) { continue }
             $categories = @($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') |
-                ForEach-Object { [string]$_.value })
+                    ForEach-Object { [string]$_.value })
             if (@($categories | Where-Object { $_ -in @('Performance', 'Coverage', 'Corpus') }).Count) { continue }
             $id = [string]$test.id
             if ([string]::IsNullOrWhiteSpace($id) -or -not $ids.Add($assembly + '|' + $id)) {
@@ -204,23 +204,23 @@ function Save-SharpProofCanonicalCohort {
     }
     $discovered.Sort([StringComparer]::Ordinal)
     $receipt = [ordered]@{
-        schemaVersion = 1
-        commit = $commit
-        tree = $tree
-        runId = $env:GITHUB_RUN_ID
-        runAttempt = $env:GITHUB_RUN_ATTEMPT
-        cohort = $Cohort
-        configuration = $Configuration
-        filter = $Filter
-        projects = @($Projects | Sort-Object)
-        expectedTasks = $expectedNames
-        completedTasks = $completedNames
-        completed = @($Completed | ForEach-Object {
+        schemaVersion   = 1
+        commit          = $commit
+        tree            = $tree
+        runId           = $env:GITHUB_RUN_ID
+        runAttempt      = $env:GITHUB_RUN_ATTEMPT
+        cohort          = $Cohort
+        configuration   = $Configuration
+        filter          = $Filter
+        projects        = @($Projects | Sort-Object)
+        expectedTasks   = $expectedNames
+        completedTasks  = $completedNames
+        completed       = @($Completed | ForEach-Object {
                 [ordered]@{ name = $_.Test.Name; exitCode = $_.ExitCode; elapsedMilliseconds = $_.ElapsedMilliseconds }
             })
-        discovered = @($discovered.ToArray())
+        discovered      = @($discovered.ToArray())
         discoveredCases = $discoveredCases
-        cases = $cases
+        cases           = $cases
     }
     $receipt | ConvertTo-Json -Depth 7 |
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort.json') -Encoding utf8NoBOM
@@ -231,7 +231,7 @@ function Assert-SharpProofCanonicalCohorts {
 
     $canonicalFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
     $projects = @((Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw |
-            ConvertFrom-Json).solution.projects | ForEach-Object { ([string]$_).Replace('\', '/') })
+                ConvertFrom-Json).solution.projects | ForEach-Object { ([string]$_).Replace('\', '/') })
     $gatesProject = 'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
     $commit = [string](& git -C $RepositoryRoot rev-parse HEAD)
     if ($LASTEXITCODE -ne 0) { throw 'Canonical aggregate source commit could not be read.' }
@@ -271,7 +271,7 @@ function Assert-SharpProofCanonicalCohorts {
         }
         Assert-SharpProofCanonicalOutcomes -Cases $cases -Cohort $cohort
         [string[]]$discovered = @(Get-ChildItem -LiteralPath $cohortRoot -Recurse -Filter 'discovered-tests.txt' -File |
-            ForEach-Object { Get-Content -LiteralPath $_.FullName })
+                ForEach-Object { Get-Content -LiteralPath $_.FullName })
         [Array]::Sort($discovered, [StringComparer]::Ordinal)
         if (($discovered -join "`n") -cne (@($receipt.discovered) -join "`n")) {
             throw 'Canonical method-name discovery differs from its retained receipt.'
@@ -306,11 +306,13 @@ function Assert-SharpProofCanonicalCohorts {
             }
         }
         $summary.Add([ordered]@{ cohort = $cohort; projects = $expectedProjects; cases = $cases.Count;
-            passed = @($cases | Where-Object { $_.outcome -ceq 'Passed' }).Count;
-            notExecuted = @($cases | Where-Object { $_.outcome -ceq 'NotExecuted' }).Count })
+                passed      = @($cases | Where-Object { $_.outcome -ceq 'Passed' }).Count;
+                notExecuted = @($cases | Where-Object { $_.outcome -ceq 'NotExecuted' }).Count
+            })
     }
     [ordered]@{ schemaVersion = 1; commit = $commit; tree = $tree; runId = $env:GITHUB_RUN_ID;
-        runAttempt = $env:GITHUB_RUN_ATTEMPT; cases = $allIds.Count; cohorts = @($summary) } |
+        runAttempt = $env:GITHUB_RUN_ATTEMPT; cases = $allIds.Count; cohorts = @($summary)
+    } |
         ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort-validation.json') -Encoding utf8NoBOM
 }

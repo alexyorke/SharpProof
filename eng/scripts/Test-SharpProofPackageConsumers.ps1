@@ -35,13 +35,13 @@ function Resolve-SharpProofPackageSource {
     }
     $packageSourceFiles = @(Get-ChildItem -LiteralPath $resolved -File)
     $packageFiles = @(
-        $packageSourceFiles | Where-Object Extension -eq '.nupkg'
+        $packageSourceFiles | Where-Object Extension -EQ '.nupkg'
     )
     if ($packageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Count)."
     }
     $symbolPackageFiles = @(
-        $packageSourceFiles | Where-Object Extension -eq '.snupkg'
+        $packageSourceFiles | Where-Object Extension -EQ '.snupkg'
     )
     if ($symbolPackageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three snupkg files; found $($symbolPackageFiles.Count)."
@@ -68,8 +68,8 @@ function Resolve-SharpProofPackageSource {
         throw 'Could not resolve the package-source checkout commit.'
     }
     foreach ($packageId in $expectedIds) {
-        $main = @($identities | Where-Object Id -eq $packageId)[0]
-        $symbols = @($symbolIdentities | Where-Object Id -eq $packageId)[0]
+        $main = @($identities | Where-Object Id -EQ $packageId)[0]
+        $symbols = @($symbolIdentities | Where-Object Id -EQ $packageId)[0]
         $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $main.Path `
             -SymbolPackagePath $symbols.Path `
@@ -78,12 +78,14 @@ function Resolve-SharpProofPackageSource {
             -RepositoryCommit $repositoryCommit
     }
     return [pscustomobject][ordered]@{
-        Path = [string]$resolved
+        Path    = [string]$resolved
         Version = [string]$versions[0]
     }
 }
 
 function New-FrameworkPackageSource {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'RepositoryRoot',
+        Justification = 'Compatibility parameter; targeting packs are selected by the consumer SDK.')]
     param(
         [Parameter(Mandatory = $true)]
         [string]$Root,
@@ -120,47 +122,47 @@ function New-FrameworkPackageSource {
         '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>',
         [Text.UTF8Encoding]::new($false))
     $frameworkEvaluation = (Invoke-ConsumerDotNet `
-        -WorkingDirectory $Root `
-        -Arguments @('msbuild', $frameworkProbe, '-nologo',
+            -WorkingDirectory $Root `
+            -Arguments @('msbuild', $frameworkProbe, '-nologo',
             '-getItem:KnownFrameworkReference') -Quiet) | ConvertFrom-Json
     $frameworkReferences = @($frameworkEvaluation.Items.KnownFrameworkReference |
-        Where-Object { $_.TargetFramework -eq 'net8.0' })
+            Where-Object { $_.TargetFramework -eq 'net8.0' })
     $targetingPacks = @(
         'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref')
     if ($IsWindows) { $targetingPacks += 'Microsoft.WindowsDesktop.App.Ref' }
     $frameworkPackages = @(
         [pscustomobject]@{
-            Id = 'netstandard.library'
+            Id      = 'netstandard.library'
             Version = '2.0.3'
             Pattern = 'NETStandard.Library'
         }
         [pscustomobject]@{
-            Id = 'microsoft.netcore.platforms'
+            Id      = 'microsoft.netcore.platforms'
             Version = '1.1.0'
             Pattern = 'Microsoft.NETCore.Platforms'
         }
         [pscustomobject]@{
-            Id = 'microsoft.netframework.referenceassemblies'
+            Id      = 'microsoft.netframework.referenceassemblies'
             Version = '1.0.3'
             Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
         }
         [pscustomobject]@{
-            Id = 'microsoft.netframework.referenceassemblies.net472'
+            Id      = 'microsoft.netframework.referenceassemblies.net472'
             Version = '1.0.3'
             Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
         }
     )
     foreach ($targetingPack in $targetingPacks) {
         $packVersions = @($frameworkReferences |
-            Where-Object { $_.TargetingPackName -eq $targetingPack } |
-            Select-Object -ExpandProperty TargetingPackVersion -Unique)
+                Where-Object { $_.TargetingPackName -eq $targetingPack } |
+                Select-Object -ExpandProperty TargetingPackVersion -Unique)
         if ($packVersions.Count -ne 1 -or
             [string]$packVersions[0] -notmatch '^8\.0\.[0-9]+$') {
             throw "The selected consumer SDK did not declare one net8.0 targeting-pack version for '$targetingPack'."
         }
         Write-Host "Consumer SDK requires $targetingPack $($packVersions[0])."
         $frameworkPackages += [pscustomobject]@{
-            Id = $targetingPack.ToLowerInvariant()
+            Id      = $targetingPack.ToLowerInvariant()
             Version = [string]$packVersions[0]
             Pattern = $targetingPack
         }
@@ -177,9 +179,9 @@ function New-FrameworkPackageSource {
         try {
             if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
                 $downloadRoot = Join-Path `
-                    ([IO.Path]::GetTempPath()) `
-                    ('sharpproof-framework-package-' +
-                        [Guid]::NewGuid().ToString('N'))
+                ([IO.Path]::GetTempPath()) `
+                ('sharpproof-framework-package-' +
+                    [Guid]::NewGuid().ToString('N'))
                 [IO.Directory]::CreateDirectory($downloadRoot) | Out-Null
                 $packagePath = Join-Path $downloadRoot $fileName
                 $normalizedId = $package.Id.ToLowerInvariant()
@@ -264,7 +266,7 @@ function New-FrameworkPackageSource {
             'SharpProof packages.')
     }
     return [pscustomobject][ordered]@{
-        Source = $frameworkSource
+        Source   = $frameworkSource
         Packages = $frameworkPackages
     }
 }
@@ -323,7 +325,7 @@ function Assert-SharpProofAnalyzerItems {
         $analyzerItems |
             Where-Object {
                 ([string]$_.Identity) -match
-                    '[/\\]SharpProof\.[^/\\]+\.dll$'
+                '[/\\]SharpProof\.[^/\\]+\.dll$'
             }
     )
     $entryPointNames = [Collections.Generic.List[string]]::new()
@@ -370,7 +372,7 @@ function Test-SharpProofFrameworkConsumers {
     )
 
     $parent = Join-Path `
-        ([IO.Path]::GetTempPath()) `
+    ([IO.Path]::GetTempPath()) `
         'SharpProof.PackageConsumers'
     $root = Join-Path $parent ([Guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($root) | Out-Null
@@ -385,7 +387,7 @@ function Test-SharpProofFrameworkConsumers {
         else {
             $json = [ordered]@{
                 sdk = [ordered]@{
-                    version = $SdkVersion
+                    version     = $SdkVersion
                     rollForward = 'disable'
                 }
             } | ConvertTo-Json -Depth 3
@@ -401,7 +403,7 @@ function Test-SharpProofFrameworkConsumers {
         $frameworkSource = [string]$frameworkCatalog.Source
         $escapedSource = [Security.SecurityElement]::Escape($Source)
         $escapedFrameworkSource =
-            [Security.SecurityElement]::Escape($frameworkSource)
+        [Security.SecurityElement]::Escape($frameworkSource)
         $nugetConfig = Join-Path $root 'NuGet.config'
         $nugetConfigLines = @(
             '<?xml version="1.0" encoding="utf-8"?>'
@@ -441,7 +443,7 @@ function Test-SharpProofFrameworkConsumers {
         }
 
         $contract = Get-Content -LiteralPath (Join-Path `
-            $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+                $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
             ConvertFrom-Json
         $frameworks = @($contract.supportedTargetFrameworks | ForEach-Object {
                 [string]$_
@@ -496,32 +498,32 @@ function Test-SharpProofFrameworkConsumers {
             Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
-                    'restore',
-                    'Consumer.csproj',
-                    '--configfile',
-                    $nugetConfig,
-                    '--packages',
-                    $cache,
-                    '--nologo') | Out-Null
+                'restore',
+                'Consumer.csproj',
+                '--configfile',
+                $nugetConfig,
+                '--packages',
+                $cache,
+                '--nologo') | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
-                    'msbuild',
-                    'Consumer.csproj',
-                    '-getItem:Analyzer',
-                    '--nologo')
+                'msbuild',
+                'Consumer.csproj',
+                '-getItem:Analyzer',
+                '--nologo')
             Assert-SharpProofAnalyzerItems `
                 -Output $analyzers `
                 -Framework $framework
             Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
-                    'build',
-                    'Consumer.csproj',
-                    '--configuration',
-                    $Configuration,
-                    '--no-restore',
-                    '--nologo') | Out-Null
+                'build',
+                'Consumer.csproj',
+                '--configuration',
+                $Configuration,
+                '--no-restore',
+                '--nologo') | Out-Null
         }
     }
     finally {
@@ -541,11 +543,11 @@ function Test-SharpProofFrameworkConsumers {
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $testProject = Join-Path $repositoryRoot 'src\SharpProof.Package.IntegrationTests\SharpProof.Package.IntegrationTests.csproj'
 $isSupportedWorkerHost = $IsLinux -and
-    $env:SHARPPROOF_CONTAINER -ceq '1' -and
-    [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
-        [System.Runtime.InteropServices.Architecture]::X64 -and
-    [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
-        [System.Runtime.InteropServices.Architecture]::X64
+$env:SHARPPROOF_CONTAINER -ceq '1' -and
+[System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
+[System.Runtime.InteropServices.Architecture]::X64 -and
+[System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
+[System.Runtime.InteropServices.Architecture]::X64
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {
     $PackageSource = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_PACKAGE_SOURCE',
@@ -614,9 +616,9 @@ try {
         # the complete package suite belongs to the ordinary test/acceptance
         # lane and must not be duplicated for every consumer job.
         $focusedPackageFilter =
-            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
-            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
-            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
+        'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
+        'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
+        'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
         $packageTestArguments += @('--filter', $focusedPackageFilter)
     }
     & dotnet @packageTestArguments

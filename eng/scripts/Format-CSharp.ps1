@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$VerifyNoChanges
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -14,71 +16,66 @@ function Invoke-DotnetFormat {
     )
 
     $effectiveArguments =
-        [Collections.Generic.List[string]]::new($Arguments)
+    [Collections.Generic.List[string]]::new($Arguments)
+    if ($VerifyNoChanges) {
+        $effectiveArguments.Add('--verify-no-changes')
+    }
     & $wrapperPath `
         -TimeoutSeconds 900 `
         @effectiveArguments
     if ($LASTEXITCODE -ne 0) {
         throw (
-            "dotnet $($effectiveArguments -join ' ') failed with exit code " +
+            "dotnet format failed with exit code " +
             "$LASTEXITCODE.")
     }
 }
 
-function Invoke-DotnetFormatForGenerated {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-        [Parameter(Mandatory = $true)]
-        [string[]]$GeneratedPaths
-    )
-
-    Invoke-DotnetFormat -Arguments @(
-        $Arguments +
-        '--include-generated' +
-        '--include' +
-        $GeneratedPaths
-    )
-}
-
 Push-Location $repositoryRoot
 try {
+    $sourcePaths = @(git ls-files -- '*.cs')
+    if ($LASTEXITCODE -ne 0 -or $sourcePaths.Count -eq 0) {
+        throw 'Formatting requires a Git checkout with tracked C# sources.'
+    }
+
+    & $wrapperPath -TimeoutSeconds 900 restore SharpProof.slnx --locked-mode
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Solution restore failed before formatting.'
+    }
+
+    # Folder mode covers every tracked C# file, including samples, templates,
+    # script helpers and golden fixtures outside the main solution. Restrict
+    # generated formatting to tracked source so bin/obj output stays excluded.
     $whitespaceArguments = @(
         'format',
         'whitespace',
-        'SharpProof.slnx',
-        '--no-restore',
+        $repositoryRoot,
+        '--folder',
+        '--include-generated',
         '--verbosity',
-        'minimal'
+        'minimal',
+        '--include'
     )
-    $styleArguments = @(
+    $solutionArguments = @(
         'format',
-        'style',
         'SharpProof.slnx',
         '--severity',
         'warn',
         '--no-restore',
+        '--include-generated',
         '--verbosity',
-        'minimal'
+        'minimal',
+        '--include'
     )
-    Invoke-DotnetFormat -Arguments $whitespaceArguments
-    Invoke-DotnetFormat -Arguments $styleArguments
-
-    $generatedPaths = @(git ls-files '*.generated.cs')
-    if ($LASTEXITCODE -ne 0) {
-        throw 'git ls-files failed while resolving generated C# sources.'
-    }
-    if ($generatedPaths.Count -ne 0) {
-        Invoke-DotnetFormatForGenerated `
-            -Arguments $whitespaceArguments `
-            -GeneratedPaths $generatedPaths
-        Invoke-DotnetFormatForGenerated `
-            -Arguments $styleArguments `
-            -GeneratedPaths $generatedPaths
-    }
+    Invoke-DotnetFormat -Arguments ($whitespaceArguments + $sourcePaths)
+    Invoke-DotnetFormat -Arguments ($solutionArguments + $sourcePaths)
 }
 finally {
     Pop-Location
 }
 
-Write-Host 'Applied standard dotnet C# formatting.'
+if ($VerifyNoChanges) {
+    Write-Host 'Repository C# formatting is correct.'
+}
+else {
+    Write-Host 'Applied standard dotnet C# formatting across the repository.'
+}

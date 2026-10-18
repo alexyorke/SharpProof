@@ -2,8 +2,10 @@ using SharpProof.Attributes;
 
 namespace SharpProof.Samples.Library;
 
-public static class AccessPolicy {
-    public static bool IsAuthorized(bool isAdministrator, bool ownsResource) {
+public static class AccessPolicy
+{
+    public static bool IsAuthorized(bool isAdministrator, bool ownsResource)
+    {
         Contract.Ensures(
             Contract.Result<bool>() == (isAdministrator || ownsResource));
         if (isAdministrator)
@@ -13,7 +15,8 @@ public static class AccessPolicy {
 
     public static bool SelectApproval(
         bool manualApproval,
-        bool automatedApproval) {
+        bool automatedApproval)
+    {
         Contract.Ensures(
             Contract.Result<bool>() ==
             (manualApproval ? true : automatedApproval));

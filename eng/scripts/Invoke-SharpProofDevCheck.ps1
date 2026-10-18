@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer `
     'The developer check requires the canonical Linux container.'
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
@@ -38,13 +38,13 @@ $plannedCommands = @($commandPlan.commands)
 function Get-RequiredPlanCommand {
     param([Parameter(Mandatory = $true)][string]$Id)
 
-    $matches = @($plannedCommands | Where-Object {
+    $matchedCommands = @($plannedCommands | Where-Object {
             [string]$_.id -ceq $Id
         })
-    if ($matches.Count -ne 1) {
+    if ($matchedCommands.Count -ne 1) {
         throw "Developer-check command plan must contain exactly one '$Id' row."
     }
-    return $matches[0]
+    return $matchedCommands[0]
 }
 
 $restoreCommand = Get-RequiredPlanCommand 'restore'
@@ -85,23 +85,23 @@ Invoke-SharpProofTimedPhase -Name 'restore' -Timings $timings -Action {
 Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
     $builds = [Collections.Generic.List[object]]::new()
     $builds.Add([pscustomobject]@{
-        Name = 'solution-' +
+            Name      = 'solution-' +
             ([string]$solutionBuildCommand.configuration).ToLowerInvariant()
-        Arguments = @(
-            'build', 'SharpProof.slnx', '-c',
-            [string]$solutionBuildCommand.configuration,
-            '--no-restore')
-    })
+            Arguments = @(
+                'build', 'SharpProof.slnx', '-c',
+                [string]$solutionBuildCommand.configuration,
+                '--no-restore')
+        })
     if ($packageProductBuild) {
         $builds.Add([pscustomobject]@{
-            Name = 'package-products-release'
-            Arguments = @(
-                'build',
-                'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
-                '-c', [string]$packageProductBuildCommands[0].configuration,
-                '--no-restore',
-                '-p:GeneratePackageOnBuild=false')
-        })
+                Name      = 'package-products-release'
+                Arguments = @(
+                    'build',
+                    'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
+                    '-c', [string]$packageProductBuildCommands[0].configuration,
+                    '--no-restore',
+                    '-p:GeneratePackageOnBuild=false')
+            })
     }
     Invoke-SharpProofParallelDotnetBuilds `
         -Builds @($builds) `
@@ -117,7 +117,7 @@ Invoke-SharpProofTimedPhase -Name 'semantic-tests' -Timings $timings -Action {
 }
 Invoke-SharpProofTimedPhase -Name 'package-tests' -Timings $timings -Action {
     $packageArguments = @{
-        Configuration = $Configuration
+        Configuration  = $Configuration
         TimeoutSeconds = $TimeoutSeconds
     }
     $packageArguments.NoBuild = $true
@@ -131,13 +131,13 @@ $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 $timingOutput = Join-Path $timingDirectory (
     'dev-check-' + $Configuration.ToLowerInvariant() + '.json')
 $temporaryTiming =
-    $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+$timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
 [pscustomobject]@{
-    schemaVersion = 1
-    command = 'check'
-    configuration = $Configuration
+    schemaVersion            = 1
+    command                  = 'check'
+    configuration            = $Configuration
     totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-    phases = @($timings)
+    phases                   = @($timings)
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
 Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force

@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer `
     'Package tests require the canonical Linux container.'
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
@@ -101,29 +101,30 @@ function New-SharpProofWeightedBuckets {
     $buckets = @(
         for ($index = 0; $index -lt $BucketCount; $index++) {
             [pscustomobject]@{
-                Index = $index
-                Methods = [Collections.Generic.List[string]]::new()
+                Index                 = $index
+                Methods               = [Collections.Generic.List[string]]::new()
                 EstimatedMilliseconds = 0L
             }
         })
     $orderedMethods = @($Methods | Sort-Object `
-        @{ Expression = {
+        @{ Expression     = {
                 if ($HistoricalMilliseconds.ContainsKey($_)) {
                     [long]$HistoricalMilliseconds[$_]
                 }
                 else {
                     $DefaultMilliseconds
                 }
-            }; Descending = $true }, `
+            }; Descending = $true
+        }, `
         @{ Expression = { $_ }; Descending = $false })
     foreach ($method in $orderedMethods) {
         $bucket = $buckets | Sort-Object `
             EstimatedMilliseconds, `
-            @{ Expression = { $_.Methods.Count } }, `
+        @{ Expression = { $_.Methods.Count } }, `
             Index | Select-Object -First 1
         $bucket.Methods.Add($method)
         $bucket.EstimatedMilliseconds +=
-            $(if ($HistoricalMilliseconds.ContainsKey($method)) {
+        $(if ($HistoricalMilliseconds.ContainsKey($method)) {
                 [long]$HistoricalMilliseconds[$method]
             }
             else {
@@ -169,7 +170,7 @@ function Get-TestMethodTimings {
 
     if (-not $script:SharpProofTrxTimingRowsCache.ContainsKey($ResultsRoot)) {
         $rowsByClass = [Collections.Generic.Dictionary[string,
-            Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+        Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
         foreach ($trx in Get-ChildItem `
                 -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
             [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
@@ -179,18 +180,18 @@ function Get-TestMethodTimings {
                 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
             $definitions = @{}
             foreach ($definition in @($document.SelectNodes(
-                    '//trx:UnitTest', $namespace))) {
+                        '//trx:UnitTest', $namespace))) {
                 $method = $definition.SelectSingleNode(
                     'trx:TestMethod', $namespace)
                 if ($null -ne $method) {
                     $definitions[[string]$definition.id] = [pscustomobject]@{
-                        ClassName = [string]$method.className
+                        ClassName  = [string]$method.className
                         MethodName = [string]$method.name
                     }
                 }
             }
             foreach ($result in @($document.SelectNodes(
-                    '//trx:UnitTestResult', $namespace))) {
+                        '//trx:UnitTestResult', $namespace))) {
                 $testId = [string]$result.testId
                 if (-not $definitions.ContainsKey($testId)) {
                     continue
@@ -206,10 +207,10 @@ function Get-TestMethodTimings {
                         $classRows)
                 }
                 $classRows.Add([pscustomobject]@{
-                    ClassName = $definition.ClassName
-                    MethodName = $definition.MethodName
-                    Duration = [string]$result.duration
-                })
+                        ClassName  = $definition.ClassName
+                        MethodName = $definition.MethodName
+                        Duration   = [string]$result.duration
+                    })
             }
         }
         $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rowsByClass
@@ -240,7 +241,7 @@ function Get-TestMethodTimings {
     }
     return @($milliseconds.GetEnumerator() | ForEach-Object {
             [pscustomobject]@{
-                name = [string]$_.Key
+                name                = [string]$_.Key
                 elapsedMilliseconds = [long]$_.Value
             }
         } | Sort-Object name)
@@ -301,9 +302,9 @@ $phaseTimings = [Collections.Generic.List[object]]::new()
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $canonicalPackageFilter =
-    'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 $useDefaultShardPlan = [string]::IsNullOrWhiteSpace($TestFilter) -or
-    $TestFilter -ceq $canonicalPackageFilter
+$TestFilter -ceq $canonicalPackageFilter
 $timingStem = 'package-tests-' + $Configuration.ToLowerInvariant()
 $timingSuffix = if ($coverageEnabled) { '-coverage' } else { '' }
 $canonicalTimingOutput = Join-Path $timingDirectory (
@@ -337,7 +338,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
             continue
         }
         $hasScheduler =
-            $priorTiming.PSObject.Properties.Name -contains 'scheduler'
+        $priorTiming.PSObject.Properties.Name -contains 'scheduler'
         $methodHistory = if ($hasScheduler) {
             @($priorTiming.scheduler.workerMethods)
         }
@@ -352,7 +353,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
         }
         $packageLayoutMethodHistory = if ($hasScheduler -and
             $priorTiming.scheduler.PSObject.Properties.Name -contains
-                'packageLayoutMethods') {
+            'packageLayoutMethods') {
             @($priorTiming.scheduler.packageLayoutMethods)
         }
         else {
@@ -362,7 +363,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
                 $priorPackageLayoutMethodMilliseconds[
-                    [string]$method.name] = $elapsed
+                [string]$method.name] = $elapsed
             }
         }
         $filterHistory = if ($hasScheduler) {
@@ -391,8 +392,8 @@ try {
             -Timings $phaseTimings -RecordOnFailure -Action {
             Invoke-SharpProofRequiredDotnet `
                 -Arguments @(
-                    'restore', 'SharpProof.slnx', '--locked-mode',
-                    '/nodeReuse:false') `
+                'restore', 'SharpProof.slnx', '--locked-mode',
+                '/nodeReuse:false') `
                 -TimeoutSeconds $TimeoutSeconds `
                 -Quiet:$Quiet
         }
@@ -405,12 +406,12 @@ try {
             '--no-restore')
         if ($Fast) {
             $testHarnessBuildArguments +=
-                '-p:RunAnalyzersDuringBuild=false'
+            '-p:RunAnalyzersDuringBuild=false'
         }
         $builds.Add([pscustomobject]@{
-            Name = 'test-harness-' + $Configuration.ToLowerInvariant()
-            Arguments = $testHarnessBuildArguments
-        })
+                Name      = 'test-harness-' + $Configuration.ToLowerInvariant()
+                Arguments = $testHarnessBuildArguments
+            })
     }
     # The Release test-harness project references Verifier with no output
     # assembly, so its build already materializes the complete package
@@ -425,12 +426,12 @@ try {
             '-p:GeneratePackageOnBuild=false')
         if ($Fast) {
             $packageProductBuildArguments +=
-                '-p:RunAnalyzersDuringBuild=false'
+            '-p:RunAnalyzersDuringBuild=false'
         }
         $builds.Add([pscustomobject]@{
-            Name = 'package-products-release'
-            Arguments = $packageProductBuildArguments
-        })
+                Name      = 'package-products-release'
+                Arguments = $packageProductBuildArguments
+            })
     }
     if ($builds.Count -gt 0) {
         Invoke-SharpProofTimedPhase -Name 'build-prerequisites' `
@@ -440,9 +441,9 @@ try {
                 # closure. Wait for it before building the empty Verifier
                 # root, whose package payload consumes those outputs.
                 Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -eq 'test-harness-release')
+                    $builds | Where-Object Name -EQ 'test-harness-release')
                 Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -eq 'package-products-release')
+                    $builds | Where-Object Name -EQ 'package-products-release')
             }
             else {
                 Invoke-RequiredBuilds -Builds @($builds)
@@ -455,21 +456,21 @@ try {
             -Timings $phaseTimings -RecordOnFailure -Action {
             Invoke-SharpProofRequiredDotnet `
                 -Arguments @(
-                    'pack', 'SharpProof.slnx', '-c', 'Release',
-                    '--no-restore', '--no-build', '--nologo',
-                    '/nodeReuse:false', '--output', $feed,
-                    '/p:GeneratePackageOnBuild=false') `
+                'pack', 'SharpProof.slnx', '-c', 'Release',
+                '--no-restore', '--no-build', '--nologo',
+                '/nodeReuse:false', '--output', $feed,
+                '/p:GeneratePackageOnBuild=false') `
                 -TimeoutSeconds $TimeoutSeconds `
                 -Quiet:$Quiet
         }
     }
 
     $workerClass =
-        'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
+    'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
     $packageLayoutClass =
-        'SharpProof.Package.Test.PackageLayoutSmokeTests'
+    'SharpProof.Package.Test.PackageLayoutSmokeTests'
     $verifierDefaultsClass =
-        'SharpProof.Package.Test.VerifierPackageDefaultsTests'
+    'SharpProof.Package.Test.VerifierPackageDefaultsTests'
     function Get-SharpProofHistoricalFilterMilliseconds {
         param([Parameter(Mandatory = $true)][string]$Filter)
 
@@ -490,16 +491,16 @@ try {
     $shards = [Collections.Generic.List[object]]::new()
     if (-not $useDefaultShardPlan) {
         $shards.Add([pscustomobject]@{
-            Name = 'selected'
-            Filter = $TestFilter
-            EstimatedMilliseconds =
+                Name                  = 'selected'
+                Filter                = $TestFilter
+                EstimatedMilliseconds =
                 $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
-                    [long]$priorFilterMilliseconds[$TestFilter]
-                }
-                else {
-                    1L
-                })
-        })
+                        [long]$priorFilterMilliseconds[$TestFilter]
+                    }
+                    else {
+                        1L
+                    })
+            })
     }
     else {
         if ([string]::IsNullOrWhiteSpace($testAssembly)) {
@@ -511,18 +512,18 @@ try {
             -Assembly $testAssembly `
             -ClassNames @($workerClass, $packageLayoutClass, $verifierDefaultsClass) `
             -MinimumCounts @{
-                $workerClass = 40
-                $packageLayoutClass = 15
-                $verifierDefaultsClass = 4
-            } `
+            $workerClass           = 40
+            $packageLayoutClass    = 15
+            $verifierDefaultsClass = 4
+        } `
             -Descriptions @{
-                $workerClass = 'Worker MSBuild integration'
-                $packageLayoutClass = 'package-layout'
-                $verifierDefaultsClass = 'verifier-package defaults'
-            }
+            $workerClass           = 'Worker MSBuild integration'
+            $packageLayoutClass    = 'package-layout'
+            $verifierDefaultsClass = 'verifier-package defaults'
+        }
         $workerMethods = @($discoveredMethods[$workerClass])
         $threeTargetWorkerMethod =
-            'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
+        'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
         $threeTargetWorkerHistoryNames = @(
             $threeTargetWorkerMethod,
             'ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds')
@@ -533,8 +534,8 @@ try {
         # every useful multi-lane width; retain the bucketed path for 1-3
         # lanes where it would consume the wave.
         $isolateThreeTargetWorker =
-            $parallelism -ge 4 -and
-            $workerMethods -contains $threeTargetWorkerMethod
+        $parallelism -ge 4 -and
+        $workerMethods -contains $threeTargetWorkerMethod
         $bucketWorkerMethods = if ($isolateThreeTargetWorker) {
             @($workerMethods | Where-Object {
                     $_ -cne $threeTargetWorkerMethod
@@ -558,15 +559,15 @@ try {
         # containers retain the historical plan because their extra lanes make
         # those samples useful and the existing wide-wave tuning depends on it.
         $countBalancedBuckets = @(New-SharpProofWeightedBuckets `
-            -Methods $bucketWorkerMethods `
-            -HistoricalMilliseconds @{} `
-            -DefaultMilliseconds 1L `
-            -BucketCount $workerShardCount)
+                -Methods $bucketWorkerMethods `
+                -HistoricalMilliseconds @{} `
+                -DefaultMilliseconds 1L `
+                -BucketCount $workerShardCount)
         $weightedBuckets = @(New-SharpProofWeightedBuckets `
-            -Methods $bucketWorkerMethods `
-            -HistoricalMilliseconds $priorMethodMilliseconds `
-            -DefaultMilliseconds 1L `
-            -BucketCount $workerShardCount)
+                -Methods $bucketWorkerMethods `
+                -HistoricalMilliseconds $priorMethodMilliseconds `
+                -DefaultMilliseconds 1L `
+                -BucketCount $workerShardCount)
         $countMaximum = Get-SharpProofBucketMaximum `
             -Buckets $countBalancedBuckets `
             -HistoricalMilliseconds $priorMethodMilliseconds `
@@ -589,33 +590,33 @@ try {
         $packageLayoutMethods = @($discoveredMethods[$packageLayoutClass])
         $packageLayoutFilter = "FullyQualifiedName~$packageLayoutClass"
         $defaultPackageLayoutMethodMilliseconds =
-            if ($null -ne ($packageLayoutHistoricalMilliseconds =
-                    Get-SharpProofHistoricalFilterMilliseconds `
-                        $packageLayoutFilter)) {
-                [long][Math]::Max(
-                    1,
-                    [Math]::Ceiling(
-                        [long]$packageLayoutHistoricalMilliseconds /
-                            [double]$packageLayoutMethods.Count))
-            }
-            else {
-                # A fresh CI-width run has no method history. The layout
-                # host launches nested MSBuild processes and is substantially
-                # heavier than a single worker method; give it a conservative
-                # one-second estimate so it starts before the exclusive
-                # postflight shards instead of becoming a cold-start tail.
-                if ($parallelism -le 4) { 1000L } else { 1L }
-            }
+        if ($null -ne ($packageLayoutHistoricalMilliseconds =
+                Get-SharpProofHistoricalFilterMilliseconds `
+                    $packageLayoutFilter)) {
+            [long][Math]::Max(
+                1,
+                [Math]::Ceiling(
+                    [long]$packageLayoutHistoricalMilliseconds /
+                    [double]$packageLayoutMethods.Count))
+        }
+        else {
+            # A fresh CI-width run has no method history. The layout
+            # host launches nested MSBuild processes and is substantially
+            # heavier than a single worker method; give it a conservative
+            # one-second estimate so it starts before the exclusive
+            # postflight shards instead of becoming a cold-start tail.
+            if ($parallelism -le 4) { 1000L } else { 1L }
+        }
         # Split the layout fixture only on wider waves. Two hosts let the
         # uneven restore/build methods overlap while each host retains its
         # four-worker NUnit pool; a four-lane wave keeps one host so it does
         # not serialize two full pools or duplicate package-cache startup.
         $packageLayoutBucketCount = if ($parallelism -ge 8) { 2 } else { 1 }
         $packageLayoutBuckets = @(New-SharpProofWeightedBuckets `
-            -Methods $packageLayoutMethods `
-            -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
-            -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
-            -BucketCount $packageLayoutBucketCount)
+                -Methods $packageLayoutMethods `
+                -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
+                -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
+                -BucketCount $packageLayoutBucketCount)
         $fixtureClasses = @(
             'CompilerCaptureFreshnessControlTests',
             'CompilerCaptureFreshnessRegressionTests',
@@ -665,19 +666,19 @@ try {
                 })
             $filter = $classFilters -join '|'
             $estimatedMilliseconds =
-                Get-SharpProofHistoricalFilterMilliseconds $filter
+            Get-SharpProofHistoricalFilterMilliseconds $filter
             if ($null -eq $estimatedMilliseconds) {
                 # Retain the individual-class lookup for timing files written
                 # by older schedulers and fixture-specific test runs.
                 $estimatedMilliseconds = [long](@($classFilters |
-                        ForEach-Object {
-                            if ($priorFilterMilliseconds.ContainsKey($_)) {
-                                [long]$priorFilterMilliseconds[$_]
-                            }
-                            else {
-                                1L
-                            }
-                        } | Measure-Object -Sum).Sum)
+                            ForEach-Object {
+                                if ($priorFilterMilliseconds.ContainsKey($_)) {
+                                    [long]$priorFilterMilliseconds[$_]
+                                }
+                                else {
+                                    1L
+                                }
+                            } | Measure-Object -Sum).Sum)
             }
             # Keep the shard directory short enough for TRX and coverage
             # output paths on Linux filesystems. The first fixture groups
@@ -689,92 +690,92 @@ try {
                 'fixture-' + $fixtureClass.ToLowerInvariant()
             }
             $shards.Add([pscustomobject]@{
-                Name = $fixtureName
-                Filter = $filter
-                EstimatedMilliseconds = $estimatedMilliseconds
-                # FinalCompilationProbeTests runs up to four NUnit children
-                # concurrently, each launching an MSBuild process. Charge
-                # those internal workers to the outer wave scheduler so they
-                # do not consume untracked CPU alongside every worker shard.
-                Slots = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
-                    [Math]::Min(4, $parallelism)
-                }
-                else {
-                    1
-                }
+                    Name                  = $fixtureName
+                    Filter                = $filter
+                    EstimatedMilliseconds = $estimatedMilliseconds
+                    # FinalCompilationProbeTests runs up to four NUnit children
+                    # concurrently, each launching an MSBuild process. Charge
+                    # those internal workers to the outer wave scheduler so they
+                    # do not consume untracked CPU alongside every worker shard.
+                    Slots                 = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
+                        [Math]::Min(4, $parallelism)
+                    }
+                    else {
+                        1
+                    }
                 })
         }
         $buildTaskFilter = 'FullyQualifiedName~SharpProof.Package.Test.BuildTaskTests'
         $shards.Add([pscustomobject]@{
-            Name = 'postflight-buildtask'
-            Filter = $buildTaskFilter
-            EstimatedMilliseconds =
+                Name                  = 'postflight-buildtask'
+                Filter                = $buildTaskFilter
+                EstimatedMilliseconds =
                 $(if ($null -ne ($historicalMilliseconds =
-                        Get-SharpProofHistoricalFilterMilliseconds `
-                            $buildTaskFilter)) {
-                    $historicalMilliseconds
-                }
-                else {
-                    10000L
-                })
-            # BuildTaskTests needs a fresh dotnet test host.
-            Slots = 1
-            Exclusive = $true
-        })
+                            Get-SharpProofHistoricalFilterMilliseconds `
+                                $buildTaskFilter)) {
+                        $historicalMilliseconds
+                    }
+                    else {
+                        10000L
+                    })
+                # BuildTaskTests needs a fresh dotnet test host.
+                Slots                 = 1
+                Exclusive             = $true
+            })
         foreach ($bucket in $packageLayoutBuckets) {
             $filter = @($bucket.Methods | ForEach-Object {
                     "FullyQualifiedName~$packageLayoutClass.$_"
                 }) -join '|'
             $shards.Add([pscustomobject]@{
-                Name = 'package-layout-' + ($bucket.Index + 1).ToString(
-                    'D2', [Globalization.CultureInfo]::InvariantCulture)
-                Filter = $filter
-                EstimatedMilliseconds =
+                    Name                  = 'package-layout-' + ($bucket.Index + 1).ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture)
+                    Filter                = $filter
+                    EstimatedMilliseconds =
                     $(if ($null -ne ($historicalMilliseconds =
-                            Get-SharpProofHistoricalFilterMilliseconds $filter)) {
-                        $historicalMilliseconds
-                    }
-                    else {
-                        $bucket.EstimatedMilliseconds
-                    })
-                # PackageLayoutSmokeTests enables NUnit child parallelism up
-                # to four workers. Charge that nested pool to the outer
-                # scheduler so the package-layout host does not oversubscribe
-                # the integration-test wave alongside worker shards.
-                Slots = [Math]::Min(4, $parallelism)
-            })
+                                Get-SharpProofHistoricalFilterMilliseconds $filter)) {
+                            $historicalMilliseconds
+                        }
+                        else {
+                            $bucket.EstimatedMilliseconds
+                        })
+                    # PackageLayoutSmokeTests enables NUnit child parallelism up
+                    # to four workers. Charge that nested pool to the outer
+                    # scheduler so the package-layout host does not oversubscribe
+                    # the integration-test wave alongside worker shards.
+                    Slots                 = [Math]::Min(4, $parallelism)
+                })
         }
         foreach ($bucket in @($workerBuckets | Where-Object {
                     $_.Methods.Count -gt 0
                 })) {
             $shards.Add([pscustomobject]@{
-                Name = 'worker-' + ($bucket.Index + 1).ToString(
-                    'D2', [Globalization.CultureInfo]::InvariantCulture)
-                Filter = @($bucket.Methods | ForEach-Object {
-                    "FullyQualifiedName~$workerClass.$_"
-                }) -join '|'
-                EstimatedMilliseconds = $bucket.EstimatedMilliseconds
-                Slots = 1
-            })
+                    Name                  = 'worker-' + ($bucket.Index + 1).ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture)
+                    Filter                = @($bucket.Methods | ForEach-Object {
+                            "FullyQualifiedName~$workerClass.$_"
+                        }) -join '|'
+                    EstimatedMilliseconds = $bucket.EstimatedMilliseconds
+                    Slots                 = 1
+                })
         }
         if ($isolateThreeTargetWorker) {
             $threeTargetEstimatedMilliseconds = 1L
             foreach ($historyName in $threeTargetWorkerHistoryNames) {
                 if ($priorMethodMilliseconds.ContainsKey($historyName)) {
                     $threeTargetEstimatedMilliseconds =
-                        [long]$priorMethodMilliseconds[$historyName]
+                    [long]$priorMethodMilliseconds[$historyName]
                     break
                 }
             }
             $shards.Add([pscustomobject]@{
-                Name = 'worker-three-target'
-                Filter = "FullyQualifiedName~$workerClass.$threeTargetWorkerMethod"
-                EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
-                # The test performs a complete analyzer pass for each
-                # framework. Reserve a bounded lane slice while allowing the
-                # independent worker shards to overlap its work.
-                Slots = [Math]::Min(3, $parallelism)
-            })
+                    Name                  = 'worker-three-target'
+                    Filter                = "FullyQualifiedName~$workerClass.$threeTargetWorkerMethod"
+                    EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
+                    # The test performs a complete analyzer pass for each
+                    # framework. Reserve a bounded lane slice while allowing the
+                    # independent worker shards to overlap its work.
+                    Slots                 = [Math]::Min(3, $parallelism)
+                })
         }
     }
 
@@ -794,7 +795,7 @@ try {
     # Start high-resource shards first so reserved lanes overlap their tails
     # instead of leaving the containment process as the final wave.
     $orderedShards = @($shards | Sort-Object `
-        @{ Expression = {
+        @{ Expression     = {
                 $slots = if ($_.PSObject.Properties.Name -contains 'Slots') {
                     [long]$_.Slots
                 }
@@ -806,7 +807,8 @@ try {
                     1L
                 }
                 [long]$_.EstimatedMilliseconds * $slots
-            }; Descending = $true }, `
+            }; Descending = $true
+        }, `
         @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
         @{ Expression = 'Name'; Descending = $false })
     $testPhase = [Diagnostics.Stopwatch]::StartNew()
@@ -814,8 +816,8 @@ try {
         param([object]$shard)
 
         $nextIsExclusive =
-            $shard.PSObject.Properties.Name -contains 'Exclusive' -and
-            [bool]$shard.Exclusive
+        $shard.PSObject.Properties.Name -contains 'Exclusive' -and
+        [bool]$shard.Exclusive
         $environment = @{
             SHARPPROOF_PACKAGE_SOURCE = $feed
         }
@@ -827,10 +829,10 @@ try {
                     '/net10.0')) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
-                        $shard.Name + '/' + $Configuration + '/net10.0'))
+                    $shard.Name + '/' + $Configuration + '/net10.0'))
         }
         $directVstest = -not $coverageEnabled -and
-            -not $nextIsExclusive
+        -not $nextIsExclusive
         if ($directVstest) {
             $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
         }
@@ -865,7 +867,7 @@ try {
             -Enabled $coverageEnabled `
             -Settings $resolvedCoverageSettings
         return [pscustomobject]@{
-            Arguments = $arguments
+            Arguments   = $arguments
             Environment = $environment
         }
     }.GetNewClosure()
@@ -883,11 +885,11 @@ try {
     }
     foreach ($result in @($testRun.Completed)) {
         $shardTimings.Add([pscustomobject]@{
-            name = $result.Test.Name
-            filter = $result.Test.Filter
-            elapsedMilliseconds = $result.ElapsedMilliseconds
-            exitCode = $result.ExitCode
-        })
+                name                = $result.Test.Name
+                filter              = $result.Test.Filter
+                elapsedMilliseconds = $result.ElapsedMilliseconds
+                exitCode            = $result.ExitCode
+            })
     }
     $failures = [Collections.Generic.List[string]]::new()
     foreach ($failure in @($testRun.Completed | Where-Object {
@@ -899,9 +901,9 @@ try {
     }
     $testPhase.Stop()
     $phaseTimings.Add([pscustomobject]@{
-        name = 'test-shards'
-        elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
-    })
+            name                = 'test-shards'
+            elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
+        })
 
     $campaign.Stop()
     $workerMethodTimings = Get-TestMethodTimings `
@@ -912,57 +914,57 @@ try {
         -ClassName $packageLayoutClass
     foreach ($entry in $workerMethodTimings) {
         $priorMethodMilliseconds[[string]$entry.name] =
-            [long]$entry.elapsedMilliseconds
+        [long]$entry.elapsedMilliseconds
     }
     foreach ($entry in $packageLayoutMethodTimings) {
         $priorPackageLayoutMethodMilliseconds[[string]$entry.name] =
-            [long]$entry.elapsedMilliseconds
+        [long]$entry.elapsedMilliseconds
     }
     foreach ($entry in $shardTimings) {
         $priorFilterMilliseconds[[string]$entry.filter] =
-            [long]$entry.elapsedMilliseconds
+        [long]$entry.elapsedMilliseconds
     }
     $temporaryTiming =
-        $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     [pscustomobject]@{
-        schemaVersion = 1
-        command = 'package-tests'
-        configuration = $Configuration
-        fast = [bool]$Fast
-        parallelism = $parallelism
+        schemaVersion            = 1
+        command                  = 'package-tests'
+        configuration            = $Configuration
+        fast                     = [bool]$Fast
+        parallelism              = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-        phases = @($phaseTimings)
-        shards = @($shardTimings | Sort-Object name)
-        workerMethods = $workerMethodTimings
-        packageLayoutMethods = $packageLayoutMethodTimings
-        scheduler = [ordered]@{
-            workerMethods = @(
+        phases                   = @($phaseTimings)
+        shards                   = @($shardTimings | Sort-Object name)
+        workerMethods            = $workerMethodTimings
+        packageLayoutMethods     = $packageLayoutMethodTimings
+        scheduler                = [ordered]@{
+            workerMethods            = @(
                 $priorMethodMilliseconds.GetEnumerator() |
                     ForEach-Object {
                         [pscustomobject]@{
-                            name = [string]$_.Key
+                            name                = [string]$_.Key
                             elapsedMilliseconds = [long]$_.Value
                         }
                     } | Sort-Object name)
-            packageLayoutMethods = @(
-                $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
-                    ForEach-Object {
-                        [pscustomobject]@{
-                            name = [string]$_.Key
-                            elapsedMilliseconds = [long]$_.Value
-                        }
-                    } | Sort-Object name)
-            filters = @(
-                $priorFilterMilliseconds.GetEnumerator() |
-                    ForEach-Object {
-                        [pscustomobject]@{
-                            filter = [string]$_.Key
-                            elapsedMilliseconds = [long]$_.Value
-                        }
-                    } | Sort-Object filter)
-        }
-    } | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
+                packageLayoutMethods = @(
+                    $priorPackageLayoutMethodMilliseconds.GetEnumerator() |
+                        ForEach-Object {
+                            [pscustomobject]@{
+                                name                = [string]$_.Key
+                                elapsedMilliseconds = [long]$_.Value
+                            }
+                        } | Sort-Object name)
+                    filters          = @(
+                        $priorFilterMilliseconds.GetEnumerator() |
+                            ForEach-Object {
+                                [pscustomobject]@{
+                                    filter              = [string]$_.Key
+                                    elapsedMilliseconds = [long]$_.Value
+                                }
+                            } | Sort-Object filter)
+                    }
+                } | ConvertTo-Json -Depth 5 |
+                    Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 
     if ($failures.Count -ne 0) {

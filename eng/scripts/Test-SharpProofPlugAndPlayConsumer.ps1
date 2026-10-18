@@ -9,6 +9,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$consumerCommandTimeoutSeconds = $CommandTimeoutSeconds
 $actualFamily = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } elseif ($IsLinux) { 'linux' } else { 'unknown' }
 $actualHost = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
 $actualProcess = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
@@ -17,7 +18,7 @@ if ($actualFamily -cne $OsFamily -or $actualHost -cne $Architecture -or $actualP
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -in @('.nupkg', '.snupkg'))
+$files = @(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
 $identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
 $version = [string]$identities.Version
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -72,10 +73,10 @@ function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory 
         if (-not $process.Start()) { throw 'Unable to start the consumer SDK.' }
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($CommandTimeoutSeconds * 1000)) {
+        if (-not $process.WaitForExit($consumerCommandTimeoutSeconds * 1000)) {
             $process.Kill($true)
             $process.WaitForExit()
-            throw "Consumer command exceeded $CommandTimeoutSeconds seconds."
+            throw "Consumer command exceeded $consumerCommandTimeoutSeconds seconds."
         }
         $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         Write-Host (($output -split '\r?\n' | Select-Object -Last 100) -join "`n")
@@ -221,7 +222,7 @@ return result == 42 && attributes == "SharpProof.Attributes" ? 0 : 1;
         throw 'The downstream application did not receive the attribute runtime assembly.'
     }
     $nativeFiles = @(Get-ChildItem -LiteralPath $applicationOutput -Recurse -File |
-        Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })
+            Where-Object { $_.Name -in @('libz3.so', 'libz3.dylib', 'libz3.dll', 'z3.dll') })
     if ($nativeFiles.Count -ne 0) { throw 'Verifier native build-tool payloads leaked into application runtime output.' }
     $run = Invoke-ConsumerCommand -WorkingDirectory $downstream -Arguments @(
         'run', '--project', 'Application.csproj', '-c', 'Release', '--no-build', '--no-restore')

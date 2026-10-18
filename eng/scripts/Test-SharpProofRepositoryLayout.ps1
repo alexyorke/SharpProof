@@ -13,9 +13,9 @@ $inventoryText = Invoke-SharpProofGitText -RepositoryRoot $repositoryRoot `
     -Arguments @('ls-files', '--cached', '--others', '--exclude-standard', '-z') `
     -FailureMessage 'Could not inventory repository source files.'
 $files = @($inventoryText.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries) |
-    Sort-Object -Unique | Where-Object {
-        Test-Path -LiteralPath (Join-Path $repositoryRoot $_) -PathType Leaf
-    })
+        Sort-Object -Unique | Where-Object {
+            Test-Path -LiteralPath (Join-Path $repositoryRoot $_) -PathType Leaf
+        })
 $failures = [Collections.Generic.List[string]]::new()
 $records = [Collections.Generic.List[object]]::new()
 $evaluations = [Collections.Generic.List[object]]::new()
@@ -76,12 +76,12 @@ foreach ($solutionPath in @($files | Where-Object { $_.EndsWith('.slnx', [String
 $projectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($relative in $files) {
     $classification = if ($relative.StartsWith('eng/common/', [StringComparison]::Ordinal)) { 'pinned-upstream-bootstrapper' }
-        elseif ($relative.StartsWith('src/', [StringComparison]::Ordinal)) { 'source-project-or-source-asset' }
-        elseif ($relative.StartsWith('eng/', [StringComparison]::Ordinal)) { 'engineering' }
-        elseif ($relative.StartsWith('docs/', [StringComparison]::Ordinal) -or $relative.EndsWith('.md', [StringComparison]::Ordinal)) { 'documentation' }
-        elseif ($relative.StartsWith('tests/', [StringComparison]::Ordinal)) { 'test-data' }
-        elseif ($relative.StartsWith('.github/', [StringComparison]::Ordinal)) { 'ci' }
-        else { 'repository-metadata-or-developer-configuration' }
+    elseif ($relative.StartsWith('src/', [StringComparison]::Ordinal)) { 'source-project-or-source-asset' }
+    elseif ($relative.StartsWith('eng/', [StringComparison]::Ordinal)) { 'engineering' }
+    elseif ($relative.StartsWith('docs/', [StringComparison]::Ordinal) -or $relative.EndsWith('.md', [StringComparison]::Ordinal)) { 'documentation' }
+    elseif ($relative.StartsWith('tests/', [StringComparison]::Ordinal)) { 'test-data' }
+    elseif ($relative.StartsWith('.github/', [StringComparison]::Ordinal)) { 'ci' }
+    else { 'repository-metadata-or-developer-configuration' }
     $records.Add([ordered]@{ path = $relative; classification = $classification })
     Require (-not ($relative -match '(^|/)(bin|obj)/')) "Build output is tracked or unignored: $relative"
     Require (-not ($relative -match '^(scripts|tools|samples)/')) "Source path uses a retired root: $relative"
@@ -103,7 +103,7 @@ foreach ($relative in $files) {
         Require (-not (Test-Path -LiteralPath (Join-Path $projectDirectory 'obj'))) "Project-local obj output exists: $relative"
         if ($EvaluateProjects) {
             $query = @(& dotnet msbuild $absolute -nologo -p:Configuration=Release `
-                '-getProperty:MSBuildProjectName,AssemblyName,TargetPath,BaseOutputPath,BaseIntermediateOutputPath,PackageOutputPath,ArtifactsDir,IsTestProject,IsShipping,Version,PackageVersion,AssemblyVersion')
+                    '-getProperty:MSBuildProjectName,AssemblyName,TargetPath,BaseOutputPath,BaseIntermediateOutputPath,PackageOutputPath,ArtifactsDir,IsTestProject,IsShipping,Version,PackageVersion,AssemblyVersion')
             if ($LASTEXITCODE -ne 0) {
                 $failures.Add("MSBuild evaluation failed: $relative")
             }
@@ -131,7 +131,7 @@ foreach ($relative in $files) {
             if ([string]::IsNullOrWhiteSpace($value) -or $value -match '[$@%*?;]' -or $node.GetAttribute('Sdk')) { continue }
             $value = $value.Replace('\', '/')
             $target = if ([IO.Path]::IsPathRooted($value)) { [IO.Path]::GetFullPath($value) }
-                else { [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $absolute) $value)) }
+            else { [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $absolute) $value)) }
             if ($target.StartsWith((Join-Path $repositoryRoot 'artifacts') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) { continue }
             Require (Test-Path -LiteralPath $target) "Missing static MSBuild input: $relative -> $value"
         }
@@ -144,18 +144,18 @@ foreach ($relative in @($files | Where-Object { $_.EndsWith('.slnf', [StringComp
     }
 }
 $report = [ordered]@{
-    schemaVersion = 1
-    standard = 'Microsoft.DotNet.Arcade.Sdk repository requirements'
-    arcadeVersion = $upstream.sdkVersion
-    upstreamCommit = $upstream.commit
-    sourceFiles = $files.Count
-    projects = $projectNames.Count
-    upstreamFilesVerified = $expectedCommon.Count
-    evaluatedProjects = $evaluations.Count
+    schemaVersion               = 1
+    standard                    = 'Microsoft.DotNet.Arcade.Sdk repository requirements'
+    arcadeVersion               = $upstream.sdkVersion
+    upstreamCommit              = $upstream.commit
+    sourceFiles                 = $files.Count
+    projects                    = $projectNames.Count
+    upstreamFilesVerified       = $expectedCommon.Count
+    evaluatedProjects           = $evaluations.Count
     excludedFromSourceInventory = @('Git administration', 'ignored generated outputs and local caches', 'separate registered or embedded Git worktrees')
-    files = @($records)
-    evaluations = @($evaluations)
-    failures = @($failures)
+    files                       = @($records)
+    evaluations                 = @($evaluations)
+    failures                    = @($failures)
 }
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $repositoryRoot 'artifacts/layout-audit/report.json'

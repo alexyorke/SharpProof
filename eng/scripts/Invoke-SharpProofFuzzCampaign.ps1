@@ -23,7 +23,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.FuzzEvidenceLifecycle.ps1')
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputDirectory `
     -ParameterName 'OutputDirectory'
@@ -167,34 +167,34 @@ try {
             $validationError = $_.Exception.Message
         }
         return [pscustomobject][ordered]@{
-            name = $Name
-            requestedCases = $Cases
-            observedCases = $observedCases
-            seed = $Seed
-            exitCode = $process.ExitCode
+            name                = $Name
+            requestedCases      = $Cases
+            observedCases       = $observedCases
+            seed                = $Seed
+            exitCode            = $process.ExitCode
             runnerSchemaVersion = $runnerSchemaVersion
-            agreements = $agreements
-            abstentions = $abstentions
-            runnerPassed = $runnerPassed
-            validationPassed = $null -eq $validationError
-            validationError = $validationError
-            standardOutput = "$logicalOutput/$Name.stdout.json"
-            standardError = "$logicalOutput/$Name.stderr.txt"
+            agreements          = $agreements
+            abstentions         = $abstentions
+            runnerPassed        = $runnerPassed
+            validationPassed    = $null -eq $validationError
+            validationError     = $validationError
+            standardOutput      = "$logicalOutput/$Name.stdout.json"
+            standardError       = "$logicalOutput/$Name.stderr.txt"
         }
     }
 
     $runs = [Collections.Generic.List[object]]::new()
     $runs.Add((Invoke-FuzzRun `
-        -Name "rotating-$RotatingSeed" `
-        -Cases $schedule.RotatingCases `
-        -Seed $RotatingSeed `
-        -TimeoutSeconds ([int]$contract.fuzz.rotatingRunWallSeconds)))
+                -Name "rotating-$RotatingSeed" `
+                -Cases $schedule.RotatingCases `
+                -Seed $RotatingSeed `
+                -TimeoutSeconds ([int]$contract.fuzz.rotatingRunWallSeconds)))
     foreach ($seed in $schedule.RetainedRunSeeds) {
         $runs.Add((Invoke-FuzzRun `
-            -Name "retained-$seed" `
-            -Cases $effectiveRetainedCases `
-            -Seed ([int]$seed) `
-            -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds)))
+                    -Name "retained-$seed" `
+                    -Cases $effectiveRetainedCases `
+                    -Seed ([int]$seed) `
+                    -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds)))
     }
     $completedCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
@@ -206,19 +206,19 @@ try {
         })
     $campaignPassed = $failedRuns.Count -eq 0
     $summary = [pscustomobject][ordered]@{
-        schemaVersion = 5
-        status = if ($campaignPassed) { 'passed' } else { 'failed' }
-        commit = $sourceCommit
-        rotatingSeed = $RotatingSeed
-        rotatingCases = $schedule.RotatingCases
+        schemaVersion          = 5
+        status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
+        commit                 = $sourceCommit
+        rotatingSeed           = $RotatingSeed
+        rotatingCases          = $schedule.RotatingCases
         requestedRotatingCases = $schedule.RequestedRotatingCases
-        retainedCasesPerSeed = $schedule.RetainedCasesPerSeed
-        retainedSeeds = $schedule.RetainedSeeds
-        requestedCases = $schedule.RequestedCases
-        totalCases = [int](@($runs |
-            Measure-Object -Property observedCases -Sum).Sum)
-        runs = @($runs)
-        passed = $campaignPassed
+        retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
+        retainedSeeds          = $schedule.RetainedSeeds
+        requestedCases         = $schedule.RequestedCases
+        totalCases             = [int](@($runs |
+                    Measure-Object -Property observedCases -Sum).Sum)
+        runs                   = @($runs)
+        passed                 = $campaignPassed
     }
     Complete-SharpProofFuzzEvidence `
         -OutputDirectory $resolvedOutput `

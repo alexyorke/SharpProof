@@ -10,33 +10,33 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b3 source=none
 block: b1 filter:accepted
-  i57 op14 Goto b25 source=total-call-precondition-filter.cs:542+10
+  i57 op14 Goto b25 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b2 filter:rejected
-  i58 op14 Goto b23 source=total-call-precondition-filter.cs:542+10
+  i58 op14 Goto b23 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b3 cfg:0
   i4 op0 Goto b4 source=none
 block: b4 cfg:1
-  i5 op3 Assign v10:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:246+8
-  i6 op4 Assign v11:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:252+1
-  i7 op3 Assign v12:bool[width=0,signed=False] = (v11 >= 0) source=total-call-precondition-filter.cs:246+8
-  i45 op3 Assign v6:int[width=32,signed=True] = v11 source=total-call-precondition-filter.cs:246+8
-  i46 op3 Goto b10 source=total-call-precondition-filter.cs:246+8
+  i5 op3 Assign v10:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
+  i6 op4 Assign v11:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:tokens["x"]#2
+  i7 op3 Assign v12:bool[width=0,signed=False] = (v11 >= 0) source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
+  i45 op3 Assign v6:int[width=32,signed=True] = v11 source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
+  i46 op3 Goto b10 source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
 block: b5 cfg:2
-  i49 op18 Assign v23:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:309+1
-  i50 op19 Assign v24:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:314+1
-  i51 op20 Assign v25:bool[width=0,signed=False] = (v23 == v24) source=total-call-precondition-filter.cs:309+6
-  i52 op17 Branch v25 ? b1 : b2 source=total-call-precondition-filter.cs:309+6
+  i49 op18 Assign v23:int[width=32,signed=True] = v1 source=total-call-precondition-filter.cs:tokens["x"]#3
+  i50 op19 Assign v24:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:tokens["0"]#1
+  i51 op20 Assign v25:bool[width=0,signed=False] = (v23 == v24) source=total-call-precondition-filter.cs:tokens["x","==","0"]#1
+  i52 op17 Branch v25 ? b1 : b2 source=total-call-precondition-filter.cs:tokens["x","==","0"]#1
 block: b6 cfg:3
-  i53 op22 Assign v26:int[width=32,signed=True] = 2 source=total-call-precondition-filter.cs:326+1
-  i54 op21 Assign v3:int[width=32,signed=True] = v26 source=total-call-precondition-filter.cs:326+1
-  i55 op21 Return v3 source=total-call-precondition-filter.cs:326+1
+  i53 op22 Assign v26:int[width=32,signed=True] = 2 source=total-call-precondition-filter.cs:tokens["2"]#1
+  i54 op21 Assign v3:int[width=32,signed=True] = v26 source=total-call-precondition-filter.cs:tokens["2"]#1
+  i55 op21 Return v3 source=total-call-precondition-filter.cs:tokens["2"]#1
 block: b7 cfg:4
   i56 op0 Return void source=none
 block: b8 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b9 call:continued
-  i47 op1 Assign v3:int[width=32,signed=True] = v10 source=total-call-precondition-filter.cs:246+8
-  i48 op1 Return v3 source=total-call-precondition-filter.cs:246+8
+  i47 op1 Assign v3:int[width=32,signed=True] = v10 source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
+  i48 op1 Return v3 source=total-call-precondition-filter.cs:tokens["Outer","(","x",")"]#1
 block: b10 entry
   i8 op5 Assign v7:int[width=32,signed=True] = v6 source=none
   i9 op5 Assign v8:int[width=32,signed=True] = v6 source=none
@@ -44,19 +44,19 @@ block: b10 entry
 block: b11 cfg:0
   i12 op5 Goto b12 source=none
 block: b12 cfg:1
-  i13 op8 Assign v17:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:430+12
-  i14 op9 Assign v18:int[width=32,signed=True] = v7 source=total-call-precondition-filter.cs:436+5
-  i15 op8 Assign v19:bool[width=0,signed=False] = (v18 > 0) source=total-call-precondition-filter.cs:430+12
-  i39 op8 Assign v13:int[width=32,signed=True] = v18 source=total-call-precondition-filter.cs:430+12
-  i40 op8 Goto b16 source=total-call-precondition-filter.cs:430+12
+  i13 op8 Assign v17:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
+  i14 op9 Assign v18:int[width=32,signed=True] = v7 source=total-call-precondition-filter.cs:tokens["value"]#3
+  i15 op8 Assign v19:bool[width=0,signed=False] = (v18 > 0) source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
+  i39 op8 Assign v13:int[width=32,signed=True] = v18 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
+  i40 op8 Goto b16 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
 block: b13 cfg:2
   i44 op5 Goto b9 source=none
 block: b14 exceptional:exit
   i10 op5 ExceptionalExit source=none
 block: b15 call:continued
-  i41 op6 Assign v9:int[width=32,signed=True] = v17 source=total-call-precondition-filter.cs:430+12
-  i42 op6 Assign v10:int[width=32,signed=True] = v9 source=total-call-precondition-filter.cs:430+12
-  i43 op6 Goto b9 source=total-call-precondition-filter.cs:430+12
+  i41 op6 Assign v9:int[width=32,signed=True] = v17 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
+  i42 op6 Assign v10:int[width=32,signed=True] = v9 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
+  i43 op6 Goto b9 source=total-call-precondition-filter.cs:tokens["Inner","(","value",")"]#1
 block: b16 entry
   i16 op10 Assign v14:int[width=32,signed=True] = v13 source=none
   i17 op10 Assign v15:int[width=32,signed=True] = v13 source=none
@@ -64,36 +64,36 @@ block: b16 entry
 block: b17 cfg:0
   i20 op10 Goto b18 source=none
 block: b18 cfg:1
-  i21 op12 Assign v20:int[width=32,signed=True] = 20 source=total-call-precondition-filter.cs:542+2
-  i22 op13 Assign v21:int[width=32,signed=True] = v14 source=total-call-precondition-filter.cs:547+5
-  i23 op14 Branch (v21 == 0) ? b21 : b22 source=total-call-precondition-filter.cs:542+10
+  i21 op12 Assign v20:int[width=32,signed=True] = 20 source=total-call-precondition-filter.cs:tokens["20"]#1
+  i22 op13 Assign v21:int[width=32,signed=True] = v14 source=total-call-precondition-filter.cs:tokens["value"]#6
+  i23 op14 Branch (v21 == 0) ? b21 : b22 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b19 cfg:2
   i38 op10 Goto b15 source=none
 block: b20 exceptional:exit
   i18 op10 ExceptionalExit source=none
 block: b21 throw
-  i30 op14 Throw DivideByZero -> b26 source=total-call-precondition-filter.cs:542+10
+  i30 op14 Throw DivideByZero -> b26 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b22 normal
-  i31 op15 Branch ((v20 == -2147483648) && (v21 == -1)) ? b27 : b28 source=total-call-precondition-filter.cs:542+10
+  i31 op15 Branch ((v20 == -2147483648) && (v21 == -1)) ? b27 : b28 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b23 exception:searched
-  i24 op14 Throw DivideByZero -> b8 source=total-call-precondition-filter.cs:542+10
+  i24 op14 Throw DivideByZero -> b8 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b24 catch:entry
-  i25 op14 Assign v5:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:542+10
-  i26 op14 Goto b6 source=total-call-precondition-filter.cs:542+10
+  i25 op14 Assign v5:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
+  i26 op14 Goto b6 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b25 exception:searched
-  i27 op14 Throw DivideByZero -> b24 source=total-call-precondition-filter.cs:542+10
+  i27 op14 Throw DivideByZero -> b24 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b26 filter:entry
-  i28 op14 Assign v4:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:542+10
-  i29 op14 Goto b5 source=total-call-precondition-filter.cs:542+10
+  i28 op14 Assign v4:int[width=32,signed=True] = 0 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
+  i29 op14 Goto b5 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b27 throw
-  i33 op15 Throw Overflow -> b29 source=total-call-precondition-filter.cs:542+10
+  i33 op15 Throw Overflow -> b29 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b28 normal
-  i34 op16 Assign v22:int[width=32,signed=True] = (v20 / v21) source=total-call-precondition-filter.cs:542+10
-  i35 op11 Assign v16:int[width=32,signed=True] = v22 source=total-call-precondition-filter.cs:542+10
-  i36 op11 Assign v17:int[width=32,signed=True] = v16 source=total-call-precondition-filter.cs:542+10
-  i37 op11 Goto b15 source=total-call-precondition-filter.cs:542+10
+  i34 op16 Assign v22:int[width=32,signed=True] = (v20 / v21) source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
+  i35 op11 Assign v16:int[width=32,signed=True] = v22 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
+  i36 op11 Assign v17:int[width=32,signed=True] = v16 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
+  i37 op11 Goto b15 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 block: b29 exception:searched
-  i32 op15 Throw Overflow -> b8 source=total-call-precondition-filter.cs:542+10
+  i32 op15 Throw Overflow -> b8 source=total-call-precondition-filter.cs:tokens["20","/","value"]#1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v6
 term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0

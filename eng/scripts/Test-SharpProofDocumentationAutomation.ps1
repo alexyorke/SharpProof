@@ -7,7 +7,7 @@ $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-docs-' + [Guid]::Ne
 [IO.Directory]::CreateDirectory($fixture) | Out-Null
 $sync = Join-Path $PSScriptRoot 'Sync-SharpProofDocumentation.ps1'
 $links = Join-Path $PSScriptRoot 'Test-SharpProofDocumentation.ps1'
-function Expect-Failure([scriptblock]$Action) {
+function Assert-Failure([scriptblock]$Action) {
     $failed = $false
     try { & $Action } catch { $failed = $true }
     if (-not $failed) { throw 'Expected documentation validation to reject this fixture.' }
@@ -49,7 +49,7 @@ try {
         $original = [IO.File]::ReadAllText($path)
         if (-not $original.Contains($mutation.Before)) { throw "Fixture mutation no longer matches $path" }
         [IO.File]::WriteAllText($path, $original.Replace($mutation.Before, $mutation.After))
-        Expect-Failure { & $sync -RepositoryRoot $fixture }
+        Assert-Failure { & $sync -RepositoryRoot $fixture }
         & $sync -RepositoryRoot $fixture -Update
         & $sync -RepositoryRoot $fixture
         if (-not [IO.File]::ReadAllText($generated).Contains($mutation.Visible)) { throw 'Source addition was not rendered.' }
@@ -58,23 +58,23 @@ try {
     }
     if ([IO.File]::ReadAllText($guide) -cne "# Guide`n`nHuman prose stays intact.`n") { throw 'Authored prose changed.' }
     [IO.File]::WriteAllText($guide, "# Renamed`n")
-    Expect-Failure { & $links -RepositoryRoot $fixture }
+    Assert-Failure { & $links -RepositoryRoot $fixture }
     [IO.File]::WriteAllText($guide, "# Guide`n`n[Missing](missing.md)`n")
-    Expect-Failure { & $links -RepositoryRoot $fixture }
+    Assert-Failure { & $links -RepositoryRoot $fixture }
     [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), '[Ghost](docs/guide.md#ghost)')
     [IO.File]::WriteAllText($guide, '# Guide' + "`n" + '```html' + "`n" + '<a id="ghost"></a>' + "`n" + '```' + "`n")
-    Expect-Failure { & $links -RepositoryRoot $fixture }
+    Assert-Failure { & $links -RepositoryRoot $fixture }
     [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), '# Fixture')
     $outsideDocs = Join-Path $fixture 'CONTRIBUTING.md'
     [IO.File]::WriteAllText($outsideDocs, '[Missing](missing-contributor-guide.md)')
     & git -C $fixture add -- CONTRIBUTING.md
     if ($LASTEXITCODE -ne 0) { throw 'Cannot track outside-docs fixture.' }
-    Expect-Failure { & $links -RepositoryRoot $fixture }
+    Assert-Failure { & $links -RepositoryRoot $fixture }
     Write-Host 'Documentation automation regressions passed: drift, regeneration, idempotence, preserved prose, links and anchors.'
 }
 finally {
     # The fixture is a freshly created child of the OS temporary directory.
-    if ((Split-Path $fixture -Parent) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('/','\')) {
+    if ((Split-Path $fixture -Parent) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('/', '\')) {
         throw 'Unexpected documentation fixture location.'
     }
     Remove-Item -LiteralPath $fixture -Recurse -Force

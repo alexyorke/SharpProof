@@ -12,7 +12,7 @@ fi
 arguments=()
 while [[ $# -gt 0 ]]; do
   case "${1,,}" in
-    --projects|-projects)
+    --projects | -projects)
       arguments+=("$1")
       shift
       if [[ $# == 0 ]]; then
@@ -34,7 +34,7 @@ done
 set -- "${arguments[@]}"
 for argument in "$@"; do
   case "${argument,,}" in
-    -h|--help|-help) exec bash "${repo_root}/eng/common/build.sh" "$@" ;;
+    -h | --help | -help) exec bash "${repo_root}/eng/common/build.sh" "$@" ;;
   esac
 done
 # The repo-only analyzer must exist before any action that compiles source.
@@ -42,8 +42,9 @@ done
 bootstrap_analyzer=false
 for argument in "$@"; do
   case "${argument,,}" in
-    --build|-build|-b|--rebuild|-rebuild|--pack|-pack|--sourcebuild|-sourcebuild|-sb|--productbuild|-productbuild|-pb)
-      bootstrap_analyzer=true ;;
+    --build | -build | -b | --rebuild | -rebuild | --pack | -pack | --sourcebuild | -sourcebuild | -sb | --productbuild | -productbuild | -pb)
+      bootstrap_analyzer=true
+      ;;
   esac
 done
 if ${bootstrap_analyzer}; then

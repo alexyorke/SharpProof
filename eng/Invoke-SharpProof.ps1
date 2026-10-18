@@ -5,7 +5,8 @@ param(
         'quick', 'check', 'pr', 'nightly', 'security', 'coverage',
         'build', 'test', 'test-changed', 'pack', 'samples', 'corpus',
         'fuzz-nightly', 'package-consumers', 'dependency-audit')]
-    [string]$Profile = 'check',
+    [Alias('Profile')]
+    [string]$BuildProfile = 'check',
 
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
@@ -27,7 +28,7 @@ Set-StrictMode -Version Latest
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 Import-Module (Join-Path `
-    $repositoryRoot 'eng/scripts/SharpProof.ContainerExecution.psm1') -Force
+        $repositoryRoot 'eng/scripts/SharpProof.ContainerExecution.psm1') -Force
 
 function Invoke-Docker([string[]]$Arguments) {
     Invoke-SharpProofCheckedCommand `
@@ -70,17 +71,17 @@ function Invoke-Container(
 }
 
 $forcedConfigurations = @{
-    quick = 'Debug'
-    pr = 'Release'
-    nightly = 'Release'
+    quick    = 'Debug'
+    pr       = 'Release'
+    nightly  = 'Release'
     security = 'Release'
 }
-if ($forcedConfigurations.ContainsKey($Profile)) {
-    Invoke-Container $Profile $forcedConfigurations[$Profile]
+if ($forcedConfigurations.ContainsKey($BuildProfile)) {
+    Invoke-Container $BuildProfile $forcedConfigurations[$BuildProfile]
     return
 }
 
-switch ($Profile) {
+switch ($BuildProfile) {
     'coverage' {
         if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
             throw 'coverage requires -ComparisonRef <commit-or-ref>.'
@@ -108,20 +109,20 @@ switch ($Profile) {
     }
     'package-consumers' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-            throw "$Profile requires -PackageSource."
+            throw "$BuildProfile requires -PackageSource."
         }
-        Invoke-Container $Profile $Configuration @(
+        Invoke-Container $BuildProfile $Configuration @(
             '-PackageSource', $PackageSource)
     }
     default {
-        $arguments = if ($Profile -ceq 'build') {
+        $arguments = if ($BuildProfile -ceq 'build') {
             @('-Target', $Target)
         }
-        elseif ($Profile -ceq 'samples' -and
-                -not [string]::IsNullOrWhiteSpace($PackageSource)) {
+        elseif ($BuildProfile -ceq 'samples' -and
+            -not [string]::IsNullOrWhiteSpace($PackageSource)) {
             @('-PackageSource', $PackageSource)
         }
         else { @() }
-        Invoke-Container $Profile $Configuration $arguments
+        Invoke-Container $BuildProfile $Configuration $arguments
     }
 }

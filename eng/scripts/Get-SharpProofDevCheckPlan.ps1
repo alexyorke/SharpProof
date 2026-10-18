@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $packageManifest = Get-Content -LiteralPath (Join-Path `
-    $repositoryRoot 'eng/scripts/package-projects.json') -Raw |
+        $repositoryRoot 'eng/scripts/package-projects.json') -Raw |
     ConvertFrom-Json
 if ([int]$packageManifest.schemaVersion -ne 1) {
     throw 'Unsupported package-project manifest schema.'
@@ -29,11 +29,11 @@ function Add-Command {
     )
 
     $commands.Add([ordered]@{
-        id = $Id
-        phase = $Phase
-        configuration = $CommandConfiguration
-        noBuild = $NoBuild
-    })
+            id            = $Id
+            phase         = $Phase
+            configuration = $CommandConfiguration
+            noBuild       = $NoBuild
+        })
 }
 
 Add-Command 'restore' 'restore' $Configuration $false
@@ -50,7 +50,7 @@ foreach ($project in $packageProjects) {
 
 [ordered]@{
     schemaVersion = 1
-    command = 'check'
+    command       = 'check'
     configuration = $Configuration
-    commands = @($commands)
+    commands      = @($commands)
 } | ConvertTo-Json -Depth 5

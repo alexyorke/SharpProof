@@ -5,7 +5,8 @@ public static class C
 {
     public static void Target()
     {
-        lock (new object[1]) { }
+        lock (new object[1])
+        { }
         return;
     }
 }

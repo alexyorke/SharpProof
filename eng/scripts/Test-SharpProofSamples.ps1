@@ -10,17 +10,18 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$sampleConfiguration = $Configuration
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $samplesRoot = Join-Path $repositoryRoot 'src/samples'
 $isSupportedWorkerHost = $IsLinux -and
-    $env:SHARPPROOF_CONTAINER -ceq '1' -and
-    [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
-        [Runtime.InteropServices.Architecture]::X64 -and
-    [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
-        [Runtime.InteropServices.Architecture]::X64
+$env:SHARPPROOF_CONTAINER -ceq '1' -and
+[Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
+[Runtime.InteropServices.Architecture]::X64 -and
+[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
+[Runtime.InteropServices.Architecture]::X64
 if (-not $isSupportedWorkerHost) {
     throw 'SharpProof samples must run in the canonical Linux amd64 container.'
 }
@@ -63,7 +64,7 @@ function Invoke-CapturedDotNet {
     $exitCode = $LASTEXITCODE
     $global:LASTEXITCODE = 0
     $capturedOutput =
-        @($lines | ForEach-Object { $_.ToString() }) -join "`n"
+    @($lines | ForEach-Object { $_.ToString() }) -join "`n"
     $loggedOutput = if ($null -ne $logPath -and
         (Test-Path -LiteralPath $logPath -PathType Leaf)) {
         Get-Content -LiteralPath $logPath -Raw
@@ -77,7 +78,7 @@ function Invoke-CapturedDotNet {
     }
     return [pscustomobject]@{
         ExitCode = $exitCode
-        Output = $output
+        Output   = $output
     }
 }
 
@@ -242,7 +243,7 @@ function New-LocalPackageFeed {
             'pack',
             $projectPath,
             '--configuration',
-            $Configuration,
+            $sampleConfiguration,
             '--output',
             $feed,
             '--nologo'
@@ -296,7 +297,7 @@ function Invoke-SampleBuild {
             'build',
             $projectPath,
             '--configuration',
-            $Configuration,
+            $sampleConfiguration,
             '--no-restore',
             '--nologo',
             '--verbosity',
@@ -322,7 +323,7 @@ try {
     $script:resolvedPackageSource = (
         Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
     $script:nugetConfig =
-        New-IsolatedNuGetConfig $script:resolvedPackageSource
+    New-IsolatedNuGetConfig $script:resolvedPackageSource
     & (Join-Path $PSScriptRoot 'Test-SharpProofPackageConsumers.ps1') `
         -PackageSource $script:resolvedPackageSource `
         -ValidatePackageSourceOnly
@@ -346,7 +347,7 @@ try {
     Assert-ExitCode $diagnostics $true 'Expected-diagnostics build'
     Assert-OutputContains `
         $diagnostics `
-        @('SP0027', 'SP0045', 'SP0047') `
+    @('SP0027', 'SP0045', 'SP0047') `
         'Expected-diagnostics build'
 
     $malformed = Invoke-SampleBuild `
@@ -361,16 +362,16 @@ try {
         -ProjectName 'Library' `
         -RunName 'Library-strict' `
         -Properties @(
-            '-p:ContinuousIntegrationBuild=true',
-            "-p:SharpProofVerifyResultFile=$strictResultPath"
-        )
+        '-p:ContinuousIntegrationBuild=true',
+        "-p:SharpProofVerifyResultFile=$strictResultPath"
+    )
     Assert-ExitCode $strict $true 'Strict library build'
     $strictResult = Read-WorkerResult $strictResultPath
     if ([string]$strictResult.runStatus -ne 'Complete' -or
         [string]$strictResult.failureReason -ne 'None' -or
         @($strictResult.claimResults).Count -ne 5 -or
         @($strictResult.claimResults |
-            Where-Object { [string]$_.outcome -ne 'Proven' }).Count -ne 0) {
+                Where-Object { [string]$_.outcome -ne 'Proven' }).Count -ne 0) {
         throw 'The strict library sample did not prove every selected claim.'
     }
 
@@ -380,14 +381,14 @@ try {
         -ProjectName 'Outcomes' `
         -RunName 'Outcomes-explicit' `
         -Properties @(
-            '-p:SharpProofVerify=true',
-            '-p:SharpProofVerifyPolicy=advisory',
-            "-p:SharpProofVerifyResultFile=$outcomesResultPath"
-        )
+        '-p:SharpProofVerify=true',
+        '-p:SharpProofVerifyPolicy=advisory',
+        "-p:SharpProofVerifyResultFile=$outcomesResultPath"
+    )
     Assert-ExitCode $outcomes $false 'Mixed-outcomes verification'
     Assert-OutputContains `
         $outcomes `
-        @('error SP0051: Refuted Postcondition claim') `
+    @('error SP0051: Refuted Postcondition claim') `
         'Mixed-outcomes verification'
     $outcomeResult = Read-WorkerResult $outcomesResultPath
     if ([string]$outcomeResult.runStatus -ne 'Complete' -or

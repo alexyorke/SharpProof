@@ -23,6 +23,20 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Apply the repository's `.editorconfig` formatting rules before submitting changes:
+
+```text
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-CSharp.ps1'
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-Scripts.ps1'
+docker compose run --rm tooling format-check
+```
+
+For a Git worktree, use `pwsh -File scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
+
+`Format-Scripts.ps1` formats all tracked `.ps1`, `.psm1`, and `.psd1` files with PSScriptAnalyzer's formatter and checks parsing plus warning/error rules. It also runs ShellCheck and shfmt on every tracked `.sh`/`.bash` file and shell shebang script, including extensionless files. PowerShell uses four-space indentation; shell scripts use two spaces, indented case arms, and spaces after redirections. Check mode never rewrites sources. `format-check` includes these checks and regression tests proving that lint, syntax, and formatting failures are rejected.
+
+Tool versions and download SHA256 values are pinned in [the container catalog](eng/container/toolchain.json). PowerShell [lint settings](eng/PSScriptAnalyzerSettings.psd1) retain default warning/error rules except host status output, plural helper nouns, and interactive `ShouldProcess` requirements: these are unattended build/test utilities with existing helper APIs, and status output must not pollute data pipelines. The [formatter settings](eng/PowerShellFormatting.psd1) are separate from lint policy. A narrowly scoped suppression documents the legacy `RepositoryRoot` compatibility parameter in the framework-feed helper; its targeting packs come from the selected SDK.
+
 ```text
 docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~NameOfRegression
 docker compose run --rm tooling pr
