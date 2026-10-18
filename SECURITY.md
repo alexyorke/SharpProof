@@ -23,3 +23,5 @@ The single standard `SharpProof.Verifier` reference enables strict verification 
 ## Repository security checks
 
 `docker compose run --rm tooling security` runs the dependency audit and full Release build with banned-API enforcement. These checks are separate from ordinary PR tests; passing them is not a blanket security guarantee.
+
+See the [repository security runbook](eng/security/README.md) for enforced GitHub controls, CodeQL merge protection, image servicing, release qualification, and package provenance verification.
