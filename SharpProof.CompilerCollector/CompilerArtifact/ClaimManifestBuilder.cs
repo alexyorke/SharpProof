@@ -12,7 +12,7 @@ internal sealed partial class ClaimManifestBuilder(
 #pragma warning disable CA2000
     internal ClaimManifestBuilder(CSharpCompilation compilation,
         WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All)
-        : this(compilation, enabledFeatures, new CancellationTokenSource(TimeSpan.FromMinutes(30)))
+        : this(compilation, enabledFeatures, new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes)))
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
     }

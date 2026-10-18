@@ -11,7 +11,7 @@ internal static class CompilerTotalCallableArtifactCodec
 {
     internal static CompilerTotalCallableArtifact? Encode(CompilerTotalCallablePreparation? preparation)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Encode(preparation, cancellation.Token);
     }
 
@@ -34,7 +34,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return EncodeEntry(preparation, cancellation.Token);
     }
 

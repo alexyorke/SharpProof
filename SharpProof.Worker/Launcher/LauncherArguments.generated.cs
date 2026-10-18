@@ -89,7 +89,7 @@ internal sealed partial class LauncherArguments
     {
         return new()
         {
-            Enabled = Boolean("cache-enabled", true),
+            Enabled = Boolean("cache-enabled", WorkerCacheOptions.DefaultEnabled),
             Directory = Optional("cache-directory"),
             MaximumBytes = Number("cache-maximum-bytes", WorkerCacheOptions.DefaultMaximumBytes)
         };

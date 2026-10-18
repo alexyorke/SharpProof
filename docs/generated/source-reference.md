@@ -238,7 +238,8 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
     public const int DefaultCases = 1000;
     public const int MaximumCases = 1_000_000;
     public const int DefaultSeed = 0x5A17;
-    public const int DefaultMaximumParallelism = 4;
+    public const int MaximumAllowedParallelism = 4;
+    public const int DefaultMaximumParallelism = MaximumAllowedParallelism;
 
     public static FuzzOptions Parse(IReadOnlyList<string> arguments)
     {
@@ -290,10 +291,10 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
                     break;
                 case "--max-parallelism":
                     maximumParallelism = ParsePositive(value, argument);
-                    if (maximumParallelism > 4)
+                    if (maximumParallelism > MaximumAllowedParallelism)
                     {
                         throw new FuzzUsageException(
-                            "--max-parallelism cannot exceed the limit of 4.");
+                            "--max-parallelism cannot exceed the limit of " + MaximumAllowedParallelism.ToString(CultureInfo.InvariantCulture) + ".");
                     }
 
                     break;

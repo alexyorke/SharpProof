@@ -97,10 +97,10 @@ internal static class FinalCompilationCollector
                 System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var maximumExpressionDepth) ||
-            maximumExpressionDepth is < 1 or > 256)
+            maximumExpressionDepth is < 1 or > WorkerBudgets.MaximumAllowedExpressionDepth)
         {
             throw new InvalidOperationException(
-                "SharpProofVerifyMaximumExpressionDepth must be between 1 and 256.");
+                "SharpProofVerifyMaximumExpressionDepth must be between 1 and " + WorkerBudgets.MaximumAllowedExpressionDepth.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
         }
 
         var artifact = CompilerManifestArtifactProducer.Create(

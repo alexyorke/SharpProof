@@ -131,7 +131,7 @@ internal static class OpenSourceCorpusRunner
             Environment.NewLine +
             string.Join(
                 Environment.NewLine,
-                invalid.Take(25).Select(static item =>
+                invalid.Take(CorpusExecutionDefaults.MaximumReportedDiagnostics).Select(static item =>
                     $"{item.Diagnostic.Id} [{item.Count}] " +
                     item.Diagnostic.Location)));
     }
@@ -267,7 +267,7 @@ internal static class OpenSourceCorpusRunner
             .AddSyntaxTrees(trees);
         AnalyzerGateHost.ThrowIfCompilationHasErrors(
             compilation,
-            25,
+            CorpusExecutionDefaults.MaximumReportedDiagnostics,
             static errors => errors is null ? throw new System.ArgumentNullException(nameof(errors)) : (new InvalidDataException(
                 "The pinned OSS corpus did not compile:" +
                 Environment.NewLine + errors)),

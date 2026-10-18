@@ -14,9 +14,9 @@ internal static class TrustedChildEnvironment
         "TEMP",
         "TMP",
         "USERPROFILE",
-        "SHARPPROOF_CONTAINER",
-        "SHARPPROOF_CONTAINER_CONTRACT",
-        "SHARPPROOF_NATIVE_ROOT",
+        HostEnvironmentVariables.Container,
+        HostEnvironmentVariables.ContainerContract,
+        HostEnvironmentVariables.NativeRoot,
         "DOTNET_CLI_TELEMETRY_OPTOUT"
     ];
 

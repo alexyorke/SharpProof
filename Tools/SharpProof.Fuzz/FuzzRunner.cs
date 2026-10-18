@@ -125,7 +125,7 @@ public sealed record FuzzSummary(
     public bool Passed =>
         SchemaVersion == 7 &&
         Cases > 0 &&
-        MaximumParallelism is >= 1 and <= 4 &&
+        MaximumParallelism is >= 1 and <= FuzzOptions.MaximumAllowedParallelism &&
         !Failures.IsDefault &&
         Failures.IsEmpty &&
         FrontendCoverage != null &&
@@ -163,8 +163,8 @@ public static class FuzzRunner
         error = RepositoryParameterGuard.NotNull(error, nameof(error));
         output = RepositoryParameterGuard.NotNull(output, nameof(output));
         var log = new RepositoryLogger(output, error);
-        const string usage =
-            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+        var usage =
+            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1.." + FuzzOptions.MaximumAllowedParallelism.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]";
         FuzzOptions options;
         try
         {
@@ -212,12 +212,12 @@ public static class FuzzRunner
                 "The fuzz case count must be between 1 and " +
                 FuzzOptions.MaximumCases + ".");
         }
-        if (options.MaximumParallelism is < 1 or > 4)
+        if (options.MaximumParallelism is < 1 or > FuzzOptions.MaximumAllowedParallelism)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 options.MaximumParallelism,
-                "Maximum parallelism must be between 1 and 4.");
+                "Maximum parallelism must be between 1 and " + FuzzOptions.MaximumAllowedParallelism.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
         }
 
         var frontendCases = new GeneratedCSharpCase[options.Cases];

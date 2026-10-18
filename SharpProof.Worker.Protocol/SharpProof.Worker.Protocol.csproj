@@ -23,4 +23,8 @@
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
     <InternalsVisibleTo Include="SharpProof.Package.Test" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\eng\configuration\SolverDefaults.cs"
+             Link="Configuration\SolverDefaults.cs" />
+  </ItemGroup>
 </Project>

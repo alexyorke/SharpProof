@@ -170,7 +170,7 @@ internal sealed class MetadataProgramSourceReplay
                 [parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], [])
             };
             var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, []);
-            var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: 10000, cancellationToken: cancellationToken);
+            var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||
                 !TotalProgramDifferentialOracle.Equal(execution.ReturnValue!, expected))
             { Fail(name + ": compiled/original disagreement"); continue; }

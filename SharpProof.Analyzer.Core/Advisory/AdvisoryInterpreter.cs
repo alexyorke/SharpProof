@@ -189,6 +189,10 @@ internal sealed class CoreIrAdvisoryInterpreter
     private bool _activeTransferHasGap;
     private Dictionary<IrInstructionId, IrAssignInstruction>? _markerSites;
     private List<CoreIrAdvisoryMarkerSnapshot>? _markerSnapshots;
+    internal const int DefaultMaximumIterations = 1000;
+    internal const int DefaultMaximumTermWork = 65536;
+    internal const int DefaultMaximumSyntheticEdges = 8192;
+
     internal CoreIrAdvisoryInterpreter(IrProgram program, ImmutableArray<IrVarId> variables)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
@@ -202,16 +206,16 @@ internal sealed class CoreIrAdvisoryInterpreter
         _variables = variables;
     }
     internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial,
-        int maxIterations = 1000, int maximumTermWork = 65536,
-        int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> /* SPINT001: all values valid - default denotes no optional marker instructions */ markers = default)
+        int maxIterations = DefaultMaximumIterations, int maximumTermWork = DefaultMaximumTermWork,
+        int maximumSyntheticEdges = DefaultMaximumSyntheticEdges, ImmutableArray<IrAssignInstruction> /* SPINT001: all values valid - default denotes no optional marker instructions */ markers = default)
     {
         initial = RepositoryParameterGuard.NotNull(initial, nameof(initial));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Run(initial, cancellation.Token, maxIterations,
             maximumTermWork, maximumSyntheticEdges, markers);
     }
 
-    internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, CancellationToken token, int maxIterations = 1000, int maximumTermWork = 65536, int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default)
+    internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, CancellationToken token, int maxIterations = DefaultMaximumIterations, int maximumTermWork = DefaultMaximumTermWork, int maximumSyntheticEdges = DefaultMaximumSyntheticEdges, ImmutableArray<IrAssignInstruction> markers = default)
     {
         initial = RepositoryParameterGuard.NotNull(initial, nameof(initial));
         _token = token;
@@ -363,7 +367,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                 edges.Add(new(from, ids[thrown.Target]));
             }
         }
-        if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks, edges, ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(2, maxIterations)))
+        if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks, edges, ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(maxIterations: maxIterations)))
         {
             return Incomplete(_termBudgetExceeded ? "aggregate term work budget" : failure == DataflowAnalysisFailure.NonmonotoneTransfer ? "nonmonotone transfer" : "iteration limit");
         }

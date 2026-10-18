@@ -58,7 +58,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         {
             if (!_closedSealedTypes.TryGetValue(type, out var certified))
             {
-                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
                 _closedSealedTypes.Add(type, certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type, cancellation.Token));
             }
             if (certified)
