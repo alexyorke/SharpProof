@@ -580,7 +580,10 @@ public sealed class GoldenWorkerTests
                 ReturnType = PortableGraphChanges.FindIndex(graph.Types,
                             type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed))
             });
-            reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton).Graph = graph;
+            {
+                reachable = reachable with { Bodies = reachable.Bodies.ReplaceReference(reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton), reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton) with { Graph = graph }) };
+                artifact = artifact with { ReachableSource = reachable };
+            }
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
             PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(

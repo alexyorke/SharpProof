@@ -248,17 +248,17 @@ internal static class GeneratedDomainSamples
 {
     private static readonly ImmutableArray<int> Moduli = [1, 2, 3, 4, 5, 8, 16];
 
-    public static IReadOnlyList<IntervalValue> Intervals(int seed, int count)
+    public static ImmutableArray<IntervalValue> Intervals(int seed, int count)
     {
         var domain = IntervalDomain.Instance;
         var random = new Random(seed);
-        var values = new List<IntervalValue> {
+        ImmutableList<IntervalValue> values = [
             domain.Bottom,
             domain.Top,
             domain.Constant(long.MinValue),
             domain.Constant(long.MaxValue),
             domain.Range(long.MinValue, long.MaxValue)
-        };
+        ];
 
         for (var index = 0; index < count; index++)
         {
@@ -266,7 +266,7 @@ internal static class GeneratedDomainSamples
             var second = NextSignedValue(random);
             var lower = Math.Min(first, second);
             var upper = Math.Max(first, second);
-            values.Add(random.Next(6) switch
+            values = values.Add(random.Next(6) switch
             {
                 0 => domain.Constant(first),
                 1 => domain.Range(lower, upper),
@@ -283,20 +283,20 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values;
+        return values.ToImmutableArray();
     }
 
-    public static IReadOnlyList<SequenceCardinalityValue> Sequences(int seed, int count)
+    public static ImmutableArray<SequenceCardinalityValue> Sequences(int seed, int count)
     {
         var domain = SequenceCardinalityDomain.Instance;
         var random = new Random(seed);
-        var values = new List<SequenceCardinalityValue> {
+        ImmutableList<SequenceCardinalityValue> values = [
             domain.Bottom,
             domain.Empty,
             domain.NonEmpty,
             domain.Top,
             domain.KnownLength(long.MaxValue)
-        };
+        ];
 
         for (var index = 0; index < count; index++)
         {
@@ -315,7 +315,7 @@ internal static class GeneratedDomainSamples
                     NextModulus(random),
                     random.NextInt64(0, 17))
             };
-            values.Add(random.Next(5) switch
+            values = values.Add(random.Next(5) switch
             {
                 0 => domain.KnownLength(first),
                 1 => domain.Create(SequenceCardinalityKind.Empty, length),
@@ -327,7 +327,7 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values;
+        return values.ToImmutableArray();
     }
 
     private static long NextSignedValue(Random random)
@@ -360,7 +360,7 @@ public abstract class GeneratedDomainPropertyTests<T>
 {
     protected abstract IAbstractDomain<T> Domain { get; }
     protected abstract int Seed { get; }
-    protected abstract IReadOnlyList<T> Values { get; }
+    protected abstract ImmutableArray<T> Values { get; }
 
     [Test]
     public void GeneratedValuesSatisfyLatticeAndBottomLaws()
@@ -387,7 +387,7 @@ public sealed class GeneratedIntervalDomainPropertyTests :
     protected override int Seed => 0x51A2;
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
     protected override IAbstractDomain<IntervalValue> Domain => _domain;
-    protected override IReadOnlyList<IntervalValue> Values =>
+    protected override ImmutableArray<IntervalValue> Values =>
         GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
@@ -437,7 +437,7 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
         SequenceCardinalityDomain.Instance;
     protected override IAbstractDomain<SequenceCardinalityValue> Domain =>
         _domain;
-    protected override IReadOnlyList<SequenceCardinalityValue> Values =>
+    protected override ImmutableArray<SequenceCardinalityValue> Values =>
         GeneratedDomainSamples.Sequences(Seed, 256);
 
     [Test]
@@ -469,7 +469,7 @@ public sealed class GeneratedNullnessDomainPropertyTests :
     protected override int Seed => 0x19F3;
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
     protected override IAbstractDomain<NullnessValue> Domain => _domain;
-    protected override IReadOnlyList<NullnessValue> Values
+    protected override ImmutableArray<NullnessValue> Values
     {
         get
         {
@@ -478,7 +478,7 @@ public sealed class GeneratedNullnessDomainPropertyTests :
                 .Select(_ => (NullnessValue)random.Next(4))
                 .Prepend(NullnessValue.Bottom)
                 .Prepend(NullnessValue.MaybeNull)
-                .ToArray();
+                .ToImmutableArray();
         }
     }
 

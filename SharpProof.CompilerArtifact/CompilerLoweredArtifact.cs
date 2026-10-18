@@ -23,21 +23,21 @@ internal static class CompilerLoweredArtifact
         {
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
-            EffectClaims = preparation.EffectClaims.ToArray(),
+            EffectClaims = preparation.EffectClaims,
             Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken),
             TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken)
         };
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
-        CompilerCallableArtifact[] artifacts,
+        IReadOnlyList<CompilerCallableArtifact> artifacts,
         WorkerClaimManifest manifest,
         CompilerCompilationSnapshot compilation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        if (artifacts == null)
+        if (artifacts == null || artifacts is ImmutableArray<CompilerCallableArtifact> { IsDefault: true })
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
         }
@@ -48,12 +48,13 @@ internal static class CompilerLoweredArtifact
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        artifacts = artifacts.ToImmutableArray();
         var callables = manifest.Callables.ToDictionary(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId), StringComparer.Ordinal);
         var claims = manifest.Claims.GroupBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId))
             .ToDictionary(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
                 static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Ordinal)).ToImmutableArray()),
                 StringComparer.Ordinal);
-        if (artifacts.Length != callables.Count)
+        if (artifacts.Count != callables.Count)
         {
             throw new InvalidDataException("The lowered callable payload does not equal the manifest.");
         }
@@ -69,7 +70,7 @@ internal static class CompilerLoweredArtifact
             }
         }
 
-        var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Length);
+        var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Count);
         foreach (var artifact in artifacts.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId), StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -127,7 +128,7 @@ internal static class CompilerLoweredArtifact
 
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         cancellationToken.ThrowIfCancellationRequested();
-        if (artifact.EffectClaims == null)
+        if (artifact.EffectClaims.IsDefault)
         {
             throw new InvalidDataException("Compiler effect-claim evidence is missing.");
         }

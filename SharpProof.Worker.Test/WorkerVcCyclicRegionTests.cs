@@ -150,7 +150,10 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(throws, Is.Not.Empty);
         foreach (var instruction in throws)
         {
-            total.Graph = total.Graph.ReplaceRow(instruction, instruction with { Kind = IrInstructionKind.Goto, A = instruction.B, B = -1 });
+            {
+                total = total with { Graph = total.Graph.ReplaceRow(instruction, instruction with { Kind = IrInstructionKind.Goto, A = instruction.B, B = -1 }) };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -166,7 +169,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
+        { withTotal = withTotal with { Total = null }; }
         Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions), Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }
 

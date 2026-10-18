@@ -557,7 +557,7 @@ public sealed class EmptyIteratorAllocationAuditTests
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase, values ?? throw new System.ArgumentNullException(nameof(values)));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))

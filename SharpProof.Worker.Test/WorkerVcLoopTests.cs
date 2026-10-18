@@ -77,7 +77,7 @@ public sealed class WorkerVcLoopTests
                 }
             }
         }
-        artifact.Callables.Single().Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() });
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() }) }) }; }
         try
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);

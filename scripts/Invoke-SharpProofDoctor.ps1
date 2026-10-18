@@ -77,14 +77,18 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
         }
         $verifyEnabled = $configuration.SharpProofVerify.Trim().ToLowerInvariant() -eq 'true'
         $verificationProfile = $configuration.SharpProofProfile.Trim().ToLowerInvariant()
-        $allowedValues = [ordered]@{
-            SharpProofProfile          = @('advisory', 'strict', 'off')
-            SharpProofFeatures         = @('effects', 'contracts', 'all')
-            SharpProofVerify           = @('true', 'false')
-            SharpProofVerifyPolicy     = @('advisory', 'warn-on-unknown', 'require-proven')
-            SharpProofAssumptionPolicy = @('allow', 'warn', 'error')
-        }
-        foreach ($property in $allowedValues.Keys) {
+        New-Variable -Name allowedValueKeys -Option Constant -Value (
+            [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'SharpProofProfile', 'SharpProofFeatures', 'SharpProofVerify',
+                    'SharpProofVerifyPolicy', 'SharpProofAssumptionPolicy')))
+        New-Variable -Name allowedValues -Option Constant -Value (
+            ([System.Collections.Immutable.ImmutableDictionary]::Create[string, object]([StringComparer]::Ordinal)).
+            Add('SharpProofProfile', [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('advisory', 'strict', 'off'))).
+            Add('SharpProofFeatures', [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('effects', 'contracts', 'all'))).
+            Add('SharpProofVerify', [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('true', 'false'))).
+            Add('SharpProofVerifyPolicy', [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('advisory', 'warn-on-unknown', 'require-proven'))).
+            Add('SharpProofAssumptionPolicy', [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('allow', 'warn', 'error'))))
+        foreach ($property in $allowedValueKeys) {
             $value = $configuration.$property.Trim().ToLowerInvariant()
             if ($value -and $value -notin $allowedValues[$property]) {
                 Add-Check $property 'error' "The evaluated $property value is invalid." "Use one of: $($allowedValues[$property] -join ', ')."

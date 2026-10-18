@@ -6,8 +6,8 @@ internal sealed class CompilerSpecificationPackProvider
 {
     private readonly IrFactory _factory;
     private readonly ImmutableDictionary<string, CompilerSpecificationMethodEvidence> _methods;
-    private readonly Dictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
-        new(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
+        ImmutableDictionary.Create<IMethodSymbol, CompilerSpecificationMethodEvidence?>(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
@@ -24,7 +24,7 @@ internal sealed class CompilerSpecificationPackProvider
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
-        var selectedPacks = authority.SpecificationPackIds?.ToArray();
+        var selectedPacks = authority.SpecificationPackIds;
         var catalogVersion = authority.SpecificationPackCatalogVersion;
         var catalogSha256 = authority.SpecificationPackCatalogSha256;
         if (!CompilerSpecificationPackSelection.IsValid(
@@ -38,7 +38,7 @@ internal sealed class CompilerSpecificationPackProvider
                 "The SharpProof specification-pack authority is not current.");
         }
 
-        var methods = ImmutableDictionary.CreateBuilder<
+        var methods = ImmutableDictionary.Create<
             string,
             CompilerSpecificationMethodEvidence>(StringComparer.Ordinal);
         foreach (var packId in selectedPacks!)
@@ -50,11 +50,11 @@ internal sealed class CompilerSpecificationPackProvider
                 var definition = new CompilerSpecificationMethodEvidence(
                     method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
                     method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
-                methods.Add(method.DocumentationCommentId, definition);
+                methods = methods.AddUnique(method.DocumentationCommentId, definition);
             }
         }
 
-        _methods = methods.ToImmutable();
+        _methods = methods;
     }
 
     internal static CompilerSpecificationPackConfiguration ResolveConfiguration(
@@ -70,12 +70,12 @@ internal sealed class CompilerSpecificationPackProvider
         };
     }
 
-    private static string[] CanonicalizeSelection(
+    private static ImmutableArray<string> CanonicalizeSelection(
         IEnumerable<string>? enabledPacks,
         RelationalSpecPackCatalog catalog)
     {
-        var values = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var values = ImmutableList<string>.Empty;
+        var seen = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         foreach (var value in enabledPacks ?? [])
         {
             var normalized = value?.Trim() ?? string.Empty;
@@ -84,16 +84,17 @@ internal sealed class CompilerSpecificationPackProvider
                 continue;
             }
 
-            if (!seen.Add(normalized))
+            if (seen.Contains(normalized))
             {
                 throw new InvalidOperationException(
                     "SharpProof specification-pack identifiers must be unique.");
             }
 
-            values.Add(normalized);
+            seen = seen.Add(normalized);
+            values = values.Add(normalized);
         }
 
-        values.Sort(StringComparer.Ordinal);
+        values = values.Sort(StringComparer.Ordinal);
         foreach (var packId in values)
         {
             if (!catalog.Packs.ContainsKey(packId))
@@ -103,7 +104,7 @@ internal sealed class CompilerSpecificationPackProvider
             }
         }
 
-        return values.ToArray();
+        return values.ToImmutableArray();
     }
 
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
@@ -129,7 +130,7 @@ internal sealed class CompilerSpecificationPackProvider
             ? CompilerSpecificationMethodBinding.Admit(method, candidate)
             : null;
         definition = resolved!;
-        _resolved[method] = resolved;
+        _resolved = _resolved.SetItem(method, resolved);
         return resolved != null;
     }
 }

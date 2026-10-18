@@ -177,22 +177,41 @@ public sealed class NativeExceptionConstraintTests
         switch (mutation)
         {
             case "duplicate-kind":
-                row.AllowedKinds = [IrExceptionKind.Overflow, IrExceptionKind.Overflow];
+                {
+                    row = row with { AllowedKinds = [IrExceptionKind.Overflow, IrExceptionKind.Overflow] };
+                    total = total with { ExceptionConstraints = total.ExceptionConstraints.ReplaceReference(total.ExceptionConstraints.Single(), row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "unordered-kinds":
-                row.AllowedKinds = [IrExceptionKind.Overflow, IrExceptionKind.DivideByZero];
+                {
+                    row = row with { AllowedKinds = [IrExceptionKind.Overflow, IrExceptionKind.DivideByZero] };
+                    total = total with { ExceptionConstraints = total.ExceptionConstraints.ReplaceReference(total.ExceptionConstraints.Single(), row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "duplicate-claim":
-                total.ExceptionConstraints = [row, row];
+                {
+                    total = total with { ExceptionConstraints = [row, row] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "foreign-claim":
-                row.ClaimId = "foreign";
+                {
+                    row = row with { ClaimId = "foreign" };
+                    total = total with { ExceptionConstraints = total.ExceptionConstraints.ReplaceReference(total.ExceptionConstraints.Single(), row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "entry-constraint":
-                artifact.Callables.Single().TotalEntry!.ExceptionConstraints = [row];
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = artifact.Callables.Single().TotalEntry! with { ExceptionConstraints = [row] } }) }; }
                 break;
             case "null-kinds":
-                row.AllowedKinds = null!;
+                {
+                    row = row with { AllowedKinds = default };
+                    total = total with { ExceptionConstraints = total.ExceptionConstraints.ReplaceReference(total.ExceptionConstraints.Single(), row) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mutation));
@@ -216,7 +235,7 @@ public sealed class NativeExceptionConstraintTests
     public void DoesNotThrowCannotCarryAnAllowance()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { [DoesNotThrow] public static int Target(int x) { return x; } }");
-        artifact.Callables.Single().Total!.ExceptionConstraints.Single().AllowedKinds = [IrExceptionKind.Overflow];
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { ExceptionConstraints = artifact.Callables.Single().Total!.ExceptionConstraints.ReplaceReference(artifact.Callables.Single().Total!.ExceptionConstraints.Single(), artifact.Callables.Single().Total!.ExceptionConstraints.Single() with { AllowedKinds = [IrExceptionKind.Overflow] }) } }) }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }

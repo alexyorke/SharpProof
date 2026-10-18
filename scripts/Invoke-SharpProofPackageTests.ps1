@@ -524,9 +524,10 @@ try {
         $workerMethods = @($discoveredMethods[$workerClass])
         $threeTargetWorkerMethod =
         'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
-        $threeTargetWorkerHistoryNames = @(
-            $threeTargetWorkerMethod,
-            'ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds')
+        New-Variable -Name threeTargetWorkerHistoryNames -Option Constant -Value (
+            [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    $threeTargetWorkerMethod,
+                    'ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds')))
         # This test performs one serial initial build followed by parallel
         # incremental and clean builds. At the normal wide package wave,
         # keeping it in a worker bucket lets its analyzer CPU compete with

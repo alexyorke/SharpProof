@@ -57,25 +57,33 @@ public sealed class WorkerTcbEdgeCaseTests
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:
-                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)) with { B = -1 });
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)) with { B = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnboundCall:
                 var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
                 {
-                    (call, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { Kind = IrInstructionKind.Call });
+                    {
+                        var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { Kind = IrInstructionKind.Call });
+                        call = changedFixture.Item1;
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+                    }
                 }
                 {
-                    (call, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { B = int.MaxValue });
+                    {
+                        var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { B = int.MaxValue });
+                        call = changedFixture.Item1;
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+                    }
                 }
                 break;
             case MalformedBodyKind.MissingBranchCondition:
-                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)) with { A = -1 });
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.MissingReturnValue:
-                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)) with { A = -1 });
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
-                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions[0], instructions[0] with { Kind = (IrInstructionKind)int.MaxValue });
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions[0], instructions[0] with { Kind = (IrInstructionKind)int.MaxValue }) } }) }; }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
@@ -86,7 +94,7 @@ public sealed class WorkerTcbEdgeCaseTests
     public void ContractClaimOrderMismatchFailsClosedBeforeBackendInvocation()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
-        artifact.Callables.Single().Total!.Clauses.Single().ClaimId = "foreign-claim";
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Clauses = artifact.Callables.Single().Total!.Clauses.ReplaceReference(artifact.Callables.Single().Total!.Clauses.Single(), artifact.Callables.Single().Total!.Clauses.Single() with { ClaimId = "foreign-claim" }) } }) }; }
         RejectMalformedArtifact(artifact);
     }
     [Test]
@@ -94,7 +102,10 @@ public sealed class WorkerTcbEdgeCaseTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
         var total = artifact.Callables.Single().Total!;
-        total.Clauses = [total.Clauses.Single(), total.Clauses.Single()];
+        {
+            total = total with { Clauses = [total.Clauses.Single(), total.Clauses.Single()] };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+        }
         RejectMalformedArtifact(artifact);
     }
     [Test]
@@ -303,7 +314,7 @@ public sealed class WorkerTcbEdgeCaseTests
     public void UnknownCompilerClauseKindIsRejectedExhaustively()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
-        artifact.Callables.Single().Total!.Clauses.Single().Kind = (CompilerContractKind)int.MaxValue;
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Clauses = artifact.Callables.Single().Total!.Clauses.ReplaceReference(artifact.Callables.Single().Total!.Clauses.Single(), artifact.Callables.Single().Total!.Clauses.Single() with { Kind = (CompilerContractKind)int.MaxValue }) } }) }; }
         RejectMalformedArtifact(artifact);
     }
 

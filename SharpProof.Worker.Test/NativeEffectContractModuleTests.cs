@@ -51,7 +51,7 @@ public sealed class NativeEffectContractModuleTests
         };
         if (!allowed)
         {
-            constraint.AllowedCapabilities &= ~(facet == "all" ? WorkerEffectCapabilitySet.Synchronization : WorkerEffectCapabilitySet.IO);
+            { constraint = constraint with { AllowedCapabilities = constraint.AllowedCapabilities & ~(facet == "all" ? WorkerEffectCapabilitySet.Synchronization : WorkerEffectCapabilitySet.IO) }; }
         }
         Assert.That(WorkerProtocolJson.HasKnownEffects(constraint.AllowedEffects, constraint.AllowedCapabilities), Is.True);
         Assert.That(constraint.AllowedExceptionTypes, Is.Empty);

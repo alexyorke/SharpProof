@@ -82,7 +82,7 @@ public sealed class CompilerReportingTests
                 second.Location.Start++;
                 break;
             case "line":
-                second.Location = second.Location with { Line = second.Location.Line + 1 };
+                { second = second with { Location = second.Location with { Line = second.Location.Line + 1 } }; }
                 break;
             case "column":
                 second.Location.Column++;
@@ -91,7 +91,7 @@ public sealed class CompilerReportingTests
                 second.Location.Path += ".other";
                 break;
             case "message":
-                second.Message += " other";
+                { second = second with { Message = second.Message + " other" }; }
                 break;
         }
         Assert.That(CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]), Is.EqualTo(new[] { first, second }));

@@ -535,103 +535,103 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 
 | ID | Baseline location | Property | Status |
 | --- | --- | --- | --- |
-| MODEL-001 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:125` | `DisjointInputs`: `CompilerDisjointInputPair[]?` | Open; coordinated migration |
-| MODEL-002 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:127` | `EffectsCompleteAtEntry`: `bool` | Open; coordinated migration |
-| MODEL-003 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:128` | `ValidEffectClaimIds`: `string[]` | Open; coordinated migration |
-| MODEL-004 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:130` | `IsBodyAbstraction`: `bool` | Open; coordinated migration |
-| MODEL-005 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:132` | `HasReceiver`: `bool` | Open; coordinated migration |
-| MODEL-006 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:133` | `Graph`: `PortableIrGraph` | Open; coordinated migration |
-| MODEL-007 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:134` | `Parameters`: `CompilerTotalParameterArtifact[]` | Open; coordinated migration |
-| MODEL-008 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:135` | `Result`: `int` | Open; coordinated migration |
-| MODEL-009 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:136` | `Clauses`: `CompilerTotalClauseArtifact[]` | Open; coordinated migration |
-| MODEL-010 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:137` | `ExceptionConstraints`: `CompilerTotalExceptionConstraintArtifact[]` | Open; coordinated migration |
-| MODEL-011 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:138` | `CallPreconditions`: `CompilerTotalCallPreconditionArtifact[]` | Open; coordinated migration |
-| MODEL-012 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:150` | `MetadataClause`: `CompilerMetadataClauseOrigin?` | Open; coordinated migration |
-| MODEL-013 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:152` | `InstructionIndex`: `int` | Open; coordinated migration |
-| MODEL-014 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:153` | `CalleeIdentity`: `string` | Open; coordinated migration |
-| MODEL-015 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:154` | `ClauseOrdinal`: `int` | Open; coordinated migration |
-| MODEL-016 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:155` | `ClauseSite`: `int` | Open; coordinated migration |
-| MODEL-017 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:156` | `ValueRoot`: `int` | Open; coordinated migration |
-| MODEL-018 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:157` | `SafeRoot`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-019 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:162` | `ClaimId`: `string` | Open; coordinated migration |
-| MODEL-020 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:163` | `AllowedKinds`: `IrExceptionKind[]` | Open; coordinated migration |
-| MODEL-021 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:168` | `Entry`: `int` | Open; coordinated migration |
-| MODEL-022 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:169` | `Current`: `int` | Open; coordinated migration |
-| MODEL-023 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:170` | `Old`: `int` | Open; coordinated migration |
-| MODEL-024 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:175` | `Kind`: `CompilerContractKind` | Open; coordinated migration |
-| MODEL-025 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:176` | `ValueRoot`: `int` | Open; coordinated migration |
-| MODEL-026 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:177` | `SafeRoot`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-027 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:178` | `Operation`: `int` | Open; coordinated migration |
-| MODEL-028 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:179` | `ClaimId`: `string?` | Open; coordinated migration |
-| MODEL-029 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:180` | `AssumptionId`: `string?` | Open; coordinated migration |
-| MODEL-030 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:190` | `SpecificationPackIds`: `string[]` | Open; coordinated migration |
-| MODEL-031 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:191` | `SpecificationPackCatalogVersion`: `int` | Open; coordinated migration |
-| MODEL-032 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:192` | `SpecificationPackCatalogSha256`: `string` | Open; coordinated migration |
-| MODEL-033 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:197` | `CallableId`: `string` | Open; coordinated migration |
-| MODEL-034 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:198` | `FailureReason`: `WorkerClaimReason` | Open; coordinated migration |
-| MODEL-035 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:199` | `EffectClaims`: `CompilerEffectClaimArtifact[]` | Open; coordinated migration |
-| MODEL-036 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:201` | `Total`: `CompilerTotalCallableArtifact?` | Open; coordinated migration |
-| MODEL-037 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:203` | `TotalEntry`: `CompilerTotalCallableArtifact?` | Init-only; retained mutable members remain under review |
-| MODEL-038 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:208` | `ClaimId`: `string` | Open; coordinated migration |
-| MODEL-039 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:209` | `ContractKind`: `WorkerEffectContractKind` | Open; coordinated migration |
-| MODEL-040 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:210` | `Outcome`: `WorkerClaimOutcome` | Open; coordinated migration |
-| MODEL-041 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:211` | `Reason`: `WorkerClaimReason` | Open; coordinated migration |
-| MODEL-042 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:212` | `Certainty`: `WorkerEffectEvidenceCertainty` | Open; coordinated migration |
-| MODEL-043 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:213` | `Constraint`: `CompilerEffectConstraintArtifact` | Open; coordinated migration |
-| MODEL-044 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:214` | `Evidence`: `string` | Open; coordinated migration |
-| MODEL-045 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:215` | `EvidenceSha256`: `string` | Open; coordinated migration |
-| MODEL-046 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:220` | `AllowedEffects`: `WorkerEffectSet` | Open; coordinated migration |
-| MODEL-047 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:221` | `AllowedCapabilities`: `WorkerEffectCapabilitySet` | Open; coordinated migration |
-| MODEL-048 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:222` | `AllowedExceptionTypes`: `string[]` | Open; coordinated migration |
-| MODEL-049 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:280` | `Code`: `string` | Open; coordinated migration |
-| MODEL-050 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:281` | `Message`: `string` | Open; coordinated migration |
-| MODEL-051 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:282` | `IsSource`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-052 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:283` | `Location`: `WorkerSourceLocation` | Open; coordinated migration |
+| MODEL-001 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:125` | `DisjointInputs`: `CompilerDisjointInputPair[]?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-002 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:127` | `EffectsCompleteAtEntry`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-003 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:128` | `ValidEffectClaimIds`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-004 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:130` | `IsBodyAbstraction`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-005 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:132` | `HasReceiver`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-006 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:133` | `Graph`: `PortableIrGraph` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-007 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:134` | `Parameters`: `CompilerTotalParameterArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-008 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:135` | `Result`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-009 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:136` | `Clauses`: `CompilerTotalClauseArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-010 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:137` | `ExceptionConstraints`: `CompilerTotalExceptionConstraintArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-011 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:138` | `CallPreconditions`: `CompilerTotalCallPreconditionArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-012 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:150` | `MetadataClause`: `CompilerMetadataClauseOrigin?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-013 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:152` | `InstructionIndex`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-014 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:153` | `CalleeIdentity`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-015 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:154` | `ClauseOrdinal`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-016 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:155` | `ClauseSite`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-017 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:156` | `ValueRoot`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-018 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:157` | `SafeRoot`: `int` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-019 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:162` | `ClaimId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-020 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:163` | `AllowedKinds`: `IrExceptionKind[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-021 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:168` | `Entry`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-022 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:169` | `Current`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-023 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:170` | `Old`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-024 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:175` | `Kind`: `CompilerContractKind` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-025 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:176` | `ValueRoot`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-026 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:177` | `SafeRoot`: `int` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-027 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:178` | `Operation`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-028 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:179` | `ClaimId`: `string?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-029 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:180` | `AssumptionId`: `string?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-030 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:190` | `SpecificationPackIds`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-031 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:191` | `SpecificationPackCatalogVersion`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-032 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:192` | `SpecificationPackCatalogSha256`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-033 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:197` | `CallableId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-034 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:198` | `FailureReason`: `WorkerClaimReason` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-035 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:199` | `EffectClaims`: `CompilerEffectClaimArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-036 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:201` | `Total`: `CompilerTotalCallableArtifact?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-037 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:203` | `TotalEntry`: `CompilerTotalCallableArtifact?` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-038 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:208` | `ClaimId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-039 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:209` | `ContractKind`: `WorkerEffectContractKind` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-040 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:210` | `Outcome`: `WorkerClaimOutcome` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-041 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:211` | `Reason`: `WorkerClaimReason` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-042 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:212` | `Certainty`: `WorkerEffectEvidenceCertainty` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-043 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:213` | `Constraint`: `CompilerEffectConstraintArtifact` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-044 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:214` | `Evidence`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-045 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:215` | `EvidenceSha256`: `string` | Preserve; explicit in-place Seal digest replacement contract |
+| MODEL-046 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:220` | `AllowedEffects`: `WorkerEffectSet` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-047 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:221` | `AllowedCapabilities`: `WorkerEffectCapabilitySet` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-048 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:222` | `AllowedExceptionTypes`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-049 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:280` | `Code`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-050 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:281` | `Message`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-051 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:282` | `IsSource`: `bool` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-052 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:283` | `Location`: `WorkerSourceLocation` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
 | MODEL-053 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:285` | `SourceTreeOrdinal`: `int` | Init-only; provenance initialized by producer |
 | MODEL-054 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:287` | `SourceTreePath`: `string` | Init-only; provenance initialized by producer |
 | MODEL-055 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:289` | `SourceTreeSha256`: `string` | Init-only; provenance initialized by producer |
 | MODEL-056 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:291` | `SourceLineMapSha256`: `string` | Init-only; provenance initialized by producer |
-| MODEL-057 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:296` | `Schema`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-058 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:297` | `SchemaVersion`: `int` | Open; coordinated migration |
-| MODEL-059 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:298` | `ProtocolVersion`: `string` | Open; coordinated migration |
-| MODEL-060 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:299` | `RelationalSummarySchemaVersion`: `int` | Open; coordinated migration |
-| MODEL-061 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:300` | `SpecificationPackSchemaVersion`: `int` | Open; coordinated migration |
-| MODEL-062 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:301` | `SpecificationPackIds`: `string[]` | Open; coordinated migration |
-| MODEL-063 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:302` | `SpecificationPackCatalogVersion`: `int` | Open; coordinated migration |
-| MODEL-064 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:303` | `SpecificationPackCatalogSha256`: `string` | Open; coordinated migration |
-| MODEL-065 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:304` | `Features`: `WorkerFeatureSet` | Open; coordinated migration |
-| MODEL-066 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:305` | `Compilation`: `CompilerCompilationSnapshot` | Open; coordinated migration |
-| MODEL-067 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:306` | `Manifest`: `WorkerClaimManifest` | Open; coordinated migration |
-| MODEL-068 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:307` | `MaximumExpressionDepth`: `int` | Open; coordinated migration |
-| MODEL-069 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:308` | `CompilerDiagnostics`: `CompilerDiagnosticArtifact[]` | Open; coordinated migration |
-| MODEL-070 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:309` | `Callables`: `CompilerCallableArtifact[]` | Open; coordinated migration |
-| MODEL-071 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:310` | `ReachableSource`: `CompilerReachableSourceArtifact?` | Init-only; retained mutable members remain under review |
-| MODEL-072 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:317` | `CollectionComplete`: `bool` | Init-only; retained mutable members remain under review |
-| MODEL-073 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:318` | `Roots`: `CompilerSourceRootArtifact[]` | Open; coordinated migration |
-| MODEL-074 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:319` | `Bodies`: `CompilerSourceBodyArtifact[]` | Open; coordinated migration |
-| MODEL-075 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:320` | `Documents`: `CompilerSourceDocumentArtifact[]` | Init-only; retained mutable members remain under review |
-| MODEL-076 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:325` | `SourceTreeOrdinal`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-077 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:326` | `Path`: `string` | Open; coordinated migration |
-| MODEL-078 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:327` | `MaximumBodyEnd`: `int` | Open; coordinated migration |
-| MODEL-079 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:332` | `CallableId`: `string` | Open; coordinated migration |
-| MODEL-080 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:333` | `BodyId`: `string` | Open; coordinated migration |
-| MODEL-081 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:338` | `BodyId`: `string` | Open; coordinated migration |
-| MODEL-082 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:339` | `MethodIdentity`: `string` | Open; coordinated migration |
-| MODEL-083 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:340` | `CallIdentity`: `string` | Open; coordinated migration |
-| MODEL-084 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:341` | `IsStatic`: `bool` | Open; coordinated migration |
-| MODEL-085 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:342` | `ParameterTypes`: `string[]` | Open; coordinated migration |
-| MODEL-086 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:343` | `ReturnType`: `string?` | Open; coordinated migration |
-| MODEL-087 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:344` | `SourceTreeOrdinal`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-088 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:345` | `Start`: `int` | Open; coordinated migration |
-| MODEL-089 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:346` | `Length`: `int` | Open; coordinated migration |
-| MODEL-090 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:347` | `CallsComplete`: `bool` | Open; coordinated migration |
-| MODEL-091 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:348` | `EffectsCompleteAtEntry`: `bool` | Open; coordinated migration |
-| MODEL-092 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:349` | `Callees`: `string[]` | Open; coordinated migration |
-| MODEL-093 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:350` | `Graph`: `PortableIrGraph?` | Open; coordinated migration |
-| MODEL-094 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:351` | `IsCallSkeleton`: `bool` | Open; coordinated migration |
-| MODEL-095 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:352` | `SourceCalls`: `CompilerSourceCallArtifact[]` | Open; coordinated migration |
-| MODEL-096 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:357` | `InstructionIndex`: `int` | Open; coordinated migration |
-| MODEL-097 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:358` | `CalleeBodyId`: `string` | Open; coordinated migration |
+| MODEL-057 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:296` | `Schema`: `string` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-058 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:297` | `SchemaVersion`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-059 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:298` | `ProtocolVersion`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-060 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:299` | `RelationalSummarySchemaVersion`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-061 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:300` | `SpecificationPackSchemaVersion`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-062 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:301` | `SpecificationPackIds`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-063 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:302` | `SpecificationPackCatalogVersion`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-064 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:303` | `SpecificationPackCatalogSha256`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-065 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:304` | `Features`: `WorkerFeatureSet` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-066 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:305` | `Compilation`: `CompilerCompilationSnapshot` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-067 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:306` | `Manifest`: `WorkerClaimManifest` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-068 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:307` | `MaximumExpressionDepth`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-069 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:308` | `CompilerDiagnostics`: `CompilerDiagnosticArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-070 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:309` | `Callables`: `CompilerCallableArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-071 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:310` | `ReachableSource`: `CompilerReachableSourceArtifact?` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-072 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:317` | `CollectionComplete`: `bool` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-073 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:318` | `Roots`: `CompilerSourceRootArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-074 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:319` | `Bodies`: `CompilerSourceBodyArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-075 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:320` | `Documents`: `CompilerSourceDocumentArtifact[]` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-076 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:325` | `SourceTreeOrdinal`: `int` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-077 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:326` | `Path`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-078 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:327` | `MaximumBodyEnd`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-079 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:332` | `CallableId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-080 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:333` | `BodyId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-081 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:338` | `BodyId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-082 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:339` | `MethodIdentity`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-083 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:340` | `CallIdentity`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-084 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:341` | `IsStatic`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-085 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:342` | `ParameterTypes`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-086 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:343` | `ReturnType`: `string?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-087 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:344` | `SourceTreeOrdinal`: `int` | Implemented; record/init and immutable array members; focused checks passed |
+| MODEL-088 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:345` | `Start`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-089 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:346` | `Length`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-090 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:347` | `CallsComplete`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-091 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:348` | `EffectsCompleteAtEntry`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-092 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:349` | `Callees`: `string[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-093 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:350` | `Graph`: `PortableIrGraph?` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-094 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:351` | `IsCallSkeleton`: `bool` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-095 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:352` | `SourceCalls`: `CompilerSourceCallArtifact[]` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-096 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:357` | `InstructionIndex`: `int` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
+| MODEL-097 | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:358` | `CalleeBodyId`: `string` | Implemented; record/init and immutable arrays; 193 focused checks passed; broad check pending |
 | MODEL-098 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:20` | `ProjectDirectory`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
 | MODEL-099 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:22` | `AssemblyName`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
 | MODEL-100 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:24` | `AssemblyIdentity`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
@@ -940,9 +940,9 @@ refactor. Concurrent callback caches retain an explicit concurrency contract.
   tokens unchanged across 226 changed C# files**. Subsequent edits changed only
   method-body style and the nonliteral replacement-validation implementation.
   Golden, sample, template and vendored sources have no changes.
-- Of the 312 inventoried model properties, 149 are now init-only, six budget
-  properties retain the explicit mutable-budget snapshot test contract, and
-  157 remain open for coordinated review/migration. Init-only collection
+- Of the 312 inventoried model properties, 231 are now init-only, six budget
+  properties and the in-place Seal digest retain explicit mutable contracts, and
+  74 protocol properties remain open for coordinated review/migration. Init-only collection
   properties still require deep immutability review; the inventory does not
   silently count retained arrays as immutable.
 - The 35 sites in the strict analyzer local-state appendix are implemented; targeted analyzer tests passed (1,085).
@@ -993,7 +993,7 @@ is itself under test require an explicit boundary justification.
 | FOLLOW-022 | CorpusFileTransaction retained updates across awaits, duplicate/path sets and entries; AllocationIlOracle map/stack/visited/branch arrays; CompilerClrTypeMatcher and NativeExceptionWitnessOracle name stacks | Open |
 | FOLLOW-023 | CorpusGate sets/counters; NativeAllocationWitnessOracle and NativeStaticWriteWitnessOracle initial/alias maps; NativeCorpusVerifier lookup/outcomes; OpenSourceCorpusCatalog map/sets; OpenSourceCorpusImporter dedupe; OpenSourceCorpusRunner diagnostics and indexed assignment counters | Open; do not blanket-exempt algorithm counters |
 | FOLLOW-024 | Host TrustedChildEnvironment and Fuzz FiniteDomainSmtFuzzing/FrontendFuzzing/TotalProgramFuzzing retained snapshots | Unchecked detail; agent shell unavailable during final re-read; boundary-level lead only |
-| FOLLOW-025 | Compiler/protocol 157 open model properties plus init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
+| FOLLOW-025 | Protocol 74 open model properties plus remaining init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
 
 Follow-up coverage: IR/Dataflow 45 production files / 9,163 lines; SMT 13 files /
 2,043 lines; Contracts 25 files / 5,124 lines; S-Z/lowercase test/support 344 files.
@@ -1121,7 +1121,10 @@ syntax sites. This checkpoint is not the comprehensive completion condition.
   propagation were independently reviewed against current disk; no lost
   mutation was found. The golden program and expected output are unchanged.
 
-The ordinary full-suite check for the Portable IR checkpoint is pending.
+Commit f248435fe passed all 19 ordinary projects: 11,595 passed, zero failures,
+one existing package skip (Worker 5,331; Gates 470). Evidence:
+artifacts/immutability-portable-all-tests.log. Performance, coverage and corpus
+categories were excluded.
 Compiler/protocol model fields, remaining helper findings and syntax candidate
 classification remain open; this is not the comprehensive completion condition.
 Final Portable checkpoint preservation check passed: 1,992 original
@@ -1129,3 +1132,30 @@ raw/interpolated literal tokens across 340 changed C# files are unchanged.
 The refreshed syntax inventory parses 1,808 tracked/new non-vendored C# files
 and records 4,052 candidates, including 12 explicit program-subject exclusions.
 Evidence: artifacts/immutability-portable-preservation2.log.
+### Compiler artifact and retained helper follow-up
+
+- CompilerArtifact wire records now use init-only properties and immutable array
+  storage, preserving nullable DisjointInputs and default-array wire null sentinels.
+  EvidenceSha256 remains settable for the explicitly tested in-place Seal API.
+- Producer attachment and canonicalization return copies. Reachable-source queues,
+  maps, stacks and sets are persistent, preserving FIFO/LIFO order, symbol/ordinal
+  comparers, reentrant enqueue publication and final canonical sorting.
+- Corruption fixtures replace rows and publish them through owning artifacts.
+  Peer review caught lost helper returns and compound assignments; corrections
+  preserve append/bitmask operations and artifact ownership. Filtered assumption
+  clause aliases map back by original reference into the complete clause list.
+- All 193 focused compiler/diagnostic/source-assumption/retained-input checks pass.
+  Evidence: artifacts/immutability-compiler-model-focused2.log. The full ordinary
+  suite is running; this checkpoint is not yet counted as broadly verified.
+- Retained PE bytes, fixed region tables, generated domain samples, diagnostic
+  observations, options snapshots and code-action lists now use immutable storage.
+  Additional metadata traversal and corpus/fuzz lookup state is persistent.
+  Script validation tables preserve explicit key order and immutable values.
+- Canonical script/C# formatting passed; the exported patch contained only script
+  indentation and was reviewed and applied. Literal preservation verified 2,018
+  original raw/interpolated tokens across 369 changed C# files. Evidence:
+  artifacts/immutability-compiler-model-format.log and
+  artifacts/immutability-compiler-model-preservation.log.
+The refreshed inventory parses 1,809 tracked/new non-vendored C# files and records
+3,887 syntax candidates (12 explicit program-subject exclusions). These remain
+review candidates; the comprehensive stopping condition is still open.

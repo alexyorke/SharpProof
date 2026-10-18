@@ -3464,7 +3464,7 @@ public sealed partial class WorkerTests
             Assert.That(withArtifact.SpecificationPackIds.Single(), Is.EqualTo("dotnet.scalar"));
         }
 
-        withArtifact.Callables.Single().Total!.Graph = withArtifact.Callables.Single().Total!.Graph with { Semantics = IrExecutionSemantics.Legacy };
+        { withArtifact = withArtifact with { Callables = withArtifact.Callables.ReplaceReference(withArtifact.Callables.Single(), withArtifact.Callables.Single() with { Total = withArtifact.Callables.Single().Total! with { Graph = withArtifact.Callables.Single().Total!.Graph with { Semantics = IrExecutionSemantics.Legacy } } }) }; }
         Assert.That(
             new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());

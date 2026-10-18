@@ -238,14 +238,14 @@ public sealed class ResultTypeCodeFixTests
         return await compilation!.WithAnalyzers([new SharpProofAnalyzer()]).GetAnalyzerDiagnosticsAsync();
     }
 
-    private static async Task<List<CodeAction>> GetFixesAsync(Document document, Diagnostic diagnostic)
+    private static async Task<ImmutableArray<CodeAction>> GetFixesAsync(Document document, Diagnostic diagnostic)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(diagnostic);
-        var fixes = new List<CodeAction>();
+        var fixes = ImmutableList<CodeAction>.Empty;
         await new ResultTypeCodeFixProvider().RegisterCodeFixesAsync(new CodeFixContext(
-            document, diagnostic, (action, _) => fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
+            document, diagnostic, (action, _) => fixes = fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
             TestContext.CurrentContext.CancellationToken));
-        return fixes;
+        return fixes.ToImmutableArray();
     }
 }

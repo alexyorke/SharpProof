@@ -26,8 +26,8 @@ internal static class CompilerReachableSourceValidator
         var artifact = manifest.ReachableSource;
         if (artifact == null)
         { return; }
-        Require(artifact.Bodies != null && artifact.Roots != null && artifact.Bodies.Length <= 4096);
-        Require(artifact.Documents != null && artifact.Documents.Length <= artifact.Bodies!.Length);
+        Require(!artifact.Bodies.IsDefault && !artifact.Roots.IsDefault && artifact.Bodies.Length <= 4096);
+        Require(!artifact.Documents.IsDefault && artifact.Documents.Length <= artifact.Bodies!.Length);
         var documents = new Dictionary<int, CompilerSourceDocumentArtifact>();
         foreach (var document in artifact.Documents!)
         {
@@ -46,9 +46,9 @@ internal static class CompilerReachableSourceValidator
             Require(body!.Start >= 0 && body.Length > 0 &&
                 body.Start <= documents[body.SourceTreeOrdinal].MaximumBodyEnd - body.Length &&
                 body.BodyId == BodyId(body.SourceTreeOrdinal, body.Start, body.Length) &&
-                !bodies.ContainsKey(body.BodyId) && body.Callees != null && body.Callees.Length <= 4096 &&
-                body.SourceCalls != null && body.SourceCalls.Length <= 4096 &&
-                body.ParameterTypes != null && body.ParameterTypes.Length <= 4096 &&
+                !bodies.ContainsKey(body.BodyId) && !body.Callees.IsDefault && body.Callees.Length <= 4096 &&
+                !body.SourceCalls.IsDefault && body.SourceCalls.Length <= 4096 &&
+                !body.ParameterTypes.IsDefault && body.ParameterTypes.Length <= 4096 &&
                 body.ParameterTypes.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (!string.IsNullOrWhiteSpace(type))));
             bodies.Add(body.BodyId, body);
             if (body.Graph != null)

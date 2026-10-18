@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -11,7 +12,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerScalarSignatureProviderTests
 {
-    private byte[] _image = [];
+    private ImmutableArray<byte> _image = [];
 
     [OneTimeSetUp]
     public void CompileOrdinarySignatureFixture()
@@ -56,7 +57,7 @@ public sealed class CompilerScalarSignatureProviderTests
             """, []).WithAssemblyName("CompilerScalarSignatures");
         compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true)
             .WithOptimizationLevel(OptimizationLevel.Debug));
-        _image = AnalyzerTestHost.EmitImage(compilation);
+        _image = AnalyzerTestHost.EmitImage(compilation).ToImmutableArray();
     }
 
     [TestCase("Boolean", SpecialType.System_Boolean)]
@@ -84,7 +85,7 @@ public sealed class CompilerScalarSignatureProviderTests
     public void GenuineMethodSignaturesClassifyAcceptedAndRejectedTypes(string name, SpecialType expected)
     {
         System.ArgumentNullException.ThrowIfNull(name);
-        using var pe = new PEReader(new MemoryStream(_image, writable: false));
+        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
         var reader = pe.GetMetadataReader();
         var method = FindMethod(reader, name);
         var signature = method.DecodeSignature(new CompilerScalarSignatureProvider(), genericContext: null);
@@ -101,7 +102,7 @@ public sealed class CompilerScalarSignatureProviderTests
     public void GenuineReferenceReturnsRemainOutsideTheScalarSubset(string name)
     {
         System.ArgumentNullException.ThrowIfNull(name);
-        using var pe = new PEReader(new MemoryStream(_image, writable: false));
+        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
         var reader = pe.GetMetadataReader();
         var signature = FindMethod(reader, name).DecodeSignature(
             new CompilerScalarSignatureProvider(), genericContext: null);
@@ -115,7 +116,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [Test]
     public void GenuinePinnedLocalsRemainOutsideTheScalarSubset()
     {
-        using var pe = new PEReader(new MemoryStream(_image, writable: false));
+        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
         var reader = pe.GetMetadataReader();
         var method = FindMethod(reader, "Pinned");
         var body = pe.GetMethodBody(method.RelativeVirtualAddress);
@@ -128,7 +129,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [Test]
     public void GenuineConstructedTypeSpecificationRemainsOutsideTheScalarSubset()
     {
-        using var pe = new PEReader(new MemoryStream(_image, writable: false));
+        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
         var reader = pe.GetMetadataReader();
         var count = reader.GetTableRowCount(TableIndex.TypeSpec);
         var provider = new CompilerScalarSignatureProvider();

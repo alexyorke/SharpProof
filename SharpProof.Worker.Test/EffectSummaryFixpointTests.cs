@@ -214,9 +214,9 @@ public sealed class EffectSummaryFixpointTests
         Assert.That(summaries.Values.All(summary => summary.MayEffects.HasFlag(SourceMayEffect.Allocation) &&
             summary.UnknownEffects == SourceMayEffect.None && summary.MayDiverge), Is.True);
         var expected = summaries.ToArray();
-        graph.Bodies = graph.Bodies.Reverse().ToArray();
+        { graph = graph with { Bodies = (graph.Bodies.Reverse().ToArray()).ToImmutableArray() }; }
         foreach (var body in graph.Bodies)
-        { body.Callees = body.Callees.Reverse().ToArray(); }
+        { { { graph = graph with { Bodies = graph.Bodies.ReplaceReference(body, body with { Callees = (body.Callees.Reverse().ToArray()).ToImmutableArray() }) }; } } }
         Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: TestContext.CurrentContext.CancellationToken).ToArray(), Is.EqualTo(expected));
     }
 
@@ -303,7 +303,7 @@ public sealed class EffectSummaryFixpointTests
             Graph = leaf.Graph,
             Callees = index < 4095 ? [(index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)] : cycle ? ["0"] : []
         }).ToArray();
-        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies }, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies.ToImmutableArray() }, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(summaries, Has.Count.EqualTo(4096));
         Assert.That(summaries.Values.All(summary => summary.MayEffects == SourceMayEffect.None && summary.MayDiverge == cycle), Is.True);
     }

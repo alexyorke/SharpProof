@@ -39,8 +39,8 @@ public sealed class MetadataClauseOriginTests
         }
         if (metadata)
         {
-            detached.CallPreconditions[0].MetadataClause = origin with { Minimum = -100 };
-            detached.CallPreconditions = [];
+            { detached = detached with { CallPreconditions = detached.CallPreconditions.SetItem(0, detached.CallPreconditions[0] with { MetadataClause = origin with { Minimum = -100 } }) }; }
+            { detached = detached with { CallPreconditions = [] }; }
             references[0] = references[0] with { Modules = [] };
             Assert.That(row.MetadataClause!.Minimum, Is.EqualTo(1));
             Assert.That(row.MetadataClause.ValueBlob, Is.EqualTo(origin.ValueBlob));
@@ -83,32 +83,38 @@ public sealed class MetadataClauseOriginTests
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
         _ = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references);
         var row = dto.CallPreconditions.Single();
-        row.MetadataClause = mutation switch
         {
-            "image" => origin with { ImageSha256 = new string('0', 64) },
-            "mvid" => origin with { ModuleMvid = Guid.Empty.ToString("D") },
-            "module" => origin with { ModuleName = "other.dll" },
-            "assembly" => origin with { AssemblyIdentity = "other" },
-            "method" => origin with { MethodToken = origin.MethodToken + 1 },
-            "parameter" => origin with { ParameterToken = origin.ParameterToken + 1 },
-            "attribute" => origin with { AttributeToken = origin.AttributeToken + 1 },
-            "constructor" => origin with { ConstructorToken = origin.ConstructorToken + 1 },
-            "ordinal" => origin with { ParameterOrdinal = 128 },
-            "sequence" => origin with { ParameterSequence = 0 },
-            "kind" => origin with { Kind = "Positive" },
-            "minimum" => origin with { Minimum = 2 },
-            "maximum" => origin with { Maximum = 9 },
-            "signature" => origin with { ConstructorSignature = [0x20, 0, 1] },
-            "blob" => origin with { ValueBlob = [1] },
-            "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(new byte[65_536]) },
-            "missing-origin" => null,
-            "wrong-table" => origin with { MethodToken = 0x08000001 },
-            _ => origin
-        };
+            row = row with
+            {
+                MetadataClause = mutation switch
+                {
+                    "image" => origin with { ImageSha256 = new string('0', 64) },
+                    "mvid" => origin with { ModuleMvid = Guid.Empty.ToString("D") },
+                    "module" => origin with { ModuleName = "other.dll" },
+                    "assembly" => origin with { AssemblyIdentity = "other" },
+                    "method" => origin with { MethodToken = origin.MethodToken + 1 },
+                    "parameter" => origin with { ParameterToken = origin.ParameterToken + 1 },
+                    "attribute" => origin with { AttributeToken = origin.AttributeToken + 1 },
+                    "constructor" => origin with { ConstructorToken = origin.ConstructorToken + 1 },
+                    "ordinal" => origin with { ParameterOrdinal = 128 },
+                    "sequence" => origin with { ParameterSequence = 0 },
+                    "kind" => origin with { Kind = "Positive" },
+                    "minimum" => origin with { Minimum = 2 },
+                    "maximum" => origin with { Maximum = 9 },
+                    "signature" => origin with { ConstructorSignature = [0x20, 0, 1] },
+                    "blob" => origin with { ValueBlob = [1] },
+                    "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(new byte[65_536]) },
+                    "missing-origin" => null,
+                    "wrong-table" => origin with { MethodToken = 0x08000001 },
+                    _ => origin
+                }
+            };
+            dto = dto with { CallPreconditions = dto.CallPreconditions.ReplaceReference(dto.CallPreconditions.Single(), row) };
+        }
         switch (mutation)
         {
             case "source-span":
-                dto.Graph = dto.Graph with { Operations = dto.Graph.Operations.SetItem(row.ClauseSite, dto.Graph.Operations[row.ClauseSite] with { SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 } }) };
+                { dto = dto with { Graph = dto.Graph with { Operations = dto.Graph.Operations.SetItem(row.ClauseSite, dto.Graph.Operations[row.ClauseSite] with { SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 } }) } }; }
                 break;
             case "missing-owner":
                 references = [];
@@ -119,10 +125,10 @@ public sealed class MetadataClauseOriginTests
                         module with { Sha256 = new string('0', 64) })] })];
                 break;
             case "remove-row":
-                dto.CallPreconditions = [];
+                { dto = dto with { CallPreconditions = [] }; }
                 break;
             case "duplicate-row":
-                dto.CallPreconditions = [row, row];
+                { dto = dto with { CallPreconditions = [row, row] }; }
                 break;
         }
         Assert.Throws<InvalidDataException>(new Action(() =>

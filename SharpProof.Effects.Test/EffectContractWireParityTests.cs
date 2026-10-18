@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,12 +8,12 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class EffectContractWireParityTests
 {
-    private static readonly (
+    private static readonly ImmutableArray<(
         EffectRegionKind Region,
         EffectContractKind Read,
         EffectContractKind Write,
         EffectRegionId? RegionId,
-        bool ExpandsParameters)[] s_regionMappings =
+        bool ExpandsParameters)> s_regionMappings =
     [
         (
             EffectRegionKind.Receiver,

@@ -89,20 +89,21 @@ function Write-SharpProofFailureOutput {
     # terminal colour escapes that otherwise make the summary noisy.
     $ansiPattern = [char]27 + '\[[0-?]*[ -/]*[@-~]'
     $normalized = [regex]::Replace($Output, $ansiPattern, '')
-    $progressPatterns = @(
-        '^\s*Static graph loaded ',
-        '^\s*[^:]+ -> .+\.(dll|exe|pdb)\s*$',
-        '^\s*Test run for ',
-        '^\s*VSTest version ',
-        '^\s*Starting test execution',
-        '^\s*A total of \d+ test files matched',
-        '^\s*Passed!\s+- Failed:\s+0,',
-        '^\s*Test Run Successful',
-        '^\s*Results File:',
-        '^\s*Attachments:',
-        '^\s*(Determining projects to restore|All projects are up-to-date)',
-        '^\s*(Build started|Build succeeded|Time Elapsed)'
-    )
+    New-Variable -Name progressPatterns -Option Constant -Value (
+        [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                '^\s*Static graph loaded ',
+                '^\s*[^:]+ -> .+\.(dll|exe|pdb)\s*$',
+                '^\s*Test run for ',
+                '^\s*VSTest version ',
+                '^\s*Starting test execution',
+                '^\s*A total of \d+ test files matched',
+                '^\s*Passed!\s+- Failed:\s+0,',
+                '^\s*Test Run Successful',
+                '^\s*Results File:',
+                '^\s*Attachments:',
+                '^\s*(Determining projects to restore|All projects are up-to-date)',
+                '^\s*(Build started|Build succeeded|Time Elapsed)'
+            )))
     $summaryLines = @(
         $normalized -split '\r?\n' |
             Where-Object {

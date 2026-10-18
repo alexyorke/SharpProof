@@ -82,7 +82,11 @@ public sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("if (x == 0) x = 1; return x;"));
         var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
-        (row, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = (int)region });
+        {
+            var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = (int)region });
+            row = changedFixture.Item1;
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+        }
         var preparation = Prepare(artifact);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
@@ -99,10 +103,21 @@ public sealed class NativePurityEffectTests
     public async Task PreconditionsCanExcludeNonlocalWriteEvents()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("Contract.Requires(x != 0); if (x == 0) x = 1; return x;"));
-        artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        {
+            artifact = artifact with
+            {
+                Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with
+                {
+                    Total = artifact.Callables.Single().Total! with
+                    {
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
-            { A = (int)IrWriteRegion.Field });
+            { A = (int)IrWriteRegion.Field })
+                    }
+                })
+            };
+        }
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome,
             Is.TypeOf<ProvenOutcome>());
     }
@@ -111,10 +126,21 @@ public sealed class NativePurityEffectTests
     public async Task LoopWriteWitnessRequiresOriginalBodyReplay()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("while (x > 0) x--; return x;"));
-        artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        {
+            artifact = artifact with
+            {
+                Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with
+                {
+                    Total = artifact.Callables.Single().Total! with
+                    {
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
-            { A = (int)IrWriteRegion.Element });
+            { A = (int)IrWriteRegion.Element })
+                    }
+                })
+            };
+        }
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
@@ -129,10 +155,18 @@ public sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("x = 1; return x;"));
         var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
-        (row, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = region });
+        {
+            var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = region });
+            row = changedFixture.Item1;
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+        }
         if (unusedSlot)
         {
-            (row, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { B = 0 });
+            {
+                var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { B = 0 });
+                row = changedFixture.Item1;
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = changedFixture.Item2 } }) };
+            }
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }
@@ -331,9 +365,9 @@ public sealed class NativePurityEffectTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("Contract.Requires(false); return x;"));
         if (initialization)
-        { artifact.Callables.Single().Total!.EffectsCompleteAtEntry = false; }
+        { { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { EffectsCompleteAtEntry = false } }) }; } }
         else
-        { artifact.Callables.Single().Total!.ValidEffectClaimIds = []; }
+        { { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { ValidEffectClaimIds = [] } }) }; } }
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
@@ -456,12 +490,12 @@ public sealed class NativePurityEffectTests
         if (unusedSlot)
         {
             (row, graph) = graph.ChangeRow(row, row with { B = 0 });
-            artifact.Callables.Single().Total!.Graph = graph;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         else
         {
             (row, graph) = graph.ChangeRow(row, row with { A = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Integer)) });
-            artifact.Callables.Single().Total!.Graph = graph;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
     }

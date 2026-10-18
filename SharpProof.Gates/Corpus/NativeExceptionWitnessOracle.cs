@@ -118,13 +118,13 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     private static string MetadataName(INamedTypeSymbol type)
     {
         System.ArgumentNullException.ThrowIfNull(type);
-        var names = new Stack<string>();
+        var names = ImmutableStack<string>.Empty;
         for (var current = type; current != null; current = current.ContainingType)
-        { names.Push(current.MetadataName); }
-        var namespaces = new Stack<string>();
+        { names = names.Push(current.MetadataName); }
+        var namespaces = ImmutableStack<string>.Empty;
         for (var current = type.ContainingNamespace; !current.IsGlobalNamespace; current = current.ContainingNamespace)
-        { namespaces.Push(current.MetadataName); }
-        return (namespaces.Count == 0 ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
+        { namespaces = namespaces.Push(current.MetadataName); }
+        return (namespaces.IsEmpty ? "" : string.Join(".", namespaces) + ".") + string.Join("+", names);
     }
 
     private static Type? RuntimeType(ITypeSymbol type)

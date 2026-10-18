@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -7,8 +8,8 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerReferenceModuleSelectionTests
 {
-    private byte[] _firstImage = [];
-    private byte[] _secondImage = [];
+    private ImmutableArray<byte> _firstImage = [];
+    private ImmutableArray<byte> _secondImage = [];
 
     [OneTimeSetUp]
     public void CompileOrdinaryAssemblyImages()
@@ -104,11 +105,11 @@ public sealed class CompilerReferenceModuleSelectionTests
             [first, second], cancellation.Token)), Throws.TypeOf<OperationCanceledException>());
     }
 
-    private static byte[] EmitImage(int value)
+    private static ImmutableArray<byte> EmitImage(int value)
     {
         return AnalyzerTestHost.EmitImage(AnalyzerTestHost.CreateCompilation(
             $"public static class Dependency {{ public static int Value() => {value}; }}", [])
-            .WithAssemblyName("MetadataSelectionDependency"));
+            .WithAssemblyName("MetadataSelectionDependency")).ToImmutableArray();
     }
 
     private sealed class ModuleFiles : IDisposable
@@ -122,12 +123,13 @@ public sealed class CompilerReferenceModuleSelectionTests
             Directory.CreateDirectory(_directory);
         }
 
-        internal CompilerMetadataResolution.ReferenceModule Add(string name, byte[] image)
+        internal CompilerMetadataResolution.ReferenceModule Add(string name, ImmutableArray<byte> image)
         {
-            System.ArgumentNullException.ThrowIfNull(image, nameof(image));
             System.ArgumentNullException.ThrowIfNull(name);
+            if (image.IsDefault)
+            { throw new ArgumentException("Image must be initialized.", nameof(image)); }
             var path = Path.Combine(_directory, name);
-            File.WriteAllBytes(path, image);
+            File.WriteAllBytes(path, image.ToArray());
             var reference = MetadataReference.CreateFromFile(path);
             var metadata = (AssemblyMetadata)reference.GetMetadata();
             _metadata.Add(metadata);

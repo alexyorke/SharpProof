@@ -15,7 +15,7 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
     public void Schema30CannotSupplyTheOldExceptionAdmissionMeaning()
     {
         var artifact = Create();
-        artifact.SchemaVersion = 30;
+        { artifact = artifact with { SchemaVersion = 30 }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -28,7 +28,12 @@ public sealed class Wave8ExceptionInitializationCompatibilityTests
         var total = artifact.Callables.Single().Total!;
         Assert.That(total.ExceptionConstraints, Has.Length.EqualTo(1));
         if (omit)
-        { total.ExceptionConstraints = []; }
+        {
+            {
+                total = total with { ExceptionConstraints = [] };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (omit)

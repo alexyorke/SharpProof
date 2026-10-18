@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -11,7 +12,7 @@ public sealed class IrUnboxingDifferentialRegressionTests
     {
         var fixture = CreateFixture();
         var interpreter = new IrInterpreter(fixture.Factory);
-        var results = fixture.Cases.ToDictionary(
+        var results = fixture.Cases.ToImmutableDictionary(
             @case => @case is null ? throw new System.ArgumentNullException(nameof(@case)) : (@case.Name),
             @case => @case is null ? throw new System.ArgumentNullException(nameof(@case)) : (Evaluate(
                 interpreter,
@@ -123,11 +124,11 @@ public sealed class IrUnboxingDifferentialRegressionTests
     private sealed record UnboxingFixture(
         IrFactory Factory,
         IrVarId Value,
-        IReadOnlyList<UnboxingCase> Cases)
+        ImmutableArray<UnboxingCase> Cases)
     {
         public IrVarId Value { get; init; } = Value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Value)) : Value;
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
-        public IReadOnlyList<UnboxingCase> Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+        public ImmutableArray<UnboxingCase> Cases { get; init; } = Cases.IsDefault ? throw new ArgumentException("Cases must be initialized.", nameof(Cases)) : Cases;
     }
 
     private sealed record UnboxingCase(

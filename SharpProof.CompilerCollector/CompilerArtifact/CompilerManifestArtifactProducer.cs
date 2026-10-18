@@ -37,7 +37,7 @@ internal static class CompilerManifestArtifactProducer
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
-        CompilerCallableArtifact[] callables;
+        ImmutableArray<CompilerCallableArtifact> callables;
         if (diagnosticArtifacts.Length != 0)
         {
             callables = [.. targets.Select(item =>
@@ -106,8 +106,7 @@ internal static class CompilerManifestArtifactProducer
             var claim = claims[index];
             evidence[index] = claim.Evidence;
         }
-        artifact.EffectClaims = evidence;
-        return artifact;
+        return artifact with { EffectClaims = evidence.ToImmutableArray() };
     }
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(

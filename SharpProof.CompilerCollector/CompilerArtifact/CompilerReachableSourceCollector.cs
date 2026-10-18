@@ -16,11 +16,11 @@ internal static class CompilerReachableSourceCollector
         if (trees.Length < compilation.SyntaxTrees.Length)
         { throw new ArgumentException("Snapshot array must cover every compilation syntax tree.", nameof(trees)); }
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
-            .ToDictionary(item => item.tree, item => item.ordinal);
-        var pending = new Queue<IMethodSymbol>();
-        var bodies = new Dictionary<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
-        var methods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var roots = new List<CompilerSourceRootArtifact>();
+            .ToImmutableDictionary(item => item.tree, item => item.ordinal);
+        var pending = ImmutableQueue<IMethodSymbol>.Empty;
+        var bodies = ImmutableDictionary.Create<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
+        var methods = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var roots = ImmutableList<CompilerSourceRootArtifact>.Empty;
         var complete = true;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         foreach (var target in targets.OrderBy(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal))
@@ -28,45 +28,50 @@ internal static class CompilerReachableSourceCollector
             var body = Enqueue(target.Method);
             if (body != null)
             {
-                body.MethodIdentity = target.Entry.CallableId;
-                roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId });
+                body = UpdateRegisteredBody(body with { MethodIdentity = target.Entry.CallableId });
+                roots = roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId });
             }
             else
             { complete = false; }
         }
         var emission = new InvocationEmissionPolicy(compilation);
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var method = pending.Dequeue();
+            var method = pending.Peek();
+            pending = pending.Dequeue();
             var syntax = method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
             var body = bodies[Id(syntax)];
-            body.EffectsCompleteAtEntry = CompilerTotalCallableLowerer.HasNoEffectEntryInitialization(
-                compilation, method.ContainingType, cancellationToken);
+            body = UpdateRegisteredBody(body with
+            {
+                EffectsCompleteAtEntry = CompilerTotalCallableLowerer.HasNoEffectEntryInitialization(
+                compilation, method.ContainingType, cancellationToken)
+            });
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree);
             var operation = model.GetOperation(syntax, cancellationToken);
-            var calls = new HashSet<string>(StringComparer.Ordinal);
-            body.CallsComplete = operation != null;
+            var calls = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+            body = UpdateRegisteredBody(body with { CallsComplete = operation != null });
             if (operation == null)
             { complete = false; }
             if (operation != null)
             {
-                var stack = new Stack<IOperation>();
-                stack.Push(operation);
+                var stack = ImmutableStack<IOperation>.Empty;
+                stack = stack.Push(operation);
                 var remaining = CompilerArtifactLimits.MaximumInstructions;
-                while (stack.Count != 0)
+                while (!stack.IsEmpty)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (--remaining < 0)
-                    { body.CallsComplete = false; complete = false; break; }
-                    var current = stack.Pop();
+                    { body = UpdateRegisteredBody(body with { CallsComplete = false }); complete = false; break; }
+                    var current = stack.Peek();
+                    stack = stack.Pop();
                     // Deferred bodies belong to their own invocation, not to
                     // the enclosing method's execution.
                     if (current is INameOfOperation or IAnonymousFunctionOperation ||
                         current is ILocalFunctionOperation && !ReferenceEquals(current, operation))
                     { continue; }
                     if (HasUncollectedCall(current, compilation, model, cancellationToken, ref remaining))
-                    { body.CallsComplete = false; complete = false; }
+                    { body = UpdateRegisteredBody(body with { CallsComplete = false }); complete = false; }
                     if (current is IInvocationOperation invocation)
                     {
                         if (emission.IsElided(current))
@@ -74,21 +79,21 @@ internal static class CompilerReachableSourceCollector
                         var callee = invocation.TargetMethod.OriginalDefinition;
                         if (callee.IsVirtual || callee.IsAbstract || callee.IsOverride ||
                             callee.MethodKind == MethodKind.DelegateInvoke)
-                        { body.CallsComplete = false; complete = false; }
+                        { body = UpdateRegisteredBody(body with { CallsComplete = false }); complete = false; }
                         if (SymbolEqualityComparer.Default.Equals(callee.ContainingAssembly, compilation.Assembly))
                         {
                             var destination = Enqueue(callee);
                             if (destination == null)
-                            { body.CallsComplete = false; complete = false; }
+                            { body = UpdateRegisteredBody(body with { CallsComplete = false }); complete = false; }
                             else
-                            { calls.Add(destination.BodyId); }
+                            { calls = calls.Add(destination.BodyId); }
                         }
                     }
                     foreach (var child in current.ChildOperations)
-                    { stack.Push(child); }
+                    { stack = stack.Push(child); }
                 }
             }
-            body.Callees = [.. calls.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
+            body = UpdateRegisteredBody(body with { Callees = [.. calls.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)] });
             // Calls stay as shadow boundaries rather than expanding bodies.
             if (syntax is MethodDeclarationSyntax declaration && method.IsStatic && !method.IsGenericMethod &&
                 !method.ContainingType.IsGenericType &&
@@ -116,15 +121,21 @@ internal static class CompilerReachableSourceCollector
                         if (lowered.Classification.IsExact && body.CallsComplete)
                         {
                             var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], variables: null, cancellationToken: cancellationToken);
-                            body.Graph = encoded.Graph;
-                            body.IsCallSkeleton = lowered.PreservedSourceCalls.Count != 0;
-                            body.SourceCalls = [.. lowered.PreservedSourceCalls.Select(call => new CompilerSourceCallArtifact
+                            body = UpdateRegisteredBody(body with { Graph = encoded.Graph });
+                            body = UpdateRegisteredBody(body with { IsCallSkeleton = lowered.PreservedSourceCalls.Count != 0 });
+                            body = UpdateRegisteredBody(body with
+                            {
+                                SourceCalls = [.. lowered.PreservedSourceCalls.Select(call => new CompilerSourceCallArtifact
                             {
                                 InstructionIndex = encoded.InstructionIndices[call.Key.Id],
                                 CalleeBodyId = (Enqueue(call.Value) ?? throw new InvalidOperationException("Preserved source call has no collectable callee body.")).BodyId
-                            }).OrderBy(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.InstructionIndex))];
-                            body.Callees = [.. body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId)).Distinct(StringComparer.Ordinal)
-                                .OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
+                            }).OrderBy(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.InstructionIndex))]
+                            });
+                            body = UpdateRegisteredBody(body with
+                            {
+                                Callees = [.. body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId)).Distinct(StringComparer.Ordinal)
+                                .OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)]
+                            });
                         }
                     }
                 }
@@ -132,19 +143,23 @@ internal static class CompilerReachableSourceCollector
         }
         // The compiler CFG can omit statically unreachable calls. Retain only
         // bodies connected by the final IR edges (or an incomplete boundary).
-        var retained = new HashSet<string>(StringComparer.Ordinal);
-        var reachable = new Stack<string>(roots.Select(root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root.BodyId)));
-        while (reachable.Count != 0)
+        var retained = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var reachable = ImmutableStack<string>.Empty;
+        foreach (var root in roots)
+        { reachable = reachable.Push(root.BodyId); }
+        while (!reachable.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var id = reachable.Pop();
-            if (!retained.Add(id))
+            var id = reachable.Peek();
+            reachable = reachable.Pop();
+            if (retained.Contains(id))
             { continue; }
+            retained = retained.Add(id);
             foreach (var callee in bodies[id].Callees)
-            { reachable.Push(callee); }
+            { reachable = reachable.Push(callee); }
         }
-        foreach (var id in bodies.Keys.Where(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!retained.Contains(id))).ToArray())
-        { bodies.Remove(id); }
+        foreach (var id in bodies.Keys.Where(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!retained.Contains(id))).ToImmutableArray())
+        { bodies = bodies.Remove(id); }
         return new()
         {
             CollectionComplete = complete,
@@ -158,6 +173,17 @@ internal static class CompilerReachableSourceCollector
                         .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length))
                 })))]
         };
+
+        CompilerSourceBodyArtifact UpdateRegisteredBody(CompilerSourceBodyArtifact body)
+        {
+            body = RepositoryParameterGuard.NotNull(body, nameof(body));
+            if (!bodies.ContainsKey(body.BodyId))
+            {
+                throw new InvalidOperationException("A collected body must be registered before publication.");
+            }
+            bodies = bodies.SetItem(body.BodyId, body);
+            return body;
+        }
 
         string Id(SyntaxNode syntax)
         { syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax)); return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
@@ -175,8 +201,9 @@ internal static class CompilerReachableSourceCollector
             var id = Id(syntax);
             if (bodies.TryGetValue(id, out var existing))
             { return existing; }
-            if (bodies.Count >= CompilerArtifactLimits.MaximumInstructions || !methods.Add(method))
+            if (bodies.Count >= CompilerArtifactLimits.MaximumInstructions || methods.Contains(method))
             { return null; }
+            methods = methods.Add(method);
             var body = new CompilerSourceBodyArtifact
             {
                 BodyId = id,
@@ -185,21 +212,27 @@ internal static class CompilerReachableSourceCollector
                 Start = syntax.SpanStart,
                 Length = syntax.Span.Length
             };
-            body.CallIdentity = CompilerIdentityBridge.CreateSymbolDisplay(method);
-            body.IsStatic = method.IsStatic;
+            body = body with { CallIdentity = CompilerIdentityBridge.CreateSymbolDisplay(method) };
+            body = body with { IsStatic = method.IsStatic };
             if (method.Parameters.Length <= CompilerArtifactLimits.MaximumInstructions &&
                 method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CSharpOperationSemantics.IsValueDomain(parameter.Type))) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
                 var signatureFactory = new IrFactory(IrExecutionSemantics.Total);
                 var mapper = new RoslynTypeMapper(signatureFactory);
-                body.ParameterTypes = [.. method.Parameters.Select(parameter =>
-                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(parameter.Type))))];
-                body.ReturnType = method.ReturnsVoid ? null :
-                    CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType));
+                body = body with
+                {
+                    ParameterTypes = [.. method.Parameters.Select(parameter =>
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(parameter.Type))))]
+                };
+                body = body with
+                {
+                    ReturnType = method.ReturnsVoid ? null :
+                    CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType))
+                };
             }
-            bodies.Add(id, body);
-            pending.Enqueue(method);
+            bodies = bodies.AddUnique(id, body);
+            pending = pending.Enqueue(method);
             return body;
         }
     }
@@ -211,14 +244,15 @@ internal static class CompilerReachableSourceCollector
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
             var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
-            var pending = new Stack<DeconstructionInfo>();
-            pending.Push(model.GetDeconstructionInfo(syntax));
+            var pending = ImmutableList<DeconstructionInfo>.Empty;
+            pending = pending.Add(model.GetDeconstructionInfo(syntax));
             while (pending.Count != 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (--remaining < 0)
                 { return true; }
-                var info = pending.Pop();
+                var info = pending[pending.Count - 1];
+                pending = pending.RemoveAt(pending.Count - 1);
                 if (IsUncollectedMethod(info.Method, compilation) ||
                     IsUncollectedMethod(info.Conversion?.MethodSymbol, compilation))
                 { return true; }
@@ -227,7 +261,7 @@ internal static class CompilerReachableSourceCollector
                 if (info.Nested.Length > remaining - pending.Count)
                 { return true; }
                 foreach (var nested in info.Nested)
-                { pending.Push(nested); }
+                { pending = pending.Add(nested); }
             }
         }
         if (operation is IRecursivePatternOperation { DeconstructSymbol: not null and not IMethodSymbol })
@@ -287,15 +321,16 @@ internal static class CompilerReachableSourceCollector
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
         emission = RepositoryParameterGuard.NotNull(emission, nameof(emission));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        var pending = new Stack<IOperation>();
-        pending.Push(operation);
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(operation);
         var remaining = CompilerArtifactLimits.MaximumInstructions;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (--remaining < 0)
             { return false; }
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
             { continue; }
             if (current is IInvocationOperation invocation && context.IsSpecificationOperation(current))
@@ -305,7 +340,7 @@ internal static class CompilerReachableSourceCollector
                 continue;
             }
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         return true;
     }

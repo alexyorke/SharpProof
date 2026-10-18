@@ -34,7 +34,7 @@ public sealed class ReachableGraphRejectionBoundaryTests
                 Assert.That(CompilerManifestArtifactJson.Deserialize(payload, cancellationToken: TestContext.CurrentContext.CancellationToken).ReachableSource!.Bodies, Has.Length.EqualTo(1));
                 return;
         }
-        artifact.ReachableSource!.Bodies.Single().Graph = graph;
+        { artifact = artifact with { ReachableSource = artifact.ReachableSource! with { Bodies = artifact.ReachableSource!.Bodies.ReplaceReference(artifact.ReachableSource!.Bodies.Single(), artifact.ReachableSource!.Bodies.Single() with { Graph = graph }) } }; }
         var malformed = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Deserialize(malformed, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));

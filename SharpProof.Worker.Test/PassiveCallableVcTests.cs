@@ -682,10 +682,10 @@ public sealed class PassiveCallableVcTests
         Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
         Assert.That(actual.ConsumedApproximation, Is.False);
         var plan = Build(candidate);
-        var replay = plan.ReplayEffects(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken);
+        var replay = plan.ReplayEffects(inputs, TestContext.CurrentContext.CancellationToken);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(3));
         Assert.That(replay.ConsumedApproximation, Is.False);
-        Assert.That(plan.ReplayException(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken).ReturnValue!.Integer, Is.EqualTo(3));
+        Assert.That(plan.ReplayException(inputs, TestContext.CurrentContext.CancellationToken).ReturnValue!.Integer, Is.EqualTo(3));
         using var solver = new PassiveCallableSolver(plan);
         var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
@@ -696,7 +696,7 @@ public sealed class PassiveCallableVcTests
         { Assert.That(result.EntryModel.All(row => row.Key == candidate.Parameters.Single().Entry), Is.True); }
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) BodyOldHeapCandidate(bool array)
+    internal static (PassiveCallableCandidate Candidate, ImmutableDictionary<IrVarId, IrValue> Inputs) BodyOldHeapCandidate(bool array)
     {
         var subject = new ScalarSubject();
         var factory = subject.Factory;
@@ -726,7 +726,7 @@ public sealed class PassiveCallableVcTests
                 new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(3)), factory.Boolean(true), subject.Site)]);
         var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
-        return (candidate, new Dictionary<IrVarId, IrValue> { [owner.Entry] = value });
+        return (candidate, ImmutableDictionary<IrVarId, IrValue>.Empty.Add(owner.Entry, value));
     }
 
     [TestCase("allocation", true, false)]

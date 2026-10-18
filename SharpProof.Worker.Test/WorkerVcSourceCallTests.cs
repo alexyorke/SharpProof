@@ -300,7 +300,7 @@ public sealed class WorkerVcSourceCallTests
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
-        withTotal.Total = null;
+        { withTotal = withTotal with { Total = null }; }
         Assert.That(JsonSerializer.Serialize(withTotal, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(legacy, WorkerProtocolJson.SharedOptions)));
     }

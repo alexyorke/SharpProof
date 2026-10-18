@@ -111,13 +111,22 @@ public sealed class NativeSynchronizationProjectionTests
                 preparation = preparation with { Total = preparation.Total! with { ValidEffectClaimIds = [] } };
                 break;
             case "wrong-contract":
-                claim.ContractKind = WorkerEffectContractKind.ZeroAllocations;
+                {
+                    claim = claim with { ContractKind = WorkerEffectContractKind.ZeroAllocations };
+                    preparation = preparation with { EffectClaims = preparation.EffectClaims.ReplaceReference(preparation.EffectClaims.Single(), claim) };
+                }
                 break;
             case "invalid-constraint":
-                claim.Constraint.AllowedEffects = WorkerEffectSet.Allocates;
+                {
+                    claim = claim with { Constraint = claim.Constraint with { AllowedEffects = WorkerEffectSet.Allocates } };
+                    preparation = preparation with { EffectClaims = preparation.EffectClaims.ReplaceReference(preparation.EffectClaims.Single(), claim) };
+                }
                 break;
             case "changed-mask":
-                claim.Constraint.AllowedCapabilities = WorkerEffectCapabilitySet.Synchronization;
+                {
+                    claim = claim with { Constraint = claim.Constraint with { AllowedCapabilities = WorkerEffectCapabilitySet.Synchronization } };
+                    preparation = preparation with { EffectClaims = preparation.EffectClaims.ReplaceReference(preparation.EffectClaims.Single(), claim) };
+                }
                 CompilerEffectClaimArtifactCodec.Seal(claim);
                 break;
             case "entry-incomplete":

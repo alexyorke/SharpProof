@@ -107,14 +107,14 @@ internal static class NativeCorpusVerifier
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), cancellationToken);
-        var methods = new Dictionary<string, IMethodSymbol>(StringComparer.Ordinal);
+        var methods = ImmutableDictionary.Create<string, IMethodSymbol>(StringComparer.Ordinal);
         foreach (var tree in compilation.SyntaxTrees)
         {
             var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
             foreach (var declaration in (await tree.GetRootAsync(cancellationToken).ConfigureAwait(false)).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>())
             {
                 if (model.GetDeclaredSymbol(declaration, cancellationToken) is { } method)
-                { methods[SemanticClaimIdentity.CreateCallableId(method)] = method; }
+                { methods = methods.SetItem(SemanticClaimIdentity.CreateCallableId(method), method); }
             }
         }
         var verdicts = ImmutableArray.CreateBuilder<NativeCorpusVerdict>();
@@ -126,13 +126,13 @@ internal static class NativeCorpusVerifier
                 ?? throw new InvalidOperationException("The shadow caller body cannot be encoded.");
             var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(caller.Body.CallableId,
                 encoded, cancellationToken);
-            var outcomes = new List<WorkerClaimOutcome>();
+            var outcomes = ImmutableList<WorkerClaimOutcome>.Empty;
             if (PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(detached), out var plan, out _, cancellationToken))
             {
                 using var solver = new PassiveCallableSolver(plan!);
                 for (var ordinal = 0; ordinal < detached.Body.CallPreconditions.Length; ordinal++)
                 {
-                    outcomes.Add((await solver.VerifyCallPreconditionAsync(ordinal, cancellationToken).ConfigureAwait(false)).Outcome switch
+                    outcomes = outcomes.Add((await solver.VerifyCallPreconditionAsync(ordinal, cancellationToken).ConfigureAwait(false)).Outcome switch
                     {
                         Verify.ProvenOutcome => WorkerClaimOutcome.Proven,
                         Verify.RefutedOutcome => WorkerClaimOutcome.Refuted,
@@ -153,7 +153,7 @@ internal static class NativeCorpusVerifier
     private static WorkerClaimOutcome Combine(IEnumerable<WorkerClaimOutcome> outcomes)
     {
         System.ArgumentNullException.ThrowIfNull(outcomes);
-        var all = outcomes.ToArray();
+        var all = outcomes.ToImmutableArray();
         return all.Contains(WorkerClaimOutcome.Refuted) ? WorkerClaimOutcome.Refuted
             : all.All(static outcome => outcome == WorkerClaimOutcome.Proven) ? WorkerClaimOutcome.Proven
             : WorkerClaimOutcome.Unknown;

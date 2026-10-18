@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -185,12 +186,10 @@ public sealed class NativeFieldReferenceViewTests
         var candidate = new PassiveCallableCandidate("field-reference-view-" + typeName, builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var owner = factory.CreateReferenceValue(boxType, new IrObjectState().WithField(field, initialValue));
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(parameter.Entry, owner)
+            .Add(parameter.Current, owner)
+            .Add(parameter.Old, owner);
         return new(factory, candidate, observed, fieldType, isBoolean, width, signed, inputs);
     }
 
@@ -232,32 +231,30 @@ public sealed class NativeFieldReferenceViewTests
             [.. requires], [.. ensures]);
         var objectState = new IrObjectState().WithField(field, factory.CreateIntegerValue(0));
         var owner = factory.CreateReferenceValue(boxType, objectState);
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(parameter.Entry, owner)
+            .Add(parameter.Current, owner)
+            .Add(parameter.Old, owner);
         return new(factory, candidate, observed, inputs);
     }
 
     private sealed record Scenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+        ImmutableDictionary<IrVarId, IrValue> InitialValues)
     {
         public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
         public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
-        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+        public ImmutableDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
     }
 
     private sealed record TypedScenario(IrFactory Factory, PassiveCallableCandidate Candidate, IrVarId Observed,
         IrTypeId FieldType, bool IsBoolean, int IntegerWidth, bool IntegerSigned,
-        IReadOnlyDictionary<IrVarId, IrValue> InitialValues)
+        ImmutableDictionary<IrVarId, IrValue> InitialValues)
     {
         public IrTypeId FieldType { get; init; } = FieldType.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(FieldType)) : FieldType;
         public IrVarId Observed { get; init; } = Observed.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Observed)) : Observed;
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
         public PassiveCallableCandidate Candidate { get; init; } = Candidate ?? throw new System.ArgumentNullException(nameof(Candidate));
-        public IReadOnlyDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
+        public ImmutableDictionary<IrVarId, IrValue> InitialValues { get; init; } = InitialValues ?? throw new System.ArgumentNullException(nameof(InitialValues));
     }
 }

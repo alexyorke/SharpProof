@@ -23,13 +23,15 @@ internal static class CompilerTotalCallableArtifactCodec
         { return null; }
         var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result,
             preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions, cancellationToken);
-        artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
-        artifact.HasReceiver = preparation.HasReceiver;
-        artifact.DisjointInputs = preparation.DisjointInputs.IsEmpty ? null : [.. preparation.DisjointInputs];
-        artifact.ValidEffectClaimIds = [.. preparation.ValidEffectClaimIds];
-        artifact.ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (new CompilerTotalExceptionConstraintArtifact
-        { ClaimId = constraint.ClaimId, AllowedKinds = [.. constraint.AllowedKinds] }))];
-        return artifact;
+        return artifact with
+        {
+            EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry,
+            HasReceiver = preparation.HasReceiver,
+            DisjointInputs = preparation.DisjointInputs.IsEmpty ? null : preparation.DisjointInputs,
+            ValidEffectClaimIds = preparation.ValidEffectClaimIds,
+            ExceptionConstraints = [.. preparation.ExceptionConstraints.Select(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (new CompilerTotalExceptionConstraintArtifact
+            { ClaimId = constraint.ClaimId, AllowedKinds = constraint.AllowedKinds }))]
+        };
     }
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
@@ -45,8 +47,7 @@ internal static class CompilerTotalCallableArtifactCodec
         if (preparation == null)
         { return null; }
         var artifact = EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses, false, default, cancellationToken);
-        artifact.HasReceiver = preparation.HasReceiver;
-        return artifact;
+        return artifact with { HasReceiver = preparation.HasReceiver };
     }
 
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
@@ -144,8 +145,10 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerArtifactLimits.MaximumInstructions,
             "A shadow body has an invalid owner label.");
         Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry && !artifact.HasReceiver &&
-            artifact.Clauses is { Length: 0 } && artifact.ValidEffectClaimIds is { Length: 0 } &&
-            artifact.ExceptionConstraints is { Length: 0 } && artifact.DisjointInputs is null or { Length: 0 },
+            !artifact.Clauses.IsDefault && artifact.Clauses.IsEmpty &&
+            !artifact.ValidEffectClaimIds.IsDefault && artifact.ValidEffectClaimIds.IsEmpty &&
+            !artifact.ExceptionConstraints.IsDefault && artifact.ExceptionConstraints.IsEmpty &&
+            (artifact.DisjointInputs is null || artifact.DisjointInputs is { IsDefault: false, IsEmpty: true }),
             "A shadow body cannot carry own contracts, effects or abstraction.");
         var decoded = DecodeCore(artifact, [], [], entryOnly: false, cancellationToken, metadataReferences)!;
         return new(ownerId, decoded.Program!, decoded.Parameters, decoded.Result, [])
@@ -174,12 +177,12 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
         Require(!artifact.HasReceiver || !artifact.IsBodyAbstraction, "A body abstraction has no receiver.");
-        Require(artifact.DisjointInputs == null || artifact.DisjointInputs.Length <= CompilerArtifactLimits.MaximumInstructions &&
-            (!(entryOnly || artifact.IsBodyAbstraction) || artifact.DisjointInputs.Length == 0),
+        Require(artifact.DisjointInputs is not { } disjoint || !disjoint.IsDefault && disjoint.Length <= CompilerArtifactLimits.MaximumInstructions &&
+            (!(entryOnly || artifact.IsBodyAbstraction) || disjoint.Length == 0),
             "Disjoint input evidence exceeds its bound or mode.");
         cancellationToken.ThrowIfCancellationRequested();
-        if (artifact.Graph == null || artifact.Parameters == null || artifact.Clauses == null || artifact.ExceptionConstraints == null ||
-            artifact.CallPreconditions == null || artifact.Result < -1)
+        if (artifact.Graph == null || artifact.Parameters.IsDefault || artifact.Clauses.IsDefault || artifact.ExceptionConstraints.IsDefault ||
+            artifact.CallPreconditions.IsDefault || artifact.Result < -1)
         { throw new InvalidDataException("The Total callable payload is incomplete."); }
         Require(artifact.Parameters!.Length <= CompilerArtifactLimits.MaximumInstructions &&
             artifact.Clauses!.Length <= CompilerArtifactLimits.MaximumInstructions &&
@@ -347,7 +350,7 @@ internal static class CompilerTotalCallableArtifactCodec
         if (!entryOnly)
         { ValidateProgram(decoded.Program!, result, clauses, parameters, artifact.IsBodyAbstraction, cancellationToken); }
         var exceptionConstraints = DecodeExceptionConstraints(artifact.ExceptionConstraints, claims, entryOnly, cancellationToken);
-        Require(artifact.ValidEffectClaimIds != null && artifact.ValidEffectClaimIds.Length <= CompilerArtifactLimits.MaximumInstructions &&
+        Require(!artifact.ValidEffectClaimIds.IsDefault && artifact.ValidEffectClaimIds.Length <= CompilerArtifactLimits.MaximumInstructions &&
             (!entryOnly || artifact.ValidEffectClaimIds.Length == 0), "Validated effect claims have an invalid bound or mode.");
         var effectOwners = claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect)).Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -530,7 +533,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private static ImmutableArray<CompilerTotalExceptionConstraint> DecodeExceptionConstraints(
-        CompilerTotalExceptionConstraintArtifact[] rows, ImmutableArray<WorkerClaimManifestEntry> claims,
+        ImmutableArray<CompilerTotalExceptionConstraintArtifact> rows, ImmutableArray<WorkerClaimManifestEntry> claims,
         bool entryOnly, CancellationToken cancellationToken)
     {
 
@@ -543,7 +546,7 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var row in rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (row == null || row.ClaimId == null || row.AllowedKinds == null)
+            if (row == null || row.ClaimId == null || row.AllowedKinds.IsDefault)
             { throw new InvalidDataException("An exception constraint contains a missing row or field."); }
             Require(seen.Add(row.ClaimId) && owned.TryGetValue(row.ClaimId, out var claim) &&
                 claim.Kind == WorkerClaimKind.Effect && claim.EffectContractKind is WorkerEffectContractKind.DoesNotThrow or

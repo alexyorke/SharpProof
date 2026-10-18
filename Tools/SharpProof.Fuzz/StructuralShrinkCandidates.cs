@@ -23,8 +23,8 @@ internal static class StructuralShrinkCandidates
         identityComparer = RepositoryParameterGuard.NotNull(identityComparer, nameof(identityComparer));
         tryReplaceChild = RepositoryParameterGuard.NotNull(tryReplaceChild, nameof(tryReplaceChild));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        var candidates = new List<T>();
-        var seen = new HashSet<TIdentity>(identityComparer);
+        var candidates = ImmutableList<T>.Empty;
+        var seen = ImmutableHashSet.Create<TIdentity>(identityComparer);
         var originalSize = getSize(value);
         var originalIdentity = getIdentity(value);
 
@@ -37,12 +37,13 @@ internal static class StructuralShrinkCandidates
             }
 
             if (getSize(candidate) >= originalSize ||
-                !seen.Add(identity))
+                seen.Contains(identity))
             {
                 return;
             }
 
-            candidates.Add(candidate);
+            seen = seen.Add(identity);
+            candidates = candidates.Add(candidate);
         }
 
         var children = getChildren(value);

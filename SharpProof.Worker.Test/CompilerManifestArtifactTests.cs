@@ -62,7 +62,7 @@ public sealed class CompilerManifestArtifactTests
             "internal static int A(int value) { Contract.Requires(value > 0); " +
             "Contract.Ensures(Contract.Result<int>() == value); return value; } }");
         var canonical = CompilerManifestArtifactJson.Serialize(artifact, TestContext.CurrentContext.CancellationToken);
-        artifact.Callables = artifact.Callables.Reverse().ToArray();
+        { artifact = artifact with { Callables = (artifact.Callables.Reverse().ToArray()).ToImmutableArray() }; }
         artifact.Manifest.Callables = artifact.Manifest.Callables.Reverse().ToArray();
         artifact.Manifest.Claims = artifact.Manifest.Claims.Reverse().ToArray();
         foreach (var callable in artifact.Manifest.Callables)
@@ -88,7 +88,7 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(actual, Is.EqualTo(canonical));
             Assert.That(JsonSerializer.Serialize(artifact, WorkerProtocolJson.SharedOptions), Is.EqualTo(before));
             Assert.That(artifact.Manifest, Is.SameAs(manifest));
-            Assert.That(artifact.Callables, Is.SameAs(payloads));
+            Assert.That(artifact.Callables.Equals(payloads), Is.True);
             Assert.That(manifest.Callables, Is.SameAs(entries));
             Assert.That(manifest.Claims, Is.SameAs(claims));
             foreach (var collection in collections)
@@ -303,7 +303,7 @@ public sealed class CompilerManifestArtifactTests
 
         foreach (var reason in allowed)
         {
-            artifact.Callables.Single().FailureReason = reason;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { FailureReason = reason }) }; }
             Assert.That(
                 CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
                     .Single().FailureReason,
@@ -313,7 +313,7 @@ public sealed class CompilerManifestArtifactTests
 
         foreach (var reason in rejected)
         {
-            artifact.Callables.Single().FailureReason = reason;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { FailureReason = reason }) }; }
             Assert.Throws<JsonException>(
                 (Action)(() =>
                     CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)),
@@ -347,7 +347,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
-        artifact.Callables[0].FailureReason = WorkerClaimReason.UnsupportedBody;
+        { artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables[0] with { FailureReason = WorkerClaimReason.UnsupportedBody }) }; }
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -428,19 +428,29 @@ public sealed class CompilerManifestArtifactTests
     public void CompilerDiagnosticLocationsUseTheSharedOneBasedOrNoneShape()
     {
         var valid = CreateArtifact();
-        valid.CompilerDiagnostics = [Diagnostic(
-            "valid", length: 0, line: 1, column: 1)];
-        BindDiagnostics(valid);
+        {
+            valid = valid with
+            {
+                CompilerDiagnostics = [Diagnostic(
+            "valid", length: 0, line: 1, column: 1)]
+            };
+        }
+        valid = BindDiagnostics(valid);
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(valid, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         var none = CreateArtifact();
-        none.CompilerDiagnostics = [new CompilerDiagnosticArtifact
+        {
+            none = none with
+            {
+                CompilerDiagnostics = [new CompilerDiagnosticArtifact
         {
             Code = "compiler.NONE",
             Message = "non-source",
             Location = new WorkerSourceLocation()
-        }];
+        }]
+            };
+        }
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(none, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
@@ -469,12 +479,17 @@ public sealed class CompilerManifestArtifactTests
                  })
         {
             var malformed = CreateArtifact();
-            malformed.CompilerDiagnostics = [new CompilerDiagnosticArtifact
+            {
+                malformed = malformed with
+                {
+                    CompilerDiagnostics = [new CompilerDiagnosticArtifact
             {
                 Code = "compiler.BAD",
                 Message = "bad geometry",
                 Location = location
-            }];
+            }]
+                };
+            }
             Assert.Throws<JsonException>((Action)(() =>
                 CompilerManifestArtifactJson.Serialize(malformed, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         }
@@ -495,10 +510,15 @@ public sealed class CompilerManifestArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(code);
         var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [Diagnostic(
-            "invalid code", length: 1, line: 1, column: 1)];
-        BindDiagnostics(artifact);
-        artifact.CompilerDiagnostics[0].Code = code;
+        {
+            artifact = artifact with
+            {
+                CompilerDiagnostics = [Diagnostic(
+            "invalid code", length: 1, line: 1, column: 1)]
+            };
+        }
+        artifact = BindDiagnostics(artifact);
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Code = code }) }; }
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -508,10 +528,15 @@ public sealed class CompilerManifestArtifactTests
     public void CompilerDiagnosticCodesRejectControlCharacters()
     {
         var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [Diagnostic(
-            "invalid code", length: 1, line: 1, column: 1)];
-        BindDiagnostics(artifact);
-        artifact.CompilerDiagnostics[0].Code = "compiler.CS" + (char)1;
+        {
+            artifact = artifact with
+            {
+                CompilerDiagnostics = [Diagnostic(
+            "invalid code", length: 1, line: 1, column: 1)]
+            };
+        }
+        artifact = BindDiagnostics(artifact);
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Code = "compiler.CS" + (char)1 }) }; }
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -525,10 +550,15 @@ public sealed class CompilerManifestArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(code);
         var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [Diagnostic(
-            "canonical code", length: 1, line: 1, column: 1)];
-        BindDiagnostics(artifact);
-        artifact.CompilerDiagnostics[0].Code = code;
+        {
+            artifact = artifact with
+            {
+                CompilerDiagnostics = [Diagnostic(
+            "canonical code", length: 1, line: 1, column: 1)]
+            };
+        }
+        artifact = BindDiagnostics(artifact);
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Code = code }) }; }
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
@@ -538,20 +568,18 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void RelationalEvidenceSchemaVersionsAreExactPins()
     {
-        Action<CompilerManifestArtifact>[] corruptions =
+        ImmutableArray<Func<CompilerManifestArtifact, CompilerManifestArtifact>> corruptions =
         [
-            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); artifact.RelationalSummarySchemaVersion = 0; },
-            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); artifact.RelationalSummarySchemaVersion =
-                CompilerRelationalSummaryVersions.Current + 1; },
-            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); artifact.SpecificationPackSchemaVersion = 0; },
-            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); artifact.SpecificationPackSchemaVersion =
-                CompilerSpecificationPackVersions.Current + 1; }
+            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); { artifact = artifact with { RelationalSummarySchemaVersion = 0 }; } return artifact;},
+            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); { artifact = artifact with { RelationalSummarySchemaVersion = CompilerRelationalSummaryVersions.Current + 1 }; } return artifact;},
+            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); { artifact = artifact with { SpecificationPackSchemaVersion = 0 }; } return artifact;},
+            artifact => { System.ArgumentNullException.ThrowIfNull(artifact); { artifact = artifact with { SpecificationPackSchemaVersion = CompilerSpecificationPackVersions.Current + 1 }; } return artifact;}
         ];
 
         foreach (var corrupt in corruptions)
         {
             var artifact = CreateArtifact();
-            corrupt(artifact);
+            artifact = corrupt(artifact);
 
             Assert.Throws<JsonException>((Action)(() =>
                 CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -601,15 +629,15 @@ public sealed class CompilerManifestArtifactTests
     public void CompilerManifestAllowsPayloadsAboveWorkerJsonEnvelope()
     {
         var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
-        BindDiagnostics(artifact);
+        { artifact = artifact with { CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)] }; }
+        artifact = BindDiagnostics(artifact);
         var initial = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var padding =
             WorkerProtocolJson.MaximumJsonBytes + 1 -
             Encoding.UTF8.GetByteCount(initial);
         Assert.That(padding, Is.GreaterThan(0));
 
-        artifact.CompilerDiagnostics[0].Message += new string('x', padding);
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Message = artifact.CompilerDiagnostics[0].Message + new string('x', padding) }) }; }
 
         var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -630,20 +658,20 @@ public sealed class CompilerManifestArtifactTests
     public void SerializationEnforcesWorkerInputByteLimit()
     {
         var artifact = CreateArtifact();
-        artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
-        BindDiagnostics(artifact);
+        { artifact = artifact with { CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)] }; }
+        artifact = BindDiagnostics(artifact);
         var initial = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var padding = CompilerManifestArtifactFile.MaximumBytes -
             Encoding.UTF8.GetByteCount(initial);
         Assert.That(padding, Is.GreaterThan(0));
 
-        artifact.CompilerDiagnostics[0].Message += new string('x', padding);
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Message = artifact.CompilerDiagnostics[0].Message + new string('x', padding) }) }; }
         var exact = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             Encoding.UTF8.GetByteCount(exact),
             Is.EqualTo(CompilerManifestArtifactFile.MaximumBytes));
 
-        artifact.CompilerDiagnostics[0].Message += "x";
+        { artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(0, artifact.CompilerDiagnostics[0] with { Message = artifact.CompilerDiagnostics[0].Message + "x" }) }; }
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -669,20 +697,18 @@ public sealed class CompilerManifestArtifactTests
                 .EffectClaims, Has.Length.EqualTo(1));
         }
 
-        Action<CompilerCallableArtifact>[] corruptions = [
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims = []; },
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims = [value.EffectClaims[0], value.EffectClaims[0]]; },
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims[0].ClaimId = "spc1:invented"; },
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims[0].ContractKind =
-                WorkerEffectContractKind.ZeroAllocations; },
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims[0].Outcome = WorkerClaimOutcome.Refuted; },
-            value => { System.ArgumentNullException.ThrowIfNull(value); value.EffectClaims[0].Certainty =
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary; }
+        ImmutableArray<Func<CompilerCallableArtifact, CompilerCallableArtifact>> corruptions = [
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = [] }; } return value;},
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = [value.EffectClaims[0], value.EffectClaims[0]] }; } return value;},
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = value.EffectClaims.SetItem(0, value.EffectClaims[0] with { ClaimId = "spc1:invented" }) }; } return value;},
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = value.EffectClaims.SetItem(0, value.EffectClaims[0] with { ContractKind = WorkerEffectContractKind.ZeroAllocations }) }; } return value;},
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = value.EffectClaims.SetItem(0, value.EffectClaims[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; } return value;},
+            value => { System.ArgumentNullException.ThrowIfNull(value); { value = value with { EffectClaims = value.EffectClaims.SetItem(0, value.EffectClaims[0] with { Certainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; } return value;}
         ];
         foreach (var corrupt in corruptions)
         {
             var artifact = CloneArtifact(valid);
-            corrupt(artifact.Callables[0]);
+            artifact = artifact with { Callables = artifact.Callables.SetItem(0, corrupt(artifact.Callables[0])) };
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         }
@@ -709,20 +735,27 @@ public sealed class CompilerManifestArtifactTests
             CompilerEffectClaimArtifactCodec.Validate(evidence)));
 
         var constraint = evidence.Constraint;
-        evidence.Constraint = null!;
+        {
+            evidence = evidence with { Constraint = null! };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = artifact.Callables.Single().EffectClaims.ReplaceReference(artifact.Callables.Single().EffectClaims.Single(), evidence) }) };
+        }
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerEffectClaimArtifactCodec.Validate(evidence)));
-        evidence.Constraint = constraint;
-
-        foreach (var invalid in new string[]?[]
         {
-            null,
+            evidence = evidence with { Constraint = constraint };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = artifact.Callables.Single().EffectClaims.ReplaceReference(artifact.Callables.Single().EffectClaims.Single(), evidence) }) };
+        }
+
+        foreach (var invalid in ImmutableArray.Create<ImmutableArray<string>>(
+            default,
             ["", allowed[1]],
             [allowed[0], allowed[0]],
-            [allowed[1], allowed[0]]
-        })
+            [allowed[1], allowed[0]]))
         {
-            evidence.Constraint.AllowedExceptionTypes = invalid!;
+            {
+                evidence = evidence with { Constraint = evidence.Constraint with { AllowedExceptionTypes = invalid } };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = artifact.Callables.Single().EffectClaims.ReplaceReference(artifact.Callables.Single().EffectClaims.Single(), evidence) }) };
+            }
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerEffectClaimArtifactCodec.Validate(evidence)));
         }
@@ -745,25 +778,25 @@ public sealed class CompilerManifestArtifactTests
             switch (mutation)
             {
                 case "missing-payload":
-                    artifact.Callables = null!;
+                    { artifact = artifact with { Callables = default }; }
                     break;
                 case "missing-compilation":
-                    artifact.Compilation = null!;
+                    { artifact = artifact with { Compilation = null! }; }
                     break;
                 case "callable-count":
-                    artifact.Callables = [];
+                    { artifact = artifact with { Callables = [] }; }
                     break;
                 case "foreign-id":
-                    artifact.Callables[0].CallableId = "foreign";
+                    { artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables[0] with { CallableId = "foreign" }) }; }
                     break;
                 case "claim-id":
                     artifact.Manifest.Callables[0].ClaimIds = ["foreign"];
                     break;
                 case "reason":
-                    artifact.Callables[0].FailureReason = WorkerClaimReason.MethodTimeout;
+                    { artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables[0] with { FailureReason = WorkerClaimReason.MethodTimeout }) }; }
                     break;
                 case "missing-effects":
-                    artifact.Callables[0].EffectClaims = null!;
+                    { artifact = artifact with { Callables = artifact.Callables.SetItem(0, artifact.Callables[0] with { EffectClaims = default }) }; }
                     break;
             }
 
@@ -791,7 +824,10 @@ public sealed class CompilerManifestArtifactTests
             artifact.Callables, artifact.Manifest, artifact.Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken).Length,
             Is.EqualTo(1));
 
-        effects[1].ClaimId = effects[0].ClaimId;
+        {
+            effects = effects.SetItem(1, effects[1] with { ClaimId = effects[0].ClaimId });
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { EffectClaims = effects }) };
+        }
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerLoweredArtifact.Decode(
                 artifact.Callables, artifact.Manifest, artifact.Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -804,7 +840,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
-        artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph with { Roots = default };
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph with { Roots = default } } }) }; }
         var failure = Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(failure!.Message,
@@ -826,17 +862,17 @@ public sealed class CompilerManifestArtifactTests
                 }
             }
             """;
-        Action<CompilerCallableArtifact>[] corruptions = [
-            callable => { System.ArgumentNullException.ThrowIfNull(callable); callable.Total!.Result = callable.Total.Parameters[0].Entry; },
-            callable => { System.ArgumentNullException.ThrowIfNull(callable); callable.Total!.Parameters[0].Current = callable.Total.Parameters[0].Entry; },
-            callable => { System.ArgumentNullException.ThrowIfNull(callable); callable.Total!.Parameters[0].Old = callable.Total.Parameters[0].Current; }
+        ImmutableArray<Func<CompilerCallableArtifact, CompilerCallableArtifact>> corruptions = [
+            callable => { System.ArgumentNullException.ThrowIfNull(callable); { callable = callable with { Total = callable.Total! with { Result = callable.Total.Parameters[0].Entry } }; } return callable;},
+            callable => { System.ArgumentNullException.ThrowIfNull(callable); { callable = callable with { Total = callable.Total! with { Parameters = callable.Total!.Parameters.SetItem(0, callable.Total!.Parameters[0] with { Current = callable.Total.Parameters[0].Entry }) } }; } return callable;},
+            callable => { System.ArgumentNullException.ThrowIfNull(callable); { callable = callable with { Total = callable.Total! with { Parameters = callable.Total!.Parameters.SetItem(0, callable.Total!.Parameters[0] with { Old = callable.Total.Parameters[0].Current }) } }; } return callable;}
         ];
         var valid = CreateContractArtifact(source);
         Assert.That(valid.Callables[0].Total, Is.Not.Null);
         foreach (var corrupt in corruptions)
         {
             var artifact = CloneArtifact(valid);
-            corrupt(artifact.Callables[0]);
+            artifact = artifact with { Callables = artifact.Callables.SetItem(0, corrupt(artifact.Callables[0])) };
             Assert.Throws<InvalidDataException>(new Action(() => CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         }
     }
@@ -874,13 +910,13 @@ public sealed class CompilerManifestArtifactTests
         switch (mutation)
         {
             case "array":
-                artifact.Callables = null!;
+                { artifact = artifact with { Callables = default }; }
                 break;
             case "entry":
-                artifact.Callables = [null!];
+                { artifact = artifact with { Callables = [null!] }; }
                 break;
             case "manifest":
-                artifact.Manifest = null!;
+                { artifact = artifact with { Manifest = null! }; }
                 break;
         }
 
@@ -1092,7 +1128,7 @@ public sealed class CompilerManifestArtifactTests
         };
     }
 
-    private static void BindDiagnostics(CompilerManifestArtifact artifact)
+    private static CompilerManifestArtifact BindDiagnostics(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         var tree = artifact.Compilation.SyntaxTrees.Single();
@@ -1109,14 +1145,20 @@ public sealed class CompilerManifestArtifactTests
             diagnostic.Location.Path = entry!.MappedPath;
             diagnostic.Location.Start = entry.SourceStart +
                 mappedColumn - entry.MappedColumn;
-            artifact.CompilerDiagnostics[index] = diagnostic with
             {
-                SourceTreeOrdinal = 0,
-                SourceTreePath = tree.Path,
-                SourceTreeSha256 = tree.Sha256,
-                SourceLineMapSha256 = tree.LineMapSha256
-            };
+                artifact = artifact with
+                {
+                    CompilerDiagnostics = artifact.CompilerDiagnostics.SetItem(index, diagnostic with
+                    {
+                        SourceTreeOrdinal = 0,
+                        SourceTreePath = tree.Path,
+                        SourceTreeSha256 = tree.Sha256,
+                        SourceLineMapSha256 = tree.LineMapSha256
+                    })
+                };
+            }
         }
+        return artifact;
     }
 
     private static void AssertWellFormedCapture(

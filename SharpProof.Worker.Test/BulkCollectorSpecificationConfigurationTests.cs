@@ -42,7 +42,7 @@ public sealed class BulkCollectorSpecificationConfigurationTests
 
         // This configuration is rejected input, never accepted model or proof authority.
         // Preserve every resolved field except the caller-supplied catalog version.
-        configuration.SpecificationPackCatalogVersion += 1;
+        { configuration = configuration with { SpecificationPackCatalogVersion = configuration.SpecificationPackCatalogVersion + 1 }; }
         Assert.That(CompilerSpecificationPackSelection.IsValid(configuration.SpecificationPackIds,
             configuration.SpecificationPackCatalogVersion, configuration.SpecificationPackCatalogSha256), Is.False);
         var error = Assert.Throws<InvalidOperationException>((Action)(() =>

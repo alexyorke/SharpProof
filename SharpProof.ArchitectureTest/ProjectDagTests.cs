@@ -117,16 +117,17 @@ public sealed class ProjectDagTests
     public void WorkerRuntimeClosureIsCompilerNeutral(string root)
     {
         System.ArgumentNullException.ThrowIfNull(root);
-        var closure = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
-        pending.Push(root);
-        while (pending.TryPop(out var project))
+        var closure = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var pending = ImmutableStack<string>.Empty.Push(root);
+        while (!pending.IsEmpty)
         {
-            if (closure.Add(project))
+            pending = pending.Pop(out var project);
+            if (!closure.Contains(project))
             {
+                closure = closure.Add(project);
                 foreach (var reference in ProjectReferences(project))
                 {
-                    pending.Push(reference);
+                    pending = pending.Push(reference);
                 }
             }
         }
@@ -143,7 +144,7 @@ public sealed class ProjectDagTests
                 .Descendants("PackageReference")
                 .Any(static reference =>
                     reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string?)reference.Attribute("Include") == "Microsoft.Z3"))))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(z3Consumers, Is.SubsetOf(Z3Consumers));
         // Guard against the scan silently matching nothing.
@@ -184,7 +185,7 @@ public sealed class ProjectDagTests
         return XDocument.Load(path);
     }
 
-    private static string[] ProjectReferences(string project)
+    private static ImmutableArray<string> ProjectReferences(string project)
     {
         System.ArgumentNullException.ThrowIfNull(project);
         return ProjectFile(project)
@@ -193,6 +194,6 @@ public sealed class ProjectDagTests
             .Select(static include => include is null ? throw new System.ArgumentNullException(nameof(include)) : (Path.GetFileNameWithoutExtension(
                 include.Replace('\\', Path.DirectorySeparatorChar))))
             .Distinct(StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
     }
 }

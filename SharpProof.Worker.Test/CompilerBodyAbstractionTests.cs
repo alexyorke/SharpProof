@@ -67,25 +67,46 @@ public sealed class CompilerBodyAbstractionTests
         switch (mutation)
         {
             case "missing-marker":
-                total.IsBodyAbstraction = false;
+                {
+                    total = total with { IsBodyAbstraction = false };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "drop-current":
                 {
-                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Result] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Result] });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "havoc-entry":
                 {
-                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Parameters[0].Entry, total.Result] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Parameters[0].Entry, total.Result] });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "origin":
                 {
-                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Origin = IrHavocOrigin.Input });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(havoc, havoc with { Origin = IrHavocOrigin.Input });
+                        havoc = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "initial-old":
-                total.Graph = total.Graph.ReplaceRow(instructions[1], instructions[1] with { A = total.Parameters[0].Current });
+                {
+                    total = total with { Graph = total.Graph.ReplaceRow(instructions[1], instructions[1] with { A = total.Parameters[0].Current }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);

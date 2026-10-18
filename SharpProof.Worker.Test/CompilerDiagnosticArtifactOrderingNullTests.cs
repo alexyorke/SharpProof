@@ -29,7 +29,7 @@ public sealed class CompilerDiagnosticArtifactOrderingNullTests
     public void CompareRejectsLeftDiagnosticWithoutLocation()
     {
         var left = Diagnostic();
-        left.Location = null!;
+        { left = left with { Location = null! }; }
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerDiagnosticArtifactOrdering.Compare(left, Diagnostic())));
     }
@@ -38,7 +38,7 @@ public sealed class CompilerDiagnosticArtifactOrderingNullTests
     public void CompareRejectsRightDiagnosticWithoutLocation()
     {
         var right = Diagnostic();
-        right.Location = null!;
+        { right = right with { Location = null! }; }
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerDiagnosticArtifactOrdering.Compare(Diagnostic(), right)));
     }

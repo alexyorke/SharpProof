@@ -27,7 +27,7 @@ public sealed class ReachableGraphBoundaryControlTests
     public void CancellationPrecedesMalformedGraphRejection()
     {
         var artifact = CreateArtifact();
-        artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph = artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph! with { Types = default };
+        { artifact = artifact with { ReachableSource = artifact.ReachableSource! with { Bodies = artifact.ReachableSource!.Bodies.ReplaceReference(artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)), artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)) with { Graph = artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph! with { Types = default } }) } }; }
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellation.Token)));
@@ -38,7 +38,7 @@ public sealed class ReachableGraphBoundaryControlTests
     public void GraphRejectionRetainsOriginalDecodeCause()
     {
         var artifact = CreateArtifact();
-        artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph = artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph! with { Types = default };
+        { artifact = artifact with { ReachableSource = artifact.ReachableSource! with { Bodies = artifact.ReachableSource!.Bodies.ReplaceReference(artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)), artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)) with { Graph = artifact.ReachableSource!.Bodies.First(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null)).Graph! with { Types = default } }) } }; }
         var exception = Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidDataException>());
     }

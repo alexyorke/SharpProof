@@ -137,7 +137,7 @@ internal static class CompilerManifestArtifactJson
 
         // Reject malformed containers before canonicalization dereferences them.
         if (validate && (artifact.Manifest == null ||
-            artifact.Callables == null ||
+            artifact.Callables.IsDefault ||
             artifact.Callables.Any(static item => item == null)))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
@@ -166,14 +166,13 @@ internal static class CompilerManifestArtifactJson
             {
                 throw new JsonException("The compiler manifest contains an unknown enum value.", exception);
             }
-            artifact.CompilerDiagnostics =
-                CompilerDiagnosticArtifactOrdering.Canonicalize(
-                    artifact.CompilerDiagnostics);
-            artifact.Callables = [
-                .. artifact.Callables.OrderBy(
+            artifact = artifact with
+            {
+                CompilerDiagnostics = CompilerDiagnosticArtifactOrdering.Canonicalize(artifact.CompilerDiagnostics),
+                Callables = [.. artifact.Callables.OrderBy(
                     static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
-                    StringComparer.Ordinal)
-            ];
+                    StringComparer.Ordinal)]
+            };
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (validate)
@@ -262,7 +261,7 @@ internal static class CompilerManifestArtifactJson
             cancellationToken);
         compilation = artifact.Compilation with
         {
-            SpecificationPackIds = artifact.SpecificationPackIds.ToImmutableArray(),
+            SpecificationPackIds = artifact.SpecificationPackIds,
             SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion,
             SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256
         };
@@ -394,9 +393,9 @@ internal static class CompilerManifestArtifactJson
     }
 
     private static bool HasValidDiagnosticShapes(
-        CompilerDiagnosticArtifact[]? diagnostics)
+        ImmutableArray<CompilerDiagnosticArtifact> diagnostics)
     {
-        return diagnostics?.All(HasValidDiagnosticShape) == true;
+        return !diagnostics.IsDefault && diagnostics.All(HasValidDiagnosticShape);
     }
 
     private static bool HasValidDiagnosticShape(
@@ -413,21 +412,21 @@ internal static class CompilerManifestArtifactJson
     }
 
     private static bool HasMatchingCallables(
-        CompilerCallableArtifact[]? callables,
+        ImmutableArray<CompilerCallableArtifact> callables,
         WorkerClaimManifest manifest)
     {
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
-        return callables?.Length == manifest.Callables.Length &&
+        return !callables.IsDefault && callables.Length == manifest.Callables.Length &&
         callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
             manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
             StringComparer.Ordinal);
     }
 
     private static bool HasValidCallableStates(
-        CompilerCallableArtifact[]? callables,
+        ImmutableArray<CompilerCallableArtifact> callables,
         bool hasCompilerDiagnostics)
     {
-        return callables?.All(callable =>
+        return !callables.IsDefault && callables.All(callable =>
             callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable != null &&
             (!hasCompilerDiagnostics ||
              (callable.FailureReason ==

@@ -767,9 +767,12 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         };
         if (!isSupported)
         {
-            evidence.Outcome = WorkerClaimOutcome.Unknown;
-            evidence.Reason = WorkerClaimReason.UnsupportedContract;
-            evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
+            evidence = evidence with
+            {
+                Outcome = WorkerClaimOutcome.Unknown,
+                Reason = WorkerClaimReason.UnsupportedContract,
+                Certainty = WorkerEffectEvidenceCertainty.Unavailable
+            };
         }
         return evidence;
     }

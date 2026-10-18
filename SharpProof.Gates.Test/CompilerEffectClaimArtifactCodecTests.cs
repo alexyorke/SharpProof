@@ -21,7 +21,7 @@ public sealed class CompilerEffectClaimArtifactCodecTests
     {
         var artifact = new CompilerEffectClaimArtifact
         {
-            Constraint = new CompilerEffectConstraintArtifact { AllowedExceptionTypes = null! },
+            Constraint = new CompilerEffectConstraintArtifact { AllowedExceptionTypes = default },
         };
 
         Assert.That(

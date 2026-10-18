@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using SharpProof.Ir;
@@ -10,7 +11,7 @@ internal static class CompilerDiagnosticArtifactOrdering
     private static readonly IComparer<CompilerDiagnosticArtifact> Comparer =
         System.Collections.Generic.Comparer<CompilerDiagnosticArtifact>.Create(Compare);
 
-    internal static CompilerDiagnosticArtifact[] Canonicalize(
+    internal static ImmutableArray<CompilerDiagnosticArtifact> Canonicalize(
         IEnumerable<CompilerDiagnosticArtifact> diagnostics)
     {
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
@@ -18,7 +19,7 @@ internal static class CompilerDiagnosticArtifactOrdering
             .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), Comparer)];
     }
 
-    internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
+    internal static bool IsCanonical(IReadOnlyList<CompilerDiagnosticArtifact> diagnostics)
     {
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return diagnostics.Zip(

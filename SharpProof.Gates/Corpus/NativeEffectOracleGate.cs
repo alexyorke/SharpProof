@@ -78,8 +78,8 @@ internal static class NativeEffectOracleGate
         { throw new ArgumentException("An oracle universe must have unique, nonempty method identities.", nameof(methodIds)); }
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var targets = discovery.Targets.Values.Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) != null))
-            .ToDictionary(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!), StringComparer.Ordinal);
-        if (!targets.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(methodIds))
+            .ToImmutableDictionary(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!), StringComparer.Ordinal);
+        if (!targets.Keys.ToImmutableHashSet(StringComparer.Ordinal).SetEquals(methodIds))
         { throw new InvalidDataException("The declared exception probes do not equal the selected corpus universe."); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, root, "net9.0", WorkerFeatureSet.Effects,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, cancellationToken);
@@ -88,7 +88,7 @@ internal static class NativeEffectOracleGate
         var sourceSummaries = validatedArtifact.ReachableSource is { } source
             ? EffectSummaryFixpoint.ComputeValidated(source, cancellationToken)
             : ImmutableSortedDictionary<string, SourceEffectSummary>.Empty;
-        var owned = preparations.ToDictionary(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId), StringComparer.Ordinal);
+        var owned = preparations.ToImmutableDictionary(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId), StringComparer.Ordinal);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var oracle = new NativeExceptionWitnessOracle(compilation);
         using var allocationOracle = new NativeAllocationWitnessOracle(compilation);

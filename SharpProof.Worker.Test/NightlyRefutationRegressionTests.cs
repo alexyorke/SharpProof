@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -149,7 +150,7 @@ public sealed class NightlyRefutationRegressionTests
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<string, string> _guarded_values = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase, values ?? throw new System.ArgumentNullException(nameof(values)));
         public override bool TryGetValue(string key, out string value)
         {
             System.ArgumentNullException.ThrowIfNull(key);

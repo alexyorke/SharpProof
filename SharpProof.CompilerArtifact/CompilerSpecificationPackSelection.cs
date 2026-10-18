@@ -12,7 +12,7 @@ internal static class CompilerSpecificationPackSelection
                 new[] { ';' },
                 StringSplitOptions.RemoveEmptyEntries));
     internal static bool IsValid(
-        string[]? packIds,
+        IReadOnlyList<string>? packIds,
         int catalogVersion,
         string? catalogSha256)
     {
@@ -26,6 +26,13 @@ internal static class CompilerSpecificationPackSelection
         }
 
         return packIds.All(KnownPackIds.Contains);
+    }
+
+    internal static bool IsValid(
+        ImmutableArray<string> packIds, int catalogVersion, string? catalogSha256)
+    {
+        return !packIds.IsDefault &&
+            IsValid((IReadOnlyList<string>)packIds, catalogVersion, catalogSha256);
     }
 
     internal static bool Matches(
@@ -44,7 +51,7 @@ internal static class CompilerSpecificationPackSelection
                 >= '0' and <= '9' or '.' or '-');
     }
 
-    private static bool IsCanonical(string[] values)
+    private static bool IsCanonical(IReadOnlyList<string> values)
     {
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
         return values.Zip(values.Skip(1), static (left, right) =>

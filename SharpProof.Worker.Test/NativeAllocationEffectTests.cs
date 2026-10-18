@@ -172,7 +172,10 @@ public sealed class NativeAllocationEffectTests
             .Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate)))
         {
             var total = artifact.Callables.Single().Total!;
-            total.Graph = total.Graph.ReplaceRow(allocation, allocation with { Kind = IrInstructionKind.Write, A = (int)IrWriteRegion.Local });
+            {
+                total = total with { Graph = total.Graph.ReplaceRow(allocation, allocation with { Kind = IrInstructionKind.Write, A = (int)IrWriteRegion.Local }) };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
         }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -241,25 +244,25 @@ public sealed class NativeAllocationEffectTests
             case "missing-length":
                 {
                     (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = -1 });
-                    artifact.Callables.Single().Total!.Graph = graph;
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
                 }
                 break;
             case "missing-target":
                 {
                     (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = -1 });
-                    artifact.Callables.Single().Total!.Graph = graph;
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
                 }
                 break;
             case "invalid-length":
                 {
                     (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = int.MaxValue });
-                    artifact.Callables.Single().Total!.Graph = graph;
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
                 }
                 break;
             case "wrong-length-type":
                 {
                     (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean)) });
-                    artifact.Callables.Single().Total!.Graph = graph;
+                    { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
                 }
                 break;
         }
@@ -283,7 +286,7 @@ public sealed class NativeAllocationEffectTests
                     : new[] { PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
                 ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)), allocation.Items[1] }).ToImmutableArray()
         });
-        artifact.Callables.Single().Total!.Graph = graph;
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
                     CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -437,42 +440,82 @@ public sealed class NativeAllocationEffectTests
         {
             case "input-origin":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.Input });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.Input });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "spec-origin":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.SpecResult });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.SpecResult });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "memory":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { A = (int)IrHavocKind.VariablesAndMemory });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { A = (int)IrHavocKind.VariablesAndMemory });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "duplicate":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [row.Items.Single(), row.Items.Single()] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [row.Items.Single(), row.Items.Single()] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "entry":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Entry] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Entry] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "current":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Current] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Current] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "old":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Old] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Old] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "result":
                 {
-                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Result] });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(row, row with { Items = [total.Result] });
+                        row = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
         }
@@ -496,27 +539,51 @@ public sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "foreign-claim":
-                total.ValidEffectClaimIds = ["foreign"];
+                {
+                    total = total with { ValidEffectClaimIds = ["foreign"] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "duplicate-claim":
-                total.ValidEffectClaimIds = [total.ValidEffectClaimIds.Single(), total.ValidEffectClaimIds.Single()];
+                {
+                    total = total with { ValidEffectClaimIds = [total.ValidEffectClaimIds.Single(), total.ValidEffectClaimIds.Single()] };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "null-claims":
-                total.ValidEffectClaimIds = null!;
+                {
+                    total = total with { ValidEffectClaimIds = default };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                }
                 break;
             case "unused-slot":
                 {
-                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { C = 0 });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { C = 0 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "invalid-type":
                 {
-                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { A = -1 });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { A = -1 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
             case "scalar-type":
                 {
-                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { A = 0 });
+                    {
+                        var changedFixture = total.Graph.ChangeRow(allocation, allocation with { A = 0 });
+                        allocation = changedFixture.Item1;
+                        total = total with { Graph = changedFixture.Item2 };
+                        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+                    }
                 }
                 break;
         }
@@ -537,17 +604,17 @@ public sealed class NativeAllocationEffectTests
         if (mutation == "invalid-index")
         {
             (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = int.MaxValue });
-            artifact.Callables.Single().Total!.Graph = graph;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         else if (mutation == "wrong-type")
         {
             (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = 0 });
-            artifact.Callables.Single().Total!.Graph = graph;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         else
         {
             (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = 0 });
-            artifact.Callables.Single().Total!.Graph = graph;
+            { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -561,9 +628,19 @@ public sealed class NativeAllocationEffectTests
             "[ZeroAllocations] public static int Target(int x) { Contract.Requires(false); new object(); return x; } }");
         var total = artifact.Callables.Single().Total!;
         if (initialization)
-        { total.EffectsCompleteAtEntry = false; }
+        {
+            {
+                total = total with { EffectsCompleteAtEntry = false };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         else
-        { total.ValidEffectClaimIds = []; }
+        {
+            {
+                total = total with { ValidEffectClaimIds = [] };
+                artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
+            }
+        }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Null);
