@@ -1,0 +1,31 @@
+using System;
+using System.Collections.Generic;
+
+static class Comprehensive
+{
+    public static int ArrayHead(int[] values) => values[0];
+    public static int ArrayLength(int[] values) => values.Length;
+    public static int MatrixValue(int[,] values, int row, int column) => values[row, column];
+    public static int FirstTuple((int value, bool flag) pair) => pair.value;
+    public static List<string> ContainerIdentity(List<string> values) => values;
+    public static int Branch(bool condition, int yes, int no)
+    {
+        if (condition) { var selected = yes; return selected; }
+        else { var selected = no; return selected; }
+    }
+    public static int Recursive(bool done, int value) => done ? value : Recursive(true, value);
+    public static int Switch(int choice, int left, int right) => choice switch { 0 => left, _ => right };
+    public static Func<int, int> Capture(int value) => ignored => value;
+    public static int[] PairArray(int first, int second) => new[] { first, second };
+    public static int LocalGeneric(int value)
+    {
+        T Identity<T>(T input) => input;
+        return Identity(value);
+    }
+    public static (int, string) Calls(int number, string text) => (GenericIdentity(number), GenericIdentity(text));
+    private static T GenericIdentity<T>(T input) => input;
+    public static double Numeric(double value) => -value / 2.0;
+    public static bool Boolean(bool left, bool right) => left && !right;
+    public static int StringLength(string text) => text.Length;
+    public static int ListCount(List<string> values) => values.Count;
+}

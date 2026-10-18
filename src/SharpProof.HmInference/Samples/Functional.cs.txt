@@ -1,0 +1,17 @@
+using System;
+
+static class Functional
+{
+    public static int Identity(int value) => value;
+    public static int First(int first, string second) => first;
+    public static int Choose(bool condition, int yes, int no) => condition ? yes : no;
+    public static int Apply(Func<int, int> function, int value) => function(value);
+    public static int Compose(Func<int, int> outer, Func<int, int> inner, int value) => outer(inner(value));
+    public static (int, string) Pair(int number, string text) => (number, text);
+    public static int Local(int value) { var copy = value; return copy; }
+    public static int Increment(int value) => value + 1;
+    public static int TypedLocal(int value) { int copy = value; return copy; }
+    public static int Length(string value) => value.Length;
+    public static int Absolute(int value) => Math.Abs(value);
+    public static int Mutable(int value) { value++; return value; }
+}
