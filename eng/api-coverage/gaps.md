@@ -79,6 +79,18 @@ reference assembly bytes and catalog digest are unchanged. Exactly five evidence
 rows changed; four previously unmodeled declarations now have partial evidence.
 Trusted-code coverage and exact-head CI remain required before merge readiness.
 
+Follow-up commit `5a794ca6c` closes alias escape propagation for this slice.
+Escape exclusions follow every alias definition and CFG capture/join through a
+deduplicated worklist; publishing an alias also removes the original receiver's
+ownership fact. Three direct provenance controls reproduced the previous gap;
+all nine frontend domain/depth controls now pass. Native alias publication stays
+Unknown, with a CLR probe showing that an escaped alias can change comparer state.
+All 177 selected worker/loop/artifact/replay controls, eight keyed IR controls and
+the mathematical-integer-key SMT rejection test pass. Keyed loop cuts forget
+memory and replay preserves 32/64-bit keys. Framework observations that disagree
+with the expected state now decline replay authority instead of throwing.
+Fresh changed-trusted-code coverage and exact-head CI are still pending.
+
 This closes a semantic slice, not the Dictionary work item or its corpus sites.
 The 40 ranked index reads span 13 source files. Representative declarations in
 those files use `TVertex/int`, `int/TVertex`, `T/int`, `T/long`, nested graph/trie
