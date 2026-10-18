@@ -2064,3 +2064,18 @@ sets may use scoped builders retaining ReferenceEqualityComparer.Instance; publi
 runtime arrays into the memo before recursive materialization exactly as before.
 Actual Array.CreateInstance/SetValue reflection subjects and StringBuilder output
 remain native construction adapters. Status: open before edits.
+## Build task path construction inventory
+
+IMM-M035: Coordinator traced InvalidatePublishedResult output/input/compiler/publication
+path arrays and capture paths, ResetPublishedVerification paths, and VerificationPublication
+required options/private input arrays. These are read-only sequences consumed by
+PublicationLease/PublicationPaths IEnumerable APIs; freeze as immutable arrays without
+changing ordering or path comparers. Publication option/path maps are scoped construction:
+use Ordinal builders and freeze before iteration and publication. Retain current Add
+semantics and option exception order.
+
+VerificationPublication.Prepare(string[]) explicitly rewrites its caller's argument
+array; BuildTaskTests assert this mutable contract at lines 204-210 and 223-226.
+Preserve that mutable subject and RunVerifier's writable argument adapter for now.
+Public MSBuild setter/ITaskItem[] contracts and process char buffers are required
+framework adapters. Status: open before edits.
