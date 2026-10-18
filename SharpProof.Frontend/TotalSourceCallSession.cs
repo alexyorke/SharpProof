@@ -200,7 +200,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (!CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type))).Any() ||
+            {
+                parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+                var declared = method.OriginalDefinition.Parameters[ordinal].Type;
+                return !CSharpOperationSemantics.SharesValueDomain(parameter.Type, declared) &&
+                    (assigned && ordinal == method.Parameters.Length - 1 ||
+                     declared is not IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol } &&
+                     (declared is not ITypeParameterSymbol || caller.KnownScalarType(parameter.Type) == null));
+            }).Any() ||
             !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !scalarReturnSpecialization ||
             method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
@@ -221,6 +228,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 argument.ArgumentKind == ArgumentKind.DefaultValue &&
                     (!parameter.HasExplicitDefaultValue || !argument.Value.ConstantValue.HasValue))
             { return false; }
+            if (method.OriginalDefinition.Parameters[parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol } &&
+                (parameter.Type is not IArrayTypeSymbol { IsSZArray: true } constructed ||
+                 caller.ConcreteArray(argument.Value) is not { } array || caller.Type(constructed.ElementType) != caller.Type(array.ElementType)))
+            { return false; }
+
         }
         var reference = method.DeclaringSyntaxReferences[0];
         var declaration = reference.GetSyntax(cancellationToken);
@@ -267,14 +279,16 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return false; }
         if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
-        // Source operations bind to declaration symbols. Closed outer types
-        // may share that body only when their intrinsic signature is unchanged.
+        // Source operations bind to declaration symbols. Reconcile parameter and
+        // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
-        // Specialize only immutable by-value parameters. Captured storage and
-        // ref/out escapes are excluded by scanning the complete declaration.
+        // Value and array parameters keep their representation through rebinding. Interface
+        // provenance requires immutable storage without captures or ref escapes.
         var receiverArguments = arguments.Where(argument =>
-            TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) &&
-            caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value)).ToArray();
+            (TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) ||
+             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol }) &&
+            caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -289,7 +303,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
-            if (declarationOperations.Length != 0 &&
+            if (parameter.Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) is { } scalar)
+            {
+                frame.SpecializeScalarParameter(parameter, scalar);
+                continue;
+            }
+            if (parameter.Type is IArrayTypeSymbol { IsSZArray: true } || declarationOperations.Length != 0 &&
                 !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
                     (use.Parent is IAssignmentOperation assignment && assignment.Target == use ||
@@ -302,8 +321,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDefaultComparerParameter(parameter); }
             }
         }
-        // A closed scalar signature alone grants no representation facts. The
-        // immutable array parameter must have specialized this exact return T.
+        // The argument representation must have specialized this exact return T;
+        // another type parameter cannot borrow that evidence.
         if (scalarReturnSpecialization && frame.Factory.GetVariableInfo(frame.Result!.Value).Type != caller.Type(method.ReturnType))
         { frame = null; return false; }
         if (instance != null)

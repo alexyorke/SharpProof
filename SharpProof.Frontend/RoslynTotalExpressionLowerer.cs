@@ -1018,11 +1018,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
             // A scalar element of a single-dimensional array is stored with its
             // value; other stores are effect sites only.
-            var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
+            var modeled = outside == null && (CSharpOperationSemantics.IsScalar(elementType) ||
+                _context.ConcreteArray(access.ArrayReference) is { } knownArray && CSharpOperationSemantics.IsScalar(knownArray.ElementType)) &&
                 _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
             if (stored is { } value)
             {
-                if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+                if (!modeled && CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
                 {
                     // A covariant array may reject the stored reference.
                     var mismatch = _context.Temporary(_factory.BooleanType);

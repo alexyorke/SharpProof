@@ -187,11 +187,13 @@ public sealed class ArrayReceiverModelOwnershipTests
         var sameNameForeignRead = (IMethodSymbol)sameNameForeign.GetDeclaredSymbol(locals[0])!;
         Assert.That(factory.GetTypeInfo(frame.Type(sameNameForeignRead.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
     }
-    [TestCase(false)]
-    [TestCase(true)]
-    public void GenericArrayReturnStorageRequiresTheMatchingImmutableArrayParameter(bool local)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void GenericArrayReturnStorageRequiresMatchingParameterRepresentation(bool local, bool directArray)
     {
-        const string helper = "static T Read<T>(System.Collections.Generic.IList<T> list) => list[0];";
+        var helper = "static T Read<T>(" + (directArray ? "T[]" : "System.Collections.Generic.IList<T>") + " list) => list[0];";
         var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) { return Read<int>(values); " +
             (local ? helper + " }" : " } " + helper) + " }");
         var compilation = CSharpCompilation.Create("ArrayReturnOwner", [tree], TestMetadataReferences.Platform,
@@ -206,5 +208,39 @@ public sealed class ArrayReceiverModelOwnershipTests
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
         Assert.That(factory.GetVariableInfo(frame!.Result!.Value).Type, Is.EqualTo(factory.IntegerType));
         Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame).IsExact, Is.True);
+    }
+    [Test]
+    public void UnboundGenericArrayParametersDoNotAcquireScalarEvidence()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static T Target<T>(T[] values) => Read<T>(values); " +
+            "static T Read<T>(T[] list) => list[0]; }");
+        var compilation = CSharpCompilation.Create("UnboundArrayOwner", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
+        var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
+        Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.False);
+        Assert.That(frame, Is.Null);
+        Assert.That(graph, Is.Null);
+    }
+    [Test]
+    public void ScalarParameterFactsDoNotMakeUnknownTypesPrimitive()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static T Target<T>(T value) => Read<T>(value); static U Read<U>(U input) => input; }");
+        var compilation = CSharpCompilation.Create("ScalarParameterOwner", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var target = model.GetDeclaredSymbol(syntax)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, target);
+        Assert.That(context.KnownScalarType(target.TypeParameters[0]), Is.Null);
+        Assert.That(context.KnownScalarType(null), Is.Null);
+        Assert.That(context.KnownScalarType(compilation.GetSpecialType(SpecialType.System_String)), Is.Null);
     }
 }

@@ -298,20 +298,45 @@ public sealed partial class TotalLoweringContext
         }
         return type;
     }
+    internal ITypeSymbol? KnownScalarType(ITypeSymbol? type)
+    {
+        if (type == null)
+        { return null; }
+        var known = SpecializeReceiverElement(type);
+        return CSharpOperationSemantics.IsScalar(known) ? known : null;
+    }
+
+    private void SpecializeTypeParameter(ITypeParameterSymbol parameter, ITypeSymbol scalar)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        scalar = RepositoryParameterGuard.NotNull(scalar, nameof(scalar));
+        _receiverElements[parameter] = scalar;
+        _types.TypeSpecializer = SpecializeReceiverElement;
+        if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
+            Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
+        { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+    }
+
+    internal void SpecializeScalarParameter(IParameterSymbol parameter, ITypeSymbol scalar)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        scalar = RepositoryParameterGuard.NotNull(scalar, nameof(scalar));
+        SpecializeTypeParameter((ITypeParameterSymbol)parameter.Type, scalar);
+        Parameters = [.. Parameters.Select(binding => binding is null ? throw new ArgumentNullException(nameof(binding)) :
+            SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
+                ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(scalar)),
+                    Factory.CreateVariable("current:" + parameter.Ordinal, Type(scalar)), Factory.CreateVariable("old:" + parameter.Ordinal, Type(scalar))) : binding)];
+    }
     internal void SpecializeArrayParameter(IParameterSymbol parameter, IArrayTypeSymbol array)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         array = RepositoryParameterGuard.NotNull(array, nameof(array));
         _arrayReceivers[parameter] = array;
-        if (((INamedTypeSymbol)parameter.Type).TypeArguments[0] is ITypeParameterSymbol element)
+        var declaredElement = parameter.Type is IArrayTypeSymbol declaredArray ? declaredArray.ElementType :
+            ((INamedTypeSymbol)parameter.Type).TypeArguments[0];
+        if (declaredElement is ITypeParameterSymbol element)
         {
-            _receiverElements[element] = array.ElementType;
-            _types.TypeSpecializer = SpecializeReceiverElement;
-            // The array fact also determines a return of this same scalar T.
-            // Recreate result storage before binding contracts or lowering returns.
-            if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
-                Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
-            { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+            SpecializeTypeParameter(element, array.ElementType);
 
         }
         Parameters = [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)

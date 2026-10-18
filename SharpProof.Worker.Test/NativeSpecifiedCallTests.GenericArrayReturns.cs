@@ -35,8 +35,6 @@ public sealed partial class NativeSpecifiedCallTests
             correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted, element, local ? "" : helper);
     }
 
-    [TestCase("int[] values", "return Read<int>(values);", "static T Read<T>(T[] list) => list[0];")]
-    [TestCase("int[] values", "return Read<int>(values[0]);", "static T Read<T>(T value) => value;")]
     [TestCase("System.Collections.Generic.IList<int> unknown", "return Read<int>(unknown);", "static T Read<T>(System.Collections.Generic.IList<T> list) => list[0];")]
     [TestCase("int[] values, System.Collections.Generic.IList<int> unknown", "return Read<int>(values, unknown);", "static T Read<T>(System.Collections.Generic.IList<T> list, System.Collections.Generic.IList<T> other) { list = other; return list[0]; }")]
     [TestCase("int[] values", "return Read<int, int>(values);", "static U Read<T, U>(System.Collections.Generic.IList<T> list) => default(U);")]
@@ -66,15 +64,16 @@ public sealed partial class NativeSpecifiedCallTests
         foreach (var element in new[] { "bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
         {
             foreach (var local in new[] { false, true })
-            { yield return new TestCaseData(element, local); }
+            { foreach (var directArray in new[] { false, true }) { yield return new TestCaseData(element, local, directArray); } }
         }
     }
 
     [TestCaseSource(nameof(GenericArrayReturnOracleCases))]
-    public async Task GenericScalarReturnBitsAndFaultsAgreeWithClr(string element, bool local)
+    public async Task GenericScalarReturnBitsAndFaultsAgreeWithClr(string element, bool local, bool directArray)
     {
         ArgumentNullException.ThrowIfNull(element);
-        const string helper = "static T Read<T>(System.Collections.Generic.IList<T> list, int index) => list[index];";
+        var helper = "static T Read<T>(" + (directArray ? "T[]" : "System.Collections.Generic.IList<T>") + " list, int index) => Identity<T>(list[index]); " +
+            "static U Identity<U>(U value) => value;";
         using var project = WorkerTests.TestProject.Create("public static class C { public static " + element + " Target(" + element +
             "[] values, int index) { return Read<" + element + ">(values, index); " + (local ? helper : "") + " } " + (local ? "" : helper) + " }");
         project.UseNetCoreReferencePack();
@@ -131,7 +130,7 @@ public sealed partial class NativeSpecifiedCallTests
                     object? expected = null;
                     try
                     { expected = runtime.Invoke(null, [values?.Clone(), index]); }
-                    catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is NullReferenceException or ArgumentOutOfRangeException)
+                    catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is NullReferenceException or ArgumentOutOfRangeException or IndexOutOfRangeException)
                     { fault = exception.InnerException; }
                     var input = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType,
                         values.Cast<object>().Select(value => GenericReturnOracleValue(factory, elementType, value ?? throw new ArgumentNullException(nameof(value)))));
@@ -153,7 +152,7 @@ public sealed partial class NativeSpecifiedCallTests
                             Is.EqualTo(expectedValue.Kind == IrValueKind.Boolean ? (ulong)(expectedValue.Boolean ? 1 : 0) : expectedValue.IntegerBits));
                     }
                     else
-                    { Assert.That(replay.Exception!.Kind, Is.EqualTo(fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.ArgumentOutOfRange)); }
+                    { Assert.That(replay.Exception!.Kind, Is.EqualTo(fault is NullReferenceException ? IrExceptionKind.NullReference : fault is IndexOutOfRangeException ? IrExceptionKind.IndexOutOfRange : IrExceptionKind.ArgumentOutOfRange)); }
                 }
             }
         }

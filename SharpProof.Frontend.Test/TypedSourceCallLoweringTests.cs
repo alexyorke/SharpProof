@@ -221,6 +221,7 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("uint Target(uint x) { return Add(x); } static uint Add(uint value) { return unchecked(value + 1); }", uint.MaxValue, 0U)]
     [TestCase("ulong Target(ulong x) { return Add(x); } static ulong Add(ulong value, ulong step = 1) { return unchecked(value + step); }", ulong.MaxValue, 0UL)]
     [TestCase("bool Target(bool x) { return Flip(x); } static bool Flip(bool value) { return !value; }", true, false)]
+    [TestCase("int Target(int x) { return Generic<int>(x); } static T Generic<T>(T value) => value;", int.MinValue, int.MinValue)]
     public void ScalarFramesPreserveWidthsAndDefaultConstants(string members, object input, object expected)
     {
         System.ArgumentNullException.ThrowIfNull(expected);
@@ -257,7 +258,6 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { return A(x); } static int A(int value) { return B(value); } static int B(int value) { return A(value); }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static External() { } public static int Add(int x) => x + 1; }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static int state = System.Environment.TickCount; public static int Add(int x) => x + 1; }")]
-    [TestCase("int Target(int x) { return Generic<int>(x); } static T Generic<T>(T value) => value;")]
     [TestCase("int Target(int x) { return ByReference(ref x); } static int ByReference(ref int value) => value;")]
     [TestCase("int Target(int x) { return Params(x); } static int Params(params int[] value) => value[0];")]
     [TestCase("int Target(int x) { return System.Math.Abs(x); }")]
