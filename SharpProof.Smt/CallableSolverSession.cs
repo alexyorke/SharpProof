@@ -14,7 +14,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private readonly BvEncoder _encoder;
     private readonly Dictionary<Assumption, BoolExpr> _assumptions = [];
     private readonly Dictionary<VerificationQuery, BoolExpr> _goals = [];
-    private readonly Dictionary<VerificationQuery, BoolExpr> _shortStrings = [];
+    private readonly Dictionary<VerificationQuery, BoolExpr> _smallReferences = [];
     private long _consumedResourceCount;
     private int _assertedReferenceFacts;
 
@@ -92,12 +92,12 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 _solver.Assert(_encoder.ReferenceFacts[_assertedReferenceFacts++]);
             }
             var status = Check(selectors, meter);
-            if (status == Status.SATISFIABLE && ShortStringWitnesses(query, meter) is { } shortStrings)
+            if (status == Status.SATISFIABLE && SmallReferenceWitnesses(query, meter) is { } smallReferences)
             {
-                // Unconstrained string lengths may decode as replay-sized
-                // witnesses. Prefer a model with short input strings; only
-                // the SAT model choice changes, never the query.
-                selectors.Add(shortStrings);
+                // Prefer replayable string/array witnesses after the original
+                // query is SAT. A failed preference retries the unbounded
+                // query, so this bound can never prove a claim.
+                selectors.Add(smallReferences);
                 status = Check(selectors, meter);
                 if (status != Status.SATISFIABLE)
                 {
@@ -132,18 +132,18 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         return SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
     }
 
-    // A selector bounding the length of each string model variable.
-    private BoolExpr? ShortStringWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
+    // A model preference for string and array lengths, inactive in proof checks.
+    private BoolExpr? SmallReferenceWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        if (_shortStrings.TryGetValue(query, out var existing))
+        if (_smallReferences.TryGetValue(query, out var existing))
         { return existing; }
-        var bound = _encoder.ShortStringBound(query, meter);
+        var bound = _encoder.SmallReferenceBound(query, meter);
         if (bound == null)
         { return null; }
-        var selector = _owner.Own(_runner.Context.MkBoolConst("s" + _shortStrings.Count.ToString(CultureInfo.InvariantCulture)));
+        var selector = _owner.Own(_runner.Context.MkBoolConst("s" + _smallReferences.Count.ToString(CultureInfo.InvariantCulture)));
         _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, bound)));
-        _shortStrings.Add(query, selector);
+        _smallReferences.Add(query, selector);
         return selector;
     }
 

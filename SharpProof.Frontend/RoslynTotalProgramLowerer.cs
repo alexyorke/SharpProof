@@ -58,6 +58,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
         _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
         _context.TrackArrayReceivers(graph);
+        _context.TrackDefaultComparers(graph);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||

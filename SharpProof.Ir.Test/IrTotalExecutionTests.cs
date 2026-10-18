@@ -101,7 +101,8 @@ public sealed class IrTotalExecutionTests
     {
         Assert.That(IrExceptionKindFacts.FromException(new ArgumentException()), Is.EqualTo(IrExceptionKind.Argument));
         Assert.That(IrExceptionKindFacts.FromException(new ArgumentNullException()), Is.Null);
-        Assert.That(IrExceptionKindFacts.FromException(new ArgumentOutOfRangeException()), Is.Null);
+        Assert.That(IrExceptionKindFacts.FromException(new DerivedRangeException()), Is.Null);
+        Assert.That(IrExceptionKindFacts.FromException(new ArgumentOutOfRangeException()), Is.EqualTo(IrExceptionKind.ArgumentOutOfRange));
     }
 
     [Test]
@@ -698,4 +699,6 @@ public sealed class IrTotalExecutionTests
             }, TestContext.CurrentContext.CancellationToken);
         }
     }
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private test exception only checks exact runtime-type admission.")]
+    private sealed class DerivedRangeException : ArgumentOutOfRangeException { }
 }

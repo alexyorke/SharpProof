@@ -160,8 +160,8 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var projected = CompilerExceptionConstraintEvidence.Project(core, claims);
         Assert.That(projected.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId)), Is.EqualTo(ExpectedClaimIds));
         Assert.That(projected[0].AllowedKinds, Is.Empty);
-        Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
-        Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
+        Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
+        Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
         Assert.That(compilation.Assembly.GetTypeByMetadataName("System.DivideByZeroException"), Is.Null);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, claims), Is.Empty);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, []), Is.Empty);

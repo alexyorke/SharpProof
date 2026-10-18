@@ -24,6 +24,7 @@ internal static partial class CSharpOperationSemantics
     // This deliberately requires a visible array-to-interface conversion.
     // A statically typed List can be subclassed and reimplement its interfaces;
     // a scalar SZ array has one known implementation and cannot be covariant.
+    // A matching `as` conversion preserves the same reference, including null.
     internal static IOperation? ArrayCollectionReceiver(IPropertyReferenceOperation property)
     {
         property = RepositoryParameterGuard.NotNull(property, nameof(property));
@@ -31,7 +32,7 @@ internal static partial class CSharpOperationSemantics
         { return null; }
         var receiver = property.Instance;
         if (receiver is not IConversionOperation
-            { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsReference: true } } conversion)
+            { OperatorMethod: null, Conversion: { Exists: true, IsReference: true } } conversion)
         { return null; }
         if (conversion.Type is not INamedTypeSymbol target ||
             target.OriginalDefinition.GetDocumentationCommentId() is not
@@ -51,9 +52,8 @@ internal static partial class CSharpOperationSemantics
         receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         index = RepositoryParameterGuard.NotNull(index, nameof(index));
         var guard = ElementGuard(factory, receiver, index, null);
-        // Array's IList<T> implementation throws ArgumentOutOfRangeException.
-        // Until native IR has that exact kind, retain an unknown bounds fault;
-        // never label it IndexOutOfRangeException or erase it.
-        return new(guard.Value, [guard.Throws[0], new(IrExceptionKind.Unknown, guard.Throws[1].Condition)], guard.Classification);
+        // The array interface differs from direct array indexing. Keep the exact
+        // framework fault so catch dispatch and AllowedExceptions agree with .NET.
+        return new(guard.Value, [guard.Throws[0], new(IrExceptionKind.ArgumentOutOfRange, guard.Throws[1].Condition)], guard.Classification);
     }
 }

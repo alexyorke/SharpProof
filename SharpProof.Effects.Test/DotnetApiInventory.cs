@@ -5,12 +5,13 @@ using SharpProof.Frontend;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
+
 // Test infrastructure: the inventory observes the production resolver and intrinsic
 // predicates. It never grants support based on an API name alone.
 internal static class DotnetApiInventory
 {
-    internal const string PackVersion = "9.0.18";
-    internal const string Framework = "net9.0";
+    internal const string PackVersion = "10.0.13";
+    internal const string Framework = "net10.0";
     internal sealed record Row(string Assembly, string Id, string Kind, string Evidence)
     {
         internal string Key => Assembly + "\t" + Id;
@@ -111,6 +112,9 @@ internal static class DotnetApiInventory
 
         if (symbol is IMethodSymbol method)
         {
+            if (CSharpOperationSemantics.IsObjectReferenceEquals(method))
+            { evidence.Add("intrinsic=object-reference-identity"); }
+
             if (CSharpOperationSemantics.IsIntegerCompareTo(method))
             {
                 evidence.Add("intrinsic=integer-comparison");

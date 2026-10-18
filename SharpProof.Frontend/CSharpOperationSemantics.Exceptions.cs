@@ -10,6 +10,7 @@ internal static partial class CSharpOperationSemantics
             IrExceptionKind.Overflow => "System.OverflowException",
             IrExceptionKind.NullReference => "System.NullReferenceException",
             IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
+            IrExceptionKind.ArgumentOutOfRange => "System.ArgumentOutOfRangeException",
             IrExceptionKind.InvalidCast => "System.InvalidCastException",
             IrExceptionKind.Argument => "System.ArgumentException",
             // Its hierarchy is just Exception and Object, so only those catch it.

@@ -63,7 +63,10 @@ internal static class CallableReplayValidator
                     _ => null
                 }));
             if (factory.Semantics == IrExecutionSemantics.Total)
-            { replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(); }
+            {
+                replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet();
+                replayOptions.ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider;
+            }
             var execution = new IrProgramInterpreter(factory).Execute(
                 program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)
