@@ -9,6 +9,27 @@ internal sealed partial class BvEncoder
     private readonly Dictionary<IrStringId, Expr> _stringLiterals = [];
     internal List<BoolExpr> ReferenceFacts { get; } = [];
 
+    // Witness lengths are charged when decoded. Prefer small string/array
+    // models without restricting the unbounded query used for proofs.
+    internal BoolExpr? SmallReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)
+    {
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
+        var bounds = new List<BoolExpr>();
+        foreach (var variable in query.ModelVariables)
+        {
+            meter.Consume();
+            if (factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.String or IrTypeKind.Sequence)
+            {
+                bounds.Add(owner.Own(context.MkBVULE((BitVecExpr)EncodeLength(GetVariable(variable, meter), meter),
+                    owner.Own(context.MkBV(MaximumSmallReference, 32)))));
+            }
+        }
+        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));
+    }
+
+    private const int MaximumSmallReference = 64;
+
     private Expr EncodeStringLiteral(IrStringTerm term, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));

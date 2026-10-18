@@ -26,6 +26,8 @@ internal sealed class PassiveCallableSolver : IDisposable
 {
     private readonly PassiveCallableVcPlan _plan;
     private readonly CallableSolverSession? _session;
+    private readonly uint _queryRlimit = WorkerBudgets.DefaultQueryRlimit;
+    private long _auxiliaryResources;
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly MethodResourceBudget _budget;
     private readonly ProofKernel _kernel;
@@ -42,8 +44,9 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (plan.IsBoundedSearch)
         { throw new ArgumentException("A bounded witness encoding cannot own a proof session.", nameof(plan)); }
         ArgumentOutOfRangeException.ThrowIfLessThan(methodRlimit, queryRlimit);
+        _queryRlimit = queryRlimit;
         _session = new(plan.Factory, new IrSmtBackendOptions(queryRlimit));
-        _budget = new(() => _session.ConsumedResourceCount, queryRlimit, methodRlimit);
+        _budget = new(() => ConsumedResourceCount, queryRlimit, methodRlimit);
         _kernel = new(_session);
     }
 
@@ -58,7 +61,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         _readConsumedResourceCount = readConsumedResourceCount;
     }
 
-    internal long ConsumedResourceCount => _session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0;
+    internal long ConsumedResourceCount => (_session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0) + _auxiliaryResources;
     internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
 
@@ -159,6 +162,22 @@ internal sealed class PassiveCallableSolver : IDisposable
         var encoding = _plan.LoopSearch ?? _plan;
         var witness = _plan.LoopSearch == null ? proof
             : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
+        if (!allocations && (proof.Reason == WorkerClaimReason.ResourceLimit || witness.Reason == WorkerClaimReason.ResourceLimit) && _session != null &&
+            encoding.FirstPurityPrefixQuery() is { } prefix && _budget.TryStartQuery())
+        {
+            // A resource-exhausted native session is retired. Retry the smaller
+            // witness query in a fresh context, charging the same method meter.
+            using var prefixSession = new CallableSolverSession(_plan.Factory, new IrSmtBackendOptions(_queryRlimit));
+            ProofOutcome prefixOutcome;
+            try
+            { prefixOutcome = await new ProofKernel(prefixSession).VerifyAsync(prefix, cancellationToken).ConfigureAwait(false); }
+            finally
+            { _auxiliaryResources += prefixSession.ConsumedResourceCount; }
+            if (!_budget.IsExceeded && prefixOutcome is RefutedOutcome refutedPrefix)
+            {
+                witness = new(refutedPrefix, WorkerClaimReason.None, encoding.ProjectModel(refutedPrefix), [], []);
+            }
+        }
         if (witness.Outcome is not RefutedOutcome)
         {
             return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (allocations ? plan.AllocationQuery() : plan.PurityQuery()), cancellationToken)

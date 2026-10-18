@@ -38,6 +38,7 @@ internal static class ExplicitThrowSites
             IrExceptionKind.DivideByZero => "System.DivideByZeroException",
             IrExceptionKind.Overflow => "System.OverflowException",
             IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
+            IrExceptionKind.ArgumentOutOfRange => "System.ArgumentOutOfRangeException",
             IrExceptionKind.InvalidCast => "System.InvalidCastException",
             IrExceptionKind.Argument => "System.ArgumentException",
             _ => "System.Exception"

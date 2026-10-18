@@ -1,6 +1,6 @@
 # Framework API usage ranking
 
-200 original OSS targets, 28 synthetic baseline targets, 10 sample files. 636 resolved framework use sites. 0 unresolved sites.
+200 original OSS targets, 28 synthetic baseline targets, 10 sample files. 641 resolved framework use sites. 0 unresolved sites.
 
 Counts are static source sites, not execution frequency. Dependency-only methods and metamorphic copies are excluded. Contextual lowering may support APIs without catalog evidence. Full source hashes and locations are in usage-ranking.json.
 
@@ -9,7 +9,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | 20 | 0 | 56 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | 23 | 0 | 40 | 0 | unmodeled |
 | P:System.Collections.Generic.ICollection`1.Count | read | 40 | 24 | 0 | 40 | 0 | unmodeled-dispatch |
-| P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | unmodeled |
+| P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | partially-modeled |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | call | 26 | 21 | 0 | 26 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | 11 | 0 | 22 | 0 | unmodeled |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | 16 | 0 | 22 | 0 | unmodeled |
@@ -72,6 +72,10 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.String.ToCharArray | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | P:System.Collections.Generic.Dictionary`2.Values | read | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
+| M:System.ArgumentNullException.ThrowIfNull(System.Object,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
+| M:System.ArgumentOutOfRangeException.ThrowIfGreaterThan``1(``0,``0,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
+| M:System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero``1(``0,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
+| M:System.ArgumentOutOfRangeException.ThrowIfNegative``1(``0,System.String) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
 | M:System.Array.Copy(System.Array,System.Int32,System.Array,System.Int32,System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Array.Resize``1(``0[]@,System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.EqualityComparer`1.Equals(`0,`0) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
@@ -107,6 +111,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.String.Split(System.Char,System.StringSplitOptions) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.String.Substring(System.Int32,System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Threading.Tasks.Parallel.For(System.Int32,System.Int32,System.Action{System.Int32}) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
+| M:System.Threading.Volatile.Read(System.Int64@) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
 | M:System.Type.GetTypeCode(System.Type) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | P:System.Collections.Generic.Dictionary`2.Count | read | 1 | 1 | 0 | 1 | 0 | partially-modeled |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | write | 1 | 1 | 0 | 1 | 0 | unmodeled-setter |
