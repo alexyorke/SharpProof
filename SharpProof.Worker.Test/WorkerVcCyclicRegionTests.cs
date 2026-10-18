@@ -150,9 +150,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(throws, Is.Not.Empty);
         foreach (var instruction in throws)
         {
-            instruction.Kind = IrInstructionKind.Goto;
-            instruction.A = instruction.B;
-            instruction.B = -1;
+            total.Graph = total.Graph.ReplaceRow(instruction, instruction with { Kind = IrInstructionKind.Goto, A = instruction.B, B = -1 });
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));

@@ -321,10 +321,10 @@ public sealed class CompilerReachableSourceTests
                 leaf.Callees = ["wrong"];
                 break;
             case "graph":
-                leaf.Graph!.Semantics = IrExecutionSemantics.Legacy;
+                leaf.Graph = leaf.Graph! with { Semantics = IrExecutionSemantics.Legacy };
                 break;
             case "location":
-                leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!.Document = "wrong.cs";
+                leaf.Graph = leaf.Graph!.ReplaceRow(leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!, leaf.Graph!.Operations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan! with { Document = "wrong.cs" });
                 break;
             case "document":
                 graph.Documents[0].MaximumBodyEnd = 0;

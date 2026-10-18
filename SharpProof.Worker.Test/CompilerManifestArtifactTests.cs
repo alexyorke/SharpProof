@@ -804,7 +804,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
-        artifact.Callables.Single().Total!.Graph.Roots = null!;
+        artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph with { Roots = default };
         var failure = Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(failure!.Message,

@@ -57,21 +57,25 @@ public sealed class WorkerTcbEdgeCaseTests
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)).B = -1;
+                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)) with { B = -1 });
                 break;
             case MalformedBodyKind.UnboundCall:
                 var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
-                call.Kind = IrInstructionKind.Call;
-                call.B = int.MaxValue;
+                {
+                    (call, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { Kind = IrInstructionKind.Call });
+                }
+                {
+                    (call, artifact.Callables.Single().Total!.Graph) = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { B = int.MaxValue });
+                }
                 break;
             case MalformedBodyKind.MissingBranchCondition:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)).A = -1;
+                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)) with { A = -1 });
                 break;
             case MalformedBodyKind.MissingReturnValue:
-                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)).A = -1;
+                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)) with { A = -1 });
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
-                instructions[0].Kind = (IrInstructionKind)int.MaxValue;
+                artifact.Callables.Single().Total!.Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions[0], instructions[0] with { Kind = (IrInstructionKind)int.MaxValue });
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));

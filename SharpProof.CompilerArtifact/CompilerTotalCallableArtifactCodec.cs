@@ -191,7 +191,7 @@ internal static class CompilerTotalCallableArtifactCodec
             "The Total callable metadata contains a missing row.");
         // Reject cheap Total bounds before portable materialization/re-encoding.
         var graph = artifact.Graph;
-        if (graph.Roots == null || graph.Blocks == null)
+        if (graph.Roots.IsDefault || graph.Blocks.IsDefault)
         { throw new InvalidDataException("The Total graph is incomplete."); }
         Require(graph.Roots.Length == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
             "The Total graph has an invalid mode or root closure.");
@@ -201,7 +201,7 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var block in graph.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block == null || block.Instructions == null)
+            if (block == null || block.Instructions.IsDefault)
             { throw new InvalidDataException("The Total graph contains an incomplete block."); }
             Require(block.Instructions.Length <= remainingInstructions,
                 "The Total graph exceeds its program bound.");

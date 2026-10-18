@@ -108,7 +108,7 @@ public sealed class MetadataClauseOriginTests
         switch (mutation)
         {
             case "source-span":
-                dto.Graph.Operations[row.ClauseSite].SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 };
+                dto.Graph = dto.Graph with { Operations = dto.Graph.Operations.SetItem(row.ClauseSite, dto.Graph.Operations[row.ClauseSite] with { SourceSpan = new() { Document = "Fake.cs", Start = 0, Length = 1 } }) };
                 break;
             case "missing-owner":
                 references = [];

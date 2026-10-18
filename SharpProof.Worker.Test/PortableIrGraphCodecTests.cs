@@ -13,6 +13,25 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void WireArraysPreserveOmittedEmptyAndExplicitNull()
+    {
+        var omitted = JsonSerializer.Deserialize<PortableIrMember>("{}", WorkerProtocolJson.Options)!;
+        var empty = JsonSerializer.Deserialize<PortableIrMember>(
+            "{\"parameterTypes\":[]}", WorkerProtocolJson.Options)!;
+        var explicitNull = JsonSerializer.Deserialize<PortableIrMember>(
+            "{\"parameterTypes\":null}", WorkerProtocolJson.Options)!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(omitted.ParameterTypes.IsDefault, Is.False);
+            Assert.That(omitted.ParameterTypes, Is.Empty);
+            Assert.That(empty.ParameterTypes.IsDefault, Is.False);
+            Assert.That(empty.ParameterTypes, Is.Empty);
+            Assert.That(explicitNull.ParameterTypes.IsDefault, Is.True);
+            Assert.That(JsonSerializer.SerializeToNode(explicitNull, WorkerProtocolJson.Options)!["parameterTypes"], Is.Null);
+        }
+    }
+
+    [Test]
     public void ArgumentOutOfRangeFaultSurvivesPortableRoundTripWithStableOlderCodes()
     {
         Assert.That((int)IrExceptionKind.Unknown, Is.EqualTo(6));
@@ -196,10 +215,10 @@ public sealed class PortableIrGraphCodecTests
             program: null,
             roots,
             [items], cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
-        var sequenceIndex = Array.FindIndex(
+        var sequenceIndex = PortableGraphChanges.FindIndex(
             graph.Types,
             static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Name == "Numbers"));
-        var integerIndex = Array.FindIndex(
+        var integerIndex = PortableGraphChanges.FindIndex(
             graph.Types,
             static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTypeKind.Integer));
         var variable = graph.Variables.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Name == "items"));
@@ -429,8 +448,7 @@ public sealed class PortableIrGraphCodecTests
     {
         var graph = CreateCallIdentityGraph();
         var callMember = graph.Members.Single();
-        callMember.DocumentationCommentId =
-            "M:System.Linq.Enumerable.Empty``1";
+        graph = graph.ReplaceRow(callMember, callMember with { DocumentationCommentId = "M:System.Linq.Enumerable.Empty``1" });
 
         Assert.Throws<InvalidDataException>(
             (Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -440,8 +458,7 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderPreservesSuffixBoundCallIdentityRoundTrip()
     {
         var graph = CreateCallIdentityGraph();
-        graph.Members.Single().DocumentationCommentId =
-            "M:Subject.Transform(System.Int32)";
+        graph = graph.ReplaceRow(graph.Members.Single(), graph.Members.Single() with { DocumentationCommentId = "M:Subject.Transform(System.Int32)" });
 
         var bytes = JsonSerializer.SerializeToUtf8Bytes(
             graph,
@@ -462,8 +479,7 @@ public sealed class PortableIrGraphCodecTests
     {
         var graph = CreateCallIdentityGraph(
             "call:SubjectAssembly::M:Subject.Transform(System.Int32)~display");
-        graph.Members.Single().DocumentationCommentId =
-            "M:Subject.Transform(System.Int32)";
+        graph = graph.ReplaceRow(graph.Members.Single(), graph.Members.Single() with { DocumentationCommentId = "M:Subject.Transform(System.Int32)" });
 
         Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -531,7 +547,8 @@ public sealed class PortableIrGraphCodecTests
             var call = graph.Blocks
                 .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .First(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Call));
-            call.A = -2;
+            graph = graph.ReplaceRow(call, call with { A = -2 });
+            return graph;
         });
     }
 
@@ -551,64 +568,85 @@ public sealed class PortableIrGraphCodecTests
             switch (mutation)
             {
                 case UnreachableMetadataMutation.Type:
-                    graph.Types = [.. graph.Types, new PortableIrType(
-                        IrTypeKind.Reference, "Unused", -1)];
+                    graph = graph with
+                    {
+                        Types = [.. graph.Types, new PortableIrType(
+                        IrTypeKind.Reference, "Unused", -1)]
+                    };
                     break;
                 case UnreachableMetadataMutation.Identity:
-                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                    graph = graph with { Identities = [.. graph.Identities, graph.Identities.Length] };
                     break;
                 case UnreachableMetadataMutation.Variable:
-                    graph.Variables = [.. graph.Variables,
-                        new PortableIrVariable("unused", 1)];
+                    graph = graph with
+                    {
+                        Variables = [.. graph.Variables,
+                        new PortableIrVariable("unused", 1)]
+                    };
                     break;
                 case UnreachableMetadataMutation.Member:
-                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
-                    graph.Members = [.. graph.Members, new PortableIrMember(
+                    graph = graph with { Identities = [.. graph.Identities, graph.Identities.Length] };
+                    graph = graph with
+                    {
+                        Members = [.. graph.Members, new PortableIrMember(
                         graph.Identities.Length - 1,
                         3,
                         "Unused",
                         1,
                         true,
-                        [])];
+                        [])]
+                    };
                     break;
                 case UnreachableMetadataMutation.Operation:
-                    graph.Operations = [.. graph.Operations,
-                        new PortableIrOperation("unused")];
+                    graph = graph with
+                    {
+                        Operations = [.. graph.Operations,
+                        new PortableIrOperation("unused")]
+                    };
                     break;
                 case UnreachableMetadataMutation.Term:
-                    graph.Terms = [.. graph.Terms, new PortableIrTerm(
+                    graph = graph with
+                    {
+                        Terms = [.. graph.Terms, new PortableIrTerm(
                         IrTermKind.Integer,
                         1,
                         number: 42,
-                        items: [])];
+                        items: [])]
+                    };
                     break;
                 case UnreachableMetadataMutation.ReorderedOperations:
-                    (graph.Operations[0], graph.Operations[1]) =
-                        (graph.Operations[1], graph.Operations[0]);
+                    graph = graph with { Operations = graph.Operations.SetItem(0, graph.Operations[1]).SetItem(1, graph.Operations[0]) };
                     foreach (var instruction in graph.Blocks.SelectMany(
                                  static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
                     {
-                        instruction.Operation = instruction.Operation switch
+                        graph = graph.ReplaceRow(instruction, instruction with
                         {
-                            0 => 1,
-                            1 => 0,
-                            _ => instruction.Operation
-                        };
+                            Operation = instruction.Operation switch
+                            {
+                                0 => 1,
+                                1 => 0,
+                                _ => instruction.Operation
+                            }
+                        });
                     }
                     foreach (var term in graph.Terms.Where(static term =>
                                  term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Opaque && term.C != 0)))
                     {
-                        term.D = term.D switch
+                        graph = graph.ReplaceRow(term, term with
                         {
-                            0 => 1,
-                            1 => 0,
-                            _ => term.D
-                        };
+                            D = term.D switch
+                            {
+                                0 => 1,
+                                1 => 0,
+                                _ => term.D
+                            }
+                        });
                     }
                     break;
                 default:
                     throw new AssertionException("Unknown metadata mutation.");
             }
+            return graph;
         });
     }
 
@@ -629,39 +667,45 @@ public sealed class PortableIrGraphCodecTests
                 switch (mutation)
                 {
                     case CanonicalSlotMutation.TermUnusedIndex:
-                        graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)).B = 0;
+                        graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)) with { B = 0 });
                         break;
                     case CanonicalSlotMutation.TermUnusedNumber:
-                        graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)).Number = 1;
+                        graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)) with { Number = 1 });
                         break;
                     case CanonicalSlotMutation.TermUnusedText:
-                        graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)).Text =
-                            "tampered";
+                        graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)) with { Text = "tampered" });
                         break;
                     case CanonicalSlotMutation.TermEmptyItems:
-                        graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Null)).Items = [0];
+                        graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Null)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Null)) with { Items = [0] });
                         break;
                     case CanonicalSlotMutation.InstructionUnusedIndex:
-                        graph.Blocks
+                        graph = graph.ReplaceRow(graph.Blocks
                             .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign))
-                            .C = 0;
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign)), graph.Blocks
+                            .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign)) with
+                            { C = 0 });
                         break;
                     case CanonicalSlotMutation.InstructionEmptyItems:
-                        graph.Blocks
+                        graph = graph.ReplaceRow(graph.Blocks
                             .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign))
-                            .Items = [0];
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign)), graph.Blocks
+                            .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Assign)) with
+                            { Items = [0] });
                         break;
                     case CanonicalSlotMutation.InstructionUnusedLocation:
-                        graph.Blocks
+                        graph = graph.ReplaceRow(graph.Blocks
                             .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Call))
-                            .Location = new();
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Call)), graph.Blocks
+                            .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                            .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Call)) with
+                            { Location = new() });
                         break;
                     default:
                         throw new AssertionException("Unknown mutation.");
                 }
+                return graph;
             },
             serialize: true);
         if (mutation == CanonicalSlotMutation.TermUnusedIndex)
@@ -683,21 +727,24 @@ public sealed class PortableIrGraphCodecTests
             switch (mutation)
             {
                 case WireEnumMutation.OpaquePurity:
-                    graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Opaque)).C = 999;
+                    graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Opaque)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Opaque)) with { C = 999 });
                     break;
                 case WireEnumMutation.UnaryOperator:
-                    graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Unary)).A = 999;
+                    graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Unary)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Unary)) with { A = 999 });
                     break;
                 case WireEnumMutation.BinaryOperator:
-                    graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Binary)).A = 999;
+                    graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Binary)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Binary)) with { A = 999 });
                     break;
                 case WireEnumMutation.HavocKind:
-                    graph.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                        .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Havoc)).A = 999;
+                    graph = graph.ReplaceRow(graph.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                        .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Havoc)), graph.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                        .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Havoc)) with
+                        { A = 999 });
                     break;
                 default:
                     throw new AssertionException("Unknown mutation.");
             }
+            return graph;
         });
         Assert.That(exception.Message,
             Is.EqualTo("Portable IR contains an unknown enum value."));
@@ -712,7 +759,8 @@ public sealed class PortableIrGraphCodecTests
             var opaque = graph.Terms.Single(static row =>
                 row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Opaque && row.C != 0));
             Assert.That(opaque.D, Is.GreaterThanOrEqualTo(0));
-            opaque.C = 0;
+            graph = graph.ReplaceRow(opaque, opaque with { C = 0 });
+            return graph;
         });
 
         Assert.That(failure.Message,
@@ -723,7 +771,11 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsNonBooleanScalarPayload()
     {
         var failure = AssertDecoderRejects(graph =>
-            { System.ArgumentNullException.ThrowIfNull(graph); graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)).A = 2; });
+            {
+                System.ArgumentNullException.ThrowIfNull(graph);
+                graph = graph.ReplaceRow(graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)), graph.Terms.First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean)) with { A = 2 });
+                return graph;
+            });
 
         Assert.That(failure.Message,
             Is.EqualTo("Portable IR term metadata is invalid."));
@@ -773,73 +825,77 @@ public sealed class PortableIrGraphCodecTests
             switch (mutation)
             {
                 case MalformedMutation.TermIndex:
-                    graph.Roots[0] = graph.Terms.Length;
+                    graph = graph with { Roots = graph.Roots.SetItem(0, graph.Terms.Length) };
                     break;
                 case MalformedMutation.TermCycle:
-                    var unaryIndex = Array.FindIndex(
+                    var unaryIndex = PortableGraphChanges.FindIndex(
                         graph.Terms,
                         static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Unary));
-                    graph.Terms[unaryIndex].B = unaryIndex;
+                    graph = graph with { Terms = graph.Terms.SetItem(unaryIndex, graph.Terms[unaryIndex] with { B = unaryIndex }) };
                     break;
                 case MalformedMutation.TypeCycle:
-                    var sequenceIndex = Array.FindIndex(
+                    var sequenceIndex = PortableGraphChanges.FindIndex(
                         graph.Types,
                         static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTypeKind.Sequence));
-                    graph.Types[sequenceIndex].Element = sequenceIndex;
+                    graph = graph with { Types = graph.Types.SetItem(sequenceIndex, graph.Types[sequenceIndex] with { Element = sequenceIndex }) };
                     break;
                 case MalformedMutation.TermKind:
-                    graph.Terms[0].Kind = (IrTermKind)999;
+                    graph = graph with { Terms = graph.Terms.SetItem(0, graph.Terms[0] with { Kind = (IrTermKind)999 }) };
                     break;
                 case MalformedMutation.TermType:
-                    var booleanIndex = Array.FindIndex(
+                    var booleanIndex = PortableGraphChanges.FindIndex(
                         graph.Terms,
                         static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrTermKind.Boolean));
-                    graph.Terms[booleanIndex].Type = 1;
+                    graph = graph with { Terms = graph.Terms.SetItem(booleanIndex, graph.Terms[booleanIndex] with { Type = 1 }) };
                     break;
                 case MalformedMutation.InstructionKind:
-                    graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
+                    graph = graph with { Blocks = graph.Blocks.SetItem(0, graph.Blocks[0] with { Instructions = graph.Blocks[0].Instructions.SetItem(0, graph.Blocks[0].Instructions[0] with { Kind = (IrInstructionKind)999 }) }) };
                     break;
                 case MalformedMutation.NullTopLevelArray:
-                    graph.Roots = null!;
+                    graph = graph with { Roots = default };
                     break;
                 case MalformedMutation.NullMemberParameters:
-                    graph.Members[0].ParameterTypes = null!;
+                    graph = graph with { Members = graph.Members.SetItem(0, graph.Members[0] with { ParameterTypes = default }) };
                     break;
                 case MalformedMutation.NonCanonicalIdentity:
-                    graph.Identities[0] = 1;
+                    graph = graph with { Identities = graph.Identities.SetItem(0, 1) };
                     break;
                 case MalformedMutation.CollapsedMemberPartition:
-                    graph.Members[1] = graph.Members[0];
+                    graph = graph with { Members = graph.Members.SetItem(1, graph.Members[0]) };
                     break;
                 case MalformedMutation.CollapsedTermPartition:
-                    graph.Terms[1] = graph.Terms[0];
+                    graph = graph with { Terms = graph.Terms.SetItem(1, graph.Terms[0]) };
                     break;
                 case MalformedMutation.NullInstructionItems:
-                    graph.Blocks[0].Instructions[0].Items = null!;
+                    graph = graph with { Blocks = graph.Blocks.SetItem(0, graph.Blocks[0] with { Instructions = graph.Blocks[0].Instructions.SetItem(0, graph.Blocks[0].Instructions[0] with { Items = default }) }) };
                     break;
                 case MalformedMutation.LocationKind:
-                    graph.Blocks[0].Instructions
+                    graph = graph.ReplaceRow(graph.Blocks[0].Instructions
                         .First(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Location != null))
-                        .Location!.Kind = (IrLocationKind)999;
+                        .Location!, graph.Blocks[0].Instructions
+                        .First(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Location != null))
+                        .Location! with
+                        { Kind = (IrLocationKind)999 });
                     break;
                 case MalformedMutation.ProgramShape:
-                    graph.HasProgram = false;
+                    graph = graph with { HasProgram = false };
                     break;
                 case MalformedMutation.DuplicateHavocVariable:
                     var havoc = graph.Blocks
                         .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                         .First(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Havoc));
-                    havoc.Items = [havoc.Items[0], havoc.Items[0]];
+                    graph = graph.ReplaceRow(havoc, havoc with { Items = [havoc.Items[0], havoc.Items[0]] });
                     break;
                 case MalformedMutation.WhitespaceOperationDescription:
-                    graph.Operations[0].Description = " ";
+                    graph = graph with { Operations = graph.Operations.SetItem(0, graph.Operations[0] with { Description = " " }) };
                     break;
                 case MalformedMutation.WhitespaceBlockName:
-                    graph.Blocks[0].Name = "\t";
+                    graph = graph with { Blocks = graph.Blocks.SetItem(0, graph.Blocks[0] with { Name = "\t" }) };
                     break;
                 default:
                     throw new AssertionException("Unknown mutation.");
             }
+            return graph;
         });
 
         if (mutation == MalformedMutation.WhitespaceOperationDescription)
@@ -914,7 +970,7 @@ public sealed class PortableIrGraphCodecTests
     }
 
     private static InvalidDataException AssertDecoderRejects(
-        Action<PortableIrGraph> mutate,
+        Func<PortableIrGraph, PortableIrGraph> mutate,
         bool serialize = false)
     {
         System.ArgumentNullException.ThrowIfNull(mutate);
@@ -932,7 +988,7 @@ public sealed class PortableIrGraphCodecTests
                 WorkerProtocolJson.Options)!;
         }
 
-        mutate(graph);
+        graph = mutate(graph);
         return Assert.Throws<InvalidDataException>(
             (Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)))!;
     }
@@ -957,33 +1013,41 @@ public sealed class PortableIrGraphCodecTests
         if (kind == DeepGraphKind.Types)
         {
             var types = graph.Types;
-            Array.Resize(ref types, types.Length + depth);
-            graph.Types = types;
+            types = types.AddRange(Enumerable.Repeat<PortableIrType>(null!, depth));
+            graph = graph with { Types = types };
             for (var index = 4; index < graph.Types.Length; index++)
             {
-                graph.Types[index] = new PortableIrType
+                graph = graph with
                 {
-                    Kind = IrTypeKind.Sequence,
-                    Name = $"sequence-{index}",
-                    Element = index == graph.Types.Length - 1
+                    Types = graph.Types.SetItem(index, new PortableIrType
+                    {
+                        Kind = IrTypeKind.Sequence,
+                        Name = $"sequence-{index}",
+                        Element = index == graph.Types.Length - 1
                         ? cyclic ? 4 : 0
                         : index + 1
+                    })
                 };
             }
-            graph.Variables = [new PortableIrVariable("deep", 4)];
-            graph.Terms = [new PortableIrTerm(
+            graph = graph with { Variables = [new PortableIrVariable("deep", 4)] };
+            graph = graph with
+            {
+                Terms = [new PortableIrTerm(
                 IrTermKind.Variable,
                 4,
                 a: 0,
-                items: [])];
-            graph.Roots = [0];
+                items: [])]
+            };
+            graph = graph with { Roots = [0] };
         }
         else
         {
-            graph.Terms = new PortableIrTerm[depth];
+            graph = graph with { Terms = Enumerable.Repeat<PortableIrTerm>(null!, depth).ToImmutableArray() };
             for (var index = 0; index < graph.Terms.Length; index++)
             {
-                graph.Terms[index] = index == graph.Terms.Length - 1 &&
+                graph = graph with
+                {
+                    Terms = graph.Terms.SetItem(index, index == graph.Terms.Length - 1 &&
                     !cyclic
                     ? new PortableIrTerm
                     {
@@ -997,10 +1061,11 @@ public sealed class PortableIrGraphCodecTests
                         Type = 0,
                         A = (int)IrUnaryOperator.Not,
                         B = index == graph.Terms.Length - 1 ? 0 : index + 1
-                    };
+                    })
+                };
             }
 
-            graph.Roots = [0];
+            graph = graph with { Roots = [0] };
         }
         return graph;
     }

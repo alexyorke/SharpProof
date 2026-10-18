@@ -9,90 +9,165 @@ using SharpProof.Ir;
 
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class PortableIrGraph
+internal sealed record PortableIrGraph
 {
     [System.Text.Json.Serialization.JsonRequired]
-    public IrExecutionSemantics Semantics { get; set; }
-    public bool HasProgram { get; set; }
-    public PortableIrType[] Types { get; set; } = [];
-    public int[] Identities { get; set; } = [];
-    public PortableIrVariable[] Variables { get; set; } = [];
-    public PortableIrMember[] Members { get; set; } = [];
-    public PortableIrOperation[] Operations { get; set; } = [];
-    public PortableIrTerm[] Terms { get; set; } = [];
-    public PortableIrBlock[] Blocks { get; set; } = [];
-    public int Entry { get; set; } = -1;
-    public int[] Roots { get; set; } = [];
+    public IrExecutionSemantics Semantics { get; init; }
+    public bool HasProgram { get; init; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrType> Types { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Identities { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrVariable> Variables { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrMember> Members { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrOperation> Operations { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrTerm> Terms { get; init; } = [];
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrBlock> Blocks { get; init; } = [];
+    public int Entry { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Roots { get; init; } = [];
+
 }
 
-internal sealed class PortableIrType(
+internal sealed record PortableIrType
+{
+    public IrTypeKind Kind { get; init; } = default;
+    public string Name { get; init; } = string.Empty;
+    public int Element { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Width { get; init; } = 0;
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Signed { get; init; } = false;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ClosedSealedReference { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrType() { }
+
+    public PortableIrType(
     IrTypeKind kind = default,
     string? name = null,
     int element = -1,
     int width = 0,
     bool signed = false
-)
-{
-    public IrTypeKind Kind { get; set; } = kind;
-    public string Name { get; set; } = name ?? string.Empty;
-    public int Element { get; set; } = element;
-    [System.Text.Json.Serialization.JsonRequired]
-    public int Width { get; set; } = width;
-    [System.Text.Json.Serialization.JsonRequired]
-    public bool Signed { get; set; } = signed;
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    public bool ClosedSealedReference { get; set; }
+) : this()
+    {
+        Kind = kind;
+        Name = name ?? string.Empty;
+        Element = element;
+        Width = width;
+        Signed = signed;
+    }
+
 }
 
-internal sealed class PortableIrVariable(
+internal sealed record PortableIrVariable
+{
+    public string Name { get; init; } = string.Empty;
+    public int Type { get; init; } = -1;
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrVariable() { }
+
+    public PortableIrVariable(
     string? name = null,
     int type = -1
-)
-{
-    public string Name { get; set; } = name ?? string.Empty;
-    public int Type { get; set; } = type;
+) : this()
+    {
+        Name = name ?? string.Empty;
+        Type = type;
+    }
+
 }
 
-internal sealed class PortableIrMember(
+internal sealed record PortableIrMember
+{
+    public int Identity { get; init; } = -1;
+    public int DeclaringType { get; init; } = -1;
+    public string Name { get; init; } = string.Empty;
+    public int ReturnType { get; init; } = -1;
+    public bool IsStatic { get; init; } = false;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> ParameterTypes { get; init; } = [];
+    public string? DocumentationCommentId { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrMember() { }
+
+    public PortableIrMember(
     int identity = -1,
     int declaringType = -1,
     string? name = null,
     int returnType = -1,
     bool isStatic = false,
     int[]? parameterTypes = null
-)
-{
-    public int Identity { get; set; } = identity;
-    public int DeclaringType { get; init; } = declaringType;
-    public string Name { get; set; } = name ?? string.Empty;
-    public int ReturnType { get; set; } = returnType;
-    public bool IsStatic { get; set; } = isStatic;
-    public int[] ParameterTypes { get; set; } = parameterTypes ?? [];
-    public string? DocumentationCommentId { get; set; }
+) : this()
+    {
+        Identity = identity;
+        DeclaringType = declaringType;
+        Name = name ?? string.Empty;
+        ReturnType = returnType;
+        IsStatic = isStatic;
+        ParameterTypes = parameterTypes?.ToImmutableArray() ?? [];
+    }
+
 }
 
-internal sealed class PortableIrOperation(
+internal sealed record PortableIrOperation
+{
+    public string? Description { get; init; } = null;
+    [System.Text.Json.Serialization.JsonRequired]
+    public PortableIrSourceSpan? SourceSpan { get; init; }
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrOperation() { }
+
+    public PortableIrOperation(
     string? description = null
-)
-{
-    public string? Description { get; set; } = description;
-    [System.Text.Json.Serialization.JsonRequired]
-    public PortableIrSourceSpan? SourceSpan { get; set; }
+) : this()
+    {
+        Description = description;
+    }
+
 }
 
-internal sealed class PortableIrSourceSpan
+internal sealed record PortableIrSourceSpan
 {
     [System.Text.Json.Serialization.JsonRequired]
-    public string Document { get; set; } = string.Empty;
+    public string Document { get; init; } = string.Empty;
     [System.Text.Json.Serialization.JsonRequired]
-    public int Start { get; set; }
+    public int Start { get; init; }
     [System.Text.Json.Serialization.JsonRequired]
-    public int Length { get; set; }
+    public int Length { get; init; }
     public int Line { get; init; }
-    public int Column { get; set; }
+    public int Column { get; init; }
+
 }
 
-internal sealed class PortableIrTerm(
+internal sealed record PortableIrTerm
+{
+    public IrTermKind Kind { get; init; } = default;
+    public int Type { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    public int C { get; init; } = -1;
+    public int D { get; init; } = -1;
+    public long Number { get; init; } = 0;
+    [System.Text.Json.Serialization.JsonRequired]
+    public ulong Bits { get; init; }
+    public string? Text { get; init; } = null;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrTerm() { }
+
+    public PortableIrTerm(
     IrTermKind kind = default,
     int type = -1,
     int a = -1,
@@ -102,37 +177,67 @@ internal sealed class PortableIrTerm(
     long number = 0,
     string? text = null,
     int[]? items = null
-)
-{
-    public IrTermKind Kind { get; set; } = kind;
-    public int Type { get; set; } = type;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int C { get; set; } = c;
-    public int D { get; set; } = d;
-    public long Number { get; set; } = number;
-    [System.Text.Json.Serialization.JsonRequired]
-    public ulong Bits { get; set; }
-    public string? Text { get; set; } = text;
-    public int[] Items { get; set; } = items ?? [];
+) : this()
+    {
+        Kind = kind;
+        Type = type;
+        A = a;
+        B = b;
+        C = c;
+        D = d;
+        Number = number;
+        Text = text;
+        Items = items?.ToImmutableArray() ?? [];
+    }
+
 }
 
-internal sealed class PortableIrLocation(
+internal sealed record PortableIrLocation
+{
+    public IrLocationKind Kind { get; init; } = default;
+    public int Type { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrLocation() { }
+
+    public PortableIrLocation(
     IrLocationKind kind = default,
     int type = -1,
     int a = -1,
     int b = -1,
     int[]? items = null
-)
-{
-    public IrLocationKind Kind { get; set; } = kind;
-    public int Type { get; set; } = type;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int[] Items { get; set; } = items ?? [];
+) : this()
+    {
+        Kind = kind;
+        Type = type;
+        A = a;
+        B = b;
+        Items = items?.ToImmutableArray() ?? [];
+    }
+
 }
 
-internal sealed class PortableIrInstruction(
+internal sealed record PortableIrInstruction
+{
+    public IrInstructionKind Kind { get; init; } = default;
+    public int Operation { get; init; } = -1;
+    public int A { get; init; } = -1;
+    public int B { get; init; } = -1;
+    public int C { get; init; } = -1;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<int> Items { get; init; } = [];
+    public PortableIrLocation? Location { get; init; } = null;
+    [System.Text.Json.Serialization.JsonRequired]
+    public IrHavocOrigin Origin { get; init; } = IrHavocOrigin.Approximation;
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrInstruction() { }
+
+    public PortableIrInstruction(
     IrInstructionKind kind = default,
     int operation = -1,
     int a = -1,
@@ -140,26 +245,37 @@ internal sealed class PortableIrInstruction(
     int c = -1,
     int[]? items = null,
     PortableIrLocation? location = null
-)
-{
-    public IrInstructionKind Kind { get; set; } = kind;
-    public int Operation { get; set; } = operation;
-    public int A { get; set; } = a;
-    public int B { get; set; } = b;
-    public int C { get; set; } = c;
-    public int[] Items { get; set; } = items ?? [];
-    public PortableIrLocation? Location { get; set; } = location;
-    [System.Text.Json.Serialization.JsonRequired]
-    public IrHavocOrigin Origin { get; set; } = IrHavocOrigin.Approximation;
+) : this()
+    {
+        Kind = kind;
+        Operation = operation;
+        A = a;
+        B = b;
+        C = c;
+        Items = items?.ToImmutableArray() ?? [];
+        Location = location;
+    }
+
 }
 
-internal sealed class PortableIrBlock(
+internal sealed record PortableIrBlock
+{
+    public string? Name { get; init; } = null;
+    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    public ImmutableArray<PortableIrInstruction> Instructions { get; init; } = [];
+
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PortableIrBlock() { }
+
+    public PortableIrBlock(
     string? name = null,
     PortableIrInstruction[]? instructions = null
-)
-{
-    public string? Name { get; set; } = name;
-    public PortableIrInstruction[] Instructions { get; set; } = instructions ?? [];
+) : this()
+    {
+        Name = name;
+        Instructions = instructions?.ToImmutableArray() ?? [];
+    }
+
 }
 
 internal sealed class DecodedPortableIrGraph(
@@ -173,10 +289,10 @@ internal sealed class DecodedPortableIrGraph(
 {
     internal IrFactory Factory { get; } = factory;
     internal IrProgram? Program { get; } = program;
-    internal IReadOnlyList<IrTerm> Roots { get; } = roots;
-    internal IReadOnlyList<IrVarId> Variables { get; } = variables;
-    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
-    internal IReadOnlyList<OperationId> Operations { get; } = operations;
+    internal IReadOnlyList<IrTerm> Roots { get; } = roots.ToImmutableArray();
+    internal IReadOnlyList<IrVarId> Variables { get; } = variables.ToImmutableArray();
+    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions.ToImmutableArray();
+    internal IReadOnlyList<OperationId> Operations { get; } = operations.ToImmutableArray();
 }
 
 internal sealed class EncodedPortableIrGraph(
@@ -187,9 +303,9 @@ internal sealed class EncodedPortableIrGraph(
 )
 {
     internal PortableIrGraph Graph { get; } = graph;
-    internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices;
-    internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices;
-    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices;
+    internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices.ToImmutableDictionary();
+    internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices.ToImmutableDictionary();
+    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices.ToImmutableDictionary();
 }
 
 internal static class PortableIrWireCatalog
@@ -668,7 +784,7 @@ internal static class PortableIrGraphCodecProjections
                     return context.Builder.MemberLocation(
                         context.Member(row.A),
                         context.OptionalTerm(row.B),
-                        context.Terms(row.Items));
+                        context.Terms(row.Items.ToArray()));
                 }),
             [IrLocationKind.Sequence] = new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Sequence],
@@ -707,7 +823,7 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items).ToImmutableArray());
+                    return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items.ToArray()).ToImmutableArray());
                 }),
             [IrInstructionKind.Lock] = new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Lock],
@@ -735,11 +851,11 @@ internal static class PortableIrGraphCodecProjections
                 {
                     return row.Location != null
                         ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && context.Location(row.Location) is IrMemberLocation { Receiver: { } receiver } field
-                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0])
+                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items.ToArray())[0])
                             : throw context.Invalid()
                         : context.OptionalTerm(row.B) is { } stored
                         ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index
-                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0])
+                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items.ToArray())[0])
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
                 }),
@@ -831,7 +947,7 @@ internal static class PortableIrGraphCodecProjections
                         context.OptionalVariable(row.A),
                         context.Member(row.B),
                         context.OptionalTerm(row.C),
-                        context.Terms(row.Items));
+                        context.Terms(row.Items.ToArray()));
                 }),
             [IrInstructionKind.Assume] = new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assume],
@@ -896,7 +1012,7 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.HavocKind(row.A),
                         row.Origin,
-                        context.Variables(row.Items));
+                        context.Variables(row.Items.ToArray()));
                 }),
             [IrInstructionKind.Branch] = new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Branch],
@@ -1189,8 +1305,7 @@ internal static class PortableIrGraphCodecProjections
         Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
     {
         var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
-        result.Bits = value.Width == 0 ? 0 : value.Bits;
-        return result;
+        return result with { Bits = value.Width == 0 ? 0 : value.Bits };
     }
 
     private static IrTerm DecodeOpaque(
@@ -1206,7 +1321,7 @@ internal static class PortableIrGraphCodecProjections
     {
         var purity = opaquePurity(row.C);
         var receiver = optionalTerm(row.B, depth);
-        var arguments = terms(row.Items, depth);
+        var arguments = terms(row.Items.ToArray(), depth);
         return purity switch
         {
             IrOpaquePurity.Pure when row.D == -1 =>

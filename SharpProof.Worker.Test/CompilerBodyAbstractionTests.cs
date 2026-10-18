@@ -70,16 +70,22 @@ public sealed class CompilerBodyAbstractionTests
                 total.IsBodyAbstraction = false;
                 break;
             case "drop-current":
-                havoc.Items = [total.Result];
+                {
+                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Result] });
+                }
                 break;
             case "havoc-entry":
-                havoc.Items = [total.Parameters[0].Entry, total.Result];
+                {
+                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Items = [total.Parameters[0].Entry, total.Result] });
+                }
                 break;
             case "origin":
-                havoc.Origin = IrHavocOrigin.Input;
+                {
+                    (havoc, total.Graph) = total.Graph.ChangeRow(havoc, havoc with { Origin = IrHavocOrigin.Input });
+                }
                 break;
             case "initial-old":
-                instructions[1].A = total.Parameters[0].Current;
+                total.Graph = total.Graph.ReplaceRow(instructions[1], instructions[1] with { A = total.Parameters[0].Current });
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);

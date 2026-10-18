@@ -81,7 +81,7 @@ public sealed class TypedPortableIntegerTests
     public void InvalidTypedWidthCannotBecomeLegacy(int width)
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Width = width;
+        graph = graph.ReplaceRow(graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)), graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)) with { Width = width });
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
@@ -89,10 +89,10 @@ public sealed class TypedPortableIntegerTests
     public void SignednessAndOutOfWidthBitsAreRejected()
     {
         var graph = CreateLiteralGraph(64);
-        graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)).Signed = true;
+        graph = graph.ReplaceRow(graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)), graph.Types.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Width == 64)) with { Signed = true });
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         graph = CreateLiteralGraph(8);
-        graph.Terms[0].Bits = 256;
+        graph = graph with { Terms = graph.Terms.SetItem(0, graph.Terms[0] with { Bits = 256 }) };
         Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 

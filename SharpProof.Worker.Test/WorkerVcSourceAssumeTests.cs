@@ -174,18 +174,18 @@ public sealed class WorkerVcSourceAssumeTests
                 clauses[0].Operation = clauses[1].Operation;
                 break;
             case "predicate":
-                points[0].A = points[1].A;
+                total.Graph = total.Graph.ReplaceRow(points[0], points[0] with { A = points[1].A });
                 break;
             case "missing-point":
-                points[0].Kind = IrInstructionKind.Assert;
+                total.Graph = total.Graph.ReplaceRow(points[0], points[0] with { Kind = IrInstructionKind.Assert });
                 break;
             case "duplicate-point":
-                points[1].Operation = points[0].Operation;
+                total.Graph = total.Graph.ReplaceRow(points[1], points[1] with { Operation = points[0].Operation });
                 break;
             case "canonical-role":
                 var current = total.Parameters[0].Current;
                 foreach (var term in total.Graph.Terms.Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Variable && term.A == current)))
-                { term.A = total.Parameters[0].Entry; }
+                { total.Graph = total.Graph.ReplaceRow(term, term with { A = total.Parameters[0].Entry }); }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);

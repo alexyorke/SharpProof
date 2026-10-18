@@ -701,64 +701,64 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-164 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:138` | `Sha256`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
 | MODEL-165 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:143` | `Key`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
 | MODEL-166 | `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs:144` | `Value`: `string` | Implemented; record/init and immutable array collections; 460 affected Worker checks passed |
-| MODEL-167 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:15` | `Semantics`: `IrExecutionSemantics` | Open; coordinated migration |
-| MODEL-168 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:16` | `HasProgram`: `bool` | Open; coordinated migration |
-| MODEL-169 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:17` | `Types`: `PortableIrType[]` | Open; coordinated migration |
-| MODEL-170 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:18` | `Identities`: `int[]` | Open; coordinated migration |
-| MODEL-171 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:19` | `Variables`: `PortableIrVariable[]` | Open; coordinated migration |
-| MODEL-172 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:20` | `Members`: `PortableIrMember[]` | Open; coordinated migration |
-| MODEL-173 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:21` | `Operations`: `PortableIrOperation[]` | Open; coordinated migration |
-| MODEL-174 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:22` | `Terms`: `PortableIrTerm[]` | Open; coordinated migration |
-| MODEL-175 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:23` | `Blocks`: `PortableIrBlock[]` | Open; coordinated migration |
-| MODEL-176 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:24` | `Entry`: `int` | Open; coordinated migration |
-| MODEL-177 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:25` | `Roots`: `int[]` | Open; coordinated migration |
-| MODEL-178 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:36` | `Kind`: `IrTypeKind` | Open; coordinated migration |
-| MODEL-179 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:37` | `Name`: `string` | Open; coordinated migration |
-| MODEL-180 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:38` | `Element`: `int` | Open; coordinated migration |
-| MODEL-181 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:40` | `Width`: `int` | Open; coordinated migration |
-| MODEL-182 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:42` | `Signed`: `bool` | Open; coordinated migration |
-| MODEL-183 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:44` | `ClosedSealedReference`: `bool` | Open; coordinated migration |
-| MODEL-184 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:52` | `Name`: `string` | Open; coordinated migration |
-| MODEL-185 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:53` | `Type`: `int` | Open; coordinated migration |
-| MODEL-186 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:65` | `Identity`: `int` | Open; coordinated migration |
-| MODEL-187 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:66` | `DeclaringType`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-188 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:67` | `Name`: `string` | Open; coordinated migration |
-| MODEL-189 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:68` | `ReturnType`: `int` | Open; coordinated migration |
-| MODEL-190 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:69` | `IsStatic`: `bool` | Open; coordinated migration |
-| MODEL-191 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:70` | `ParameterTypes`: `int[]` | Open; coordinated migration |
-| MODEL-192 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:71` | `DocumentationCommentId`: `string?` | Open; coordinated migration |
-| MODEL-193 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:78` | `Description`: `string?` | Open; coordinated migration |
-| MODEL-194 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:80` | `SourceSpan`: `PortableIrSourceSpan?` | Open; coordinated migration |
-| MODEL-195 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:86` | `Document`: `string` | Open; coordinated migration |
-| MODEL-196 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:88` | `Start`: `int` | Open; coordinated migration |
-| MODEL-197 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:90` | `Length`: `int` | Open; coordinated migration |
-| MODEL-198 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:91` | `Line`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-199 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:92` | `Column`: `int` | Open; coordinated migration |
-| MODEL-200 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:107` | `Kind`: `IrTermKind` | Open; coordinated migration |
-| MODEL-201 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:108` | `Type`: `int` | Open; coordinated migration |
-| MODEL-202 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:109` | `A`: `int` | Open; coordinated migration |
-| MODEL-203 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:110` | `B`: `int` | Open; coordinated migration |
-| MODEL-204 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:111` | `C`: `int` | Open; coordinated migration |
-| MODEL-205 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:112` | `D`: `int` | Open; coordinated migration |
-| MODEL-206 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:113` | `Number`: `long` | Open; coordinated migration |
-| MODEL-207 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:115` | `Bits`: `ulong` | Open; coordinated migration |
-| MODEL-208 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:116` | `Text`: `string?` | Open; coordinated migration |
-| MODEL-209 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:117` | `Items`: `int[]` | Open; coordinated migration |
-| MODEL-210 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:128` | `Kind`: `IrLocationKind` | Open; coordinated migration |
-| MODEL-211 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:129` | `Type`: `int` | Open; coordinated migration |
-| MODEL-212 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:130` | `A`: `int` | Open; coordinated migration |
-| MODEL-213 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:131` | `B`: `int` | Open; coordinated migration |
-| MODEL-214 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:132` | `Items`: `int[]` | Open; coordinated migration |
-| MODEL-215 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:145` | `Kind`: `IrInstructionKind` | Open; coordinated migration |
-| MODEL-216 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:146` | `Operation`: `int` | Open; coordinated migration |
-| MODEL-217 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:147` | `A`: `int` | Open; coordinated migration |
-| MODEL-218 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:148` | `B`: `int` | Open; coordinated migration |
-| MODEL-219 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:149` | `C`: `int` | Open; coordinated migration |
-| MODEL-220 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:150` | `Items`: `int[]` | Open; coordinated migration |
-| MODEL-221 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:151` | `Location`: `PortableIrLocation?` | Open; coordinated migration |
-| MODEL-222 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:153` | `Origin`: `IrHavocOrigin` | Open; coordinated migration |
-| MODEL-223 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:161` | `Name`: `string?` | Open; coordinated migration |
-| MODEL-224 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:162` | `Instructions`: `PortableIrInstruction[]` | Open; coordinated migration |
+| MODEL-167 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:15` | `Semantics`: `IrExecutionSemantics` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-168 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:16` | `HasProgram`: `bool` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-169 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:17` | `Types`: `PortableIrType[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-170 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:18` | `Identities`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-171 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:19` | `Variables`: `PortableIrVariable[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-172 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:20` | `Members`: `PortableIrMember[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-173 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:21` | `Operations`: `PortableIrOperation[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-174 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:22` | `Terms`: `PortableIrTerm[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-175 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:23` | `Blocks`: `PortableIrBlock[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-176 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:24` | `Entry`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-177 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:25` | `Roots`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-178 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:36` | `Kind`: `IrTypeKind` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-179 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:37` | `Name`: `string` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-180 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:38` | `Element`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-181 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:40` | `Width`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-182 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:42` | `Signed`: `bool` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-183 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:44` | `ClosedSealedReference`: `bool` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-184 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:52` | `Name`: `string` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-185 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:53` | `Type`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-186 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:65` | `Identity`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-187 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:66` | `DeclaringType`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-188 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:67` | `Name`: `string` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-189 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:68` | `ReturnType`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-190 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:69` | `IsStatic`: `bool` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-191 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:70` | `ParameterTypes`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-192 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:71` | `DocumentationCommentId`: `string?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-193 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:78` | `Description`: `string?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-194 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:80` | `SourceSpan`: `PortableIrSourceSpan?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-195 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:86` | `Document`: `string` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-196 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:88` | `Start`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-197 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:90` | `Length`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-198 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:91` | `Line`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-199 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:92` | `Column`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-200 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:107` | `Kind`: `IrTermKind` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-201 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:108` | `Type`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-202 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:109` | `A`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-203 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:110` | `B`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-204 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:111` | `C`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-205 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:112` | `D`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-206 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:113` | `Number`: `long` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-207 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:115` | `Bits`: `ulong` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-208 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:116` | `Text`: `string?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-209 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:117` | `Items`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-210 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:128` | `Kind`: `IrLocationKind` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-211 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:129` | `Type`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-212 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:130` | `A`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-213 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:131` | `B`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-214 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:132` | `Items`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-215 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:145` | `Kind`: `IrInstructionKind` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-216 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:146` | `Operation`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-217 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:147` | `A`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-218 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:148` | `B`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-219 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:149` | `C`: `int` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-220 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:150` | `Items`: `int[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-221 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:151` | `Location`: `PortableIrLocation?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-222 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:153` | `Origin`: `IrHavocOrigin` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-223 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:161` | `Name`: `string?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
+| MODEL-224 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:162` | `Instructions`: `PortableIrInstruction[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
 | MODEL-225 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:36` | `ProtocolVersion`: `string` | Open; coordinated migration |
 | MODEL-226 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:38` | `CompilerManifest`: `WorkerFileReference` | Open; coordinated migration |
 | MODEL-227 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:40` | `Budgets`: `WorkerBudgets` | Open; coordinated migration |
@@ -940,9 +940,9 @@ refactor. Concurrent callback caches retain an explicit concurrency contract.
   tokens unchanged across 226 changed C# files**. Subsequent edits changed only
   method-body style and the nonliteral replacement-validation implementation.
   Golden, sample, template and vendored sources have no changes.
-- Of the 312 inventoried model properties, 93 are now init-only, six budget
+- Of the 312 inventoried model properties, 149 are now init-only, six budget
   properties retain the explicit mutable-budget snapshot test contract, and
-  213 remain open for coordinated review/migration. Init-only collection
+  157 remain open for coordinated review/migration. Init-only collection
   properties still require deep immutability review; the inventory does not
   silently count retained arrays as immutable.
 - The 35 sites in the strict analyzer local-state appendix are implemented; targeted analyzer tests passed (1,085).
@@ -993,7 +993,7 @@ is itself under test require an explicit boundary justification.
 | FOLLOW-022 | CorpusFileTransaction retained updates across awaits, duplicate/path sets and entries; AllocationIlOracle map/stack/visited/branch arrays; CompilerClrTypeMatcher and NativeExceptionWitnessOracle name stacks | Open |
 | FOLLOW-023 | CorpusGate sets/counters; NativeAllocationWitnessOracle and NativeStaticWriteWitnessOracle initial/alias maps; NativeCorpusVerifier lookup/outcomes; OpenSourceCorpusCatalog map/sets; OpenSourceCorpusImporter dedupe; OpenSourceCorpusRunner diagnostics and indexed assignment counters | Open; do not blanket-exempt algorithm counters |
 | FOLLOW-024 | Host TrustedChildEnvironment and Fuzz FiniteDomainSmtFuzzing/FrontendFuzzing/TotalProgramFuzzing retained snapshots | Unchecked detail; agent shell unavailable during final re-read; boundary-level lead only |
-| FOLLOW-025 | Compiler/portable/protocol 213 open model properties plus init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
+| FOLLOW-025 | Compiler/protocol 157 open model properties plus init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
 
 Follow-up coverage: IR/Dataflow 45 production files / 9,163 lines; SMT 13 files /
 2,043 lines; Contracts 25 files / 5,124 lines; S-Z/lowercase test/support 344 files.
@@ -1089,3 +1089,43 @@ the earlier note about a missing A-H report describes an earlier checkpoint.
 Remaining work includes Portable/compiler artifact/protocol models, the detailed
 retained helper/input findings, and classification or replacement of remaining
 syntax sites. This checkpoint is not the comprehensive completion condition.
+
+### Verified follow-up and Portable IR checkpoint
+
+- Commit d0be2e21b passed all 19 ordinary projects: 11,594 passed, zero
+  failures, one existing package skip. Worker passed 5,330; Gates 470;
+  Analyzer 1,085. Evidence: artifacts/immutability-followup-all-tests2.log.
+- All ten Portable IR wire model declarations are records with init-only
+  properties and immutable arrays. Producer constructors defensively capture
+  arrays; explicit parameterless JSON constructors avoid exposing positional
+  record members or normalizing explicit JSON null.
+- A focused canonical .NET probe established that the default ImmutableArray
+  JSON converter rejects null. PortableIrArrayJsonConverter preserves the
+  former wire null sentinel. Omitted/empty arrays remain initialized empty;
+  explicit null remains default and reaches the existing decoder checks.
+  WireArraysPreserveOmittedEmptyAndExplicitNull is the regression.
+- Encoding tables, index maps and block snapshots are persistent. Recursive
+  table encoding computes each row before rebinding its slot, preserving rows
+  appended by recursive encoding. Published decoded collections/maps are
+  immutable snapshots behind their existing read-only API shapes.
+- Malformed fixture updates now return copied rows/graphs and publish them
+  back to artifact owners. The pure test helper preserves reference aliases
+  for shared rows, source spans, locations and instructions. Sequential
+  updates return both the new row and graph.
+- The first focused run passed 705 of 706 cases; its sole failure exposed a
+  missing graph reattachment in the golden void-call corruption fixture.
+  After correction, all 706 passed. Canonical full formatting passed with
+  zero output changes. Evidence: artifacts/immutability-portable-tests2.log
+  and artifacts/immutability-portable-format.log.
+- NativeAllocation, NativePurity, WorkerTcb and PortableTotalExecution copy
+  propagation were independently reviewed against current disk; no lost
+  mutation was found. The golden program and expected output are unchanged.
+
+The ordinary full-suite check for the Portable IR checkpoint is pending.
+Compiler/protocol model fields, remaining helper findings and syntax candidate
+classification remain open; this is not the comprehensive completion condition.
+Final Portable checkpoint preservation check passed: 1,992 original
+raw/interpolated literal tokens across 340 changed C# files are unchanged.
+The refreshed syntax inventory parses 1,808 tracked/new non-vendored C# files
+and records 4,052 candidates, including 12 explicit program-subject exclusions.
+Evidence: artifacts/immutability-portable-preservation2.log.

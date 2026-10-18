@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -170,8 +171,8 @@ public sealed class NativeAllocationEffectTests
         foreach (var allocation in artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate)))
         {
-            allocation.Kind = IrInstructionKind.Write;
-            allocation.A = (int)IrWriteRegion.Local;
+            var total = artifact.Callables.Single().Total!;
+            total.Graph = total.Graph.ReplaceRow(allocation, allocation with { Kind = IrInstructionKind.Write, A = (int)IrWriteRegion.Local });
         }
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -238,16 +239,28 @@ public sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "missing-length":
-                allocation.C = -1;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = -1 });
+                    artifact.Callables.Single().Total!.Graph = graph;
+                }
                 break;
             case "missing-target":
-                allocation.B = -1;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = -1 });
+                    artifact.Callables.Single().Total!.Graph = graph;
+                }
                 break;
             case "invalid-length":
-                allocation.C = int.MaxValue;
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = int.MaxValue });
+                    artifact.Callables.Single().Total!.Graph = graph;
+                }
                 break;
             case "wrong-length-type":
-                allocation.C = Array.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean));
+                {
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean)) });
+                    artifact.Callables.Single().Total!.Graph = graph;
+                }
                 break;
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
@@ -264,11 +277,15 @@ public sealed class NativeAllocationEffectTests
             "[ZeroAllocations] public static int Target(int x) { int[] values = new int[] { 1, -2 }; return values[0]; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
         var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
-        allocation.Items = mutation == "count" ? new[] { allocation.Items[0] }
-            : new[] { Array.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
-                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)), allocation.Items[1] };
+        (allocation, graph) = graph.ChangeRow(allocation, allocation with
+        {
+            Items = (mutation == "count" ? new[] { allocation.Items[0] }
+                    : new[] { PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
+                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)), allocation.Items[1] }).ToImmutableArray()
+        });
+        artifact.Callables.Single().Total!.Graph = graph;
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+                    CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("System.Action action = Sink;")]
@@ -419,28 +436,44 @@ public sealed class NativeAllocationEffectTests
         switch (mutation)
         {
             case "input-origin":
-                row.Origin = IrHavocOrigin.Input;
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.Input });
+                }
                 break;
             case "spec-origin":
-                row.Origin = IrHavocOrigin.SpecResult;
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Origin = IrHavocOrigin.SpecResult });
+                }
                 break;
             case "memory":
-                row.A = (int)IrHavocKind.VariablesAndMemory;
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { A = (int)IrHavocKind.VariablesAndMemory });
+                }
                 break;
             case "duplicate":
-                row.Items = [row.Items.Single(), row.Items.Single()];
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [row.Items.Single(), row.Items.Single()] });
+                }
                 break;
             case "entry":
-                row.Items = [total.Parameters[1].Entry];
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Entry] });
+                }
                 break;
             case "current":
-                row.Items = [total.Parameters[1].Current];
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Current] });
+                }
                 break;
             case "old":
-                row.Items = [total.Parameters[1].Old];
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Parameters[1].Old] });
+                }
                 break;
             case "result":
-                row.Items = [total.Result];
+                {
+                    (row, total.Graph) = total.Graph.ChangeRow(row, row with { Items = [total.Result] });
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -472,13 +505,19 @@ public sealed class NativeAllocationEffectTests
                 total.ValidEffectClaimIds = null!;
                 break;
             case "unused-slot":
-                allocation.C = 0;
+                {
+                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { C = 0 });
+                }
                 break;
             case "invalid-type":
-                allocation.A = -1;
+                {
+                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { A = -1 });
+                }
                 break;
             case "scalar-type":
-                allocation.A = 0;
+                {
+                    (allocation, total.Graph) = total.Graph.ChangeRow(allocation, allocation with { A = 0 });
+                }
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -496,11 +535,20 @@ public sealed class NativeAllocationEffectTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
         if (mutation == "invalid-index")
-        { allocation.B = int.MaxValue; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = int.MaxValue });
+            artifact.Callables.Single().Total!.Graph = graph;
+        }
         else if (mutation == "wrong-type")
-        { allocation.B = 0; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = 0 });
+            artifact.Callables.Single().Total!.Graph = graph;
+        }
         else
-        { allocation.C = 0; }
+        {
+            (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = 0 });
+            artifact.Callables.Single().Total!.Graph = graph;
+        }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }

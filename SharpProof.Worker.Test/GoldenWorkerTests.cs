@@ -575,8 +575,12 @@ public sealed class GoldenWorkerTests
             // Keep the first void member unchanged so canonical graph closure
             // cannot mask the second member's invalid return signature.
             var member = graph.Members.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Name.Contains("Helper", StringComparison.Ordinal)));
-            member.ReturnType = Array.FindIndex(graph.Types,
-                type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed));
+            (member, graph) = graph.ChangeRow(member, member with
+            {
+                ReturnType = PortableGraphChanges.FindIndex(graph.Types,
+                            type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed))
+            });
+            reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton).Graph = graph;
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
             PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(

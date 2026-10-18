@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -101,7 +102,7 @@ public sealed class CompilerTotalCallableArtifactTests
             "Contract.Ensures(Contract.Result<int[]>() == items); return items; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
         Assert.That(index < graph.Types.Length, Is.True);
-        graph.Types[index].ClosedSealedReference = true;
+        { graph = graph with { Types = graph.Types.SetItem(index, graph.Types[index] with { ClosedSealedReference = true }) }; artifact.Callables.Single().Total!.Graph = graph; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -329,7 +330,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var before = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(before.Outcome, Is.TypeOf<RefutedOutcome>(), before.Reason.ToString());
         Assert.That(before.CallPreconditionWitness, Is.Not.Null);
-        dto.Graph.Roots = [];
+        dto.Graph = dto.Graph with { Roots = [] };
         dto.Parameters[0].Entry = dto.Parameters[0].Current;
         dto.CallPreconditions[0].CalleeIdentity = "unrelated::M:Other.Helper";
         dto.CallPreconditions[0].InstructionIndex = -1;
@@ -442,25 +443,25 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "roots":
-                total.Graph.Roots = Enumerable.Repeat(0, 65_536).ToArray();
+                total.Graph = total.Graph with { Roots = Enumerable.Repeat(0, 65_536).ToImmutableArray() };
                 break;
             case "blocks":
-                total.Graph.Blocks = Enumerable.Repeat(total.Graph.Blocks[0], 4097).ToArray();
+                total.Graph = total.Graph with { Blocks = Enumerable.Repeat(total.Graph.Blocks[0], 4097).ToImmutableArray() };
                 break;
             case "instructions":
-                total.Graph.Blocks[0].Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToArray();
+                total.Graph = total.Graph with { Blocks = total.Graph.Blocks.SetItem(0, total.Graph.Blocks[0] with { Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToImmutableArray() }) };
                 break;
             case "missing-roots":
-                total.Graph.Roots = null!;
+                total.Graph = total.Graph with { Roots = default };
                 break;
             case "missing-blocks":
-                total.Graph.Blocks = null!;
+                total.Graph = total.Graph with { Blocks = default };
                 break;
             case "missing-instructions":
-                total.Graph.Blocks[0].Instructions = null!;
+                total.Graph = total.Graph with { Blocks = total.Graph.Blocks.SetItem(0, total.Graph.Blocks[0] with { Instructions = default }) };
                 break;
         }
-        total.Graph.Terms[0].Type = -1;
+        total.Graph = total.Graph with { Terms = total.Graph.Terms.SetItem(0, total.Graph.Terms[0] with { Type = -1 }) };
         var failure = Assert.Throws<InvalidDataException>(new Action(() =>
             CompilerTotalCallableArtifactCodec.Decode(total, artifact.Manifest.Callables.Single(),
                 [.. artifact.Manifest.Claims], TestContext.CurrentContext.CancellationToken)));
@@ -564,7 +565,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var comparison = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Binary &&
             (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual));
-        comparison.C = comparison.B;
+        (comparison, graph) = graph.ChangeRow(comparison, comparison with { C = comparison.B });
+        artifact.Callables.Single().Total!.Graph = graph;
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -602,7 +604,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(EmptyArraySource);
         var graph = artifact.Callables.Single().Total!.Graph;
         var empty = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.EmptyArray));
-        empty.Type = Array.FindIndex(graph.Types, type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Boolean));
+        (empty, graph) = graph.ChangeRow(empty, empty with { Type = PortableGraphChanges.FindIndex(graph.Types, type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Boolean)) });
+        artifact.Callables.Single().Total!.Graph = graph;
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -655,7 +658,7 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "body":
-                entry.Graph.HasProgram = true;
+                entry.Graph = entry.Graph with { HasProgram = true };
                 break;
             case "ensures":
                 entry.Clauses[0].Kind = CompilerContractKind.Ensures;
@@ -665,7 +668,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 break;
             case "count":
                 entry.Clauses = [];
-                entry.Graph.Roots = [];
+                entry.Graph = entry.Graph with { Roots = [] };
                 break;
             case "current":
                 (entry.Parameters[0].Entry, entry.Parameters[0].Current) = (entry.Parameters[0].Current, entry.Parameters[0].Entry);
@@ -674,10 +677,10 @@ public sealed class CompilerTotalCallableArtifactTests
                 entry.Result = entry.Parameters[0].Entry;
                 break;
             case "mode":
-                entry.Graph.Semantics = IrExecutionSemantics.Legacy;
+                entry.Graph = entry.Graph with { Semantics = IrExecutionSemantics.Legacy };
                 break;
             case "span":
-                entry.Graph.Operations[entry.Clauses[0].Operation].SourceSpan = null;
+                entry.Graph = entry.Graph with { Operations = entry.Graph.Operations.SetItem(entry.Clauses[0].Operation, entry.Graph.Operations[entry.Clauses[0].Operation] with { SourceSpan = null }) };
                 break;
         }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -690,7 +693,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(EntryOnlySource);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        roundTrip.Callables.Single().TotalEntry!.Graph.Roots = [];
+        roundTrip.Callables.Single().TotalEntry!.Graph = roundTrip.Callables.Single().TotalEntry!.Graph with { Roots = [] };
         var result = await TotalCallableVerifier.VerifyEntryAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
     }
@@ -769,7 +772,7 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(candidate.CallableId, Is.EqualTo(preparation.Entry.CallableId));
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         // Mutating the wire DTO after decoding cannot alter the owned program.
-        roundTrip.Callables.Single().Total!.Graph.Roots = [];
+        roundTrip.Callables.Single().Total!.Graph = roundTrip.Callables.Single().Total!.Graph with { Roots = [] };
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -994,10 +997,10 @@ public sealed class CompilerTotalCallableArtifactTests
         switch (mutation)
         {
             case "mode":
-                total.Graph.Semantics = IrExecutionSemantics.Legacy;
+                total.Graph = total.Graph with { Semantics = IrExecutionSemantics.Legacy };
                 break;
             case "roots":
-                total.Graph.Roots = [];
+                total.Graph = total.Graph with { Roots = [] };
                 break;
             case "alias":
                 parameter.Old = parameter.Current;
@@ -1009,7 +1012,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 (parameter.Entry, parameter.Current) = (parameter.Current, parameter.Entry);
                 break;
             case "type":
-                total.Graph.Variables[parameter.Old].Type = total.Graph.Variables[total.Parameters[1].Entry].Type;
+                total.Graph = total.Graph with { Variables = total.Graph.Variables.SetItem(parameter.Old, total.Graph.Variables[parameter.Old] with { Type = total.Graph.Variables[total.Parameters[1].Entry].Type }) };
                 break;
             case "claim":
                 total.Clauses[1].ClaimId = total.Clauses[2].ClaimId;
@@ -1027,10 +1030,10 @@ public sealed class CompilerTotalCallableArtifactTests
                 total.Clauses[0].Kind = CompilerContractKind.Assume;
                 break;
             case "missing-program":
-                total.Graph.HasProgram = false;
+                total.Graph = total.Graph with { HasProgram = false };
                 break;
             case "missing-span":
-                total.Graph.Operations[total.Clauses[0].Operation].SourceSpan = null;
+                total.Graph = total.Graph with { Operations = total.Graph.Operations.SetItem(total.Clauses[0].Operation, total.Graph.Operations[total.Clauses[0].Operation] with { SourceSpan = null }) };
                 break;
             case "missing-roles":
                 total.Parameters = null!;

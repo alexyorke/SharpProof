@@ -178,11 +178,11 @@ public sealed class WorkerVcExceptionSearchTests
         var total = artifact.Callables.Single().Total!;
         var graph = total.Graph;
         if (mutation == "naked-exit")
-        { graph.Entry = Array.FindIndex(graph.Blocks, block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit)); }
+        { { graph = graph with { Entry = PortableGraphChanges.FindIndex(graph.Blocks, block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Last().Kind == IrInstructionKind.ExceptionalExit)) }; total.Graph = graph; } }
         else if (mutation == "result-role")
         { total.Result = total.Parameters[0].Old; }
         else
-        { graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).B = graph.Blocks.Length; }
+        { { graph = graph.ReplaceRow(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)), graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)) with { B = graph.Blocks.Length }); total.Graph = graph; } }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }

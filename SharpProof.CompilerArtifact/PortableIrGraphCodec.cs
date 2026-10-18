@@ -195,12 +195,15 @@ internal static partial class PortableIrGraphCodec
             externalVariables,
             externalOperations,
             cancellationToken).Graph;
-        foreach (var member in canonical.Members)
+        canonical = canonical with
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            member.DocumentationCommentId =
-                CallDocumentationCommentId(member.Name);
-        }
+            Members = canonical.Members.Select(member =>
+            {
+                member = RepositoryParameterGuard.NotNull(member, nameof(member));
+                cancellationToken.ThrowIfCancellationRequested();
+                return member with { DocumentationCommentId = CallDocumentationCommentId(member.Name) };
+            }).ToImmutableArray()
+        };
         var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             graph,
             WorkerProtocolJson.SharedOptions);
@@ -307,7 +310,7 @@ internal static partial class PortableIrGraphCodec
     private static void RequireCanonicalSlot(
         string kind,
         string role,
-        int[] value)
+        ImmutableArray<int> value)
     {
         Require(
             role != "unused" &&
@@ -391,13 +394,13 @@ internal static partial class PortableIrGraphCodec
             : throw Bad("Portable IR contains an unknown enum value.");
     }
 
-    private static Dictionary<T, int> Dense<T>(IEnumerable<T> values) where T : notnull
+    private static ImmutableDictionary<T, int> Dense<T>(IEnumerable<T> values) where T : notnull
     {
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
-        var result = new Dictionary<T, int>();
+        var result = ImmutableDictionary<T, int>.Empty;
         foreach (var value in values)
         {
-            result.Add(value, result.Count);
+            result = result.AddUnique(value, result.Count);
         }
 
         return result;
@@ -406,11 +409,11 @@ internal static partial class PortableIrGraphCodec
     private sealed class EncodingTable<TSource, TRow>(
         Func<TSource, int, TRow> encode) where TSource : notnull
     {
-        private readonly Dictionary<TSource, int> _indices = (encode is null ? throw new System.ArgumentNullException(nameof(encode)) : []);
-        private readonly List<TRow> _rows = [];
+        private ImmutableDictionary<TSource, int> _indices = encode is null ? throw new System.ArgumentNullException(nameof(encode)) : ImmutableDictionary<TSource, int>.Empty;
+        private ImmutableList<TRow> _rows = [];
 
-        internal IReadOnlyDictionary<TSource, int> Indices => _indices;
-        internal TRow[] Rows => [.. _rows];
+        internal ImmutableDictionary<TSource, int> Indices => _indices;
+        internal ImmutableArray<TRow> Rows => [.. _rows];
 
         internal int Add(TSource source)
         {
@@ -420,9 +423,10 @@ internal static partial class PortableIrGraphCodec
             }
 
             var index = _rows.Count;
-            _indices.Add(source, index);
-            _rows.Add(default!);
-            _rows[index] = encode(source, index);
+            _indices = _indices.AddUnique(source, index);
+            _rows = _rows.Add(default!);
+            var row = encode(source, index);
+            _rows = _rows.SetItem(index, row);
             return index;
         }
     }
@@ -442,9 +446,9 @@ internal static partial class PortableIrGraphCodec
         private readonly EncodingTable<OperationId, PortableIrOperation> _operations;
         private readonly EncodingTable<IrId, PortableIrTerm> _terms;
         private ImmutableDictionary<IrId, int> _termDepths = ImmutableDictionary<IrId, int>.Empty;
-        private IrBasicBlock[] _blocks = [];
-        private Dictionary<IrBlockId, int> _blockIndices = [];
-        private Dictionary<IrInstructionId, int> _instructionIndices = [];
+        private ImmutableArray<IrBasicBlock> _blocks = [];
+        private ImmutableDictionary<IrBlockId, int> _blockIndices = ImmutableDictionary<IrBlockId, int>.Empty;
+        private ImmutableDictionary<IrInstructionId, int> _instructionIndices = ImmutableDictionary<IrInstructionId, int>.Empty;
 
         internal Encoder(
             IrFactory factory,
@@ -459,8 +463,8 @@ internal static partial class PortableIrGraphCodec
             factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
             roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
             (_factory, _program, _roots, _extraVariables, _cancellationToken) =
-                (factory, program, roots, extraVariables, cancellationToken);
-            _extraOperations = extraOperations;
+                (factory, program, roots.ToImmutableArray(), extraVariables.ToImmutableArray(), cancellationToken);
+            _extraOperations = extraOperations.ToImmutableArray();
             _types = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (TypeRow(id)));
             _identities = new(static (_, index) => index);
             _variables = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (VariableRow(id)));
@@ -476,7 +480,7 @@ internal static partial class PortableIrGraphCodec
             TypeIndex(_factory.IntegerType);
             TypeIndex(_factory.StringType);
             TypeIndex(_factory.ObjectType);
-            var roots = _roots.Select(TermIndex).ToArray();
+            var roots = _roots.Select(TermIndex).ToImmutableArray();
             foreach (var variable in _extraVariables)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
@@ -503,7 +507,7 @@ internal static partial class PortableIrGraphCodec
                     .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                     .Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id)));
             }
-            var blocks = _blocks.Select(BlockRow).ToArray();
+            var blocks = _blocks.Select(BlockRow).ToImmutableArray();
             _cancellationToken.ThrowIfCancellationRequested();
             var graph = new PortableIrGraph
             {
@@ -731,11 +735,11 @@ internal static partial class PortableIrGraphCodec
 
         private void RequireGraphShape()
         {
-            object?[] arrays = [
-                _graph.Types, _graph.Identities, _graph.Variables, _graph.Members,
-                _graph.Operations, _graph.Terms, _graph.Blocks, _graph.Roots
-            ];
-            Require(arrays.All(static value => value != null), "Portable IR arrays cannot be null.");
+            Require(!_graph.Types.IsDefault && !_graph.Identities.IsDefault &&
+                !_graph.Variables.IsDefault && !_graph.Members.IsDefault &&
+                !_graph.Operations.IsDefault && !_graph.Terms.IsDefault &&
+                !_graph.Blocks.IsDefault && !_graph.Roots.IsDefault,
+                "Portable IR arrays cannot be null.");
             Require(
                 _graph.HasProgram == (_graph.Blocks.Length != 0) &&
                 (_graph.HasProgram || _graph.Entry == -1),
@@ -829,7 +833,7 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             var name = row.Name ?? throw Bad("Portable IR member metadata is invalid.");
-            Require(row.ParameterTypes != null, "Portable IR member parameters cannot be null.");
+            Require(!row.ParameterTypes.IsDefault, "Portable IR member parameters cannot be null.");
             var member = _factory.GetOrCreateMember(
                 Item(row.Identity, _identities, "identity"),
                 Type(row.DeclaringType), name,
@@ -851,7 +855,7 @@ internal static partial class PortableIrGraphCodec
             Require(depth < MaximumGraphDepth, "Portable IR term depth exceeds the supported limit.");
             _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
-            Require(row.Items != null, "Portable IR term metadata is invalid.");
+            Require(!row.Items.IsDefault, "Portable IR term metadata is invalid.");
             RequireCanonicalTermSlots(row);
             var term = PortableIrGraphCodecProjections.DecodeTerm(
                 row,
@@ -892,7 +896,7 @@ internal static partial class PortableIrGraphCodec
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 var row = Required(_graph.Blocks[index], "block row");
-                Require(row.Instructions != null, "Portable IR instruction arrays cannot be null.");
+                Require(!row.Instructions.IsDefault, "Portable IR instruction arrays cannot be null.");
                 RequireCanonicalOptionalText(row.Name, "block name");
                 blocks[index] = builder.CreateBlock(row.Name);
             }
@@ -920,7 +924,7 @@ internal static partial class PortableIrGraphCodec
             builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "instruction row");
-            Require(row.Items != null, "Portable IR instruction metadata is invalid.");
+            Require(!row.Items.IsDefault, "Portable IR instruction metadata is invalid.");
             RequireCanonicalInstructionSlots(row);
             if (row.Kind == IrInstructionKind.Havoc)
             {
@@ -950,7 +954,7 @@ internal static partial class PortableIrGraphCodec
             builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "location row");
-            Require(row.Items != null, "Portable IR location metadata is invalid.");
+            Require(!row.Items.IsDefault, "Portable IR location metadata is invalid.");
             RequireCanonicalLocationSlots(row);
             var location = PortableIrGraphCodecProjections.DecodeLocation(
                 builder,
@@ -966,7 +970,7 @@ internal static partial class PortableIrGraphCodec
         }
 
         private TResult[] DecodeRows<TRow, TResult>(
-            TRow?[] rows,
+            ImmutableArray<TRow> rows,
             string kind,
             Func<TRow, TResult> decode) where TRow : class
         {
@@ -996,9 +1000,10 @@ internal static partial class PortableIrGraphCodec
                 $"Portable IR {kind} cannot be whitespace.");
         }
 
-        private void RequireCanonicalVariableIndices(int[] indices)
+        private void RequireCanonicalVariableIndices(ImmutableArray<int> indices)
         {
-            indices = RepositoryParameterGuard.NotNull(indices, nameof(indices));
+            if (indices.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(indices)); }
             var previous = -1;
             foreach (var index in indices)
             {
