@@ -191,6 +191,15 @@ function Assert-DockerfileAuthority {
     }
 
 
+    $powershellLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM ${POWERSHELL_IMAGE} AS powershell'
+    Assert-SingleMatchingLine `
+        $powershellLines `
+        '^ADD --checksum=' `
+        "ADD --checksum=sha256:$($ToolchainCatalog.powershell.archiveSha256) $($ToolchainCatalog.powershell.archiveUrl) /tmp/powershell.tar.gz" `
+        'serviced PowerShell archive'
+
     $toolchainLines = Get-DockerfileStageLines `
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
@@ -509,6 +518,7 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
 }
 
 if ($env:SHARPPROOF_CONTAINER -ceq '1') {
+    Assert-Exact $PSVersionTable.PSVersion.ToString() $catalog.powershell.version 'Serviced PowerShell version'
     Import-Module PSScriptAnalyzer -RequiredVersion $catalog.scriptTools.psscriptAnalyzer.version -Force
     Assert-Exact (Get-Module PSScriptAnalyzer).Version.ToString() $catalog.scriptTools.psscriptAnalyzer.version 'PSScriptAnalyzer version'
     $shellcheckVersion = & shellcheck --version

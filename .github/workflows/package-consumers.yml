@@ -20,6 +20,25 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  release-qualification:
+    name: Qualified default-branch release commit
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require exact-commit default-branch test and coverage success
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash scripts/Test-SharpProofReleaseCommit.sh
+
   security:
     name: Exact-SHA security
     if: startsWith(github.ref, 'refs/tags/v')
@@ -29,10 +48,13 @@ jobs:
 
   package:
     name: Pack exact container artifacts
+    outputs:
+      package-artifact-id: ${{ steps.package-upload.outputs.artifact-id }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Check the tag matches the checked-in package version
@@ -72,13 +94,17 @@ jobs:
           docker compose run --rm tooling dev -lc
           'pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofDoctor.ps1'
 
+      - name: Record qualified package identities and hashes
+        run: |
+          docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/New-SharpProofPackageManifest.ps1 -PackageDirectory artifacts/container-packages'
+
       - name: Upload NuGet artifacts
+        id: package-upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/container-packages/*
           if-no-files-found: error
-          overwrite: true
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -93,9 +119,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          artifact-id: ${{ needs.package.outputs.package-artifact-id }}
 
       - name: Run analyzer and real verifier consumers
         run: >-
@@ -122,12 +151,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          merge-multiple: true
           path: nupkgs
       - name: Prove and refute with one package and default settings
         shell: pwsh
@@ -161,12 +193,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          merge-multiple: true
           path: nupkgs
       - name: Run the portable consumer against the packed packages
         run: >-
@@ -208,6 +243,73 @@ jobs:
           pwsh scripts/Test-SharpProofMacOsVerifierConsumer.ps1
           -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
 
+
+  provenance:
+    name: Attest qualified release packages
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+    needs: [release-qualification, security, package, container-verifier, native-linux-verifier, portable-consumers]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          merge-multiple: true
+          path: nupkgs
+      - name: Prepare exact package contents and identity inventory for the SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence sbom-input
+          cp nupkgs/packages.lock.json sbom-input/
+          for package in nupkgs/*.nupkg; do
+            unzip -q "$package" -d "sbom-input/$(basename "$package" .nupkg)"
+          done
+      - name: Generate the exact package graph SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: sbom-input
+          syft-version: v1.54.1
+          format: spdx-json
+          output-file: release-evidence/packages.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Reject an SBOM missing any qualified package identity
+        run: |
+          set -euo pipefail
+          while IFS=$'\t' read -r id version _filename _checksum; do
+            jq -e --arg id "$id" --arg version "$version" \
+              '.packages | any(.[]; (.name | ascii_downcase) == $id and .versionInfo == $version)' \
+              release-evidence/packages.spdx.json > /dev/null
+          done < nupkgs/packages.tsv
+      - name: Record release artifact checksums
+        run: sha256sum nupkgs/*.nupkg nupkgs/*.snupkg nupkgs/packages.tsv nupkgs/packages.lock.json nupkgs/Test-SharpProofPublishedPackages.sh release-evidence/packages.spdx.json > release-evidence/SHA256SUMS
+      - name: Attest package and evidence provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            nupkgs/*.nupkg
+            nupkgs/*.snupkg
+            nupkgs/packages.tsv
+            nupkgs/packages.lock.json
+            nupkgs/Test-SharpProofPublishedPackages.sh
+            release-evidence/*
+      - name: Attest the package SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: nupkgs/*.nupkg
+          sbom-path: release-evidence/packages.spdx.json
+      - name: Retain release provenance and SBOM evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: release-evidence
+          if-no-files-found: error
+          retention-days: 90
+
   publish:
     name: Publish packages
     concurrency:
@@ -217,6 +319,8 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') &&
       github.repository == 'alexyorke/SharpProof'
     needs:
+      - release-qualification
+      - provenance
       - security
       - package
       - container-verifier
@@ -227,11 +331,28 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      attestations: read
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          merge-multiple: true
           path: nupkgs
+
+      - name: Verify qualified artifact provenance before requesting credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for artifact in nupkgs/*.nupkg nupkgs/*.snupkg nupkgs/packages.tsv nupkgs/packages.lock.json nupkgs/Test-SharpProofPublishedPackages.sh; do
+            gh attestation verify "$artifact" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/package-consumers.yml" \
+              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
+              --predicate-type https://slsa.dev/provenance/v1
+          done
+      - name: Reject public package versions with different bytes
+        if: github.ref_name != 'v1.0.0-preview.1'
+        run: bash nupkgs/Test-SharpProofPublishedPackages.sh preflight nupkgs
 
       - name: Exchange GitHub OIDC token for a temporary NuGet key
         if: github.ref_name != 'v1.0.0-preview.1'
@@ -254,7 +375,15 @@ jobs:
           set -euo pipefail
           test -n "${NUGET_SOURCE}"
           test -n "${NUGET_API_KEY}"
+          push_args=()
+          if [[ "$GITHUB_REF_NAME" != v1.0.0-preview.1 ]]; then
+            push_args+=(--skip-duplicate)
+          fi
           dotnet nuget push "nupkgs/*.nupkg" \
             --source "${NUGET_SOURCE}" \
             --api-key "${NUGET_API_KEY}" \
-            --skip-duplicate
+            "${push_args[@]}"
+
+      - name: Verify public feed package bytes after publication
+        if: github.ref_name != 'v1.0.0-preview.1'
+        run: bash nupkgs/Test-SharpProofPublishedPackages.sh published nupkgs
