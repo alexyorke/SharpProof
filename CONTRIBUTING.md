@@ -23,6 +23,16 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Run every repository quality and link check with one command, including image setup:
+
+```sh
+docker compose run --rm --build lint
+```
+
+Reports are saved under `artifacts/lint`; findings return a failing exit code.
+For host Git worktrees, use `pwsh -File scripts/Invoke-SharpProof.ps1 lint`.
+See [quality gates](eng/lint/README.md) for the check scope.
+
 Apply the repository's `.editorconfig` formatting rules before submitting changes:
 
 ```text

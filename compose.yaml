@@ -73,6 +73,17 @@ services:
       - ./artifacts:/workspace/LoopArtifacts
     command: ["dev", "-lc", "while sleep 1000; do :; done"]
 
+  # Lint tools are layered over the canonical toolchain only for this service.
+  lint:
+    <<: *sharpproof-common
+    image: ${COMPOSE_PROJECT_NAME}-lint:local
+    build:
+      context: .
+      dockerfile: eng/lint/Dockerfile
+      additional_contexts:
+        canonical_tooling: service:tooling
+    command: ["lint"]
+
   tooling:
     <<: *sharpproof-common
     command: ["dev"]
