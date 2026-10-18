@@ -31,7 +31,11 @@ try {
             '--volume', "${pointerPath}:/workspace/SharpProof/.git:ro")
     }
     $service = if ($ToolingArguments[0] -eq 'lint') { 'lint' } else { 'tooling' }
-    if ($service -eq 'lint') { $arguments += '--build' }
+    if ($service -eq 'lint') {
+        # Older Compose releases lose additional service contexts in run --build.
+        & docker compose --project-directory $repositoryRoot build lint
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
     $arguments += @($service) + $ToolingArguments
     & docker @arguments
     $toolingExitCode = $LASTEXITCODE

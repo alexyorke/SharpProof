@@ -14,7 +14,8 @@ Run the same complete check set used by CI with one command:
 docker compose run --rm --build lint
 ```
 
-For host Git worktrees, the wrapper mounts the resolved Git metadata read-only:
+For host Git worktrees or older Compose releases, use the wrapper. It builds the
+images explicitly and mounts resolved worktree Git metadata read-only:
 
 ```powershell
 pwsh -File scripts/Invoke-SharpProof.ps1 lint
@@ -22,7 +23,10 @@ pwsh -File scripts/Invoke-SharpProof.ps1 lint
 
 Docker Compose builds the canonical toolchain and its lint layer in dependency order,
 so no separate setup commands or prebuilt local images are needed. This requires
-Docker Compose 2.17 or newer. Repeated runs reuse Docker's build cache.
+Docker Compose 2.17 or newer with the wrapper. The direct `run --build` form needs
+a recent Compose release with service build context fixes (verified with 5.6.0).
+CI builds explicitly before running to support older runner versions.
+Repeated runs reuse Docker's build cache.
 
 The lint service inherits the canonical Linux amd64 toolchain, container contract,
 resource limits, and private task workspace. The ordinary toolchain does not install

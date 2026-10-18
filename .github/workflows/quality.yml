@@ -28,7 +28,11 @@ jobs:
       - name: Require all repository quality and link checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: docker compose run --rm --build -e GITHUB_TOKEN lint
+        # Build explicitly: older runner Compose versions lose service build
+        # contexts when `run --build` generates its Bake plan.
+        run: |
+          docker compose build lint
+          docker compose run --rm -e GITHUB_TOKEN lint
       - name: Publish quality summary
         if: always()
         run: |
