@@ -24,7 +24,7 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 ## Run validation
 
 ```text
-docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression
+docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~NameOfRegression
 docker compose run --rm tooling pr
 ```
 
@@ -51,6 +51,6 @@ Update versioned artifacts when their meaning or shape changes. Declarative file
 
 ## Documentation and review
 
-Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in the root README, Markdown files under `docs/`, and `samples/README.md` are compiled by [DocumentationSnippetTests](SharpProof.Analyzer.Test/DocumentationSnippetTests.cs); each fence must be a complete compilation unit.
+Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in the root README, Markdown files under `docs/`, and `src/samples/README.md` are compiled by [DocumentationSnippetTests](src/SharpProof.Analyzer.Tests/DocumentationSnippetTests.cs); each fence must be a complete compilation unit.
 
 Describe the user-visible before/after behavior, relevant validation, and material limits in the pull request. Review the resulting diff and stage explicit paths.

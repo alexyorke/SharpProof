@@ -1,6 +1,6 @@
 # Upgrade and compatibility policy
 
-SharpProof is a preview. A checked-in version is not evidence that packages are published. Update the single standard `SharpProof.Verifier` reference from your chosen feed and read release notes before changing a consumer. Its exact-version API/analyzer dependencies restore automatically. The version authority is [SharpProof.Release.props](../SharpProof.Release.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
+SharpProof is a preview. A checked-in version is not evidence that packages are published. Update the single standard `SharpProof.Verifier` reference from your chosen feed and read release notes before changing a consumer. Its exact-version API/analyzer dependencies restore automatically. The version authority is [eng/Versions.props](../eng/Versions.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Compatibility boundaries
 

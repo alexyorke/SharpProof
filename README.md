@@ -26,7 +26,7 @@ Full verification runs on native Linux x64/ARM64, Windows x64, macOS ARM64/x64, 
 
 Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This is a compiler-host requirement, separate from the application's target framework. The canonical image supplies the pinned SDK.
 
-Full verification additionally requires .NET SDK 10.0.100 or newer and its .NET 10 runtime. The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
+Full verification additionally requires .NET SDK 10.0.100 or newer and its .NET 10 runtime. The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
 
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
@@ -59,7 +59,7 @@ From the repository root, with Docker Compose v2 and Linux containers:
 ```text
 docker compose build tooling
 docker compose run --rm tooling contract
-docker compose run --rm tooling test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
+docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
 docker compose run --rm tooling pr
 ```
 

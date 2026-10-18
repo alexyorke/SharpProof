@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\eng\Packaging.props" />
+  <Import Project="..\..\eng\CustomNuspec.props" />
+  <PropertyGroup>
+    <NuspecFile>SharpProof.Verifier.nuspec</NuspecFile>
+    <PackageId>SharpProof.Verifier</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Package\SharpProof.Package.csproj"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.BuildTasks\SharpProof.BuildTasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+  </ItemGroup>
+  <Target Name="_SharpProofPrepareVerifierNuspecProperties"
+          BeforeTargets="GenerateNuspec"
+          DependsOnTargets="_SharpProofPrepareCommonNuspecProperties">
+    <Error Condition="'$(SHARPPROOF_CONTAINER)' != '1'"
+           Text="SharpProof.Verifier packages must be built inside the canonical Linux amd64 container." />
+    <PropertyGroup>
+      <_SharpProofNativePayloadRoot Condition="'$(_SharpProofNativePayloadRoot)' == ''">$(SHARPPROOF_NATIVE_ROOT)</_SharpProofNativePayloadRoot>
+      <NuspecProperties>$(_SharpProofNuspecPrefix);nativeroot=$(_SharpProofNativePayloadRoot);$(_SharpProofNuspecSuffix)</NuspecProperties>
+    </PropertyGroup>
+  </Target>
+</Project>

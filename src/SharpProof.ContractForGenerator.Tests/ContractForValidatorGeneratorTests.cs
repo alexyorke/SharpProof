@@ -1,0 +1,2063 @@
+namespace SharpProof.ContractForGenerator.Test;
+
+[TestFixture]
+public sealed class ContractForValidatorGeneratorTests
+{
+    [Test]
+    public void InvalidGeneratedSourceIsRejectedByTheTestHost()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs", "public sealed class Subject { }"));
+
+        Action action = () =>
+        {
+            _ = GeneratorTestHost.RunWithGenerator(
+                compilation,
+                new InvalidOutputGenerator());
+        };
+        var exception = Assert.Throws<InvalidOperationException>(action);
+
+        Assert.That(exception, Is.Not.Null);
+        Assert.That(exception!.Message, Does.Contain("CS1513"));
+    }
+
+    [Test]
+    public void AnalyzerCrashesRemainVisibleToTheTestHost()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs", "public sealed class Subject { }"));
+
+        var run = GeneratorTestHost.RunWithAnalyzer(
+            compilation,
+            new ThrowingAnalyzer());
+
+        Assert.That(
+            run.Diagnostics.Any(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")),
+            Is.True);
+    }
+
+    [TestCase("double", "-0.0", "0.0")]
+    [TestCase("double", "0.0", "-0.0")]
+    [TestCase("float", "-0.0f", "0.0f")]
+    [TestCase("float", "0.0f", "-0.0f")]
+    [TestCase("decimal", "1.0m", "1.00m")]
+    [TestCase("decimal", "1.00m", "1.0m")]
+    [TestCase("int", "1", "2")]
+    [TestCase("bool", "true", "false")]
+    [TestCase("string", "\"left\"", "\"right\"")]
+    [TestCase("string", "null", "\"value\"")]
+    [TestCase(
+        "System.DayOfWeek",
+        "System.DayOfWeek.Monday",
+        "System.DayOfWeek.Tuesday")]
+    public void DefaultValuesMustMatchExactly(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    [TestCase("double", "0.0", "0.0")]
+    [TestCase("double", "-0.0", "-0.0")]
+    [TestCase("float", "0.0f", "0.0f")]
+    [TestCase("float", "-0.0f", "-0.0f")]
+    [TestCase("double", "double.NaN", "double.NaN")]
+    [TestCase("double", "double.PositiveInfinity", "double.PositiveInfinity")]
+    [TestCase("double", "double.NegativeInfinity", "double.NegativeInfinity")]
+    [TestCase("double", "1.25", "1.25")]
+    [TestCase("float", "-3.5f", "-3.5f")]
+    [TestCase("double", "double.NaN", "-double.NaN")]
+    public void EqualFloatingDefaultsRemainExact(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    private static string CreateDefaultValueSource(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
+        System.ArgumentNullException.ThrowIfNull(type);
+        return $$"""
+            using SharpProof.Attributes;
+            public interface ITarget {
+                void Read({{type}} value = {{targetDefault}});
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    {{type}} value = {{companionDefault}}) {
+                }
+            }
+            """;
+    }
+
+    [Test]
+    public void CompilationReferenceFloatingDefaultBitsMustMatch()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public interface IReferencedTarget {
+                void Read(double value = -0.0);
+            }
+            """,
+            ("ReferencedTargetContracts.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IReferencedTarget))]
+            public static class ReferencedTargetContracts {
+                public static void Read(
+                    IReferencedTarget receiver,
+                    double value = 0.0) {
+                }
+            }
+            """));
+
+        AssertSingle(GeneratorTestHost.RunAnalyzer(compilation), "SPCF0005");
+    }
+
+    [Test]
+    public void GeneratedCompanionFloatingDefaultBitsMustMatch()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public interface ITarget {
+                void Read(float value = -0.0f);
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            // <auto-generated />
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    float value = -0.0f) {
+                }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void FloatingDefaultOverloadsRemainTypeAndBitExact()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public interface ITarget {
+                void Read(float value = -0.0f);
+                void Read(double value = 0.0);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    float value = -0.0f) {
+                }
+                public static void Read(
+                    ITarget receiver,
+                    double value = 0.0) {
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void InterfaceCompanionWithDirectClausesIsValid()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation((
+            "Subject.cs",
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public interface IService {
+                string? Find(string key);
+            }
+
+            [ContractFor(typeof(IService))]
+            public static class IServiceContracts {
+                public static string? Find(IService receiver, string key) {
+                    Contract.Requires(receiver is not null);
+                    Contract.Requires(key.Length > 0);
+                    Contract.Ensures(
+                        Contract.Result<string?>() is null or not null);
+                    return null;
+                }
+            }
+            """));
+
+        var generatedRun = GeneratorTestHost.RunWithDefaultGenerator(compilation);
+        Assert.That(generatedRun.Diagnostics, Is.Empty);
+        Assert.That(generatedRun.RunResult.GeneratedTrees, Is.Empty);
+    }
+
+    [Test]
+    public void AbstractMemberPreservesRefKindsAndNullability()
+    {
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public abstract class Worker {
+                public abstract int Compute(ref int value, in string? label);
+            }
+
+            [ContractFor(typeof(Worker))]
+            public static class WorkerContracts {
+                public static int Compute(
+                    Worker receiver,
+                    ref int value,
+                    in string? label) {
+                    Contract.Requires(receiver is not null);
+                    return value;
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("interface", "void Read(ref readonly int value);")]
+    [TestCase("abstract class", "public abstract void Read(ref readonly int value);")]
+    public void AbstractRefReadonlyParameterMatchesExactStaticCompanion(
+        string targetKind,
+        string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(targetKind);
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public {{targetKind}} Target {
+                {{member}}
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void VirtualRefReadonlyParameterMatchesExactStaticCompanion()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public class Target {
+                public virtual void Read(ref readonly int value) { }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("ref readonly", "ref")]
+    [TestCase("ref readonly", "in")]
+    [TestCase("ref readonly", "out")]
+    [TestCase("ref", "ref readonly")]
+    public void RefReadonlyDoesNotCollapseOtherParameterRefKinds(
+        string targetRefKind,
+        string companionRefKind)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionRefKind);
+        System.ArgumentNullException.ThrowIfNull(targetRefKind);
+        var companionAssignment = companionRefKind == "out"
+            ? "value = 0;"
+            : string.Empty;
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read({{targetRefKind}} int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    {{companionRefKind}} int value) { {{companionAssignment}} }
+            }
+            """);
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    [Test]
+    public void ScopedRefReadonlyMustMatchExactly()
+    {
+        var exact = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(scoped ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    scoped ref readonly int value) { }
+            }
+            """);
+        var mismatch = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(scoped ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(exact.Diagnostics, Is.Empty);
+        AssertSingle(mismatch, "SPCF0005");
+    }
+
+    [Test]
+    public void RefReadonlyParameterDoesNotRelaxReturnOrOverloadSelection()
+    {
+        var exact = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read(ref readonly int value);
+                public abstract void Read(ref readonly int value, int other);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref readonly int Read(
+                    Target receiver,
+                    ref readonly int value) { return ref storage; }
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value,
+                    int other) { }
+            }
+            """);
+        var returnMismatch = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read(ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref int Read(
+                    Target receiver,
+                    ref readonly int value) { return ref storage; }
+            }
+            """);
+
+        Assert.That(exact.Diagnostics, Is.Empty);
+        AssertSingle(returnMismatch, "SPCF0005");
+    }
+
+    [Test]
+    public void MetadataTargetRefReadonlyParameterMatchesCurrentCompanion()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public interface IReferencedTarget {
+                void Read(ref readonly int value);
+            }
+            """,
+            ("CurrentContracts.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IReferencedTarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    IReferencedTarget receiver,
+                    ref readonly int value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedRefReadonlyCompanionRemainsValid()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public interface ITarget {
+                void Read(ref readonly int value);
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    ref readonly int value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [TestCase("ref", "ref")]
+    [TestCase("ref readonly", "ref")]
+    public void RefReturningExpressionBodiedCompanionHasAnOperationBody(
+        string returnKind,
+        string expressionKind)
+    {
+        System.ArgumentNullException.ThrowIfNull(expressionKind);
+        System.ArgumentNullException.ThrowIfNull(returnKind);
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract {{returnKind}} int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static {{returnKind}} int Read(Target receiver) =>
+                    {{expressionKind}} storage;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("ref")]
+    [TestCase("ref readonly")]
+    public void RefReturningBlockBodiedCompanionRemainsValid(string returnKind)
+    {
+        System.ArgumentNullException.ThrowIfNull(returnKind);
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract {{returnKind}} int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static {{returnKind}} int Read(Target receiver) {
+                    return ref storage;
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void OrdinaryExpressionBodyAndMissingBodyClassificationArePreserved()
+    {
+        var ordinary = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Read(); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver) => 1;
+            }
+            """);
+        var missing = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Read(); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static extern int Read(Target receiver);
+            }
+            """);
+
+        Assert.That(ordinary.Diagnostics, Is.Empty);
+        AssertSingle(missing, "SPCF0007");
+    }
+
+    [Test]
+    public void PartialRefReadonlyImplementationExpressionOwnsTheBody()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static partial class TargetContracts {
+                private static int storage;
+                public static partial ref readonly int Read(Target receiver);
+                public static partial ref readonly int Read(Target receiver) =>
+                    ref storage;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedRefReadonlyExpressionBodyRemainsValid()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public abstract class Target {
+                public abstract ref readonly int Read();
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref readonly int Read(Target receiver) =>
+                    ref storage;
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void OpenGenericTargetAndMethodConstraintsMatchStructurally()
+    {
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public interface IRepository<T>
+                where T : class? {
+                TResult Map<TResult>(T value, TResult fallback)
+                    where TResult : notnull, new();
+            }
+
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T>
+                where T : class? {
+                public static TResult Map<TResult>(
+                    IRepository<T> receiver,
+                    T value,
+                    TResult fallback)
+                    where TResult : notnull, new() {
+                    Contract.Requires(receiver is not null);
+                    return fallback;
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GenericFunctionPointerSignaturesMatchStructurally()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer<T> where T : unmanaged {
+                delegate*<T, T> Map(delegate*<T, T> value);
+            }
+
+            [ContractFor(typeof(ITransformer<>))]
+            public static unsafe class TransformerContracts<T>
+                where T : unmanaged {
+                public static delegate*<T, T> Map(
+                    ITransformer<T> receiver,
+                    delegate*<T, T> value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void UnmanagedFunctionPointerConventionOrderIsInterchangeable()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer {
+                delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>
+                    Map(delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int> value);
+            }
+
+            [ContractFor(typeof(ITransformer))]
+            public static unsafe class TransformerContracts {
+                public static delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int>
+                    Map(
+                        ITransformer receiver,
+                        delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) =>
+                        value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedCompanionUsesUnorderedFunctionPointerConventions()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            using SharpProof.Attributes;
+            public unsafe interface ITarget {
+                delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>
+                    Map(delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int> value);
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            // <auto-generated />
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget))]
+            public static unsafe class TargetContracts {
+                public static delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int>
+                    Map(
+                        ITarget receiver,
+                        delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) =>
+                        value;
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void MetadataTargetUsesUnorderedFunctionPointerConventions()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public unsafe interface IMetadataTarget {
+                delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>
+                    Map(delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int> value);
+            }
+            """,
+            ("MetadataContracts.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IMetadataTarget))]
+            public static unsafe class MetadataTargetContracts {
+                public static delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int>
+                    Map(
+                        IMetadataTarget receiver,
+                        delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) =>
+                        value;
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void ThreeUnmanagedFunctionPointerConventionsAreUnordered()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public unsafe interface ITarget {
+                delegate* unmanaged[Cdecl, MemberFunction, SuppressGCTransition]<int, int>
+                    Map(delegate* unmanaged[Cdecl, MemberFunction, SuppressGCTransition]<int, int> value);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static unsafe class TargetContracts {
+                public static delegate* unmanaged[SuppressGCTransition, Cdecl, MemberFunction]<int, int>
+                    Map(
+                        ITarget receiver,
+                        delegate* unmanaged[SuppressGCTransition, Cdecl, MemberFunction]<int, int> value) =>
+                        value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    [TestCase(
+        "delegate* unmanaged[Cdecl, Cdecl]<int, int>",
+        "delegate* unmanaged[Cdecl, Cdecl]<int, int>",
+        0)]
+    [TestCase(
+        "delegate* unmanaged[Cdecl, Cdecl]<int, int>",
+        "delegate* unmanaged[Cdecl]<int, int>",
+        1)]
+    [TestCase(
+        "delegate* unmanaged[Cdecl, Cdecl]<int, int>",
+        "delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>",
+        1)]
+    public void DuplicateUnmanagedFunctionPointerMultiplicityIsExact(
+        string targetPointer,
+        string companionPointer,
+        int expectedDiagnostics)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
+
+        Assert.That(run.Diagnostics, Has.Length.EqualTo(expectedDiagnostics));
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(Enumerable.Repeat("SPCF0005", expectedDiagnostics)));
+    }
+
+    [TestCase(
+        "delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>",
+        "delegate* unmanaged[Cdecl]<int, int>")]
+    [TestCase(
+        "delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>",
+        "delegate* unmanaged[Stdcall, SuppressGCTransition]<int, int>")]
+    public void UnmanagedFunctionPointerConventionSetMustMatchExactly(
+        string targetPointer,
+        string companionPointer)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    private static string CreateUnmanagedFunctionPointerSource(
+        string targetPointer,
+        string companionPointer)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
+        return $$"""
+            using SharpProof.Attributes;
+            public unsafe interface ITarget {
+                {{targetPointer}} Map({{targetPointer}} value);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static unsafe class TargetContracts {
+                public static {{companionPointer}} Map(
+                    ITarget receiver,
+                    {{companionPointer}} value) => value;
+            }
+            """;
+    }
+
+    [TestCase(
+        "delegate* unmanaged[Cdecl]<T, T>",
+        "delegate* unmanaged[Stdcall]<T, T>")]
+    [TestCase("delegate*<ref T, T>", "delegate*<T, T>")]
+    public void FunctionPointerConventionAndRefKindsMustMatch(
+        string targetPointer,
+        string companionPointer)
+    {
+        System.ArgumentNullException.ThrowIfNull(companionPointer);
+        System.ArgumentNullException.ThrowIfNull(targetPointer);
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer<T> where T : unmanaged {
+                {{targetPointer}} Map({{targetPointer}} value);
+            }
+
+            [ContractFor(typeof(ITransformer<>))]
+            public static unsafe class TransformerContracts<T>
+                where T : unmanaged {
+                public static {{companionPointer}} Map(
+                    ITransformer<T> receiver,
+                    {{companionPointer}} value) => value;
+            }
+            """);
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    [Test]
+    public void OpenGenericConstraintOrderIsSemanticallyMatched()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface IFirst {
+            }
+            public interface ISecond {
+            }
+            public interface IRepository<T>
+                where T : IFirst, ISecond {
+                T Select(T value, bool ok);
+            }
+
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T>
+                where T : ISecond, IFirst {
+                public static T Select(
+                    IRepository<T> receiver,
+                    T value,
+                    bool ok) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void TupleElementNamesMatchExactly()
+    {
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                (int Left, string? Right) Read(
+                    (int Left, string? Right) value);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static (int Left, string? Right) Read(
+                    ITarget receiver,
+                    (int Left, string? Right) value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        """
+        public interface ITarget<T> {
+            static abstract void Ping();
+        }
+        [ContractFor(typeof(ITarget<>))]
+        public static class TargetContracts {
+            public static void Ping() {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget<T>
+            where T : class? {
+            static abstract void Ping();
+        }
+        [ContractFor(typeof(ITarget<>))]
+        public static class TargetContracts<T>
+            where T : class {
+            public static void Ping() {
+            }
+        }
+        """)]
+    public void OpenGenericCompanionTypeMustMatchArityAndConstraints(
+        string declarations)
+    {
+        System.ArgumentNullException.ThrowIfNull(declarations);
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+            """ +
+            declarations);
+
+        var diagnostic = AssertSingle(run, "SPCF0003");
+        Assert.That(
+            GetLocatedText(diagnostic),
+            Does.Contain("ContractFor"));
+    }
+
+    [Test]
+    public void EscapedIdentifiersBindBySymbolName()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface IKeywords {
+                int @class(string @event);
+            }
+
+            [ContractFor(typeof(IKeywords))]
+            public static class KeywordContracts {
+                public static int @class(
+                    IKeywords receiver,
+                    string @event) {
+                    Contract.Requires(receiver is not null);
+                    return @event.Length;
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void DuplicateCompanionsAreReportedAtBothAttributes()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class FirstContracts {
+                public static void Invoke(ITarget receiver) {
+                }
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class SecondContracts {
+                public static void Invoke(ITarget receiver) {
+                }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+        Assert.That(
+            run.Diagnostics.All(diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (GetLocatedText(diagnostic).Contains(
+                    "ContractFor",
+                    StringComparison.Ordinal))),
+            Is.True);
+    }
+
+    [Test]
+    public void OpenAndClosedGenericCompanionsAreReportedAsOverlapping()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> {
+                void Invoke(T value);
+            }
+
+            [ContractFor(typeof(ITarget<>))]
+            public static class OpenContracts<T> {
+                public static void Invoke(ITarget<T> receiver, T value) { }
+            }
+
+            [ContractFor(typeof(ITarget<int>))]
+            public static class ClosedContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+    }
+
+    [Test]
+    public void DistinctClosedGenericCompanionsDoNotOverlap()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> {
+                void Invoke(T value);
+            }
+
+            [ContractFor(typeof(ITarget<int>))]
+            public static class IntContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+
+            [ContractFor(typeof(ITarget<string>))]
+            public static class StringContracts {
+                public static void Invoke(ITarget<string> receiver, string value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "typeof(ITarget<>)",
+        "public static class ReferencedContracts<T> { public static void Invoke(ITarget<T> receiver, T value) { } }",
+        "typeof(ITarget<int>)",
+        "public static class SourceContracts { public static void Invoke(ITarget<int> receiver, int value) { } }")]
+    [TestCase(
+        "typeof(ITarget<int>)",
+        "public static class ReferencedContracts { public static void Invoke(ITarget<int> receiver, int value) { } }",
+        "typeof(ITarget<>)",
+        "public static class SourceContracts<T> { public static void Invoke(ITarget<T> receiver, T value) { } }")]
+    public void ReferencedAndSourceGenericCompanionsReportSourceOverlap(
+        string referencedTarget,
+        string referencedCompanion,
+        string sourceTarget,
+        string sourceCompanion)
+    {
+        System.ArgumentNullException.ThrowIfNull(referencedCompanion);
+        System.ArgumentNullException.ThrowIfNull(referencedTarget);
+        System.ArgumentNullException.ThrowIfNull(sourceCompanion);
+        System.ArgumentNullException.ThrowIfNull(sourceTarget);
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            $$"""
+            using SharpProof.Attributes;
+            public interface ITarget<T> { void Invoke(T value); }
+            [ContractFor({{referencedTarget}})]
+            {{referencedCompanion}}
+            """,
+            ("Subject.cs",
+            $$"""
+            using SharpProof.Attributes;
+            [ContractFor({{sourceTarget}})]
+            {{sourceCompanion}}
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.RunAnalyzer(compilation),
+            "SPCF0002");
+        Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+    }
+
+    [Test]
+    public void ReferencedAndSourceDistinctClosedCompanionsDoNotOverlap()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            using SharpProof.Attributes;
+            public interface ITarget<T> { void Invoke(T value); }
+            [ContractFor(typeof(ITarget<int>))]
+            public static class ReferencedContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+            """,
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget<string>))]
+            public static class SourceContracts {
+                public static void Invoke(ITarget<string> receiver, string value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void CompilationReferenceTargetDiagnosticUsesCurrentCompanionLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public interface IReferencedTarget { void Invoke(); }
+            """,
+            ("CurrentCompanion.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IReferencedTarget))]
+            public static class ReferencedTargetContracts { }
+            """));
+
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
+        Assert.That(run.Diagnostics.Length, Is.EqualTo(1));
+        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0004"));
+        var diagnostic = AssertSingle(run, "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("CurrentCompanion.cs"));
+            Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+            Assert.That(
+                compilation.ContainsSyntaxTree(diagnostic.Location.SourceTree!),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void MetadataReferenceTargetDiagnosticUsesCurrentCompanionLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("MetadataCompanion.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IDisposable))]
+            public static class DisposableContracts { }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.RunAnalyzer(compilation),
+            "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("MetadataCompanion.cs"));
+            Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+        }
+    }
+
+    [Test]
+    public void CurrentCompilationTargetDiagnosticUsesTargetLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("CurrentTarget.cs",
+            """
+            public interface ICurrentTarget { void Invoke(); }
+            """),
+            ("CurrentCompanion.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ICurrentTarget))]
+            public static class CurrentTargetContracts { }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.RunAnalyzer(compilation),
+            "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("CurrentTarget.cs"));
+            Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Invoke"));
+        }
+    }
+
+    [Test]
+    public void RepeatedContractForAttributesOnOneCompanionFailClosed()
+    {
+        var compilation =
+            GeneratorTestHost.CreateCompilationWithoutAttributes(
+                ("Subject.cs",
+                """
+                using System;
+                using SharpProof.Attributes;
+
+                namespace SharpProof.Attributes {
+                    [AttributeUsage(
+                        AttributeTargets.Class,
+                        AllowMultiple = true)]
+                    public sealed class ContractForAttribute(Type target)
+                        : Attribute {
+                    }
+                }
+
+                public interface ITarget {
+                    void Invoke();
+                }
+
+                [ContractFor(typeof(ITarget))]
+                [ContractFor(typeof(ITarget))]
+                public static class TargetContracts {
+                    public static void Invoke(ITarget receiver) {
+                    }
+                }
+                """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.RunAnalyzer(compilation),
+            "SPCF0001");
+
+        Assert.That(
+            diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("TargetContracts"));
+    }
+
+    [Test]
+    public void NullContractForTargetFailsClosed()
+    {
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            [ContractFor(null)]
+            public static class InvalidContracts {
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0001");
+        Assert.That(
+            GetLocatedText(diagnostic),
+            Does.Contain("ContractFor"));
+    }
+
+    [TestCase("public struct Target { }")]
+    [TestCase("public enum Target { Value }")]
+    [TestCase("public delegate void Target();")]
+    public void ContractForTargetMustBeAClassOrInterface(
+        string targetDeclaration)
+    {
+        System.ArgumentNullException.ThrowIfNull(targetDeclaration);
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            """ +
+            targetDeclaration +
+            """
+
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0001");
+        Assert.That(
+            GetLocatedText(diagnostic),
+            Does.Contain("ContractFor"));
+    }
+
+    [Test]
+    public void LookalikeAttributeIsNotTrusted()
+    {
+        var run = Run(
+            """
+            using System;
+            using ContractForAttribute = Lookalike.ContractForAttribute;
+
+            public interface ITarget {
+                void Missing();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class NotASharpProofCompanion {
+            }
+
+            namespace Lookalike {
+                [AttributeUsage(AttributeTargets.Class)]
+                public sealed class ContractForAttribute : Attribute {
+                    public ContractForAttribute(Type target) {
+                    }
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void MissingMemberIsReportedAtTargetIdentifier()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Other(ITarget receiver) {
+                }
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0004");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Invoke"));
+    }
+
+    [TestCase(
+        """
+        public interface ITarget {
+            void Read(string? value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(ITarget receiver, string value) {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            void Read(ref int value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(ITarget receiver, out int value) {
+                value = 0;
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            int Read();
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static long Read(ITarget receiver) => 0;
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            T Read<T>(T value) where T : class;
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static T Read<T>(ITarget receiver, T value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        public interface ITarget {
+            void Read(List<string?> value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                List<string> value) {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            void Read();
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read() {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            ref int Read(ref int value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static int Read(
+                ITarget receiver,
+                ref int value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            void Read(int value = 1);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                int value) {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            (int Left, int Right) Read((int Left, int Right) value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static (int Other, int Right) Read(
+                ITarget receiver,
+                (int Other, int Right) value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        public sealed class Outer<T> {
+            public sealed class Leaf {
+            }
+        }
+        public interface ITarget {
+            void Read(Outer<int>.Leaf value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                Outer<string>.Leaf value) {
+            }
+        }
+        """)]
+    public void ExactSignatureMismatchesFailClosed(string declarations)
+    {
+        System.ArgumentNullException.ThrowIfNull(declarations);
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+            """ +
+            declarations);
+
+        var diagnostic = AssertSingle(run, "SPCF0005");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Read"));
+        Assert.That(diagnostic.Descriptor.IsEnabledByDefault, Is.True);
+        Assert.That(
+            diagnostic.Descriptor.Category,
+            Is.EqualTo("SharpProof.ContractFor.Usage"));
+    }
+
+    [Test]
+    public void ExtraOrdinaryCompanionMemberFailsOneToOneMapping()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void M();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void M(ITarget receiver) {
+                }
+
+                public static void Ghost(ITarget receiver) {
+                }
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0005");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Ghost"));
+    }
+
+    [Test]
+    public void VarargCallingConventionMustMatchExactly()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void M(__arglist);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void M(ITarget receiver) {
+                }
+            }
+            """);
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    [Test]
+    public void ObliviousInstanceReceiverMatchesCompanion()
+    {
+        var run = Run(
+            """
+            #nullable disable
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                string M(string value);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static string M(
+                    ITarget receiver,
+                    string value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void NestedGenericOwnerScopesDoNotAliasByOrdinal()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Outer<TOuter> {
+                public interface ITarget<TInner> {
+                    void Read(TOuter value);
+                }
+            }
+
+            [ContractFor(typeof(Outer<>.ITarget<>))]
+            public static class TargetContracts<TContract> {
+                public static void Read(
+                    Outer<TContract>.ITarget<TContract> receiver,
+                    TContract value) {
+                }
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0003");
+        Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+    }
+
+    [TestCase(
+        "public sealed class Middle { public interface ITarget<U> { void Read(T value, U item); } }",
+        "[ContractFor(typeof(Outer<>.Middle.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.Middle.ITarget<U> receiver, T value, U item) { } }")]
+    [TestCase(
+        "public interface ITarget<U> { void Read(T value, U item); }",
+        "public static class Middle { [ContractFor(typeof(Outer<>.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.ITarget<U> receiver, T value, U item) { } } }")]
+    [TestCase(
+        "public sealed class Middle { public interface ITarget<U> { void Read(T value, U item); } }",
+        "public static class Middle { [ContractFor(typeof(Outer<>.Middle.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.Middle.ITarget<U> receiver, T value, U item) { } } }")]
+    [TestCase(
+        "public sealed class First { public sealed class Second { public interface ITarget<U> { void Read(T value, U item); } } }",
+        "public static class First { public static class Second { [ContractFor(typeof(Outer<>.First.Second.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.First.Second.ITarget<U> receiver, T value, U item) { } } } }")]
+    public void GenericOwnersAlignIndependentlyOfNonGenericWrappers(
+        string target,
+        string companion)
+    {
+        System.ArgumentNullException.ThrowIfNull(companion);
+        System.ArgumentNullException.ThrowIfNull(target);
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> where T : class {
+                {{target}}
+            }
+            public static class CompanionOuter<T> where T : class {
+                {{companion}}
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedCompanionAlignsAcrossTargetOnlyWrapper()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public sealed class Outer<T> {
+                public sealed class Middle {
+                    public interface ITarget<U> { void Read(T value, U item); }
+                }
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            public static class CompanionOuter<T> {
+                [ContractFor(typeof(Outer<>.Middle.ITarget<>))]
+                public static class TargetContracts<U> {
+                    public static void Read(
+                        Outer<T>.Middle.ITarget<U> receiver,
+                        T value,
+                        U item) { }
+                }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void StaticAndInstanceOverloadCollapseIsAmbiguous()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Act(int value);
+                static abstract void Act(ITarget receiver, int value);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Act(ITarget receiver, int value) {
+                }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Any(static diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0006")),
+            Is.True);
+        Assert.That(
+            run.Diagnostics.All(static diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0006")),
+            Is.True);
+    }
+
+    [Test]
+    public void BodylessCompanionMemberFailsClosed()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static extern void Invoke(ITarget receiver);
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0007");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Invoke"));
+    }
+
+    [Test]
+    public void SourceDefinedContractForAttributeIsRejected()
+    {
+        AssertShadowedContractForAttributeRejected(includeAttributes: false);
+    }
+
+    [Test]
+    public void ProjectShadowedContractForAttributeIsRejected()
+    {
+        AssertShadowedContractForAttributeRejected(includeAttributes: true);
+    }
+
+    private static void AssertShadowedContractForAttributeRejected(
+        bool includeAttributes)
+    {
+        var source = ("Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [AttributeUsage(AttributeTargets.Class)]
+                public sealed class ContractForAttribute(Type target)
+                    : Attribute {
+                }
+            }
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Invoke(ITarget receiver) {
+                }
+            }
+            """);
+        var compilation = includeAttributes
+            ? GeneratorTestHost.CreateCompilation(source)
+            : GeneratorTestHost.CreateCompilationWithoutAttributes(source);
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.RunAnalyzer(compilation),
+            "SPCF0001");
+        Assert.That(
+            diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("TargetContracts"));
+    }
+
+    [Test]
+    public void EveryInvalidContractClausePlacementIsRejected()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Invoke(ITarget receiver) {
+                    Contract.Requires(receiver is not null);
+                    if (receiver is not null) {
+                        Contract.Ensures(true);
+                    }
+                    void Local() {
+                        Contract.Assume(true);
+                    }
+                    Local();
+                    Contract.Ensures(true);
+                    return;
+                    Contract.Requires(true);
+                }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(Enumerable.Repeat("SPCF0008", 3)));
+        string[] expectedMessages = [
+            "Contract.Ensures in companion method 'Invoke' has invalid placement: Conditional",
+            "Contract.Ensures in companion method 'Invoke' has invalid placement: Late",
+            "Contract.Requires in companion method 'Invoke' has invalid placement: Unreachable"
+        ];
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture))),
+            Is.EquivalentTo(expectedMessages));
+    }
+
+    [Test]
+    public void NestedCallableContractBelongsToTheNestedCallable()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Invoke(ITarget receiver) {
+                    void Local(bool condition) {
+                        Contract.Requires(condition);
+                    }
+                    Local(true);
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("sharpproof_profile")]
+    [TestCase("build_property.sharpproof_profile")]
+    [TestCase("build_property.SharpProofProfile")]
+    public void CompilationGlobalProfileOffDisablesValidationInCustomHosts(
+        string optionKey)
+    {
+        System.ArgumentNullException.ThrowIfNull(optionKey);
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Ghost(ITarget receiver) { }
+            }
+            """));
+
+        var run = GeneratorTestHost.RunAnalyzer(
+            compilation,
+            globalOptions: new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                [optionKey] = " OFF "
+            });
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "sharpproof_profile", "advisory",
+        "build_property.SharpProofProfile", "off", false)]
+    [TestCase(
+        "sharpproof_profile", "off",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "invalid",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "   ",
+        "build_property.SharpProofProfile", " OFF ", false)]
+    [TestCase(
+        "build_property.sharpproof_profile", " advisory ",
+        "build_property.SharpProofProfile", "off", false)]
+    [TestCase(
+        "sharpproof_profile", " AdViSoRy ",
+        "sharpproof_features", "contracts", true)]
+    [TestCase(
+        "sharpproof_profile", "strict",
+        "sharpproof_features", "effects", true)]
+    [TestCase(
+        "sharpproof_features", "all",
+        "build_property.SharpProofProfile", "advisory", true)]
+    [TestCase(
+        "sharpproof_features", "invalid",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "   ",
+        "build_property.SharpProofProfile", "advisory", false)]
+    public void GeneratorUsesTheAuthoritativeConfigurationAliasOrder(
+        string firstKey,
+        string firstValue,
+        string secondKey,
+        string secondValue,
+        bool validationEnabled)
+    {
+        System.ArgumentNullException.ThrowIfNull(firstKey);
+        System.ArgumentNullException.ThrowIfNull(firstValue);
+        System.ArgumentNullException.ThrowIfNull(secondKey);
+        System.ArgumentNullException.ThrowIfNull(secondValue);
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Ghost(ITarget receiver) { }
+            }
+            """));
+        var run = GeneratorTestHost.RunAnalyzer(
+            compilation,
+            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [firstKey] = firstValue,
+                [secondKey] = secondValue
+            });
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            validationEnabled ? Is.EqualTo(["SPCF0004"]) : Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedTreesAreOwnedByTheFinalCompilationAnalyzer()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public interface ITarget {
+                void Invoke();
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+            }
+            """));
+
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
+
+        AssertSingle(run, "SPCF0004");
+    }
+
+    [Test]
+    public void IncrementalRunsAndTreeOrderAreDeterministic()
+    {
+        const string target =
+            """
+            #nullable enable
+            public interface ITarget {
+                string? Read(string value);
+            }
+            """;
+        const string companion =
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static string Read(
+                    ITarget receiver,
+                    string value) => value;
+            }
+            """;
+        const string duplicate =
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(ITarget))]
+            public static class OtherTargetContracts {
+                public static string? Read(
+                    ITarget receiver,
+                    string value) => value;
+            }
+            """;
+        var forwardCompilation = GeneratorTestHost.CreateCompilation(
+            ("02_Target.cs", target),
+            ("03_OtherCompanion.cs", duplicate),
+            ("01_Companion.cs", companion));
+        var reverseCompilation = GeneratorTestHost.CreateCompilation(
+            ("01_Companion.cs", companion),
+            ("02_Target.cs", target),
+            ("03_OtherCompanion.cs", duplicate));
+
+        var first = GeneratorTestHost.RunWithDefaultGenerator(forwardCompilation);
+        var cached = GeneratorTestHost.RunWithDefaultGenerator(
+            forwardCompilation,
+            first.Driver);
+        var reversed = GeneratorTestHost.RunWithDefaultGenerator(reverseCompilation);
+
+        Assert.That(
+            GeneratorTestHost.DiagnosticKeys(cached),
+            Is.EqualTo(GeneratorTestHost.DiagnosticKeys(first)));
+        Assert.That(
+            GeneratorTestHost.DiagnosticKeys(reversed),
+            Is.EqualTo(GeneratorTestHost.DiagnosticKeys(first)));
+        Assert.That(
+            first.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+        var cachedReasons = cached.RunResult.Results
+            .SelectMany(static result => ((result.Equals(default(GeneratorRunResult))) ? throw new System.ArgumentException("Value must be initialized.", nameof(result)) : (result.TrackedSteps.Values)))
+            .SelectMany(static steps => steps)
+            .SelectMany(static step => step is null ? throw new System.ArgumentNullException(nameof(step)) : (step.Outputs))
+            .Select(static output => output.Reason)
+            .ToImmutableArray();
+        Assert.That(cachedReasons, Is.Empty);
+        Assert.That(first.RunResult.GeneratedTrees, Is.Empty);
+        Assert.That(cached.RunResult.GeneratedTrees, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratorContainsNoTextualBindingOrSourceSynthesis()
+    {
+        var root = TestRepository.FindRoot();
+        var files = Directory.GetFiles(
+            Path.Combine(root, "src/SharpProof.ContractForGenerator"),
+            "*.cs",
+            SearchOption.AllDirectories);
+        string[] forbidden = [
+            "ToDisplayString(",
+            "SyntaxFactory.",
+            "ParseExpression(",
+            "ParseStatement(",
+            "ParseTypeName(",
+            "AddSource("
+        ];
+
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            foreach (var token in forbidden)
+            {
+                Assert.That(text, Does.Not.Contain(token), file);
+            }
+        }
+    }
+
+    private static AnalyzerRun Run(string source)
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        return GeneratorTestHost.RunAnalyzer(
+            GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
+    }
+
+    private static Diagnostic AssertSingle(
+        AnalyzerRun run,
+        string diagnosticId)
+    {
+        System.ArgumentNullException.ThrowIfNull(diagnosticId);
+        System.ArgumentNullException.ThrowIfNull(run);
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo([diagnosticId]),
+            string.Join(Environment.NewLine, run.Diagnostics.Select(
+                static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        return run.Diagnostics[0];
+    }
+
+    private static string GetLocatedText(Diagnostic diagnostic)
+    {
+        var tree = diagnostic.Location.SourceTree ??
+                   throw new InvalidOperationException(
+                       "Expected a source diagnostic.");
+        return tree.GetText()
+            .GetSubText(diagnostic.Location.SourceSpan)
+            .ToString();
+    }
+
+}
+
+internal sealed class InvalidOutputGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
+        if (context.Equals(default(IncrementalGeneratorInitializationContext)))
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        context.RegisterPostInitializationOutput(static postInitialization =>
+            {
+                if ((postInitialization.Equals(default(IncrementalGeneratorPostInitializationContext))))
+                { throw new System.ArgumentException("Value must be initialized.", nameof(postInitialization)); }
+                postInitialization.AddSource(
+                "Invalid.g.cs",
+                "public sealed class Generated {");
+            });
+    }
+}
+
+#pragma warning disable RS1036, RS1041, RS2008
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+internal sealed class ThrowingAnalyzer : DiagnosticAnalyzer
+{
+    private static readonly DiagnosticDescriptor FailureRule = new(
+        "SPTEST0001",
+        "Throwing test analyzer",
+        "Throwing test analyzer",
+        "SharpProof.Tests",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        [FailureRule];
+
+    public override void Initialize(AnalysisContext context)
+    {
+        System.ArgumentNullException.ThrowIfNull(context);
+        context.EnableConcurrentExecution();
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.RegisterCompilationAction(static _ =>
+            throw new InvalidOperationException("Intentional analyzer failure."));
+    }
+}
+#pragma warning restore RS1036, RS1041, RS2008

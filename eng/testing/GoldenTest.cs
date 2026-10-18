@@ -114,7 +114,7 @@ internal static class GoldenTest
 
     private static void RequireRepository(string root)
     {
-        if (!File.Exists(Path.Combine(root, "SharpProof.slnx")) || !File.Exists(Path.Combine(root, "SharpProof.Release.props")))
+        if (!File.Exists(Path.Combine(root, "SharpProof.slnx")) || !File.Exists(Path.Combine(root, "eng/Versions.props")))
         {
             throw new DirectoryNotFoundException("The original golden source is not a SharpProof repository.");
         }

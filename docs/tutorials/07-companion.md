@@ -59,7 +59,7 @@ Validation runs at compilation end after generator syntax is available. The pack
 
 They are useful for separating an API contract from its implementation and for keeping a reviewed interface specification visible. Verify implementations separately, and investigate unsupported dispatch/body claims when enabling the native worker.
 
-The [ContractFor sample](../../samples/ContractFor/ServiceContracts.cs) demonstrates the same package-backed pattern. The [diagnostic guide](../diagnostic-examples.md#contractfor-diagnostics) explains all ten errors.
+The [ContractFor sample](../../src/samples/ContractFor/ServiceContracts.cs) demonstrates the same package-backed pattern. The [diagnostic guide](../diagnostic-examples.md#contractfor-diagnostics) explains all ten errors.
 
 ## Captured output
 

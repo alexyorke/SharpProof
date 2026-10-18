@@ -54,3 +54,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Microsoft.DotNet.Arcade.Sdk and eng/common bootstrapper scripts
+Version: 9.0.0-beta.26507.8
+Source: https://github.com/dotnet/arcade/tree/ca4c91e56da9ae88fc62578058d8aee531679dba
+License: MIT (https://github.com/dotnet/arcade/blob/ca4c91e56da9ae88fc62578058d8aee531679dba/LICENSE.TXT)

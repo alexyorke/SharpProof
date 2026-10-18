@@ -1,12 +1,12 @@
 <Project>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'ConsoleLoggingAnalyzer' AND '$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
-    <ProjectReference Include="$(MSBuildThisFileDirectory)eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
+  <ItemGroup Condition="'$(SharpProofProjectName)' != 'ConsoleLoggingAnalyzer' AND '$(SharpProofProjectName)' != 'DefensiveCodingAnalyzer'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
                       GlobalPropertiesToRemove="BaseIntermediateOutputPath;MSBuildProjectExtensionsPath;IntermediateOutputPath;BaseOutputPath;OutputPath;OutDir"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(MSBuildProjectName)' != 'SharpProof.Analyzer.Test' AND '$(RunAnalyzersDuringBuild)' != 'false'">
-    <ProjectReference Include="$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj"
+  <ItemGroup Condition="'$(SharpProofProjectName)' != 'DefensiveCodingAnalyzer' AND '$(SharpProofProjectName)' != 'SharpProof.Analyzer.Test' AND '$(RunAnalyzersDuringBuild)' != 'false'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all"
@@ -23,8 +23,8 @@
 
   <Target Name="_CopySharpProofCompilerRuntime"
           AfterTargets="Build"
-          Condition="'$(MSBuildProjectName)' == 'SharpProof.Gates' Or
-                    '$(MSBuildProjectName)' == 'SharpProof.Gates.Test'">
+          Condition="'$(SharpProofProjectName)' == 'SharpProof.Gates' Or
+                    '$(SharpProofProjectName)' == 'SharpProof.Gates.Test'">
     <Copy SourceFiles="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll;$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll"
           DestinationFolder="$(TargetDir)" />
   </Target>
@@ -39,4 +39,14 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
 
+  <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+  <!-- Retain the published preview version instead of Arcade's developer/CI suffix. -->
+  <PropertyGroup>
+    <Version>$(SharpProofPackageVersion)</Version>
+    <PackageVersion>$(SharpProofPackageVersion)</PackageVersion>
+    <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
+    <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
+    <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
 </Project>

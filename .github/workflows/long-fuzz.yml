@@ -103,7 +103,7 @@ jobs:
             -e SHARPPROOF_LONGFUZZ_MINUTES="$MINUTES" \
             -e SHARPPROOF_LONGFUZZ_OUTPUT="$LONGFUZZ_OUTPUT" \
             tooling test \
-            -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj \
+            -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj \
             -TestFilter TestCategory=LongFuzz &
           fuzz_pid=$!
           # vstest does not stream test output, so follow the harness event

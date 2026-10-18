@@ -21,7 +21,7 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus and bounded fuzz; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
-The dispatcher [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
+The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
 
 [Documentation maintenance](documentation-maintenance.md) explains generation and update PRs. The [generated reference](generated/source-reference.md) preserves literal declarations; the authored guides explain their behavior and limitations.
 
@@ -29,16 +29,16 @@ The dispatcher [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofCont
 
 The dispatcher defaults to `-Configuration Debug`, `-Target SharpProof.slnx`, no filter, and no supplied package feed. `pr` selects Release internally. `pr-gates` and `fuzz-nightly` require Release; coverage and packing build Release internally. `-Target` selects input for restore/build/test, rather than overriding specialized suites.
 
-`-NoBuild` and `-Fast` are supported for `test`, `test-changed`, `semantic-tests`, `portable-tests`, `worker-tests`, and `package-tests`. `-NoBuild` requires existing outputs in the same workspace. `-Fast` disables build analyzers for development feedback; it does not remove generation or tests. `-ReuseTestHarness` is specific to `package-tests`. See [Invoke-SharpProofPackageTests.ps1](../scripts/Invoke-SharpProofPackageTests.ps1) for package harness preparation and scheduling.
+`-NoBuild` and `-Fast` are supported for `test`, `test-changed`, `semantic-tests`, `portable-tests`, `worker-tests`, and `package-tests`. `-NoBuild` requires existing outputs in the same workspace. `-Fast` disables build analyzers for development feedback; it does not remove generation or tests. `-ReuseTestHarness` is specific to `package-tests`. See [Invoke-SharpProofPackageTests.ps1](../eng/scripts/Invoke-SharpProofPackageTests.ps1) for package harness preparation and scheduling.
 
 Change selection includes tracked differences and nonignored untracked paths. The comparison order is `-ComparisonRef`, `SHARPPROOF_CHANGED_BASE_REF`, `HEAD` for a dirty checkout, then `HEAD^` for a clean checkout. Selection follows project references, imports, linked inputs, and shared build files; uncertain ownership expands to the full graph. A first commit without `HEAD^` needs an explicit comparison. The dispatcher exposes the environment variable; script-only options are used in the persistent container:
 
 ```text
-pwsh -NoLogo -NoProfile -File scripts/Invoke-SharpProofChangedTests.ps1 -ComparisonRef origin/master -PlanOnly
-pwsh -NoLogo -NoProfile -File scripts/Invoke-SharpProofDevCheck.ps1 -Configuration Release -PlanOnly
+pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofChangedTests.ps1 -ComparisonRef origin/master -PlanOnly
+pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofDevCheck.ps1 -Configuration Release -PlanOnly
 ```
 
-`-PlanOnly` prints selection or the developer command plan without running the selected builds/tests. These script parameters are not dispatcher parameters. Sources: [changed-test selection](../scripts/Invoke-SharpProofChangedTests.ps1), [developer check](../scripts/Invoke-SharpProofDevCheck.ps1), and [command plan](../scripts/Get-SharpProofDevCheckPlan.ps1).
+`-PlanOnly` prints selection or the developer command plan without running the selected builds/tests. These script parameters are not dispatcher parameters. Sources: [changed-test selection](../eng/scripts/Invoke-SharpProofChangedTests.ps1), [developer check](../eng/scripts/Invoke-SharpProofDevCheck.ps1), and [command plan](../eng/scripts/Get-SharpProofDevCheckPlan.ps1).
 
 ## Canonical PR cohorts
 
@@ -50,7 +50,7 @@ The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCa
 
 `All` is the default cohort. `Remaining` and `Gates` require retained test results and the exact canonical filter. `pr` retains package phases and rejects Gates-only selection. `-SemanticCohort` and `-TestResultsDirectory` apply only to `pr`, `pr-gates`, and `semantic-tests`.
 
-Reconciliation checks actual NUnit discovery, TRX execution identities/outcomes, source identity, and the CI run/attempt evidence. The six existing Explicit LongFuzz skips have specific allowed identities and reasons; additional skipped tests fail reconciliation. Two independently successful job labels alone do not replace this gate. Sources: [semantic scheduler](../scripts/Invoke-SharpProofSemanticTests.ps1) and [cohort evidence validator](../scripts/SharpProof.CanonicalCohortEvidence.ps1).
+Reconciliation checks actual NUnit discovery, TRX execution identities/outcomes, source identity, and the CI run/attempt evidence. The six existing Explicit LongFuzz skips have specific allowed identities and reasons; additional skipped tests fail reconciliation. Two independently successful job labels alone do not replace this gate. Sources: [semantic scheduler](../eng/scripts/Invoke-SharpProofSemanticTests.ps1) and [cohort evidence validator](../eng/scripts/SharpProof.CanonicalCohortEvidence.ps1).
 
 ## Coverage collection and acceptance
 
@@ -64,41 +64,41 @@ Choose the actual change base. CI resolves the PR base SHA, the preceding push S
 
 [coverage.yml](../.github/workflows/coverage.yml) instead collects `coverage-shard -CoveragePhase semantic` and `coverage-shard -CoveragePhase package` on separate runners. The semantic half includes the isolated Attributes run. Each half emits normalized Cobertura reports, `coverage-authority.json`, and report-manifest evidence under `artifacts/coverage/<phase>`. CI downloads both successful shards, then runs `coverage-gate` with its comparison ref. It preserves each successful shard's artifact attempt when only failed jobs are rerun.
 
-`-CoveragePhase` is valid only for `coverage-shard`, and must select `semantic` or `package`. `coverage-gate` requires both downloaded phases and rejects preexisting merged authority or reports outside those phases. It checks the shard evidence, rebuilds production source/PDB authority, merges line hits using maximum hits within each authenticated production module, and enforces the same coverage criteria. Each project includes its authenticated linked `Compile` sources; aggregate coverage sums distinct module/source/sequence-point obligations, including separate copies of shared source compiled into different production assemblies. The shard collection alone does not enforce final acceptance. Sources: [collection](../scripts/Invoke-SharpProofCoverage.ps1), [shard evidence](../scripts/SharpProof.CoverageShardEvidence.ps1), and [coverage validation](../scripts/Test-SharpProofCoverage.ps1).
+`-CoveragePhase` is valid only for `coverage-shard`, and must select `semantic` or `package`. `coverage-gate` requires both downloaded phases and rejects preexisting merged authority or reports outside those phases. It checks the shard evidence, rebuilds production source/PDB authority, merges line hits using maximum hits within each authenticated production module, and enforces the same coverage criteria. Each project includes its authenticated linked `Compile` sources; aggregate coverage sums distinct module/source/sequence-point obligations, including separate copies of shared source compiled into different production assemblies. The shard collection alone does not enforce final acceptance. Sources: [collection](../eng/scripts/Invoke-SharpProofCoverage.ps1), [shard evidence](../eng/scripts/SharpProof.CoverageShardEvidence.ps1), and [coverage validation](../eng/scripts/Test-SharpProofCoverage.ps1).
 
-Inspect `SharpProof.coverage.json` with the reports and `artifacts/timings/*-coverage.json`. Preserve source commit, comparison SHA, configuration, binary/PDB identity, denominators, and individual shard evidence when comparing results. [Production inventory](../scripts/Get-SharpProofProductionInventory.ps1) derives the coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. The acceptance contract classifies trusted pipeline projects/paths; the coverage baseline defines line floors and declaration-only coverage classification, with its project set checked against evaluated inventory. Changing collection layout does not authorize changing these authorities.
+Inspect `SharpProof.coverage.json` with the reports and `artifacts/timings/*-coverage.json`. Preserve source commit, comparison SHA, configuration, binary/PDB identity, denominators, and individual shard evidence when comparing results. [Production inventory](../eng/scripts/Get-SharpProofProductionInventory.ps1) derives the coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. The acceptance contract classifies trusted pipeline projects/paths; the coverage baseline defines line floors and declaration-only coverage classification, with its project set checked against evaluated inventory. Changing collection layout does not authorize changing these authorities.
 
 The changed-TCB percentage measures changed lines with an authenticated PDB span or direct collector record, including generated and zero-hit spans. `changedTcb.unmappedLines` separately lists changed lines without either measurement; these receive no execution credit. This reporting requires valid syntax and matching source, module, PDB, and collector evidence from every owning compilation. Missing evidence still fails the gate. The 100% floor applies to measurable lines; it does not establish execution or semantic correctness for unmapped lines.
 
 ## Corpus and native effect oracles
 
-`corpus` prints a structured result with case counts, support counts, Unknown reasons, replay counts, and failures. [The corpus guide](../SharpProof.Gates/README.md) describes the case universe and independent ratchets. Use `sp corpus-update -Configuration Release` only for an intentional observation refresh in a persistent workspace, then review the source changes. A finite task copy discards ordinary source edits.
+`corpus` prints a structured result with case counts, support counts, Unknown reasons, replay counts, and failures. [The corpus guide](../src/SharpProof.Gates/README.md) describes the case universe and independent ratchets. Use `sp corpus-update -Configuration Release` only for an intentional observation refresh in a persistent workspace, then review the source changes. A finite task copy discards ordinary source edits.
 
-The [Gates executable](../SharpProof.Gates/Program.cs) also exposes five developer oracle modes: `exception-oracle`, `allocation-oracle`, `purity-oracle`, `capability-oracle`, and `effectcontract-oracle`. These are executable subcommands rather than `tooling` commands. Inside the canonical container:
+The [Gates executable](../src/SharpProof.Gates/Program.cs) also exposes five developer oracle modes: `exception-oracle`, `allocation-oracle`, `purity-oracle`, `capability-oracle`, and `effectcontract-oracle`. These are executable subcommands rather than `tooling` commands. Inside the canonical container:
 
 ```text
-dotnet run --project SharpProof.Gates/SharpProof.Gates.csproj -c Release -- exception-oracle --limit 5
+dotnet run --project src/SharpProof.Gates/SharpProof.Gates.csproj -c Release -- exception-oracle --limit 5
 ```
 
-Omit `--limit` or use zero for the full pinned method universe. Positive limits select method IDs in ordinal order and cannot exceed the universe size. A partial run is explicitly nonexhaustive. Reports include the universe hash/count, checked count, native outcomes/reasons, runtime observations, and reachable-source summary counts. [NativeEffectOracleGate.cs](../SharpProof.Gates/Corpus/NativeEffectOracleGate.cs) consumes the compiler artifact and independently checks applicable IL/runtime witnesses. Some purity/capability/lock cases explicitly report an oracle as not run; a successful report is not a runtime witness for every effect verdict. These reports do not publish worker proof authority.
+Omit `--limit` or use zero for the full pinned method universe. Positive limits select method IDs in ordinal order and cannot exceed the universe size. A partial run is explicitly nonexhaustive. Reports include the universe hash/count, checked count, native outcomes/reasons, runtime observations, and reachable-source summary counts. [NativeEffectOracleGate.cs](../src/SharpProof.Gates/Corpus/NativeEffectOracleGate.cs) consumes the compiler artifact and independently checks applicable IL/runtime witnesses. Some purity/capability/lock cases explicitly report an oracle as not run; a successful report is not a runtime witness for every effect verdict. These reports do not publish worker proof authority.
 
 ## Bounded fuzz campaigns
 
-[Invoke-SharpProofFuzzCampaign.ps1](../scripts/Invoke-SharpProofFuzzCampaign.ps1) combines a UTC-day rotating seed with [retained seeds](../eng/fuzz/retained-seeds.json). The current contract requests 10,000 rotating cases; the retained manifest requests 1,000 per seed. The total campaign cap is 1,000,000. The runner is rebuilt from clean exact-commit source, and source identity is checked again after rebuilding and after the campaign.
+[Invoke-SharpProofFuzzCampaign.ps1](../eng/scripts/Invoke-SharpProofFuzzCampaign.ps1) combines a UTC-day rotating seed with [retained seeds](../eng/fuzz/retained-seeds.json). The current contract requests 10,000 rotating cases; the retained manifest requests 1,000 per seed. The total campaign cap is 1,000,000. The runner is rebuilt from clean exact-commit source, and source identity is checked again after rebuilding and after the campaign.
 
 `tooling fuzz-nightly -Configuration Release` writes `artifacts/fuzz/nightly`. The script's advanced options are `-OutputDirectory`, `-RotatingSeed`, `-RotatingCases`, and `-RetainedCases`; zero case overrides use the configured budgets. Run advanced invocations in the persistent container. Output ownership is leased so overlapping writers cannot replace the same campaign. Each rotating/retained run produces `.stdout.json` and `.stderr.txt`; validated results feed `campaign.json`, including requested/observed counts, seeds, commit, and pass status. Missing, malformed, incomplete, or mismatched runner evidence fails the campaign.
 
 For a bounded individual replay, the fuzz executable accepts `--cases` (default 1,000, range 1..1,000,000), `--seed` (signed 32-bit integer, default `0x5A17`), and `--max-parallelism` (default 4, range 1..4):
 
 ```text
-dotnet run --project Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj -c Release -- --cases 1000 --seed 23063 --max-parallelism 4
+dotnet run --project src/SharpProof.Fuzz/SharpProof.Fuzz.csproj -c Release -- --cases 1000 --seed 23063 --max-parallelism 4
 ```
 
-Sources: [FuzzOptions.cs](../Tools/SharpProof.Fuzz/FuzzOptions.cs), [FuzzRunner.cs](../Tools/SharpProof.Fuzz/FuzzRunner.cs), and [evidence lifecycle](../scripts/SharpProof.FuzzEvidenceLifecycle.ps1). A standalone replay does not produce a qualified clean-source campaign envelope. [nightly.yml](../.github/workflows/nightly.yml) schedules the full nightly profile and uploads its artifacts even on failure.
+Sources: [FuzzOptions.cs](../src/SharpProof.Fuzz/FuzzOptions.cs), [FuzzRunner.cs](../src/SharpProof.Fuzz/FuzzRunner.cs), and [evidence lifecycle](../eng/scripts/SharpProof.FuzzEvidenceLifecycle.ps1). A standalone replay does not produce a qualified clean-source campaign envelope. [nightly.yml](../.github/workflows/nightly.yml) schedules the full nightly profile and uploads its artifacts even on failure.
 
 ## LongFuzz exploration and finding review
 
-The six Explicit harnesses and their feature families are described in [container development](container-development.md#long-running-fuzz-campaign). They share the process's wall-clock budget; remaining time is apportioned among harnesses. Environment defaults in [LongFuzzSession.cs](../SharpProof.Worker.Test/LongFuzz/LongFuzzSession.cs) are:
+The six Explicit harnesses and their feature families are described in [container development](container-development.md#long-running-fuzz-campaign). They share the process's wall-clock budget; remaining time is apportioned among harnesses. Environment defaults in [LongFuzzSession.cs](../src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs) are:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -113,7 +113,7 @@ The NUnit harnesses record findings and continue. [long-fuzz.yml](../.github/wor
 
 ## Packed qualification and evidence inspection
 
-`pack` exports the exact three-package graph to `artifacts/container-packages`; it requires clean exact-commit source. Run `package-consumers -Configuration Release -PackageSource artifacts/container-packages` and `samples` against those bytes. Consumer qualification also selects the pinned minimum SDK for framework consumers. The sample harness checks eight package-only projects, expected diagnostics, strict Proven claims, and mixed typed outcomes; see [samples](../samples/README.md).
+`pack` exports the exact three-package graph to `artifacts/container-packages`; it requires clean exact-commit source. Run `package-consumers -Configuration Release -PackageSource artifacts/container-packages` and `samples` against those bytes. Consumer qualification also selects the pinned minimum SDK for framework consumers. The sample harness checks eight package-only projects, expected diagnostics, strict Proven claims, and mixed typed outcomes; see [samples](../src/samples/README.md).
 
 [Release process](../eng/release/README.md) describes branch versus tag qualification, platform consumers, and feed routing. Keep the uploaded package artifact's source identity with consumer results. [Golden tests](../tests/golden/README.md) documents all four fixture stages and guarded original-workspace updates.
 

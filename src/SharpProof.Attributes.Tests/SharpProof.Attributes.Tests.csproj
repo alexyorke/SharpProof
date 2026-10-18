@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SharpProof.Attributes.Test</AssemblyName>
+    <RootNamespace>SharpProof.Attributes.Test</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <None Include="..\..\artifacts\bin\SharpProof.Attributes\$(Configuration)\netstandard2.0\SharpProof.Attributes.xml"
+          Link="SharpProof.Attributes.xml"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

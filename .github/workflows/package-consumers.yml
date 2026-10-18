@@ -39,8 +39,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
-          prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' SharpProof.Release.props)"
-          template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' SharpProof.Release.props)"
+          prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' eng/Versions.props)"
+          template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' eng/Versions.props)"
           version="${template//\$(SharpProofVersionPrefix)/$prefix}"
           test "v${version}" = "${GITHUB_REF_NAME}"
 
@@ -54,20 +54,20 @@ jobs:
       - name: Smoke test project templates against the exact package graph
         run: >-
           docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File scripts/Install-SharpProofTemplates.ps1
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Install-SharpProofTemplates.ps1
           -Verify -PackageSource artifacts/container-packages'
 
       - name: Smoke test the consumer performance harness (one iteration)
         # This verifies the harness and proof quality; it is not a statistical baseline.
         run: >-
           docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File scripts/Measure-SharpProofConsumerPerformance.ps1
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Measure-SharpProofConsumerPerformance.ps1
           -PackageSource artifacts/container-packages -Iterations 1'
 
       - name: Validate read-only doctor regressions
         run: >-
           docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofDoctor.ps1'
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofDoctor.ps1'
 
       - name: Upload NuGet artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -118,7 +118,7 @@ jobs:
       - name: Prove and refute with one package and default settings
         shell: pwsh
         run: >-
-          ./scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          ./eng/scripts/Test-SharpProofPlugAndPlayConsumer.ps1
           -PackageSource nupkgs -OsFamily linux
           -Architecture ${{ matrix.architecture }}
 
@@ -153,24 +153,24 @@ jobs:
           path: nupkgs
       - name: Run the portable consumer against the packed packages
         run: >-
-          pwsh scripts/Test-SharpProofPortableConsumer.ps1
+          pwsh eng/scripts/Test-SharpProofPortableConsumer.ps1
           -PackageSource nupkgs -OsFamily ${{ matrix.family }}
           -Architecture ${{ matrix.architecture }}
       - name: Check the packed Windows Z3 DLL on a native Windows runner
         if: matrix.family == 'windows'
         run: >-
-          pwsh scripts/Test-SharpProofWindowsNativePayload.ps1
+          pwsh eng/scripts/Test-SharpProofWindowsNativePayload.ps1
           -PackageSource nupkgs
       - name: Prove and refute with one package and default settings on Windows
         if: matrix.family == 'windows'
         run: >-
-          pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          pwsh eng/scripts/Test-SharpProofPlugAndPlayConsumer.ps1
           -PackageSource nupkgs -OsFamily windows
           -Architecture ${{ matrix.architecture }}
       - name: Run native Windows proofs against the exact packed verifier
         if: matrix.family == 'windows'
         run: >-
-          pwsh scripts/Test-SharpProofWindowsProofs.ps1
+          pwsh eng/scripts/Test-SharpProofWindowsProofs.ps1
           -PackageSource nupkgs
 
   macos-verifier:
@@ -196,12 +196,12 @@ jobs:
           path: nupkgs
       - name: Prove and refute with one package and default settings on macOS
         run: >-
-          pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          pwsh eng/scripts/Test-SharpProofPlugAndPlayConsumer.ps1
           -PackageSource nupkgs -OsFamily macos
           -Architecture ${{ matrix.architecture }}
       - name: Prove a claim and reject a modified native payload
         run: >-
-          pwsh scripts/Test-SharpProofMacOsVerifierConsumer.ps1
+          pwsh eng/scripts/Test-SharpProofMacOsVerifierConsumer.ps1
           -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
 
   publish:

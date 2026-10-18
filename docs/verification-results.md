@@ -10,7 +10,7 @@ Finite repository tooling tasks use disposable private source copies. Retain exp
 
 The three JSON files form one evidence set. The request binds the compiler artifact path and hash; the response binds the request and input identities and embeds its selected manifest. A result copied from another compilation, worker, or budget is insufficient. Stable output is published after invocation validation; an old file's existence does not establish that the latest build succeeded.
 
-Source: [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), [publication](../SharpProof.BuildTasks/VerificationPublication.cs), and [published-result validation](../SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs). Regression evidence includes [actual result-file admission](../SharpProof.Worker.Test/ActualLauncherResultFileAdmissionTests.cs) and [compiler capture/cache workflows](../SharpProof.Worker.Test/Pr275ActualCompilerCaptureCacheTests.cs).
+Source: [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), [publication](../src/SharpProof.BuildTasks/VerificationPublication.cs), and [published-result validation](../src/SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs). Regression evidence includes [actual result-file admission](../src/SharpProof.Worker.Tests/ActualLauncherResultFileAdmissionTests.cs) and [compiler capture/cache workflows](../src/SharpProof.Worker.Tests/Pr275ActualCompilerCaptureCacheTests.cs).
 
 ## Read results in this order
 
@@ -25,9 +25,9 @@ After validating a worker response, the build prints a readable summary: run/fai
 | Evidence | `Vacuity`, `ProofCore`, `Model`, `EffectCertainty`, `EffectWitness`, `Assumptions` | Conditions, dependencies, counterexample inputs, and source sites needed to interpret that outcome |
 | Execution | `Summary`: `Versions`, `Budgets`, `ElapsedMilliseconds`, `CacheStatus`, `CacheHit` | The worker/specification identity, configured limits, timing, and reuse status |
 
-The table uses C# protocol member names; JSON properties use camel case (`runStatus`, `claimResults`, `summary.cacheStatus`) and enum values use names such as `Complete` and `Proven`. See the [protocol model](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [serializer configuration](../SharpProof.Worker.Protocol/ProtocolJsonSupport.cs). JSON is a versioned protocol, not a hand-written receipt format. IDs connect manifest entries and results. Missing, duplicate, foreign, or inconsistent results fail validation; counting successful diagnostics is not an accountability check.
+The table uses C# protocol member names; JSON properties use camel case (`runStatus`, `claimResults`, `summary.cacheStatus`) and enum values use names such as `Complete` and `Proven`. See the [protocol model](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [serializer configuration](../src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs). JSON is a versioned protocol, not a hand-written receipt format. IDs connect manifest entries and results. Missing, duplicate, foreign, or inconsistent results fail validation; counting successful diagnostics is not an accountability check.
 
-[Protocol tests](../SharpProof.Worker.Test/ProtocolJsonTests.cs), [expanded manifest checks](../SharpProof.Worker.Test/ProtocolExpandedManifestAuthorityTests.cs), and [result projection tests](../SharpProof.Worker.Test/TotalClaimResultTests.cs) exercise these boundaries.
+[Protocol tests](../src/SharpProof.Worker.Tests/ProtocolJsonTests.cs), [expanded manifest checks](../src/SharpProof.Worker.Tests/ProtocolExpandedManifestAuthorityTests.cs), and [result projection tests](../src/SharpProof.Worker.Tests/TotalClaimResultTests.cs) exercise these boundaries.
 
 ## Selection and individual claims
 
@@ -35,7 +35,7 @@ A callable can be selected for effects, contracts, or both. Selection reasons in
 
 `Requires` restricts entry and produces obligations at modeled calls. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
 
-See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs), and [manifest regression tests](../SharpProof.Worker.Test/ClaimManifestBuilderTests.cs).
+See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../src/SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs), and [manifest regression tests](../src/SharpProof.Worker.Tests/ClaimManifestBuilderTests.cs).
 
 ## Proofs, models, and replay
 
@@ -47,7 +47,7 @@ Approximated heap reads, opaque call results, impossible aliases, or unsupported
 
 An effect refutation additionally identifies a concrete `EffectWitness` with kind, detail, effects, capabilities, exception hierarchy where relevant, and source location. A metadata effect without a source site cannot supply a definite emitted violation. Evidence certainty distinguishes a complete body summary, a trusted complete external boundary, a definite violation, incomplete/unavailable summaries, and vacuous entry.
 
-Read [Unknown reasons](unknown-reasons.md) for the full reason list. Source and behavioral evidence: [proof kernel](../SharpProof.Verify/ProofKernel.cs), [replay validator](../SharpProof.Verify/CallableReplayValidator.cs), [field replay tests](../SharpProof.Worker.Test/NativeFieldRefutationReplayTests.cs), [effect witness matrix](../SharpProof.Worker.Test/Wave8ProtocolEffectWitnessContractMatrixTests.cs), and [string/model projection tests](../SharpProof.Worker.Test/TotalClaimResultTests.cs).
+Read [Unknown reasons](unknown-reasons.md) for the full reason list. Source and behavioral evidence: [proof kernel](../src/SharpProof.Verify/ProofKernel.cs), [replay validator](../src/SharpProof.Verify/CallableReplayValidator.cs), [field replay tests](../src/SharpProof.Worker.Tests/NativeFieldRefutationReplayTests.cs), [effect witness matrix](../src/SharpProof.Worker.Tests/Wave8ProtocolEffectWitnessContractMatrixTests.cs), and [string/model projection tests](../src/SharpProof.Worker.Tests/TotalClaimResultTests.cs).
 
 ## Vacuity and assumptions
 
@@ -64,7 +64,7 @@ Read [Unknown reasons](unknown-reasons.md) for the full reason list. Source and 
 
 Each assumption has an ID, kind, and `Used` flag. A declared assumption and a used proof dependency answer different questions. The assumption policy applies to declared user assumptions and trusted boundaries; `error` does not reject every precondition, source-domain fact, or API specification. A contradictory entry must not mark an unrelated point assumption used.
 
-The SARIF projection marks a vacuous proof for review. See [source-assumption tests](../SharpProof.Worker.Test/WorkerVcSourceAssumeTests.cs), [assumption provenance tests](../SharpProof.Worker.Test/NativeCallAssumptionProvenanceTests.cs), and [policy projection](../SharpProof.Worker/Launcher/SarifProjection.cs).
+The SARIF projection marks a vacuous proof for review. See [source-assumption tests](../src/SharpProof.Worker.Tests/WorkerVcSourceAssumeTests.cs), [assumption provenance tests](../src/SharpProof.Worker.Tests/NativeCallAssumptionProvenanceTests.cs), and [policy projection](../src/SharpProof.Worker/Launcher/SarifProjection.cs).
 
 ## Policy and SARIF
 
@@ -83,7 +83,7 @@ SARIF includes rule IDs such as `SharpProof.Proven`, `SharpProof.Refuted`, and `
 
 The worker launcher has internal failure exit codes as well as semantic policy failures; use the recorded status/reason and build diagnostic to distinguish them. A zero ordinary compiler exit code or suppressed analyzer diagnostic is insufficient evidence of verification.
 
-Source: [SARIF projection](../SharpProof.Worker/Launcher/SarifProjection.cs), [launcher presentation](../SharpProof.Worker/Launcher/LauncherProjections.generated.cs), [launcher program](../SharpProof.Worker/Launcher/LauncherProgram.cs). [SARIF policy tests](../SharpProof.Worker.Test/WorkerSarifPolicyCoverageTests.cs) check that reporting preserves evidence.
+Source: [SARIF projection](../src/SharpProof.Worker/Launcher/SarifProjection.cs), [launcher presentation](../src/SharpProof.Worker/Launcher/LauncherProjections.generated.cs), [launcher program](../src/SharpProof.Worker/Launcher/LauncherProgram.cs). [SARIF policy tests](../src/SharpProof.Worker.Tests/WorkerSarifPolicyCoverageTests.cs) check that reporting preserves evidence.
 
 ## Cache reuse and resource failures
 
@@ -95,7 +95,7 @@ Cache keys bind the compiler artifact, worker binary, specification identity, pr
 
 First classify an Unknown as a model limitation, resource limit, replay issue, or infrastructure failure. Adjust a budget only for evidence of exhaustion. Preserve the original inputs and compare verdicts and end-to-end time if evaluating a change. [SMT lifecycle](smt-lifecycle.md) explains cancellation and accounting.
 
-Source: [cache eligibility](../SharpProof.Worker/VerificationCache.cs). Regression evidence: [cache input identity](../SharpProof.Worker.Test/WorkerCacheHashInputCoverageTests.cs), [unavailable cache](../SharpProof.Worker.Test/WorkerCacheAvailabilityCoverageTests.cs), and [eviction failures](../SharpProof.Worker.Test/WorkerCacheEvictionAvailabilityCoverageTests.cs).
+Source: [cache eligibility](../src/SharpProof.Worker/VerificationCache.cs). Regression evidence: [cache input identity](../src/SharpProof.Worker.Tests/WorkerCacheHashInputCoverageTests.cs), [unavailable cache](../src/SharpProof.Worker.Tests/WorkerCacheAvailabilityCoverageTests.cs), and [eviction failures](../src/SharpProof.Worker.Tests/WorkerCacheEvictionAvailabilityCoverageTests.cs).
 
 ## Troubleshooting sequence
 

@@ -5,7 +5,7 @@
       "label": "SharpProof: targeted tests (Docker)",
       "type": "process",
       "command": "pwsh",
-      "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/Invoke-SharpProof.ps1", "test", "-Target", "${input:testProject}", "-TestFilter", "${input:testFilter}"],
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/eng/scripts/Invoke-SharpProof.ps1", "test", "-Target", "${input:testProject}", "-TestFilter", "${input:testFilter}"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": "$msCompile",
       "group": { "kind": "test", "isDefault": true }
@@ -22,7 +22,7 @@
       "label": "SharpProof: pack (Docker)",
       "type": "process",
       "command": "pwsh",
-      "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/Invoke-SharpProof.ps1", "pack", "-Configuration", "Release"],
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/eng/scripts/Invoke-SharpProof.ps1", "pack", "-Configuration", "Release"],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": "$msCompile"
     }

@@ -15,7 +15,7 @@ internal static class TestRepository
         return RepositoryRoot.Find(
             start,
             "SharpProof.slnx",
-            "SharpProof.Release.props") ??
+            "eng/Versions.props") ??
             throw new DirectoryNotFoundException(
                 "Could not locate the SharpProof repository root.");
     }
