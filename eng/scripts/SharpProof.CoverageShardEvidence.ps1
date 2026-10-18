@@ -28,7 +28,7 @@ function Save-SharpProofCoverageCohort {
         if ($descriptor.PSObject.Properties.Name -contains 'EvidenceKind') {
             if ([string]$descriptor.EvidenceKind -cne 'ArchitectureOnly' -or
                 $name -cne 'architecture' -or
-                $target.Replace('\', '/') -cnotmatch '(^|/)SharpProof\.ArchitectureTest/SharpProof\.ArchitectureTest\.csproj$') {
+                $target.Replace('\', '/') -cnotmatch '(^|/)src/SharpProof\.Architecture\.Tests/SharpProof\.Architecture\.Tests\.csproj$') {
                 throw 'Only the exact noninstrumented architecture task may use architecture-only receipt evidence.'
             }
             $architectureEvidence = $true
@@ -38,8 +38,32 @@ function Save-SharpProofCoverageCohort {
         }
         elseif ($target.EndsWith('.csproj', [StringComparison]::Ordinal)) { @($target) }
         else { @() }
+        $projectBaseDirectory = (Get-Location).Path
+        if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
+            $projectBaseDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($target))
+            $solutionPath = [string](Get-Content -LiteralPath $target -Raw | ConvertFrom-Json).solution.path
+            if (-not [IO.Path]::IsPathRooted($solutionPath)) {
+                $solutionPath = Join-Path $projectBaseDirectory $solutionPath
+            }
+            $projectBaseDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($solutionPath))
+        }
         $requiredAssemblies = @($requiredProjects | ForEach-Object {
-            [IO.Path]::GetFileNameWithoutExtension(([string]$_).Replace('\', '/')) + '.dll'
+            $project = ([string]$_).Replace('\', '/')
+            if (-not [IO.Path]::IsPathRooted($project)) {
+                $project = Join-Path $projectBaseDirectory $project
+            }
+            $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
+            if (Test-Path -LiteralPath $project -PathType Leaf) {
+                [xml]$projectDocument = Get-Content -LiteralPath $project -Raw
+                $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
+                if ($null -ne $declaredName) {
+                    $assemblyName = [string]$declaredName.InnerText
+                    if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
+                        throw "Coverage task '$name' has an unresolved assembly identity: $project"
+                    }
+                }
+            }
+            $assemblyName + '.dll'
         } | Sort-Object -Unique)
         $observedAssemblies = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($receipt in $receipts) {

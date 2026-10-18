@@ -62,6 +62,25 @@ try {
         throw "Invalid evidence was accepted: '$Message'."
     }
 
+    # Arcade project filenames can differ from retained assembly identities.
+    # Both direct project and solution-filter receipts must use AssemblyName.
+    [IO.File]::WriteAllText($report, '<coverage />')
+    $aliasProject = Join-Path $temporary 'Alias.Tests.csproj'
+    $filterDirectory = Join-Path $temporary 'filters'
+    [void][IO.Directory]::CreateDirectory($filterDirectory)
+    $filterPath = Join-Path $filterDirectory 'Fixture.slnf'
+    [IO.File]::WriteAllText($filterPath, '{"solution":{"path":"../Fixture.slnx","projects":["Alias.Tests.csproj"]}}')
+    foreach ($coverageTarget in @($aliasProject, $filterPath)) {
+        $expected[0].Target = $coverageTarget
+        [IO.File]::WriteAllText($aliasProject, '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>fixture</AssemblyName></PropertyGroup></Project>')
+        Save-SharpProofCoverageCohort -Root $temporary -Expected $expected -Completed $completed
+        [IO.File]::WriteAllText($aliasProject, '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>other</AssemblyName></PropertyGroup></Project>')
+        Assert-EvidenceRejected -Action {
+            Save-SharpProofCoverageCohort -Root $temporary -Expected $expected -Completed $completed
+        } -Message "Coverage task 'fixture' has no test receipt for expected assembly 'other.dll'."
+    }
+    $expected[0].Target = 'fixture.csproj'
+
     # Same-second VSTest runs may reuse deployment and attachment names. Each
     # project's receipt must resolve its own attachment under its task root.
     $isolatedRoot = Join-Path $temporary 'isolated-projects'
