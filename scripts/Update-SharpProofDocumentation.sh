@@ -60,7 +60,7 @@ Refreshes the deterministic reference from the current package property declarat
 
 Generated facts need review alongside any affected authored guides. Narrative behavior and external links are not automatically validated by generation. Existing analyzer tests compile maintained C# examples; generated literal source excerpts are text. The canonical documentation gate checks source drift and local Markdown links and anchors, and runs positive and negative regression fixtures.
 
-GitHub suppresses push and pull_request workflows created with GITHUB_TOKEN. This updater explicitly dispatches the canonical workflows against this branch. Required checks and normal review still apply; no automatic merge is enabled.
+Bot-created pull request workflows may require human approval. This updater explicitly dispatches the canonical test, coverage, package and image-security workflows against this branch. If GitHub queues the default CodeQL run for approval, a maintainer must approve that run before merging. Required checks and normal review still apply; no automatic merge is enabled.
 BODY
 if [[ -z "$existing" ]]; then
   gh pr create --base "$DEFAULT_BRANCH" --head "$branch" --title 'docs: refresh source declaration reference' --body-file artifacts/docs/pr-body.md
@@ -71,3 +71,4 @@ fi
 gh workflow run ci.yml --ref "$branch"
 gh workflow run coverage.yml --ref "$branch" -f comparison_ref="$GITHUB_SHA"
 gh workflow run package-consumers.yml --ref "$branch"
+gh workflow run toolchain-security.yml --ref "$branch"
