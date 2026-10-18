@@ -85,10 +85,21 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrMemberId field, IrTerm value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        receiver = ArgumentNullGuard.NotNull(receiver, nameof(receiver));
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        return FieldStore(block, operation, region, receiver, field, value, null);
+    }
+
+    public IrWriteInstruction FieldStore(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm receiver,
+        IrMemberId field, IrTerm value, IrTerm? key)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
         RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
-            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value))));
+            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value)), key));
     }
 
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
@@ -316,7 +327,11 @@ public sealed class IrProgramBuilder(IrFactory factory)
         {
             var fieldInfo = _factory.GetMemberInfo(field);
             if (write.Region is not (IrWriteRegion.Field or IrWriteRegion.Parameter) || write.Target == null ||
-                write.Index != null || write.Value == null ||
+                write.Value == null ||
+                (write.Index == null ? !fieldInfo.ParameterTypes.IsEmpty :
+                    fieldInfo.ParameterTypes.Length != 1 ||
+                    ValidateTerm(write.Index, "index") != fieldInfo.ParameterTypes[0] ||
+                    _factory.GetTypeInfo(write.Index.Type).Kind != IrTypeKind.Integer) ||
                 !IrFieldSites.IsField(_factory, field) || fieldInfo.IsStatic ||
                 _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
                 ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)

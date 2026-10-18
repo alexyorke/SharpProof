@@ -1000,18 +1000,18 @@ public sealed partial class IrWriteInstruction : IrInstruction
     { Region = IrWriteRegion.Element; Target = target; Index = index; Value = value; }
 
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
-        IrTerm target, IrMemberId field, IrTerm value)
+        IrTerm target, IrMemberId field, IrTerm value, IrTerm? key = null)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = region; Target = target; Field = field; Value = value; }
+    { Region = region; Target = target; Field = field; Value = value; Index = key; }
 
     public IrWriteRegion Region { get; }
-    // A store names its array and index, or its object and field, and the
+    // A store names its array and index, or its object, field and optional key, and the
     // stored value; other writes are effect sites only.
     public IrTerm? Target { get; }
     public IrTerm? Index { get; }
     public IrMemberId? Field { get; }
     public IrTerm? Value { get; }
-    public bool IsElementStore => Index != null;
+    public bool IsElementStore => Index != null && Field == null;
     public bool IsFieldStore => Field != null;
     public bool IsStore => Value != null;
 }

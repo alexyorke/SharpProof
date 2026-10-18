@@ -66,7 +66,7 @@ duplicate registrations. Mutation controls verify that removing an API/facet or
 postcondition witness, accepting a wrong claim, or omitting edge inputs is detected.
 
 `intrinsic-test-evidence.json` and `.md` cover the audited string, integer comparison,
-and concrete Count invariants. The inventory test compiles comparison expressions through the
+concrete Count invariants, and the guarded fresh-dictionary state slice. The inventory test compiles expressions through the
 production frontend, and interprets their result and receiver-safety conditions against
 runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
 and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
@@ -246,6 +246,25 @@ arbitrary callers receive no implementation assumptions. Alias and smaller sourc
 helper postconditions also run through the worker. The full swap postcondition
 currently reaches the worker verification-condition construction budget; runtime
 model evidence does not turn that Unknown into a proof.
+
+### Fresh scalar dictionary state
+
+Parameterless framework `Dictionary<TKey,TValue>` construction now establishes
+empty shared state for proven local, unescaped receivers with primitive integer
+keys and scalar values. Count, successful Add, present-key index reads, ContainsKey
+and simple index assignments observe that shared state through aliases. Key equality
+preserves the full integer width; argument evaluation captures values before later
+mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
+closure escape, published references and unsupported type domains keep fallback.
+
+Initialization retains conservative allocation, static cache/capability and fault
+paths. Native replay observes fixed real CoreLib primitive dictionary operations
+before selecting an initialized normal return. Resource/error paths and precise
+capacity/growth behavior remain open. These five partial declaration registrations
+have executed normal-state and wrong-claim evidence; CLR/IR oracle and native tests
+cover all nine integer key types. They grant no universal API, exception, allocation
+or callback guarantee. The complete boundaries and remaining corpus sites are in
+[gaps.md](gaps.md#verified-dictionary-state-slice).
 
 ### Highest remaining priorities
 

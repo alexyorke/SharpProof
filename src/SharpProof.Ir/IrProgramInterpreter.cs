@@ -529,7 +529,9 @@ public sealed partial class IrWriteInstruction
             if (element.Status != IrEvaluationStatus.Value)
             { return IrProgramInterpreter.FromEvaluation(element, this, state.Values, state.Steps); }
             // The lowering guards the store, so an invalid one is not C#.
-            if (position != null)
+            if (this.Field is { } keyedField && position != null && target.Value!.Kind == IrValueKind.Reference)
+            { state.Values.Heap.StoreKeyedField(target.Value, keyedField, position.Value!, element.Value!); }
+            else if (position != null)
             {
                 if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
                 { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "An element store was not in bounds."); }
