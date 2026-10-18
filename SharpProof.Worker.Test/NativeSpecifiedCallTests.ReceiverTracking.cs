@@ -74,14 +74,18 @@ public sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayEffects("[DoesNotThrow]", "object value",
             "return ((System.Collections.Generic.IList<int>)(int[])value).Count;", false, null, null);
     }
-    [Test]
-    public async Task CorpusSwapRetainsConcreteArrayReceiverAcrossItsGenericHelper()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CorpusSwapRetainsConcreteArrayReceiverAcrossItsGenericHelper(bool local)
     {
         var declaration = await CorpusSwapDeclaration();
+        if (local)
+        { declaration = declaration.Replace("public static void Swap<T>(this ", "static void Swap<T>(", StringComparison.Ordinal); }
         using var project = WorkerTests.TestProject.Create(
             "using System.Collections.Generic; public static class C { " +
-            "public static int Target(int[] values, int first, int second, int read) { C.Swap<int>(values, first, second); return values[read]; } " +
-            declaration + " }");
+            "public static int Target(int[] values, int first, int second, int read) { " +
+            (local ? "Swap<int>" : "C.Swap<int>") + "(values, first, second); return values[read]; " +
+            (local ? declaration : "") + " } " + (local ? "" : declaration) + " }");
         project.UseNetCoreReferencePack();
         var compilation = project.CreateCompilation();
         var tree = compilation.SyntaxTrees.Single();
