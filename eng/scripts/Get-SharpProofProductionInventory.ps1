@@ -146,7 +146,7 @@ function Get-MsBuildQueries {
         $hostPath = Join-Path $temporaryPath 'SharpProof.ProductionMsBuildHost.dll'
         $compilerArguments = @($compilerPath, '-nologo', '-noconfig', '-nostdlib+',
             '-target:exe', ('-out:' + $hostPath)) + $references + @($sourcePath)
-        $compilerArguments += (Join-Path $PSScriptRoot '../eng/logging/RepositoryLogger.cs')
+        $compilerArguments += (Join-Path $PSScriptRoot '../logging/RepositoryLogger.cs')
         $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
         if ($LASTEXITCODE -ne 0) {
             throw ('Production inventory SDK host compilation failed: ' +

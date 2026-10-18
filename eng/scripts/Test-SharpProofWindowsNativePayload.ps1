@@ -24,7 +24,7 @@ if ($packages.Count -ne 1) {
     throw "Expected one packed SharpProof.Verifier package; found $($packages.Count)."
 }
 
-$catalogPath = Join-Path $PSScriptRoot '../eng/container/toolchain.json'
+$catalogPath = Join-Path $PSScriptRoot '../container/toolchain.json'
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
 $expected = $catalog.z3.windows
 $entryPath = 'tools/native/win-x64/libz3.dll'

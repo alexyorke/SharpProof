@@ -87,6 +87,13 @@ foreach ($relative in $files) {
     Require (-not ($relative -match '^(scripts|tools|samples)/')) "Source path uses a retired root: $relative"
     if ($classification -eq 'pinned-upstream-bootstrapper') { continue }
     $absolute = Join-Path $repositoryRoot $relative
+    if ($relative -match '^eng/scripts/[^/]+\.(ps1|psm1)$') {
+        $scriptText = Get-Content -LiteralPath $absolute -Raw
+        foreach ($reference in [regex]::Matches($scriptText, 'Join-Path\s+\$PSScriptRoot\s+''([^'']+)''')) {
+            $scriptTarget = Join-Path (Split-Path -Parent $absolute) $reference.Groups[1].Value
+            Require (Test-Path -LiteralPath $scriptTarget) "Missing script-relative input in ${relative}: $($reference.Groups[1].Value)"
+        }
+    }
     if ($relative.EndsWith('.csproj', [StringComparison]::Ordinal)) {
         Require ($relative.StartsWith('src/', [StringComparison]::Ordinal)) "Source project is outside src: $relative"
         Require ($coveredProjects.Contains($relative)) "Project is absent from all checked-in solutions: $relative"
