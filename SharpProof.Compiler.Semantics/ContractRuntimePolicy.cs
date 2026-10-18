@@ -1,4 +1,4 @@
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class ContractRuntimePolicy
 {
@@ -25,9 +25,9 @@ internal static class ContractRuntimePolicy
         return false;
     }
 
-    internal static InvalidAnalyzerConfigurationValue InvalidConfiguration()
+    internal static InvalidCompilerConfigurationValue InvalidConfiguration()
     {
-        return new InvalidAnalyzerConfigurationValue(
+        return new InvalidCompilerConfigurationValue(
             ConfigurationKey,
             ContractApiCatalog.ConditionalSymbol,
             "Ghost clauses do not check conditions; Result/Old throw when executed; remove SHARPPROOF_CONTRACTS before compiling.");

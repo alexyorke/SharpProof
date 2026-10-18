@@ -4,7 +4,7 @@ internal interface IAnalyzerSessionFactory
 {
     AnalyzerSession Create(
         Compilation compilation,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken);
 }
 
@@ -18,7 +18,7 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 
     public AnalyzerSession Create(
         Compilation compilation,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
@@ -29,14 +29,6 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 
 internal sealed class AnalyzerSession
 {
-    private readonly Lazy<ExternalEffectResolver> _effectContracts;
-    private readonly Lazy<ContractSelectionInventory> _attributes;
-    private readonly Lazy<ContractClauseInventoryBuilder> _contractClauses;
-    private readonly Lazy<EffectiveContractSourceResolver> _contractSources;
-    private readonly Lazy<ContractBinder> _contractBinder;
-    private readonly Lazy<ContractIntrinsicValidator> _contractIntrinsics;
-    private readonly Lazy<ResolvedApiSpecTable> _apiSpecs;
-    private readonly CancellationToken _cancellationToken;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedAttributes = new();
@@ -59,96 +51,65 @@ internal sealed class AnalyzerSession
 
     internal AnalyzerSession(
         Compilation compilation,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken,
         Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
-        _cancellationToken = cancellationToken;
         ClausePlacement = new(compilation, cancellationToken);
         _outcomeObserver = outcomeObserver;
-        _attributes = CreateLazy(
-            () => ContractSelectionInventory.ForCompilation(compilation));
-        _contractClauses = CreateLazy(
-            () => ContractClauseInventoryBuilder.ForCompilation(compilation));
-        _contractSources = CreateLazy(
-            () => EffectiveContractSourceResolver.ForCompilation(
-                compilation,
-                cancellationToken));
-        _contractIntrinsics = CreateLazy(
-            () => new ContractIntrinsicValidator(compilation));
-        _contractBinder = CreateLazy(
-            () => ContractBinder.CreateWithContractSources(
-                compilation,
-                IrFactory,
-                GetValue(_contractClauses),
-                GetValue(_contractSources)));
-        _apiSpecs = CreateLazy(
-            () => new ApiSpecResolver(ApiSpecTable.Default).Resolve(
-                compilation));
-        _effectContracts = CreateLazy(
-            () => new ExternalEffectResolver(compilation, GetValue(_apiSpecs)));
+        Semantics = new(compilation, cancellationToken);
+
     }
 
     internal Compilation Compilation
     {
         get;
     }
-    internal AnalyzerConfiguration Configuration
+    internal CompilerConfiguration Configuration
     {
         get;
     }
     internal ContractSelectionInventory Attributes =>
-        GetValue(_attributes);
+        Semantics.Attributes;
     internal ContractClausePlacementDiagnostics ClausePlacement { get; }
-    internal IrFactory IrFactory { get; } = new();
-    internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
-    internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
+    internal CompilerSemanticSession Semantics { get; }
+    internal IrFactory IrFactory => Semantics.IrFactory;
+    internal ResolvedApiSpecTable ApiSpecs => Semantics.ApiSpecs;
+    internal bool HasCreatedApiSpecs => Semantics.HasCreatedApiSpecs;
 
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
-        var normalized = method.ReducedFrom ?? method;
-        return (normalized.PartialImplementationPart ?? normalized).OriginalDefinition;
+        return CompilerSemanticSession.NormalizeMethod(method);
     }
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return GetValue(_contractClauses).Create(
-            method,
-            implementationBody: null,
-            cancellationToken: _cancellationToken);
+        return Semantics.GetContractClauses(method);
     }
 
     internal EffectiveContractSourceResolution ResolveContractSource(
         IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return GetValue(_contractSources).Resolve(
-            method,
-            implementationBody: null,
-            cancellationToken: _cancellationToken);
+        return Semantics.ResolveContractSource(method);
     }
 
     internal bool IsContractCompanion(IMethodSymbol method)
     {
-        _cancellationToken.ThrowIfCancellationRequested();
-        method = ArgumentNullGuard.NotNull(method, nameof(method));
-        return ContractForSymbolMatcher.IsCompanionType(
-            GetValue(_contractSources).Companions,
-            method.ContainingType);
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return Semantics.IsContractCompanion(method);
     }
 
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return GetValue(_contractBinder).BindRequires(
-            method,
-            _cancellationToken);
+        return Semantics.BindRequires(method);
     }
 
     // Whether a call to the method may have to establish a precondition: a
@@ -156,28 +117,14 @@ internal sealed class AnalyzerSession
     internal bool HasPotentialCallPreconditions(
         IMethodSymbol method)
     {
-        method = NormalizeMethod(method);
-        if (method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))))
-        {
-            return true;
-        }
-
-        var binding = BindRequires(method);
-        return !binding.IsSuccess ||
-            binding.Contracts is not { } contracts ||
-            contracts.Clauses.Any(static clause =>
-                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return Semantics.HasPotentialCallPreconditions(method);
     }
 
     internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        method = NormalizeMethod(method);
-        return method.DeclaringSyntaxReferences.IsEmpty &&
-            method.Parameters.Any(parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
-                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsRejectedClosedContract(attribute)))));
+        return Semantics.HasRejectedMetadataPrecondition(method);
     }
 
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
@@ -191,45 +138,29 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
         ContractClauseInventory inventory)
     {
-        inventory = ArgumentNullGuard.NotNull(inventory, nameof(inventory));
-        var body = inventory.ImplementationBody;
-        if (inventory.Callable.MethodKind == MethodKind.Constructor)
-        {
-            for (var operation = body; operation != null; operation = operation.Parent)
-            {
-                if (operation is IConstructorBodyOperation &&
-                    operation.Syntax is ConstructorDeclarationSyntax { Initializer: not null })
-                {
-                    body = operation;
-                    break;
-                }
-            }
-        }
-        return GetContractIntrinsicViolations(
-            inventory.Callable,
-            body);
+        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
+        return Semantics.GetContractIntrinsicViolations(inventory);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
         IMethodSymbol callable,
         IOperation? body)
     {
-        return GetValue(_contractIntrinsics).Validate(
-            callable,
-            body,
-            includeNestedCallables: true);
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
+        return Semantics.GetContractIntrinsicViolations(callable, body);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetMemberInitializerContractIntrinsicViolations(
         IOperation initializer)
     {
-        return GetValue(_contractIntrinsics).ValidateMemberInitializer(initializer);
+        initializer = RepositoryParameterGuard.NotNull(initializer, nameof(initializer));
+        return Semantics.GetMemberInitializerContractIntrinsicViolations(initializer);
     }
 
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return GetValue(_effectContracts).ResolveContract(method);
+        return Semantics.ResolveEffectContract(method);
     }
 
     internal void RecordSemanticOutcome(
@@ -315,24 +246,4 @@ internal sealed class AnalyzerSession
                 0);
     }
 
-    private Lazy<T> CreateLazy<T>(Func<T> valueFactory)
-    {
-        valueFactory = RepositoryParameterGuard.NotNull(valueFactory, nameof(valueFactory));
-        return new Lazy<T>(
-            () =>
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                var value = valueFactory();
-                _cancellationToken.ThrowIfCancellationRequested();
-                return value;
-            },
-            LazyThreadSafetyMode.ExecutionAndPublication);
-    }
-
-    private T GetValue<T>(Lazy<T> value)
-    {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        _cancellationToken.ThrowIfCancellationRequested();
-        return value.Value;
-    }
 }

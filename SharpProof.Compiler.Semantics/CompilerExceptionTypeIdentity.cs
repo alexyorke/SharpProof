@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class CompilerExceptionTypeIdentity
 {

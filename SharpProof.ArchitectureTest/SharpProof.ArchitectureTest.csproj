@@ -2,4 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+  <Target Name="_WriteArchitectureInventory" BeforeTargets="Build">
+    <ItemGroup>
+      <_ArchitectureProject Include="$(MSBuildProjectDirectory)/../*/*.csproj;$(MSBuildProjectDirectory)/../Tools/*/*.csproj;$(MSBuildProjectDirectory)/../eng/*/*.csproj" />
+    </ItemGroup>
+    <MSBuild Projects="@(_ArchitectureProject)" Targets="_SharpProofGetArchitectureItems" BuildInParallel="false">
+      <Output TaskParameter="TargetOutputs" ItemName="_ArchitectureItem" />
+    </MSBuild>
+    <MakeDir Directories="$(TargetDir)" />
+    <WriteLinesToFile File="$(TargetDir)architecture-items.tsv"
+                      Lines="@(_ArchitectureItem->'%(ProjectName)|%(Kind)|%(Identity)')"
+                      Overwrite="true" Encoding="UTF-8" />
+  </Target>
 </Project>

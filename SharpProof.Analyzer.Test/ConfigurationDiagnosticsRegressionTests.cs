@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -18,7 +18,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
             failGlobalOptions: true);
 
         Assert.Throws<AggregateException>(
-            (Action)(() => AnalyzerConfiguration.FromOptions(provider)));
+            (Action)(() => CompilerConfiguration.FromOptions(provider)));
     }
 
     [Test]
@@ -39,7 +39,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
                 SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
                     compilation,
                     options,
-                    AnalyzerConfiguration.AdvisoryAll,
+                    CompilerConfiguration.AdvisoryAll,
                     TestContext.CurrentContext.CancellationToken)));
     }
 

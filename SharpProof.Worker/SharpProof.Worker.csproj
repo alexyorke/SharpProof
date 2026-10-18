@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <DefineConstants>$(DefineConstants);SHARPPROOF_WORKER_ADVISORY_TRANSFER</DefineConstants>
     <TargetFramework>net10.0</TargetFramework>
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Analyzer.Core\Advisory\AdvisoryScalarIntervalTransfer.cs" Link="Advisory\AdvisoryScalarIntervalTransfer.cs" />
     <ProjectReference Include="..\SharpProof.Logging\SharpProof.Logging.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />

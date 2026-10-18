@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Attributes;
 using SharpProof.Testing;
 
@@ -35,7 +35,7 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
 
     public AnalyzerSession Create(
         Compilation compilation,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);

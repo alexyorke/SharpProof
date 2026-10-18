@@ -19,34 +19,6 @@ internal sealed partial record EffectClaimEvaluation(
     object[] DiagnosticArguments
 );
 
-internal sealed partial record EffectClaimConstraint(
-    EffectContractKind Effects,
-    EffectContractCapabilityKind Capabilities,
-    ImmutableArray<INamedTypeSymbol> ExceptionTypes
-);
-
-internal enum PotentialRequiresCallOrigin
-{
-    Operation,
-    ImplicitBaseConstructor,
-    ExplicitPrimaryBaseConstructor
-}
-
-internal sealed record PotentialRequiresCallSite(
-    IMethodSymbol Owner,
-    IOperation Origin,
-    SyntaxNode Syntax,
-    PotentialRequiresCallOrigin OriginKind,
-    int CallRoleIndex,
-    IMethodSymbol DeclaredTarget,
-    IMethodSymbol Target,
-    IOperation? Instance,
-    ImmutableArray<IArgumentOperation> Arguments,
-    ImmutableDictionary<int, IOperation> ExplicitArguments,
-    ImmutableDictionary<int, long> ImplicitIntegerArguments,
-    bool CanReplay
-);
-
 internal sealed partial class SharpProofAnalyzerEngine
 {
     private readonly partial record struct AdvisoryActivation(

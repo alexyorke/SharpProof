@@ -1,6 +1,6 @@
 using SharpProof.Frontend.Host;
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 // The one Total IR body lowering behind the compiler's claims and the
 // analyzer's advisories. Source callees are inlined with their Requires, and

@@ -3,10 +3,10 @@
   "minimumAggregateLinePercent": 100,
   "minimumChangedTcbLinePercent": 100.0,
   "declarationOnlyTcbFiles": [
-    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+    "SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
     "SharpProof.Smt/GlobalUsings.cs",
     "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
-    "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
+    "eng/shared/Polyfills/NotNullAttribute.cs",
     "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
@@ -33,6 +33,7 @@
     "SharpProof.Specs": 100.0,
     "SharpProof.Verify": 100.0,
     "SharpProof.Worker": 100,
-    "SharpProof.Worker.Protocol": 100.0
+    "SharpProof.Worker.Protocol": 100.0,
+    "SharpProof.Compiler.Semantics": 100.0
   }
 }

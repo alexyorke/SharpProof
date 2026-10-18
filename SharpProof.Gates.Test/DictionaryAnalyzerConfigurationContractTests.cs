@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Testing;
 
 namespace SharpProof.Gates.Test;
@@ -17,7 +17,7 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
             ("SHARPPROOF_PROFILE", " StRiCt "),
             ("SharpProof_Features", " EfFeCtS "));
         var provider = new DictionaryAnalyzerConfigOptionsProvider(options);
-        var configuration = AnalyzerConfiguration.FromOptions(provider);
+        var configuration = CompilerConfiguration.FromOptions(provider);
 
         using (Assert.EnterMultipleScope())
         {
@@ -41,7 +41,7 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
             ["build_property.SharpProofFeatures"] = "contracts"
         };
         var provider = new DictionaryAnalyzerConfigOptionsProvider(values);
-        var configuration = AnalyzerConfiguration.FromOptions(provider);
+        var configuration = CompilerConfiguration.FromOptions(provider);
         var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
         var additional = new ConfigurationAdditionalText();
 
@@ -77,7 +77,7 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
         var expected = globalForFiles ? options : DictionaryAnalyzerConfigOptions.Empty;
         var treeOptions = provider.GetOptions(tree);
         var additionalOptions = provider.GetOptions(additional);
-        var configuration = AnalyzerConfiguration.FromOptions(provider);
+        var configuration = CompilerConfiguration.FromOptions(provider);
 
         using (Assert.EnterMultipleScope())
         {

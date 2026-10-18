@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Dataflow;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -71,7 +71,7 @@ public sealed class Pr275CoreRequiredInputTests
         var fixture = CreateSourceFixture();
         var session = new AnalyzerSession(
             fixture.Compilation,
-            AnalyzerConfiguration.AdvisoryAll,
+            CompilerConfiguration.AdvisoryAll,
             TestContext.CurrentContext.CancellationToken);
         var diagnostics = new List<Diagnostic>();
 
@@ -94,7 +94,7 @@ public sealed class Pr275CoreRequiredInputTests
     {
         AssertArgumentNull(
             "options",
-            () => AnalyzerConfiguration.GetInvalidTreeConfigurationValues(null!));
+            () => CompilerConfiguration.GetInvalidTreeConfigurationValues(null!));
 
         var fixture = CreateSourceFixture();
         var analyzerOptions = new AnalyzerOptions([]);
@@ -102,7 +102,7 @@ public sealed class Pr275CoreRequiredInputTests
             .GetOptions(fixture.Declaration.SyntaxTree);
 
         Assert.That(
-            AnalyzerConfiguration.GetInvalidTreeConfigurationValues(treeOptions),
+            CompilerConfiguration.GetInvalidTreeConfigurationValues(treeOptions),
             Is.Empty);
     }
 

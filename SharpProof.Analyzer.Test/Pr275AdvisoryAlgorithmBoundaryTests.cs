@@ -1,13 +1,13 @@
+using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using System.Collections.Immutable;
 using System.Linq;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
 using CoreScalarIntervalTransfer = SharpProof.Advisory.Core.CoreIrScalarIntervalTransfer;
 
 
-namespace SharpProof.Worker.Test;
+namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
 public sealed class Pr275AdvisoryAlgorithmBoundaryTests
@@ -30,7 +30,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         Assert.That(defaultVariables!.ParamName, Is.EqualTo("variables"));
 
         var accepted = new CoreIrAdvisoryInterpreter(program, ImmutableArray<IrVarId>.Empty)
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
         Assert.That(accepted.Accepted, Is.True);
         Assert.That(accepted.Gaps, Is.Empty);
     }
@@ -69,7 +69,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(7)), token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(7)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("memory havoc"));
@@ -93,7 +93,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Range(0, 10)), token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Range(0, 10)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -114,7 +114,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -138,7 +138,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [sequence, loaded])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(loaded, IntervalValue.Constant(9)), token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(loaded, IntervalValue.Constant(9)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("unsupported load"));
@@ -160,7 +160,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [value])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("unsupported instruction"));
@@ -195,7 +195,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var program = builder.Build();
 
         var result = new CoreIrAdvisoryInterpreter(program, [condition, scalar, conditionalText, left, right, equal])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(condition, IntervalValue.Constant(1)), token: TestContext.CurrentContext.CancellationToken);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(condition, IntervalValue.Constant(1)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -243,7 +243,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         var result = new CoreIrAdvisoryInterpreter(program, [condition, input, deepValue, deepText, opaqueText])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(condition, IntervalValue.Constant(1))
-                .Add(input, IntervalValue.Constant(0)), token: TestContext.CurrentContext.CancellationToken);
+                .Add(input, IntervalValue.Constant(0)));
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("term depth"));
@@ -283,7 +283,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
         builder.Return(entry, factory.CreateOperation(), factory.Variable(equal));
         var program = builder.Build();
         var markers = program.Blocks
-            .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .SelectMany(static block => block.Instructions)
             .OfType<IrAssignInstruction>()
             .ToImmutableArray();
 
@@ -291,7 +291,7 @@ public sealed class Pr275AdvisoryAlgorithmBoundaryTests
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(lower, IntervalValue.Range(0, 1))
                 .Add(upper, IntervalValue.Range(3, 4)),
-                markers: markers, token: TestContext.CurrentContext.CancellationToken);
+                markers: markers);
 
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);

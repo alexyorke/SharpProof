@@ -5,12 +5,12 @@ using NUnit.Framework;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
 using CoreTransfer = SharpProof.Advisory.Core.CoreIrScalarIntervalTransfer;
-using WorkerTransfer = SharpProof.Advisory.Worker.CoreIrScalarIntervalTransfer;
+using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
-namespace SharpProof.Worker.Test;
+namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class LinkedAdvisoryScalarIntervalTransferTests
+public sealed class AdvisoryScalarIntervalBoundaryTests
 {
     [Test]
     public void CoreBinaryPropagatesBottom()
@@ -78,39 +78,39 @@ public sealed class LinkedAdvisoryScalarIntervalTransferTests
     }
 
     [Test]
-    public void WorkerUnsupportedIntegerOperatorIsRejected()
+    public void CoreUnsupportedIntegerOperatorIsRejected()
     {
-        BindWorker(nameof(WorkerUnsupportedIntegerOperatorIsRejected));
+        BindCore(nameof(CoreUnsupportedIntegerOperatorIsRejected));
         AssertTotalBinary(IrBinaryOperator.BitwiseAnd, signed: true, 1, 1, 1);
         var type = IntegerType(8, signed: true);
         var exception = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
         {
-            _ = WorkerTransfer.Binary(IrBinaryOperator.BitwiseAnd, type,
+            _ = CoreTransfer.Binary(IrBinaryOperator.BitwiseAnd, type,
                 IntervalValue.Constant(1), IntervalValue.Constant(1));
         }));
         Assert.That(exception!.ParamName, Is.EqualTo("operation"));
     }
 
     [Test]
-    public void WorkerNegationPropagatesBottom()
+    public void CoreNegationPropagatesBottom()
     {
-        BindWorker(nameof(WorkerNegationPropagatesBottom));
+        BindCore(nameof(CoreNegationPropagatesBottom));
         var type = IntegerType(8, signed: true);
-        Assert.That(WorkerTransfer.Negate(type, IntervalValue.Bottom), Is.EqualTo(IntervalValue.Bottom));
-        Assert.That(WorkerTransfer.Negate(type, IntervalValue.Constant(1)),
+        Assert.That(CoreTransfer.Negate(type, IntervalValue.Bottom), Is.EqualTo(IntervalValue.Bottom));
+        Assert.That(CoreTransfer.Negate(type, IntervalValue.Constant(1)),
             Is.EqualTo(IntervalValue.Constant(-1)));
         AssertTotalNegate(1, -1);
     }
 
     [Test]
-    public void WorkerCastPropagatesBottomBeforeWrapping()
+    public void CoreCastPropagatesBottomBeforeWrapping()
     {
-        BindWorker(nameof(WorkerCastPropagatesBottomBeforeWrapping));
+        BindCore(nameof(CoreCastPropagatesBottomBeforeWrapping));
         var source = IntegerType(16, signed: true);
         var target = IntegerType(8, signed: true);
-        Assert.That(WorkerTransfer.Cast(source, target, IntervalValue.Bottom),
+        Assert.That(CoreTransfer.Cast(source, target, IntervalValue.Bottom),
             Is.EqualTo(IntervalValue.Bottom));
-        Assert.That(WorkerTransfer.Cast(source, target, IntervalValue.Constant(256)),
+        Assert.That(CoreTransfer.Cast(source, target, IntervalValue.Constant(256)),
             Is.EqualTo(IntervalValue.Constant(0)));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var sourceId = factory.GetOrCreateIntegerType(16, signed: true);
@@ -171,12 +171,6 @@ public sealed class LinkedAdvisoryScalarIntervalTransferTests
         RecordBinding(scenario, typeof(CoreTransfer), "SharpProof.Analyzer.Core");
     }
 
-    private static void BindWorker(string scenario)
-    {
-        System.ArgumentNullException.ThrowIfNull(scenario);
-        RecordBinding(scenario, typeof(WorkerTransfer), "SharpProof.Worker");
-    }
-
     private static void RecordBinding(string scenario, Type implementationType, string expectedAssembly)
     {
         System.ArgumentNullException.ThrowIfNull(expectedAssembly);
@@ -184,7 +178,7 @@ public sealed class LinkedAdvisoryScalarIntervalTransferTests
         System.ArgumentNullException.ThrowIfNull(scenario);
         var assembly = implementationType.Assembly;
         Assert.That(assembly.GetName().Name, Is.EqualTo(expectedAssembly));
-        Assert.That(assembly, Is.Not.SameAs(typeof(LinkedAdvisoryScalarIntervalTransferTests).Assembly));
+        Assert.That(assembly, Is.Not.SameAs(typeof(AdvisoryScalarIntervalBoundaryTests).Assembly));
         Assert.That(typeof(CoreTransfer).Assembly, Is.Not.SameAs(typeof(WorkerTransfer).Assembly));
         TestContext.WriteLine("SP_LINKED_TRANSFER_V1 " + JsonSerializer.Serialize(new
         {
