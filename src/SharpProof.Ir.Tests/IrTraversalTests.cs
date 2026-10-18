@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -82,13 +83,13 @@ public sealed class IrTraversalTests
 
             var pending = new Stack<IrTerm>();
             IrTraversal.PushChildren(shape.Term, pending);
-            var pushed = new List<IrTerm>();
+            var pushed = ImmutableArray.CreateBuilder<IrTerm>();
             while (pending.Count != 0)
             {
                 pushed.Add(pending.Pop());
             }
             Assert.That(
-                pushed,
+                pushed.ToImmutable(),
                 Is.EqualTo(shape.Children.Reverse()),
                 shape.Kind + " push order");
         }

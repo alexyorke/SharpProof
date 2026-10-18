@@ -22,7 +22,7 @@ public sealed class IrTotalExecutionTests
         var third = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
         builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.DivideByZero, exit);
         builder.ExceptionalExit(exit, factory.CreateOperation());
-        var observed = new List<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
+        var observed = ImmutableArray.CreateBuilder<(IrAssignInstruction Instruction, bool Value, bool Approximation)>();
         var replay = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(true))
         {
             AssignmentObserver = (instruction, value, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction); System.ArgumentNullException.ThrowIfNull(value); observed.Add((instruction, value.Boolean, approximation)); }
@@ -30,7 +30,7 @@ public sealed class IrTotalExecutionTests
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(result.ConsumedApproximation, Is.True);
-        Assert.That(observed, Is.EqualTo(new[] { (first, false, false), (second, true, true), (third, false, true) }));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create((first, false, false), (second, true, true), (third, false, true))));
     }
 
     [Test]
@@ -44,14 +44,14 @@ public sealed class IrTotalExecutionTests
         var first = builder.Assign(entry, factory.CreateOperation(), marker, factory.Boolean(false));
         builder.Assign(entry, factory.CreateOperation(), marker, factory.Variable(missing));
         builder.Return(entry, factory.CreateOperation());
-        var observed = new List<IrAssignInstruction>();
+        var observed = ImmutableArray.CreateBuilder<IrAssignInstruction>();
         var replay = new IrProgramReplayOptions(_ => null)
         {
             AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction); observed.Add(instruction); }
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, replay);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(observed, Is.EqualTo(new[] { first }));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create(first)));
     }
 
     [TestCase("allocation", true)]
@@ -80,7 +80,7 @@ public sealed class IrTotalExecutionTests
             builder.Lock(entry, site, factory.Variable(operand));
             builder.Return(entry, factory.CreateOperation());
         }
-        var observed = new List<(OperationId Site, bool Approximation)>();
+        var observed = ImmutableArray.CreateBuilder<(OperationId Site, bool Approximation)>();
         var replay = new IrProgramReplayOptions(_ => kind == "allocation"
             ? factory.CreateIntegerValue(0) : factory.CreateReferenceValue(factory.ObjectType, new object()))
         {
@@ -91,9 +91,9 @@ public sealed class IrTotalExecutionTests
         Assert.That(result.Status, Is.EqualTo(kind == "allocation" && supplied
             ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
         if (supplied)
-        { Assert.That(observed, Is.EqualTo(new[] { (site, true) })); }
+        { Assert.That(observed.ToImmutable(), Is.EqualTo(ImmutableArray.Create((site, true)))); }
         else
-        { Assert.That(observed, Is.Empty); }
+        { Assert.That(observed.ToImmutable(), Is.Empty); }
     }
 
     [Test]
@@ -332,7 +332,7 @@ public sealed class IrTotalExecutionTests
         builder.Branch(entry, factory.CreateOperation(), factory.Binary(IrBinaryOperator.LessThan,
             factory.Variable(x), factory.Integer(1)), entry, exit);
         builder.Return(exit, factory.CreateOperation(), factory.Variable(y));
-        var requests = new List<IrHavocRequest>();
+        var requests = ImmutableArray.CreateBuilder<IrHavocRequest>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
             new IrProgramReplayOptions(request =>
             {
@@ -342,9 +342,9 @@ public sealed class IrTotalExecutionTests
             }));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(1));
-        int[] expectedOccurrences = [0, 0, 1, 1];
-        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
-        Assert.That(requests.Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
+        ImmutableArray<int> expectedOccurrences = [0, 0, 1, 1];
+        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
+        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(approximate));
     }
 

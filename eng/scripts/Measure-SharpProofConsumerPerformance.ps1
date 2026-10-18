@@ -164,7 +164,7 @@ if ($MaximumBuildMilliseconds -gt 0) {
     if ($overBudget.Count -gt 0) { throw "$($overBudget.Count) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
 }
 foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
-    $medianBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, double]([StringComparer]::OrdinalIgnoreCase)
+    $medianBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
     foreach ($variant in @('baseline', 'portable', 'verified')) {
         $times = @($measurementSnapshot | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object)
         $middle = [int][Math]::Floor($times.Count / 2)

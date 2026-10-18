@@ -21,7 +21,7 @@ public sealed class FiniteCfgConcreteOracleTests
                         blockId,
                         value => ApplyAbstract(transfer, value)))
                 .ToArray();
-            var edges = new HashSet<DataflowEdge>();
+            var edges = ImmutableHashSet.CreateBuilder<DataflowEdge>();
             for (var blockId = 1; blockId < blockCount; blockId++)
             {
                 edges.Add(new DataflowEdge(blockId - 1, blockId));
@@ -38,7 +38,7 @@ public sealed class FiniteCfgConcreteOracleTests
                 }
             }
 
-            var graph = new DataflowGraph<NullnessValue>(blocks, edges);
+            var graph = new DataflowGraph<NullnessValue>(blocks, edges.ToImmutable());
 
             var abstractResult = ForwardDataflowAnalysis.Analyze(
                 graph,
@@ -75,7 +75,7 @@ public sealed class FiniteCfgConcreteOracleTests
     private static int VerifyEveryFinitePowersetCase()
     {
         var transfers = EnumerateBottomStrictMonotoneTransfers();
-        Assert.That(transfers, Has.Count.EqualTo(25));
+        Assert.That(transfers, Has.Length.EqualTo(25));
         var checkedCases = 0;
 
         for (var blockCount = 1; blockCount <= 2; blockCount++)
@@ -249,18 +249,18 @@ public sealed class FiniteCfgConcreteOracleTests
         throw new InvalidOperationException();
     }
 
-    private static List<FiniteTransfer>
+    private static ImmutableArray<FiniteTransfer>
         EnumerateBottomStrictMonotoneTransfers()
     {
-        var result = new List<FiniteTransfer>();
+        var result = ImmutableArray.CreateBuilder<FiniteTransfer>();
         for (var encoded = 0; encoded < 64; encoded++)
         {
             var remaining = encoded;
-            var outputs = Enumerable.Repeat(FiniteSet.Bottom, 4).ToImmutableArray();
-            outputs = outputs.SetItem(0, FiniteSet.Bottom);
-            for (var input = 1; input < outputs.Length; input++)
+            var outputs = Enumerable.Repeat(FiniteSet.Bottom, 4).ToImmutableArray().ToBuilder();
+            outputs[0] = FiniteSet.Bottom;
+            for (var input = 1; input < outputs.Count; input++)
             {
-                outputs = outputs.SetItem(input, (FiniteSet)(remaining & 3));
+                outputs[input] = (FiniteSet)(remaining & 3);
                 remaining >>= 2;
             }
 
@@ -284,15 +284,15 @@ public sealed class FiniteCfgConcreteOracleTests
 
             if (monotone)
             {
-                result.Add(new FiniteTransfer(encoded, outputs));
+                result.Add(new FiniteTransfer(encoded, outputs.ToImmutable()));
             }
         }
-        return result;
+        return result.ToImmutable();
     }
 
-    private static DataflowEdge[] DecodeEdges(int blockCount, int edgeMask)
+    private static ImmutableArray<DataflowEdge> DecodeEdges(int blockCount, int edgeMask)
     {
-        var edges = new List<DataflowEdge>();
+        var edges = ImmutableArray.CreateBuilder<DataflowEdge>();
         for (var source = 0; source < blockCount; source++)
         {
             for (var target = 0; target < blockCount; target++)
@@ -305,7 +305,7 @@ public sealed class FiniteCfgConcreteOracleTests
             }
         }
 
-        return [.. edges];
+        return edges.ToImmutable();
     }
 
     private static bool IsSubset(FiniteSet lower, FiniteSet upper)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -60,8 +61,8 @@ public sealed class Pr275SemanticGuardCoverageTests
         int count, bool firstValue)
     {
         var factory = new IrFactory();
-        var terms = new List<IrTerm>();
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var terms = ImmutableArray.CreateBuilder<IrTerm>();
+        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         var expectedConjunction = true;
         var expectedDisjunction = false;
         for (var index = 0; index < count; index++)
@@ -69,13 +70,15 @@ public sealed class Pr275SemanticGuardCoverageTests
             var variable = factory.CreateVariable("condition" + index, factory.BooleanType);
             var value = index == 0 ? firstValue : index % 2 == 0;
             terms.Add(factory.Variable(variable));
-            values = values.Add(variable, factory.CreateBooleanValue(value));
+            values.Add(variable, factory.CreateBooleanValue(value));
             expectedConjunction &= value;
             expectedDisjunction |= value;
         }
+        var termSnapshot = terms.ToImmutable();
+        var valueSnapshot = values.ToImmutable();
         var interpreter = new IrInterpreter(factory);
-        var conjunction = interpreter.Evaluate(IrSemanticTerms.Conjoin(factory, terms), values);
-        var disjunction = interpreter.Evaluate(IrSemanticTerms.Disjoin(factory, terms), values);
+        var conjunction = interpreter.Evaluate(IrSemanticTerms.Conjoin(factory, termSnapshot), valueSnapshot);
+        var disjunction = interpreter.Evaluate(IrSemanticTerms.Disjoin(factory, termSnapshot), valueSnapshot);
 
         Assert.That(conjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(disjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));

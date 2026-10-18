@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Dataflow.Test;
 
 internal static class GeneratedDomainLawAssertions
@@ -407,8 +408,12 @@ public sealed class GeneratedIntervalDomainPropertyTests :
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
     {
-        var oneSided = new List<IntervalValue> { _domain.Bottom, _domain.Constant(11) };
-        var congruent = new List<IntervalValue> { _domain.Bottom, _domain.Constant(0) };
+        var oneSided = ImmutableArray.CreateBuilder<IntervalValue>();
+        oneSided.Add(_domain.Bottom);
+        oneSided.Add(_domain.Constant(11));
+        var congruent = ImmutableArray.CreateBuilder<IntervalValue>();
+        congruent.Add(_domain.Bottom);
+        congruent.Add(_domain.Constant(0));
         for (var step = 1; step <= 128; step++)
         {
             oneSided.Add(_domain.Range(11, 11 + step));
@@ -418,11 +423,11 @@ public sealed class GeneratedIntervalDomainPropertyTests :
 
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            oneSided,
+            oneSided.ToImmutable(),
             maximumChanges: 2);
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            congruent,
+            congruent.ToImmutable(),
             maximumChanges: 3);
     }
 
@@ -443,10 +448,9 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
     {
-        var chain = new List<SequenceCardinalityValue> {
-            _domain.Bottom,
-            _domain.Empty
-        };
+        var chain = ImmutableArray.CreateBuilder<SequenceCardinalityValue>();
+        chain.Add(_domain.Bottom);
+        chain.Add(_domain.Empty);
         for (var step = 1; step <= 128; step++)
         {
             chain.Add(_domain.Create(
@@ -456,7 +460,7 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
 
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
-            chain,
+            chain.ToImmutable(),
             maximumChanges: 2);
     }
 

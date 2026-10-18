@@ -15,11 +15,11 @@ internal static class ContractForValidationEngine
             return [];
         }
 
-        var diagnostics = ImmutableList<Diagnostic>.Empty;
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         void Report(Diagnostic diagnostic)
         {
             diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
-            diagnostics = diagnostics.Add(diagnostic);
+            diagnostics.Add(diagnostic);
         }
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
@@ -33,7 +33,7 @@ internal static class ContractForValidationEngine
                         candidate, compilation, Location.None),
                     candidate.Name));
             }
-            return Order(diagnostics);
+            return Order(diagnostics.ToImmutable());
         }
 
         var companions = ResolveCompanions(
@@ -88,7 +88,7 @@ internal static class ContractForValidationEngine
         // Metadata companions participate in overlap detection, but analyzer
         // diagnostics may only point into the compilation being analyzed. The
         // source participant above is the actionable location for the group.
-        return Order(diagnostics);
+        return Order(diagnostics.ToImmutable());
     }
 
     internal static ImmutableArray<INamedTypeSymbol> FindCandidates(
@@ -101,7 +101,7 @@ internal static class ContractForValidationEngine
         var selections = ContractSelectionInventory.ForCompilation(
             compilation);
 
-        var candidates = ImmutableList<INamedTypeSymbol>.Empty;
+        var candidates = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -124,11 +124,11 @@ internal static class ContractForValidationEngine
                     symbol.GetAttributes().Any(
                         selections.IsContractForCandidate))
                 {
-                    candidates = candidates.Add(symbol);
+                    candidates.Add(symbol);
                 }
             }
         }
-        return candidates.Distinct(
+        return candidates.ToImmutable().Distinct(
                 (IEqualityComparer<INamedTypeSymbol>)
                     SymbolEqualityComparer.Default)
             .ToImmutableArray();
@@ -158,7 +158,7 @@ internal static class ContractForValidationEngine
 
         RepositoryParameterGuard.ThrowIfInvalid(companions.IsDefault, nameof(companions));
         RepositoryParameterGuard.ThrowIfInvalid(discovered.IsDefault, nameof(discovered));
-        var overlapping = ImmutableHashSet<ResolvedCompanion>.Empty;
+        var overlapping = ImmutableHashSet.CreateBuilder<ResolvedCompanion>();
         foreach (var source in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -169,10 +169,10 @@ internal static class ContractForValidationEngine
                         candidate.ContractTarget,
                         (source.Target, source.IsOpenTarget)))))
             {
-                overlapping = overlapping.Add(source);
+                overlapping.Add(source);
             }
         }
-        return overlapping;
+        return overlapping.ToImmutable();
     }
 
     private static ImmutableArray<ResolvedCompanion> ResolveCompanions(

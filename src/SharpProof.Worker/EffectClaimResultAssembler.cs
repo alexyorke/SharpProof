@@ -83,7 +83,7 @@ internal static class EffectClaimResultAssembler
                     .Where(static assumption =>
                         assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
                     .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
-                    .ToHashSet(StringComparer.Ordinal))
+                    .ToImmutableHashSet(StringComparer.Ordinal))
             };
         }
         return result;

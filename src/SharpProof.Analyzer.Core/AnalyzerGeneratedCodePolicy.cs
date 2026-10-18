@@ -139,19 +139,20 @@ internal static class AnalyzerGeneratedCodePolicy
             return false;
         }
 
-        var scopes = ImmutableList.Create<ISymbol>(symbol);
+        var scopes = ImmutableArray.CreateBuilder<ISymbol>();
+        scopes.Add(symbol);
         if (symbol is IMethodSymbol { AssociatedSymbol: { } associated })
         {
-            scopes = scopes.Add(associated);
+            scopes.Add(associated);
         }
         for (var type = symbol.ContainingType;
              type != null;
              type = type.ContainingType)
         {
-            scopes = scopes.Add(type);
+            scopes.Add(type);
         }
 
-        foreach (var scope in scopes)
+        foreach (var scope in scopes.ToImmutable())
         {
             if (scope.GetAttributes().Any(attribute =>
                     attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(

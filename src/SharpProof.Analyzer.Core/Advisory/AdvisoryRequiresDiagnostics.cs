@@ -18,15 +18,14 @@ internal static class AdvisoryRequiresDiagnostics
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         if (session.Compilation is not CSharpCompilation compilation)
         { return AnalyzerSemanticOutcome.NotApplicable; }
-        var reported = ImmutableHashSet<(Location Location, string Message)>.Empty;
+        var reported = ImmutableHashSet.CreateBuilder<(Location Location, string Message)>();
         var report = reportDiagnostic;
         reportDiagnostic = diagnostic =>
         {
             diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
             var identity = (diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture));
-            if (!reported.Contains(identity))
+            if (reported.Add(identity))
             {
-                reported = reported.Add(identity);
                 report(diagnostic);
             }
         };
@@ -92,27 +91,26 @@ internal static class AdvisoryRequiresDiagnostics
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        var variables = ImmutableHashSet<IrVarId>.Empty;
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
         var terms = ImmutableStack<IrTerm>.Empty;
         foreach (var instruction in program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
         {
-            variables = variables.Union(IrInstructionFacts.WrittenVariables(instruction));
+            variables.UnionWith(IrInstructionFacts.WrittenVariables(instruction));
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))
             { terms = terms.Push(term); }
         }
-        var visited = ImmutableHashSet<IrId>.Empty;
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
         while (!terms.IsEmpty)
         {
             var term = terms.Peek();
             terms = terms.Pop();
-            if (visited.Contains(term.Id))
+            if (!visited.Add(term.Id))
             { continue; }
-            visited = visited.Add(term.Id);
             if (term is IrVariableTerm variable)
-            { variables = variables.Add(variable.Variable); }
+            { variables.Add(variable.Variable); }
             terms = IrTraversal.PushChildren(term, terms);
         }
-        return [.. variables.OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
+        return [.. variables.ToImmutable().OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 
     // The marker names its callee by identity. The call-site syntax can bind
@@ -123,7 +121,7 @@ internal static class AdvisoryRequiresDiagnostics
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        var candidates = ImmutableList<IMethodSymbol>.Empty;
+        var candidates = ImmutableArray.CreateBuilder<IMethodSymbol>();
         if (location.SourceTree is { } tree)
         {
             var node = tree.GetRoot(cancellationToken).FindNode(location.SourceSpan, getInnermostNodeForTie: true);
@@ -131,22 +129,22 @@ internal static class AdvisoryRequiresDiagnostics
             switch (model.GetOperation(node, cancellationToken))
             {
                 case IInvocationOperation invocation:
-                    candidates = candidates.Add(invocation.TargetMethod);
+                    candidates.Add(invocation.TargetMethod);
                     break;
                 case IObjectCreationOperation { Constructor: { } constructor }:
-                    candidates = candidates.Add(constructor);
+                    candidates.Add(constructor);
                     break;
             }
             if (model.GetSymbolInfo(node, cancellationToken).Symbol is IMethodSymbol bound)
-            { candidates = candidates.Add(bound); }
+            { candidates.Add(bound); }
         }
         var separator = identity.IndexOf("::", StringComparison.Ordinal);
         if (separator >= 0)
         {
-            candidates = candidates.AddRange(DocumentationCommentId.GetSymbolsForDeclarationId(identity.Substring(separator + 2), compilation)
+            candidates.AddRange(DocumentationCommentId.GetSymbolsForDeclarationId(identity.Substring(separator + 2), compilation)
                 .OfType<IMethodSymbol>());
         }
-        foreach (var method in candidates)
+        foreach (var method in candidates.ToImmutable())
         {
             if (string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method), identity, StringComparison.Ordinal) ||
                 string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method.OriginalDefinition), identity, StringComparison.Ordinal))

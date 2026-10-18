@@ -84,7 +84,7 @@ internal static class OverridePreconditionDiagnostics
         contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
-        var variables = ImmutableDictionary<IrVarId, IrTerm>.Empty;
+        var variables = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables)
         {
             var type = factory.GetVariableInfo(variable.Variable).Type;
@@ -96,11 +96,12 @@ internal static class OverridePreconditionDiagnostics
             var value = factory.Variable(identity);
             if (variables.ContainsKey(variable.Variable))
             { throw new ArgumentException("An item with the same key has already been added. Key: " + variable.Variable); }
-            variables = variables.Add(variable.Variable, value);
+            variables.Add(variable.Variable, value);
         }
+        var substitutions = variables.ToImmutable();
         return [.. contracts.Clauses
             .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
-            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrSubstitution.Substitute(factory, clause.Condition, variables)))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrSubstitution.Substitute(factory, clause.Condition, substitutions)))
             .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id.Value))];
     }
 

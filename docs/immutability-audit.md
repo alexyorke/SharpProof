@@ -1959,3 +1959,28 @@ IMM-M026 passes 77 focused Worker tests after the guard fix. IMM-M028 passes all
 485 ordinary IR tests and 118 Dataflow tests, including existing mutation-under-test
 coverage. Evidence: immutability-effect-fixpoint-builders-tests2.log,
 immutability-ir-fixture-builders-tests.log and immutability-dataflow-fixture-builders-tests.log.
+## Analyzer/native verification checkpoint
+
+IMM-M026-M029 are implemented and verified: 1,134 Analyzer tests, 77 fixpoint/identity
+Worker tests, 485 IR tests, 118 Dataflow tests, and 205 native-policy/effect tests pass.
+All builds have zero warnings/errors. The initial M029 build identified three new
+identity selectors requiring explicit guards (SPINT001); guarded selectors now pass.
+No duplicate-key behavior was relaxed. Literal preservation passes 2,738 tokens across
+571 changed C# files against master 6b062e611. Layout verifies 2,609 source files,
+59 projects and all 151 pinned common files, including 59 evaluated projects.
+Evidence: immutability-analyzer-scoped-builders-tests.log,
+immutability-effect-fixpoint-builders-tests2.log, immutability-ir-fixture-builders-tests.log,
+immutability-dataflow-fixture-builders-tests.log, immutability-native-evidence-builders-tests2.log,
+immutability-second-master-literals.log and immutability-second-master-layout.log.
+
+The median builder now retains object-valued Int64/Double results like the original
+hashtable, while preserving case-insensitive keys. Canonical parsing/TCB checks still
+pass; performance publication is awaiting an exact package feed.
+
+The current universe remains 1,867 C# files and 84 PowerShell scripts. Regeneration
+records 3,324 C# candidates (3,023 open) and 1,126 PowerShell candidates (1,010 open).
+Fifty new builder rows and seven reviewed SMT scratch/native-adapter rows are classified.
+The mutable PushChildren stack remains an explicit SUT exception. Agent exclusions
+based only on scoped state, identity caches or local arrays are not accepted: outer
+builders can preserve identity, and immutable snapshots can preserve local read-only use.
+Further reviewed frontend/worker/corpus/script and test-host findings remain open.

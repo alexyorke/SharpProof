@@ -111,7 +111,7 @@ internal static class AdvisoryEffectSites
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
-        var reachable = ImmutableHashSet<IrBlockId>.Empty;
+        var reachable = ImmutableHashSet.CreateBuilder<IrBlockId>();
         var pending = ImmutableStack<IrBlockId>.Empty;
         foreach (var root in roots)
         { pending = pending.Push(root); }
@@ -119,13 +119,12 @@ internal static class AdvisoryEffectSites
         {
             var current = pending.Peek();
             pending = pending.Pop();
-            if (reachable.Contains(current))
+            if (!reachable.Add(current))
             { continue; }
-            reachable = reachable.Add(current);
             foreach (var successor in Successors(program.GetBlock(current)))
             { pending = pending.Push(successor); }
         }
-        return reachable;
+        return reachable.ToImmutable();
     }
 
     private static ImmutableHashSet<IrBlockId> Escaping(IrProgram program)
@@ -133,7 +132,7 @@ internal static class AdvisoryEffectSites
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var predecessors = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (Successors(block).Select(successor => successor.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(successor)) : ((successor, block.Id)))))
             .ToLookup(edge => edge.successor, edge => edge.Id);
-        var escaping = ImmutableHashSet<IrBlockId>.Empty;
+        var escaping = ImmutableHashSet.CreateBuilder<IrBlockId>();
         var roots = program.Blocks
             .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id));
         var pending = ImmutableStack<IrBlockId>.Empty;
@@ -143,13 +142,12 @@ internal static class AdvisoryEffectSites
         {
             var current = pending.Peek();
             pending = pending.Pop();
-            if (escaping.Contains(current))
+            if (!escaping.Add(current))
             { continue; }
-            escaping = escaping.Add(current);
             foreach (var predecessor in predecessors[current])
             { pending = pending.Push(predecessor); }
         }
-        return escaping;
+        return escaping.ToImmutable();
     }
 
     private static IEnumerable<IrBlockId> Successors(IrBasicBlock block)

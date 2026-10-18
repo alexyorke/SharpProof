@@ -21,7 +21,7 @@ internal static class CallableClaimResultAssembler
         }
         if (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome && check.Evidence.Reason != WorkerClaimReason.None)
         { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; return record; }
-        var declarations = target.Entry.Assumptions.ToDictionary(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind), StringComparer.Ordinal);
+        var declarations = ImmutableDictionaryCapture.Create(target.Entry.Assumptions, assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind), StringComparer.Ordinal);
         if (check.Assumptions.Length != declarations.Count ||
             check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct(StringComparer.Ordinal).Count() != declarations.Count ||
             check.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (!declarations.TryGetValue(assumption.Id, out var kind) || kind != assumption.Kind)))

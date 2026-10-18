@@ -35,75 +35,93 @@ internal static class EffectSummaryFixpoint
     {
         cancellationToken.ThrowIfCancellationRequested();
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
-        var bodies = artifact.Bodies.ToDictionary(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId), StringComparer.Ordinal);
-        var edges = bodies.ToDictionary(pair => pair.Key,
-            pair => pair.Value.Callees.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
-        var predecessors = bodies.Keys.ToDictionary(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), _ => new List<string>(), StringComparer.Ordinal);
-        foreach (var pair in edges)
+        var bodyBuilder = ImmutableDictionary.CreateBuilder<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
+        var bodyOrderBuilder = ImmutableArray.CreateBuilder<string>();
+        foreach (var body in artifact.Bodies)
+        {
+            var presentBody = ArgumentNullGuard.NotNull(body, nameof(body));
+            bodyBuilder.AddUnique(presentBody.BodyId, presentBody);
+            bodyOrderBuilder.Add(presentBody.BodyId);
+        }
+        var bodies = bodyBuilder.ToImmutable();
+        var bodyOrder = bodyOrderBuilder.ToImmutable();
+        var edgeBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.Ordinal);
+        var predecessorBuilders = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>.Builder>(StringComparer.Ordinal);
+        foreach (var id in bodyOrder)
+        {
+            edgeBuilder.Add(id, bodies[id].Callees.OrderBy(callee => callee is null ? throw new ArgumentNullException(nameof(callee)) : callee, StringComparer.Ordinal).ToImmutableArray());
+            predecessorBuilders.Add(id, ImmutableArray.CreateBuilder<string>());
+        }
+        var edges = edgeBuilder.ToImmutable();
+        foreach (var id in bodyOrder)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var callee in pair.Value)
-            { predecessors[callee].Add(pair.Key); }
+            foreach (var callee in edges[id])
+            { predecessorBuilders[callee].Add(id); }
         }
-        var summaries = bodies.ToDictionary(pair => pair.Key,
-            pair => Local(pair.Value, cancellationToken), StringComparer.Ordinal);
-        var finished = new List<string>();
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var first in bodies.Keys.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal))
+        var predecessors = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.Ordinal);
+        foreach (var id in bodyOrder)
+        { predecessors.Add(id, predecessorBuilders[id].ToImmutable()); }
+        var summaries = ImmutableDictionary.CreateBuilder<string, SourceEffectSummary>(StringComparer.Ordinal);
+        foreach (var id in bodyOrder)
+        { summaries.Add(id, Local(bodies[id], cancellationToken)); }
+        var finished = ImmutableArray.CreateBuilder<string>();
+        var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var first in bodyOrder.OrderBy(id => id is null ? throw new ArgumentNullException(nameof(id)) : id, StringComparer.Ordinal))
         {
-            var pending = new Stack<(string Id, bool Exit)>();
-            pending.Push((first, false));
-            while (pending.Count != 0)
+            var pending = ImmutableStack<(string Id, bool Exit)>.Empty.Push((first, false));
+            while (!pending.IsEmpty)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var (id, exit) = pending.Pop();
+                pending = pending.Pop(out var frame);
+                var (id, exit) = frame;
                 if (exit)
                 { finished.Add(id); continue; }
                 if (!visited.Add(id))
                 { continue; }
-                pending.Push((id, true));
+                pending = pending.Push((id, true));
                 for (var index = edges[id].Length - 1; index >= 0; index--)
-                { pending.Push((edges[id][index], false)); }
+                { pending = pending.Push((edges[id][index], false)); }
             }
         }
-        var components = new List<string[]>();
+        var components = ImmutableArray.CreateBuilder<ImmutableArray<string>>();
         visited.Clear();
         for (var index = finished.Count - 1; index >= 0; index--)
         {
-            var component = new List<string>();
-            var pending = new Stack<string>();
-            pending.Push(finished[index]);
-            while (pending.Count != 0)
+            var component = ImmutableArray.CreateBuilder<string>();
+            var pending = ImmutableStack<string>.Empty.Push(finished[index]);
+            while (!pending.IsEmpty)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var id = pending.Pop();
+                pending = pending.Pop(out var id);
                 if (!visited.Add(id))
                 { continue; }
                 component.Add(id);
                 foreach (var caller in predecessors[id])
-                { pending.Push(caller); }
+                { pending = pending.Push(caller); }
             }
             if (component.Count != 0)
-            { components.Add(component.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal).ToArray()); }
+            { components.Add(component.ToImmutable().OrderBy(id => id is null ? throw new ArgumentNullException(nameof(id)) : id, StringComparer.Ordinal).ToImmutableArray()); }
         }
         // Reverse Kosaraju's source-first components so outgoing summaries
         // are final before each component's monotone worklist runs.
         for (var index = components.Count - 1; index >= 0; index--)
         {
             var component = components[index];
-            var members = new HashSet<string>(component, StringComparer.Ordinal);
+            var members = component.ToImmutableHashSet(StringComparer.Ordinal);
             var cyclic = component.Length > 1 || edges[component[0]].Contains(component[0], StringComparer.Ordinal);
             if (cyclic)
             {
                 foreach (var id in component)
                 { summaries[id] = summaries[id] with { MayDiverge = true }; }
             }
-            var queued = new HashSet<string>(component, StringComparer.Ordinal);
-            var pending = new Queue<string>(component);
-            while (pending.Count != 0)
+            var queued = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            queued.UnionWith(component);
+            var pending = ImmutableQueue.CreateRange(component);
+            while (!pending.IsEmpty)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var id = pending.Dequeue();
+                pending = pending.Dequeue(out var id);
                 queued.Remove(id);
                 var joined = summaries[id];
                 foreach (var callee in edges[id])
@@ -117,11 +135,11 @@ internal static class EffectSummaryFixpoint
                 foreach (var caller in predecessors[id])
                 {
                     if (members.Contains(caller) && queued.Add(caller))
-                    { pending.Enqueue(caller); }
+                    { pending = pending.Enqueue(caller); }
                 }
             }
         }
-        return summaries.ToImmutableSortedDictionary(StringComparer.Ordinal);
+        return summaries.ToImmutable().ToImmutableSortedDictionary(StringComparer.Ordinal);
     }
 
     private static SourceEffectSummary Local(CompilerSourceBodyArtifact body, CancellationToken cancellationToken)
@@ -178,13 +196,13 @@ internal static class EffectSummaryFixpoint
     private static bool HasCycle(IrProgram program, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(program);
-        var colors = new Dictionary<IrBlockId, int>();
-        var pending = new Stack<(IrBlockId Id, bool Exit)>();
-        pending.Push((program.Entry, false));
-        while (pending.Count != 0)
+        var colors = ImmutableDictionary.CreateBuilder<IrBlockId, int>();
+        var pending = ImmutableStack<(IrBlockId Id, bool Exit)>.Empty.Push((program.Entry, false));
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (id, exit) = pending.Pop();
+            pending = pending.Pop(out var frame);
+            var (id, exit) = frame;
             if (exit)
             { colors[id] = 2; continue; }
             if (colors.TryGetValue(id, out var color))
@@ -194,9 +212,9 @@ internal static class EffectSummaryFixpoint
                 continue;
             }
             colors[id] = 1;
-            pending.Push((id, true));
+            pending = pending.Push((id, true));
             foreach (var target in Targets(program.GetBlock(id).Terminator))
-            { pending.Push((target, false)); }
+            { pending = pending.Push((target, false)); }
         }
         return false;
     }
