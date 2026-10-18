@@ -338,7 +338,9 @@ by-value publication and immutable source-helper IList/ICollection parameters.
 Generic Count, Add and simple indexed get/set share the caller's storage through
 nested calls and extension-method syntax. Scalar and admitted reference element
 representations follow their own declaration symbols into the helper, including
-class-constrained caller types. Knowing an element representation alone never
+class-constrained caller types. Reference specialization is scoped to helpers
+declaring a supported List/IList/ICollection parameter; unrelated generic source
+calls retain their existing scalar domain and corpus diagnostics. Knowing an element representation alone never
 establishes an interface implementation. An incoming List-typed parameter can hold
 a subclass that reimplements interfaces, so it supplies no interface dispatch proof.
 
@@ -362,9 +364,11 @@ selection now prefers small observed List sizes, like existing string/array witn
 Failed preferences retry the unbounded query. Tests retain large counterexamples,
 full-domain proofs and oversized-witness rejection under the unchanged resource limit.
 
-Canonical container validation passes 5,548 worker tests, 2,048 frontend tests,
+Canonical container validation passes 5,548 worker tests, 2,049 frontend tests,
 368 SMT tests, 481 IR tests, 640 contract tests, 1,128 analyzer tests,
-29 inventory/evidence tests and eight usage-ranking tests.
+29 inventory/evidence tests and eight usage-ranking tests. The full 471-test Gates
+suite also passes, preserving the canonical corpus snapshots and Unknown-reason
+ratchets without baseline changes.
 
 This closes a contextual source-helper slice. The static report still has 116 rows
 at 641 sites and zero unresolved sites: the original generic interface declarations
@@ -373,6 +377,7 @@ Count reads therefore remain actionable; they must not all be credited as modele
 The declaration universe, support statuses, SDK/reference pins and coverage floors
 are unchanged. Other List operations, opaque value domains and precise growth/fault
 semantics remain open.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
