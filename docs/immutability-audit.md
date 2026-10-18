@@ -1869,3 +1869,27 @@ runtime publication remain to be verified against clean committed source/package
 Evidence: immutability-tcb-builders-check.log. No performance improvement is claimed.
 Further production/test/script candidate groups remain open; this is a checkpoint,
 not completion of the comprehensive audit.
+## Second master conflict checkpoint
+
+After pushing 6825da042, master advanced to 6b062e611 (generic source List receiver
+modeling, PR 328). GitHub reported four new conflicts. The coordinator fetched master
+and started a merge from a clean worktree, prioritizing conflict resolution.
+Conflicts: TotalLoweringContext.FreshCollections, TotalLoweringContext.Lists,
+TotalSourceCallSession, and BvEncoder.References. Preserve exact List provenance,
+source type specialization and bounded List count models from master while retaining
+immutable roots, construction builders, ordered field observations and native adapters.
+New SpecializeListParameter must publish the immutable Add result; IsKnownList must
+accept immutable sets; fresh tracking publications must use the exact-list field names.
+SMT count bounds must enumerate the ordered field sidecar and immutable observations,
+then adapt frozen Boolean bounds to the Z3 params array. Status: merge unresolved.
+Second master merge verification: all four conflicts are resolved, no markers or
+unmerged paths remain, and the full solution builds with zero warnings/errors.
+The affected filter passes 1,118 tests (1,001 Worker, 40 Frontend, 40 SMT, 29 Effects,
+8 Gates), zero failures/skips. This is targeted coverage; projects with no matches
+are not counted as tested. All 2,737 checked literal tokens remain unchanged versus
+new master 6b062e611. The current universe is 1,867 C# files / 3,338 candidates and
+84 PowerShell scripts / 1,126 candidates, with zero PowerShell parse failures.
+Evidence: immutability-second-master-tests.log, immutability-second-master-literals.log,
+immutability-second-master-inventory.log and immutability-second-master-whitespace.log.
+The main coordinator inspected both sides of each conflict and all auto-merged
+List/source-specialization changes. Status: resolved and verified; ready to push.
