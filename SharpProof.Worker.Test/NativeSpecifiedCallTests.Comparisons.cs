@@ -3,6 +3,7 @@ using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
+
 public sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("int")]

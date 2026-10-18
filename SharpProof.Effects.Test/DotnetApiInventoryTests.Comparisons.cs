@@ -3,6 +3,7 @@ using SharpProof.Frontend;
 using SharpProof.Ir;
 
 namespace SharpProof.Effects.Test;
+
 public sealed partial class DotnetApiInventoryTests
 {
     private static readonly (string Type, string[] Values)[] IntegerComparisonEdges = [("int", ["int.MinValue", "-1", "0", "1", "int.MaxValue"]), ("long", ["long.MinValue", "-1L", "0L", "1L", "long.MaxValue"]), ("uint", ["0U", "1U", "uint.MaxValue"]), ("ulong", ["0UL", "1UL", "ulong.MaxValue"])];

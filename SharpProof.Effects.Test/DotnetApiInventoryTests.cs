@@ -4,6 +4,7 @@ using System.Text.Json;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
+
 [TestFixture]
 public sealed partial class DotnetApiInventoryTests
 {

@@ -4,6 +4,7 @@ using SharpProof.Specs;
 using SharpProof.Testing;
 
 namespace SharpProof.Specs.Test;
+
 public sealed partial class ApiSpecRuntimeOracleTests
 {
     private static readonly string EvidenceTest = typeof(ApiSpecRuntimeOracleTests).FullName + "." + nameof(ModeledFacetsHaveExecutedTestEvidence);

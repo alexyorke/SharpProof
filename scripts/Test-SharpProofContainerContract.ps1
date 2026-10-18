@@ -116,6 +116,10 @@ function Assert-DockerfileAuthority {
             Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
         },
         [pscustomobject]@{
+            Argument = 'DOTNET_API_REFERENCE_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.apiReferenceImage)@$($ToolchainCatalog.dotnet.apiReferenceImageDigest)"
+        },
+        [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
         })
@@ -173,6 +177,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+        'FROM ${DOTNET_API_REFERENCE_IMAGE} AS api-reference',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
@@ -190,6 +195,13 @@ function Assert-DockerfileAuthority {
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
+    $apiReferencePack = 'Microsoft.NETCore.App.Ref/' +
+        [string]$ToolchainCatalog.dotnet.apiReferencePackVersion
+    Assert-SingleMatchingLine `
+        $toolchainLines `
+        '^COPY --from=api-reference ' `
+        "COPY --from=api-reference /usr/share/dotnet/packs/$apiReferencePack /usr/share/dotnet/packs/$apiReferencePack" `
+        'API inventory reference pack'
     foreach ($required in @(
             'ARG USER_UID=1000',
             'ARG USER_GID=1000',
@@ -487,6 +499,12 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         if (-not (Test-Path -LiteralPath $packPath -PathType Container)) {
             throw "The minimum-SDK framework pack is missing: $packPath"
         }
+    }
+    $apiReferencePath = Join-Path `
+        '/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref' `
+        "$($catalog.dotnet.apiReferencePackVersion)/ref/net9.0/System.Runtime.dll"
+    if (-not (Test-Path -LiteralPath $apiReferencePath -PathType Leaf)) {
+        throw "The pinned API inventory reference pack is missing: $apiReferencePath"
     }
 }
 
