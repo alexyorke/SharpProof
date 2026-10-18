@@ -49,7 +49,9 @@ New defaults sources must retain explicit ownership in the acceptance contract.
 Files containing only compile-time constants have no executable sequence points
 and are explicitly registered in the
 [declaration-only coverage baseline](../eng/coverage/baseline.json). Aggregate,
-changed-TCB, and project coverage floors remain at 100%.
+changed-TCB, and project coverage floors remain at 100%. Declaration classification
+also distinguishes compile-time const initializers from executable readonly,
+property, and method bodies; authenticated module and PDB checks still apply.
 
 ## Repository audit coverage
 
