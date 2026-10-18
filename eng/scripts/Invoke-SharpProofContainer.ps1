@@ -481,6 +481,7 @@ switch ($Command) {
             @semanticArguments
     }
     'canonical-cohort-gate' {
+        & (Join-Path $PSScriptRoot 'Test-SharpProofCanonicalEvidence.ps1')
         . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
         Assert-SharpProofCanonicalCohorts `
             -Root (Join-Path $repositoryRoot 'artifacts/canonical-cohorts') `

@@ -224,7 +224,29 @@ task_status=$?
 set -e
 # Export evidence and packages on success or failure. Compiler intermediates,
 # tool restore output and temporary build roots stay in the disposable task.
+# Aggregate gates consume downloaded evidence owned by the runner. Export only
+# their new results, preserving the authenticated inputs and their ownership.
+case "${command_name}" in
+  canonical-cohort-gate)
+    result_paths=(canonical-cohorts/canonical-cohort-validation.json)
+    ;;
+  coverage-gate)
+    result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json)
+    ;;
+  *)
+    result_paths=(.)
+    ;;
+esac
+export_paths=()
+for result_path in "${result_paths[@]}"; do
+  if [[ -e "${task_root}/artifacts/${result_path}" ]]; then
+    export_paths+=("${result_path}")
+  fi
+done
+if [[ ${#export_paths[@]} -eq 0 ]]; then
+  exit "${task_status}"
+fi
 tar -C "${task_root}/artifacts" \
   --exclude='./bin' --exclude='./obj' --exclude='./toolset' --exclude='./tmp' \
-  -cf - . | tar -C "${repo_root}/artifacts" -xf -
+  -cf - "${export_paths[@]}" | tar -C "${repo_root}/artifacts" -xf -
 exit "${task_status}"

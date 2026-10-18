@@ -80,7 +80,7 @@ function Read-SharpProofCanonicalCases {
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical cohort has no actual TRX cases.' }
-    return @($cases | Sort-Object assembly, testId, executionId)
+    return @($cases | Sort-Object { $_.assembly }, { $_.testId }, { $_.executionId })
 }
 
 function Assert-SharpProofHistoricalCaseAliases {
@@ -140,7 +140,7 @@ function Read-SharpProofCanonicalDiscovery {
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical NUnit per-case discovery is empty.' }
-    return @($cases | Sort-Object assembly, nunitId)
+    return @($cases | Sort-Object { $_.assembly }, { $_.nunitId })
 }
 
 function Assert-SharpProofCanonicalOutcomes {
@@ -265,7 +265,7 @@ function Assert-SharpProofCanonicalCohorts {
         }
         $cases = @(Read-SharpProofCanonicalCases -Root $cohortRoot)
         $serializedCases = ConvertTo-Json -InputObject $cases -Depth 5 -Compress
-        $recordedCases = ConvertTo-Json -InputObject @($receipt.cases) -Depth 5 -Compress
+        $recordedCases = ConvertTo-Json -InputObject @($receipt.cases | Sort-Object { $_.assembly }, { $_.testId }, { $_.executionId }) -Depth 5 -Compress
         if ($serializedCases -cne $recordedCases) {
             throw 'Canonical case identities or outcomes differ from their real TRX receipts.'
         }
@@ -279,7 +279,7 @@ function Assert-SharpProofCanonicalCohorts {
         $discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $cohortRoot)
         Assert-SharpProofHistoricalCaseAliases -Cases $cases -Discovery $discoveredCases
         if ((ConvertTo-Json -InputObject $discoveredCases -Depth 5 -Compress) -cne
-            (ConvertTo-Json -InputObject @($receipt.discoveredCases) -Depth 5 -Compress)) {
+            (ConvertTo-Json -InputObject @($receipt.discoveredCases | Sort-Object { $_.assembly }, { $_.nunitId }) -Depth 5 -Compress)) {
             throw 'Canonical per-case NUnit identities differ from actual discovery XML.'
         }
         [string[]]$discoveredNames = @(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases)
@@ -289,7 +289,15 @@ function Assert-SharpProofCanonicalCohorts {
         if (($discoveredNames -join "`n") -cne ($observedNames -join "`n")) {
             throw 'Canonical parameterized case-name multisets differ between actual NUnit discovery and TRX.'
         }
-        $requiredAssemblies = @($expectedProjects | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) + '.dll' })
+        $requiredAssemblies = @($expectedProjects | ForEach-Object {
+                [xml]$projectDocument = Get-Content -LiteralPath (Join-Path $RepositoryRoot $_) -Raw
+                $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
+                $assemblyName = if ($null -eq $declaredName) { [IO.Path]::GetFileNameWithoutExtension($_) } else { [string]$declaredName.InnerText }
+                if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
+                    throw "Canonical project has an unresolved assembly identity: $_"
+                }
+                $assemblyName + '.dll'
+            })
         if ($cohort -eq 'Remaining') { $requiredAssemblies += 'SharpProof.Worker.Test.dll' }
         $observedAssemblies = @($cases | ForEach-Object { $_.assembly } | Sort-Object -Unique)
         if (($observedAssemblies -join "`n") -cne (@($requiredAssemblies | Sort-Object) -join "`n")) {

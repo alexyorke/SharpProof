@@ -786,10 +786,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         'diff',
         '--name-only',
         '-z',
-        '--no-renames',
+        '--find-renames',
+        '-l10000',
         $diffTarget,
         '--'
-    ) + @($canonicalTcbPaths)
+    )
     $changedFileOutput = Invoke-SharpProofGitText `
         -RepositoryRoot $repositoryRoot `
         -Arguments $changedFileArguments `
@@ -798,7 +799,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $changedFileNames = $changedFileOutput -split ([string][char]0)
     foreach ($changedFileName in $changedFileNames) {
         $normalized = ([string]$changedFileName).Replace('\', '/')
-        if (-not [string]::IsNullOrWhiteSpace($normalized)) {
+        if (-not [string]::IsNullOrWhiteSpace($normalized) -and $normalized -cin $canonicalTcbPaths) {
             [void]$changedTcbFiles.Add($normalized)
         }
     }
@@ -816,10 +817,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 'core.quotePath=false',
                 'diff',
                 '--unified=0',
-                '--no-renames',
+                '--find-renames',
+                '-l10000',
                 $diffTarget,
                 '--'
-            ) + @(Get-OrdinalSortedUniqueStrings -Values @($changedTcbFiles))) `
+            )) `
             -FailureMessage (
             "git diff failed for changed TCB paths for comparison ref '$ComparisonRef'.")
     }
@@ -845,6 +847,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 "git diff did not identify the changed TCB path for comparison " +
                 "ref '$ComparisonRef'.")
         }
+        if (-not $changedTcbFiles.Contains($currentPath)) { continue }
         $start = [int]$match.Groups['start'].Value
         $count = if ($match.Groups['count'].Success) {
             [int]$match.Groups['count'].Value
