@@ -22,7 +22,10 @@ only `actions/*`, `github/codeql-action`, `NuGet/login`, `lycheeverse/lychee-act
 `anchore/scan-action`, and `anchore/sbom-action`. All external contributors require
 workflow approval. Keep checkout credentials disabled in build/test jobs. The docs
 updater uses explicit write permissions and authenticates Git with its job token
-before pushing its bot branch and creating a PR. The repository's shared create/approve-PR
+before pushing its bot branch and creating a PR. It explicitly dispatches the
+image-security workflow alongside the existing canonical workflows. GitHub may
+require a maintainer to approve bot-created default CodeQL runs; approve the run
+rather than bypassing the required analysis. The repository's shared create/approve-PR
 Actions switch remains enabled for this updater; it must not approve or auto-merge PRs.
 
 The `nuget.org` environment retains its explicit release-tag allowlist and requires
