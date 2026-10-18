@@ -1,16 +1,16 @@
-namespace SharpProof.Analyzer.Configuration;
+namespace SharpProof.Compiler.Semantics;
 
-internal sealed class AnalyzerConfiguration
+internal sealed class CompilerConfiguration
 {
-    internal static AnalyzerConfiguration AdvisoryAll
+    internal static CompilerConfiguration AdvisoryAll
     {
         get;
     } = new(
         SharpProofProfile.Advisory, SharpProofFeatures.All, []);
 
-    private AnalyzerConfiguration(
+    private CompilerConfiguration(
         SharpProofProfile profile, SharpProofFeatures features,
-        ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
+        ImmutableArray<InvalidCompilerConfigurationValue> invalidConfigurationValues)
     {
 
         RepositoryParameterGuard.ThrowIfInvalid(invalidConfigurationValues.IsDefault, nameof(invalidConfigurationValues));
@@ -29,12 +29,12 @@ internal sealed class AnalyzerConfiguration
     }
     internal bool EffectsEnabled => Features is SharpProofFeatures.Effects or SharpProofFeatures.All;
     internal bool ContractsEnabled => Features is SharpProofFeatures.Contracts or SharpProofFeatures.All;
-    internal ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues
+    internal ImmutableArray<InvalidCompilerConfigurationValue> InvalidConfigurationValues
     {
         get;
     }
 
-    public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
+    public static CompilerConfiguration FromOptions(AnalyzerOptions options)
     {
         if (options == null)
         {
@@ -44,7 +44,7 @@ internal sealed class AnalyzerConfiguration
         return FromOptions(options.AnalyzerConfigOptionsProvider);
     }
 
-    internal static AnalyzerConfiguration FromOptions(
+    internal static CompilerConfiguration FromOptions(
         AnalyzerConfigOptionsProvider optionsProvider)
     {
         optionsProvider = RepositoryParameterGuard.NotNull(optionsProvider, nameof(optionsProvider));
@@ -79,7 +79,7 @@ internal sealed class AnalyzerConfiguration
         }
     }
 
-    private static ImmutableArray<InvalidAnalyzerConfigurationValue>
+    private static ImmutableArray<InvalidCompilerConfigurationValue>
         GetInvalidGlobalConfigurationValues(
             AnalyzerConfigOptions options,
             out (bool Found, string Value, bool HasConflict, string Conflict)
@@ -90,10 +90,10 @@ internal sealed class AnalyzerConfiguration
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
         profileAliases = ReadOptionAliases(
             options,
-            AnalyzerConfigurationOptionRegistry.Profile);
+            CompilerConfigurationOptionRegistry.Profile);
         featuresAliases = ReadOptionAliases(
             options,
-            AnalyzerConfigurationOptionRegistry.Features);
+            CompilerConfigurationOptionRegistry.Features);
         var invalid = GetInvalidConfigurationValues(
             options,
             null,
@@ -102,24 +102,24 @@ internal sealed class AnalyzerConfiguration
             featuresAliases: featuresAliases)
             .ToList();
         if (!invalid.Any(static value =>
-                value.Key == AnalyzerConfigurationOptionRegistry.Profile.Key) &&
+                value.Key == CompilerConfigurationOptionRegistry.Profile.Key) &&
             options.TryGetValue(
-                AnalyzerConfigurationOptionRegistry.Profile.Key,
+                CompilerConfigurationOptionRegistry.Profile.Key,
                 out var analyzerProfile) &&
             options.TryGetValue(
                 "build_property." +
-                    AnalyzerConfigurationOptionRegistry.Profile.BuildPropertyName,
+                    CompilerConfigurationOptionRegistry.Profile.BuildPropertyName,
                 out var msBuildProfile) &&
-            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
-                AnalyzerConfigurationOptionRegistry.Profile,
+            CompilerConfigurationOptionRegistry.IsAcceptedValue(
+                CompilerConfigurationOptionRegistry.Profile,
                 analyzerProfile) &&
-            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
-                AnalyzerConfigurationOptionRegistry.Profile,
+            CompilerConfigurationOptionRegistry.IsAcceptedValue(
+                CompilerConfigurationOptionRegistry.Profile,
                 msBuildProfile) &&
             !Is(analyzerProfile, msBuildProfile))
         {
-            invalid.Add(new InvalidAnalyzerConfigurationValue(
-                AnalyzerConfigurationOptionRegistry.Profile.Key,
+            invalid.Add(new InvalidCompilerConfigurationValue(
+                CompilerConfigurationOptionRegistry.Profile.Key,
                 analyzerProfile.Trim() + " / " + msBuildProfile.Trim(),
                 "profile must match the MSBuild SharpProofProfile property, which controls package and verifier behavior"));
         }
@@ -130,7 +130,7 @@ internal sealed class AnalyzerConfiguration
     private static (bool Found, string Value, bool HasConflict, string Conflict)
         ReadOptionAliases(
         AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option)
+        CompilerConfigurationOption option)
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
@@ -186,7 +186,7 @@ internal sealed class AnalyzerConfiguration
             string.Join(" / ", distinct));
     }
 
-    internal static InvalidAnalyzerConfigurationValue ProviderFailure(
+    internal static InvalidCompilerConfigurationValue ProviderFailure(
         Exception exception)
     {
         exception = RepositoryParameterGuard.NotNull(exception, nameof(exception));
@@ -196,7 +196,7 @@ internal sealed class AnalyzerConfiguration
             "configuration provider failed; analysis was disabled");
     }
 
-    internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
+    internal static ImmutableArray<InvalidCompilerConfigurationValue> GetInvalidTreeConfigurationValues(
         AnalyzerConfigOptions options,
         AnalyzerConfigOptions? globalOptions = null)
     {
@@ -208,7 +208,7 @@ internal sealed class AnalyzerConfiguration
         return [.. GetInvalidConfigurationValues(options, globalOptions, parseValues: false)];
     }
 
-    private static IEnumerable<InvalidAnalyzerConfigurationValue>
+    private static IEnumerable<InvalidCompilerConfigurationValue>
         GetInvalidConfigurationValues(
             AnalyzerConfigOptions options,
             AnalyzerConfigOptions? globalOptions,
@@ -219,18 +219,18 @@ internal sealed class AnalyzerConfiguration
                 featuresAliases = null)
     {
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
-        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
+        foreach (var option in CompilerConfigurationOptionRegistry.All)
         {
-            var aliases = option == AnalyzerConfigurationOptionRegistry.Profile &&
+            var aliases = option == CompilerConfigurationOptionRegistry.Profile &&
                     profileAliases is { } cachedProfile
                 ? cachedProfile
-                : option == AnalyzerConfigurationOptionRegistry.Features &&
+                : option == CompilerConfigurationOptionRegistry.Features &&
                     featuresAliases is { } cachedFeatures
                     ? cachedFeatures
                     : ReadOptionAliases(options, option);
             if (aliases.HasConflict)
             {
-                yield return new InvalidAnalyzerConfigurationValue(
+                yield return new InvalidCompilerConfigurationValue(
                     option.Key,
                     aliases.Conflict,
                     "configuration aliases disagree; use one effective value");
@@ -244,7 +244,7 @@ internal sealed class AnalyzerConfiguration
 
             if (parseValues)
             {
-                if (AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
+                if (CompilerConfigurationOptionRegistry.IsAcceptedValue(option, value))
                 {
                     continue;
                 }
@@ -270,7 +270,7 @@ internal sealed class AnalyzerConfiguration
         }
         if (TryGetRetiredMode(options, out var retiredMode))
         {
-            yield return new InvalidAnalyzerConfigurationValue(
+            yield return new InvalidCompilerConfigurationValue(
                 "sharpproof_mode",
                 retiredMode.Trim(),
                 "option was removed; use sharpproof_profile and sharpproof_features");
@@ -301,7 +301,7 @@ internal sealed class AnalyzerConfiguration
 
     private static bool IsPackageDefaultProperty(
         AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option,
+        CompilerConfigurationOption option,
         string key,
         string value)
     {
@@ -321,20 +321,20 @@ internal sealed class AnalyzerConfiguration
     }
 
     private static bool IsPackageDefaultValue(
-        AnalyzerConfigurationOption option,
+        CompilerConfigurationOption option,
         string value)
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return option == AnalyzerConfigurationOptionRegistry.Profile
+        return option == CompilerConfigurationOptionRegistry.Profile
             ? Is(value, "advisory")
-            : option == AnalyzerConfigurationOptionRegistry.Features &&
+            : option == CompilerConfigurationOptionRegistry.Features &&
                 Is(value, "all");
     }
 
     private static bool TryGet(
         AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option,
+        CompilerConfigurationOption option,
         out string value)
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
@@ -388,7 +388,7 @@ internal sealed class AnalyzerConfiguration
     }
 }
 
-internal readonly struct InvalidAnalyzerConfigurationValue(
+internal readonly struct InvalidCompilerConfigurationValue(
     string key,
     string value,
     string reason)

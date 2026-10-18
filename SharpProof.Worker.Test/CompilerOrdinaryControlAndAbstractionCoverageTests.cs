@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -36,7 +36,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
             Assert.That(attribute.ApplicationSyntaxReference, Is.Not.Null);
         }
         var diagnostics = new List<Diagnostic>();
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
+        var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(SharpProofControlAttributePolicy.ValidateAndShouldSuppress(method, session,
             diagnostics.Add, TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(diagnostics, Has.Count.EqualTo(emptyReason ? 1 : 0));

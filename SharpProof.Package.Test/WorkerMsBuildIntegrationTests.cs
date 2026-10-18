@@ -18,6 +18,12 @@ namespace SharpProof.Package.Test;
 [NonParallelizable]
 public sealed class WorkerMsBuildIntegrationTests
 {
+    [OneTimeTearDown]
+    public void DisposeSharedCompilerPayload()
+    {
+        ConsumerProject.DisposeSharedCompilerPayload();
+    }
+
     private static readonly string s_sharedCompilationServerId =
         "sharpproof-worker-integration-" +
         typeof(WorkerMsBuildIntegrationTests).Assembly.ManifestModule
@@ -3157,6 +3163,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         private static readonly Lazy<ProjectTemplate> s_projectTemplate =
             new(CreateProjectTemplate);
+        private static TempDirectory? s_sharedCompilerPayload;
         private readonly TempDirectory _temporary;
         private readonly string _root;
         private bool _defaultRestoreCompleted;
@@ -3170,6 +3177,7 @@ public sealed class WorkerMsBuildIntegrationTests
             string AnalyzerDirectory,
             string GeneratorDirectory,
             string CollectorDirectory,
+            string SharedDirectory,
             string TargetsPath,
             string VerifierTargetsPath,
             string WorkerPath,
@@ -3184,6 +3192,7 @@ public sealed class WorkerMsBuildIntegrationTests
             public string VerifierPropsPath { get; init; } = VerifierPropsPath ?? throw new System.ArgumentNullException(nameof(VerifierPropsPath));
             public string AnalyzerDirectory { get; init; } = AnalyzerDirectory ?? throw new System.ArgumentNullException(nameof(AnalyzerDirectory));
             public string GeneratorDirectory { get; init; } = GeneratorDirectory ?? throw new System.ArgumentNullException(nameof(GeneratorDirectory));
+            public string SharedDirectory { get; init; } = SharedDirectory ?? throw new System.ArgumentNullException(nameof(SharedDirectory));
             public string CollectorDirectory { get; init; } = CollectorDirectory ?? throw new System.ArgumentNullException(nameof(CollectorDirectory));
             public string TargetsPath { get; init; } = TargetsPath ?? throw new System.ArgumentNullException(nameof(TargetsPath));
             public string VerifierTargetsPath { get; init; } = VerifierTargetsPath ?? throw new System.ArgumentNullException(nameof(VerifierTargetsPath));
@@ -3776,7 +3785,7 @@ public sealed class WorkerMsBuildIntegrationTests
                   <PropertyGroup>
                     <_SharpProofTestAnalyzerDirectory>{template.AnalyzerDirectory}</_SharpProofTestAnalyzerDirectory>
                     <_SharpProofTestContractForGeneratorPath>{template.GeneratorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofTestContractForGeneratorPath>
-                    <_SharpProofSharedDirectory>{template.CollectorDirectory}</_SharpProofSharedDirectory>
+                    <_SharpProofSharedDirectory>{template.SharedDirectory}</_SharpProofSharedDirectory>
                     <_SharpProofTestCollectorDirectory>{template.CollectorDirectory}</_SharpProofTestCollectorDirectory>
                     <_SharpProofTestCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</_SharpProofTestCompilerCollectorPath>
                     <!-- Worker-target fixtures opt into advisory; package-default tests cover zero-configuration installation. -->
@@ -3833,6 +3842,54 @@ public sealed class WorkerMsBuildIntegrationTests
                 """;
         }
 
+        internal static void DisposeSharedCompilerPayload()
+        {
+            s_sharedCompilerPayload?.Dispose();
+            s_sharedCompilerPayload = null;
+        }
+
+        private static string CreateSharedCompilerPayload(string repository, string configuration)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(repository);
+            ArgumentException.ThrowIfNullOrEmpty(configuration);
+            var packageDirectory = Path.Combine(repository, "SharpProof.Verifier");
+            var manifest = XDocument.Load(Path.Combine(packageDirectory, "SharpProof.Verifier.nuspec"));
+            var payload = TempDirectory.CreateOwned(
+                "SharpProof.Compiler.Payload.Test", string.Empty,
+                "Refusing to remove an unexpected compiler payload directory.");
+            try
+            {
+                // Mirror the package's explicit shared payload, including its source
+                // choices when product output folders contain different support DLLs.
+                foreach (var entry in manifest.Descendants())
+                {
+                    var target = (string?)entry.Attribute("target");
+                    var source = (string?)entry.Attribute("src");
+                    if (entry.Name.LocalName != "file" || target != @"tools\shared\netstandard2.0" ||
+                        source is null || !source.EndsWith(".dll", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    var sourcePath = Path.GetFullPath(Path.Combine(packageDirectory,
+                        source.Replace("$configuration$", configuration, StringComparison.Ordinal)
+                            .Replace('\\', Path.DirectorySeparatorChar)));
+                    File.Copy(sourcePath, Path.Combine(payload.FullName, Path.GetFileName(sourcePath)));
+                }
+                if (!File.Exists(Path.Combine(payload.FullName, "SharpProof.Analyzer.Core.dll")) ||
+                    !File.Exists(Path.Combine(payload.FullName, "SharpProof.Compiler.Semantics.dll")))
+                {
+                    throw new InvalidDataException("The verifier manifest did not supply the shared compiler payload.");
+                }
+                s_sharedCompilerPayload = payload;
+                return SecurityElement.Escape(payload.FullName);
+            }
+            catch
+            {
+                payload.Dispose();
+                throw;
+            }
+        }
+
         private static ProjectTemplate CreateProjectTemplate()
         {
             static string EscapePath(params string[] parts)
@@ -3861,6 +3918,7 @@ public sealed class WorkerMsBuildIntegrationTests
             var launcher = worker;
             var protocol = EscapePath(repository, "SharpProof.Worker.Protocol", "bin", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll");
             var buildTasks = EscapePath(repository, "SharpProof.BuildTasks", "bin", testConfiguration, "net10.0", "SharpProof.BuildTasks.dll");
+            var sharedDirectory = CreateSharedCompilerPayload(repository, testConfiguration);
             return new ProjectTemplate(
                 repository,
                 nativeZ3Path,
@@ -3870,6 +3928,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 analyzerDirectory,
                 generatorDirectory,
                 collectorDirectory,
+                sharedDirectory,
                 targets,
                 verifierTargets,
                 worker,

@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -10,7 +10,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     [Test]
     public void AnalyzerConfigurationOverridesOnlyDefaultedFeatures()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(
+        var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("build_property.SharpProofProfile", "strict"),
@@ -32,7 +32,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     [Test]
     public void ExplicitFeatureDoesNotMakeDefaultProfileLookExplicit()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(
+        var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("build_property.SharpProofProfile", "advisory"),
@@ -61,7 +61,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
         var tree = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "strict"));
 
-        var invalid = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+        var invalid = CompilerConfiguration.GetInvalidTreeConfigurationValues(
             tree,
             global);
 
@@ -71,7 +71,7 @@ public sealed class AnalyzerConfigurationPackageDefaultTests
     [Test]
     public void ExplicitMsBuildProfileStillConflictsWithAnalyzerConfiguration()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(
+        var configuration = CompilerConfiguration.FromOptions(
             new DictionaryAnalyzerConfigOptionsProvider(
                 new DictionaryAnalyzerConfigOptions(
                     ("build_property.SharpProofProfile", "off"),

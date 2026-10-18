@@ -14,7 +14,7 @@
     <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
     <None Update="README.md">
       <Pack>True</Pack>

@@ -1,4 +1,4 @@
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 // The callables whose shape the verifier can represent at all: synchronous,
 // non-generic, by-value signatures over managed types, outside unsafe code.

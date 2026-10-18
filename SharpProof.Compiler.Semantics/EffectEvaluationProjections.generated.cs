@@ -3,7 +3,7 @@
 // keeps analyzers treating this declarative code as generated.
 // </auto-generated>
 #nullable enable
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class EffectEvaluationProjections
 {

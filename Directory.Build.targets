@@ -45,4 +45,25 @@
       <EmbeddedFiles Include="@(Compile)" />
     </ItemGroup>
   </Target>
+
+  <!-- Architecture checks consume evaluated items, including inherited Compile links. -->
+  <Target Name="_SharpProofGetArchitectureItems" Returns="@(_SharpProofArchitectureItem)">
+    <ItemGroup>
+      <_SharpProofArchitectureItem Include="@(Compile->'%(FullPath)')">
+        <ProjectName>$(MSBuildProjectName)</ProjectName>
+        <Kind>Compile</Kind>
+      </_SharpProofArchitectureItem>
+      <!-- SDK-inferred transitive edges are derived from the declared graph. -->
+      <_SharpProofArchitectureItem Include="@(ProjectReference->'%(FullPath)')"
+                                  Exclude="@(_TransitiveProjectReferences->'%(FullPath)')"
+                                  Condition="'%(ProjectReference.ReferenceOutputAssembly)' != 'false'">
+        <ProjectName>$(MSBuildProjectName)</ProjectName>
+        <Kind>ProjectReference</Kind>
+      </_SharpProofArchitectureItem>
+      <_SharpProofArchitectureItem Include="@(PackageReference)">
+        <ProjectName>$(MSBuildProjectName)</ProjectName>
+        <Kind>PackageReference</Kind>
+      </_SharpProofArchitectureItem>
+    </ItemGroup>
+  </Target>
 </Project>

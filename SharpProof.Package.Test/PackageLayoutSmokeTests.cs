@@ -49,6 +49,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
+        "SharpProof.Compiler.Semantics.dll",
         "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
         "SharpProof.Effects.dll",
@@ -96,6 +97,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
+        "tools/shared/netstandard2.0/SharpProof.Compiler.Semantics.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
         "tools/shared/netstandard2.0/SharpProof.Contracts.dll",
         "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
@@ -305,7 +307,10 @@ public sealed class PackageLayoutSmokeTests
                          "SharpProof.CompilerCollector.dll"),
                      Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Analyzer.Core.dll")
+                         "SharpProof.Analyzer.Core.dll"),
+                     Path.Combine(
+                         sharedDirectory,
+                         "SharpProof.Compiler.Semantics.dll")
                  })
         {
             var reference = new AnalyzerFileReference(path, loader);

@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="SharpProof.Compiler.Semantics/SharpProof.Compiler.Semantics.csproj" />
   <Project Path="eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />
   <Project Path="eng/ConsoleLoggingAnalyzer.Test/ConsoleLoggingAnalyzer.Test.csproj" />
   <Project Path="eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj" />
