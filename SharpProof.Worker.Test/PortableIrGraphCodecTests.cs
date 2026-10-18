@@ -12,6 +12,24 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void ArgumentOutOfRangeFaultSurvivesPortableRoundTripWithStableOlderCodes()
+    {
+        Assert.That((int)IrExceptionKind.Unknown, Is.EqualTo(6));
+        Assert.That((int)IrExceptionKind.Explicit, Is.EqualTo(7));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exceptional = builder.CreateBlock();
+        builder.Throw(entry, factory.CreateOperation("interface-bounds"), IrExceptionKind.ArgumentOutOfRange, exceptional);
+        builder.ExceptionalExit(exceptional, factory.CreateOperation("exceptional-exit"));
+        var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = new IrProgramInterpreter(decoded.Factory).Execute(decoded.Program!);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.ArgumentOutOfRange));
+        Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
+    }
+    [Test]
     public void EncodingRejectsProgramFromAnotherFactory()
     {
         var fixture = CreateFixture();

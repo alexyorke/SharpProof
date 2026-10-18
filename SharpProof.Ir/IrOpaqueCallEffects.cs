@@ -26,6 +26,33 @@ internal enum IrOpaqueCallEffects
 internal static class IrOpaqueCallSite
 {
     private const string Prefix = "opaque-call:";
+    private const string DefaultComparerReplayPrefix = "framework-default-comparer:";
+
+    internal static string DefaultComparerReplay(string primitive)
+    {
+        primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
+        if (!IsDefaultComparerPrimitive(primitive))
+        { throw new ArgumentOutOfRangeException(nameof(primitive)); }
+        return DefaultComparerReplayPrefix + primitive;
+    }
+
+    internal static string? DefaultComparerReplayPrimitive(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        if (!description.StartsWith(DefaultComparerReplayPrefix, StringComparison.Ordinal))
+        { return null; }
+        var primitive = description.Substring(DefaultComparerReplayPrefix.Length);
+        return IsDefaultComparerPrimitive(primitive) ? primitive : null;
+    }
+
+    private static bool IsDefaultComparerPrimitive(string primitive)
+    {
+        primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
+        return primitive is "System_SByte" or "System_Byte" or "System_Int16" or "System_UInt16" or "System_Char" or
+            "System_Int32" or "System_UInt32" or "System_Int64" or "System_UInt64";
+    }
     private const int CapabilityShift = 16;
     private const int CapabilityMask = 0x1FFF;
 

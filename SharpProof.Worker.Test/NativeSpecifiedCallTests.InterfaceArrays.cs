@@ -180,6 +180,240 @@ public sealed partial class NativeSpecifiedCallTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
+    [TestCase("System.ArgumentOutOfRangeException", false)]
+    [TestCase("System.ArgumentException", false)]
+    [TestCase("System.Exception", true)]
+    [TestCase("System.IndexOutOfRangeException", false)]
+    [TestCase("System.ArgumentNullException", false)]
+    public async Task InterfaceArrayBoundsRetainResourceCallbackExceptionUncertainty(string allowed, bool expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        foreach (var access in new[] { "return ((System.Collections.Generic.IList<int>)values)[index];", "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;" })
+        {
+            var preparation = Prepare("[AllowedExceptions(typeof(" + allowed + "))] public static int Target(int[] values, int index) { Contract.Requires(values != null); " + access + " }");
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(expected), result.Reason.ToString());
+        }
+        Assert.That(ExplicitThrowSites.TypeName(SharpProof.Ir.IrExceptionKind.ArgumentOutOfRange), Is.EqualTo("System.ArgumentOutOfRangeException"));
+    }
+
+    [Test]
+    public async Task ExactArrayInterfaceBoundsRetainIndependentNullReceiverFaults()
+    {
+        var preparation = Prepare("[AllowedExceptions(typeof(System.Exception))] public static int Target(int[] values, int index) { return ((System.Collections.Generic.IList<int>)values)[index]; }");
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        var missingNull = Prepare("[AllowedExceptions(typeof(System.ArgumentOutOfRangeException))] public static int Target(int[] values, int index) { return ((System.Collections.Generic.IList<int>)values)[index]; }");
+        var rejected = await NativeExceptionEffectVerifier.VerifyAsync(missingNull, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(rejected.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+    }
+
+    [TestCase("System.ArgumentOutOfRangeException")]
+    [TestCase("System.ArgumentException")]
+    [TestCase("System.Exception")]
+    public async Task ExactArrayInterfaceBoundsDispatchToTheirRuntimeCatchHierarchy(string exception)
+    {
+        System.ArgumentNullException.ThrowIfNull(exception);
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null); Contract.Ensures(Contract.Result<int>() == 37); try { return ((System.Collections.Generic.IList<int>)values)[-1]; } catch (" + exception + ") { return 37; }",
+            WorkerClaimOutcome.Proven);
+    }
+    [Test]
+    public async Task OpaqueMutationsPreserveEarlierScalarSnapshots()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null); " +
+            "Contract.Ensures(Contract.Result<int>() == Contract.Old(values[0])); int before = values[0]; " +
+            "mutate(values); return before;", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task UntakenOpaqueMutationsPreserveArrayContents()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate, bool change",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null && !change); " +
+            "Contract.Ensures(Contract.Result<int>() == Contract.Old(values[0])); " +
+            "if (change) mutate(values); return values[0];", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task ExplicitStoresRestoreCellsAfterOpaqueMutations()
+    {
+        await CheckInterfaceArrayContract("int[] values, System.Action<int[]> mutate, int replacement",
+            "Contract.Requires(values != null && values.Length > 0 && mutate != null); " +
+            "Contract.Ensures(Contract.Result<int>() == replacement); " +
+            "mutate(values); values[0] = replacement; return values[0];", WorkerClaimOutcome.Proven);
+    }
+    [Test]
+    public async Task BoundsCallbackFailuresCanReachDifferentCatchHandlers()
+    {
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null); Contract.Ensures(Contract.Result<int>() == 37); " +
+            "try { return ((System.Collections.Generic.IList<int>)values)[-1]; } " +
+            "catch (System.ArgumentOutOfRangeException) { return 37; } catch (System.Exception) { return 0; }",
+            WorkerClaimOutcome.Unknown);
+    }
+
+    [TestCase("int before = cell.Value; mutate(cell); return before;", true)]
+    [TestCase("int before = cell.Value; mutate(cell); return cell.Value;", false)]
+    [TestCase("if (change) mutate(cell); return cell.Value;", true)]
+    [TestCase("mutate(cell); cell.Value = 17; return cell.Value;", true)]
+    public async Task OpaqueFieldMutationsRespectProgramOrderAndBranchReach(string body, bool proven)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        await CheckInterfaceArrayContract("Cell cell, System.Action<Cell> mutate, bool change",
+            "Contract.Requires(cell != null && cell.Value == 17 && mutate != null && !change); " +
+            "Contract.Ensures(Contract.Result<int>() == 17); " + body,
+            proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown,
+            members: "public sealed class Cell { public int Value; }");
+    }
+    [TestCase("int", "++", "", "1")]
+    [TestCase("long", "++", "", "1")]
+    [TestCase("uint", "++", "", "1U")]
+    [TestCase("ulong", "++", "", "1UL")]
+    [TestCase("char", "++", "", "(char)1")]
+    [TestCase("int", "", "++", "1")]
+    [TestCase("int", "--", "", "-1")]
+    [TestCase("int", "", "--", "-1")]
+    public async Task InterfaceArrayIncrementsPreserveExpressionAndStoredValues(string type, string prefix, string postfix, string delta)
+    {
+        System.ArgumentNullException.ThrowIfNull(type);
+        System.ArgumentNullException.ThrowIfNull(prefix);
+        System.ArgumentNullException.ThrowIfNull(postfix);
+        System.ArgumentNullException.ThrowIfNull(delta);
+        var previous = "Contract.Old(values[0])";
+        var updated = "unchecked((" + type + ")(" + previous + " + (" + delta + ")))";
+        await CheckInterfaceArrayContract(type + "[] values",
+            "Contract.Requires(values != null && values.Length > 0); " +
+            "Contract.Ensures(Contract.Result<" + type + ">() == " + (string.IsNullOrEmpty(postfix) ? updated : previous) + " && values[0] == " + updated + "); return unchecked(" + prefix + "((System.Collections.Generic.IList<" + type + ">)values)[0]" + postfix + ");",
+            WorkerClaimOutcome.Proven, type);
+    }
+
+    [TestCase("+=", "+")]
+    [TestCase("-=", "-")]
+    [TestCase("*=", "*")]
+    [TestCase("/=", "/")]
+    [TestCase("%=", "%")]
+    [TestCase("&=", "&")]
+    [TestCase("|=", "|")]
+    [TestCase("^=", "^")]
+    [TestCase("<<=", "<<")]
+    [TestCase(">>=", ">>")]
+    [TestCase(">>>=", ">>>")]
+    public async Task InterfaceArrayCompoundOperatorsProveTheirStoredResult(string assignment, string binary)
+    {
+        System.ArgumentNullException.ThrowIfNull(assignment);
+        System.ArgumentNullException.ThrowIfNull(binary);
+        var divisionGuard = assignment is "/=" or "%=" ? "Contract.Requires(replacement != 0 && !(values[0] == int.MinValue && replacement == -1)); " : "";
+        await CheckInterfaceArrayContract("int[] values, int replacement",
+            "Contract.Requires(values != null && values.Length > 0); " + divisionGuard +
+            "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) " + binary + " replacement) && values[0] == Contract.Result<int>()); return unchecked(((System.Collections.Generic.IList<int>)values)[0] " + assignment + " replacement);",
+            WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task InterfaceArrayCompoundReadPrecedesRhsMutationAndRebinding()
+    {
+        var requires = "Contract.Requires(values != null && values.Length > 1); ";
+        await CheckInterfaceArrayContract("int[] values, int replacement",
+            requires + "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) + replacement)); " +
+            "((System.Collections.Generic.IList<int>)values)[0] += (values[0] = replacement); return values[0];", WorkerClaimOutcome.Proven);
+        await CheckInterfaceArrayContract("int[] values",
+            requires + "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) + 1)); " +
+            "int index = 0; ((System.Collections.Generic.IList<int>)values)[index] += (index = 1); return values[0];", WorkerClaimOutcome.Proven);
+        await CheckInterfaceArrayContract("int[] values, int[] other",
+            requires + "Contract.Requires(other != null && other.Length > 0); " +
+            "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) + Contract.Old(other[0]))); " +
+            "var original = values; ((System.Collections.Generic.IList<int>)values)[0] += (values = other)[0]; return original[0];", WorkerClaimOutcome.Proven);
+        await CheckInterfaceArrayContract("int[] values",
+            requires + "Contract.Ensures(Contract.Result<int>() == 1); int index = 0; " +
+            "((System.Collections.Generic.IList<int>)values)[index++]++; return index;", WorkerClaimOutcome.Proven);
+    }
+
+    [TestCase("Contract.Requires(values == null);", "System.NullReferenceException", "0")]
+    [TestCase("Contract.Requires(values != null);", "System.Exception", "-1")]
+    public async Task InterfaceArrayCompoundGetterFaultPrecedesRhsEvaluation(string requires, string exception, string index)
+    {
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(exception);
+        System.ArgumentNullException.ThrowIfNull(index);
+        await CheckInterfaceArrayContract("int[] values",
+            requires + "Contract.Ensures(Contract.Result<int>() == 0); int evaluated = 0; " +
+            "try { ((System.Collections.Generic.IList<int>)values)[" + index + "] += ++evaluated; } catch (" + exception + ") { return evaluated; } return evaluated;",
+            WorkerClaimOutcome.Proven);
+    }
+
+    [TestCase("checked(++((System.Collections.Generic.IList<int>)values)[0])", "System.OverflowException", "int.MaxValue", "0")]
+    [TestCase("((System.Collections.Generic.IList<int>)values)[0] /= divisor", "System.DivideByZeroException", "17", "0")]
+    [TestCase("((System.Collections.Generic.IList<int>)values)[0] /= divisor", "System.OverflowException", "int.MinValue", "-1")]
+    public async Task InterfaceArrayArithmeticFaultsDoNotPerformTheSetter(string expression, string exception, string initial, string divisor)
+    {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(exception);
+        System.ArgumentNullException.ThrowIfNull(initial);
+        System.ArgumentNullException.ThrowIfNull(divisor);
+        await CheckInterfaceArrayContract("int[] values, int divisor",
+            "Contract.Requires(values != null && values.Length > 0 && values[0] == " + initial + " && divisor == " + divisor + "); " +
+            "Contract.Ensures(Contract.Result<int>() == " + initial + "); try { _ = " + expression + "; } catch (" + exception + ") { return values[0]; } return values[0];",
+            WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task InterfaceArrayCompoundEffectsAndWrongClaimsRetainControls()
+    {
+        await CheckInterfaceArrayEffects("[DoesNotThrow, ZeroAllocations, EnforcePure]", "int[] values",
+            "Contract.Requires(values != null && values.Length > 0); return unchecked(((System.Collections.Generic.IList<int>)values)[0]++);", true, true, false);
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null && values.Length > 0 && values[0] == 17); Contract.Ensures(Contract.Result<int>() == 19); " +
+            "return ++((System.Collections.Generic.IList<int>)values)[0];", WorkerClaimOutcome.Refuted);
+        await CheckInterfaceArrayContract("System.Collections.Generic.IList<int> values",
+            "Contract.Requires(values != null); Contract.Ensures(Contract.Result<int>() == 18); return ++values[0];", WorkerClaimOutcome.Unknown);
+    }
+    [Test]
+    public async Task InterfaceArrayMultiplicationStaysWithinNativeProofBudget()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { public static int Target(int[] values, int replacement) { " +
+            "Contract.Requires(values != null && values.Length > 0); Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) * replacement) && values[0] == Contract.Result<int>()); " +
+            "return unchecked(((System.Collections.Generic.IList<int>)values)[0] *= replacement); } }");
+        SharpProof.CompilerArtifact.CompilerManifestArtifactJson.DeserializePrepared(
+            SharpProof.CompilerArtifact.CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparations.Single())!;
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, TestContext.CurrentContext.CancellationToken), Is.True,
+            "construction=" + failure + "; blocks=" + candidate.Program.Blocks.Length);
+        var budgets = new WorkerBudgets();
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        var entry = await solver.VerifyEntryAsync(TestContext.CurrentContext.CancellationToken);
+        Assert.That(entry.Outcome, Is.TypeOf<RefutedOutcome>(), "entry=" + entry.Reason);
+        var proof = await solver.VerifyEnsuresAsync(0, TestContext.CurrentContext.CancellationToken);
+        Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>(), "proof=" + proof.Reason + "; resources=" + solver.ConsumedResourceCount);
+        await TestContext.Progress.WriteLineAsync("interface multiplication native resources=" + solver.ConsumedResourceCount);
+    }
+    [TestCase("&=", "&")]
+    [TestCase("|=", "|")]
+    [TestCase("^=", "^")]
+    public async Task InterfaceArrayBooleanCompoundOperatorsPreserveTheirStoredResult(string assignment, string binary)
+    {
+        System.ArgumentNullException.ThrowIfNull(assignment);
+        System.ArgumentNullException.ThrowIfNull(binary);
+        await CheckInterfaceArrayContract("bool[] values, bool replacement",
+            "Contract.Requires(values != null && values.Length > 0); " +
+            "Contract.Ensures(Contract.Result<bool>() == (Contract.Old(values[0]) " + binary + " replacement) && values[0] == Contract.Result<bool>()); " +
+            "return ((System.Collections.Generic.IList<bool>)values)[0] " + assignment + " replacement;", WorkerClaimOutcome.Proven, "bool");
+    }
+
+    [Test]
+    public async Task CheckedCompoundOverflowRetainsRhsEffectsWithoutPerformingTheSetter()
+    {
+        await CheckInterfaceArrayContract("int[] values",
+            "Contract.Requires(values != null && values.Length > 0 && values[0] == int.MaxValue); Contract.Ensures(Contract.Result<int>() == 1); " +
+            "try { checked { ((System.Collections.Generic.IList<int>)values)[0] += (values[0] = 1); } } catch (System.OverflowException) { return values[0]; } return values[0];",
+            WorkerClaimOutcome.Proven);
+        await CheckInterfaceArrayContract("byte[] values, byte replacement",
+            "Contract.Requires(values != null && values.Length > 0 && values[0] == byte.MaxValue && replacement == 1); Contract.Ensures(Contract.Result<int>() == byte.MaxValue); " +
+            "try { checked { ((System.Collections.Generic.IList<byte>)values)[0] += replacement; } } catch (System.OverflowException) { return values[0]; } return values[0];",
+            WorkerClaimOutcome.Proven);
+    }
     private static async Task CheckInterfaceArrayContract(string parameters, string body, WorkerClaimOutcome expected, string result = "int", string members = "")
     {
         System.ArgumentNullException.ThrowIfNull(parameters);

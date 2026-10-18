@@ -941,4 +941,20 @@ public sealed class PassiveCallableVcTests
                 requires == null ? [] : [new(requires, Factory.Boolean(true), Site)], clauses.ToImmutable());
         }
     }
+    [TestCase(false, 20000000U)]
+    [TestCase(true, 20000000U)]
+    [TestCase(true, 1U)]
+    public async Task InsufficientEffectQueryBudgetCannotInventAPrefixWitness(bool writes, uint methodLimit)
+    {
+        var subject = new ScalarSubject();
+        var factory = subject.Factory;
+        var block = subject.Builder.CreateBlock();
+        subject.Builder.Write(block, subject.Site, writes ? IrWriteRegion.Static : IrWriteRegion.Local);
+        subject.Builder.Return(block, subject.Site, factory.Integer(0));
+        using var solver = new PassiveCallableSolver(Build(subject.Candidate(factory.Boolean(true))), 1, methodLimit);
+        var result = await solver.VerifyPurityAsync(TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+    }
 }

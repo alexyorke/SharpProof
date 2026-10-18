@@ -160,7 +160,7 @@ public sealed partial class TotalLoweringContext
         Receiver == null ? [.. Parameters] : [.. Parameters, Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
-    public IrVarId? Result { get; }
+    public IrVarId? Result { get; private set; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
     public ImmutableArray<IrVarId> EntryVariables => [.. Inputs.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry))];

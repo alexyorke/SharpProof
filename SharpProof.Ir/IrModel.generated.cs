@@ -95,7 +95,8 @@ public enum IrExceptionKind
     Unknown = 6,
     // A `throw` statement's exception. Lowering dispatches it to handlers by
     // its static type; the site's description names that type.
-    Explicit = 7
+    Explicit = 7,
+    ArgumentOutOfRange = 8
 }
 
 public enum IrProgramExecutionStatus

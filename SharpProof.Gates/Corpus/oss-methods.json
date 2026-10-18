@@ -1102,8 +1102,8 @@
       "declarationSha256": "df31b6fd18f41941a73025fb37e3df2cb2bb3ffce0676097c68966e44769d9aa",
       "methodName": "_rehash",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0042",
@@ -1126,8 +1126,8 @@
       "declarationSha256": "1974f25a2409f54fd3810e7e7e6ba4250e4c8f70812715c10f14edc38abd8919",
       "methodName": "_expand",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0044",
@@ -1846,8 +1846,8 @@
       "declarationSha256": "98a38564ca65013e8b089add8180519cdc5c2ddebc510f7deab35410efbea2c7",
       "methodName": "MoveNext",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0104",
@@ -2398,8 +2398,8 @@
       "declarationSha256": "03bbba660314e3ddb2fd6be1634ae120199e021bf3464d01c8f0eda0ea0a0afa",
       "methodName": "Enqueue",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0150",
