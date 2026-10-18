@@ -2,6 +2,38 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
+    private GuardedExpression? ReferenceEqualsClause(IInvocationOperation invocation, TotalParameterState state, int depth)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
+        { return null; }
+        var values = new GuardedExpression[2];
+        foreach (var argument in invocation.Arguments)
+        { values[argument.Parameter!.Ordinal] = LowerClause(argument.Value, state, depth + 1); }
+        var classification = First(values[0].Classification, values[1].Classification);
+        return classification.IsExact ? new(_factory.Binary(IrBinaryOperator.Equal, values[0].Value, values[1].Value),
+            And(values[0].SafeCondition, values[1].SafeCondition), classification) : Failed(invocation, classification.Abstention);
+    }
+
+    private TotalBodyValue? ReferenceEqualsBody(IInvocationOperation invocation, IrBlockId block, int depth)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
+        { return null; }
+        var values = new IrTerm[2];
+        // Roslyn preserves source argument order; ordinals retain named bindings.
+        foreach (var argument in invocation.Arguments)
+        {
+            var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(invocation, lowered.Continuation, lowered.Classification.Abstention); }
+            values[argument.Parameter!.Ordinal] = lowered.Value;
+            block = lowered.Continuation;
+        }
+        return new(_factory.Binary(IrBinaryOperator.Equal, values[0], values[1]), block, FrontendSubsetClassification.Exact);
+    }
+
     private GuardedExpression? IntegerComparisonClause(IInvocationOperation invocation, TotalParameterState state, int depth)
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));

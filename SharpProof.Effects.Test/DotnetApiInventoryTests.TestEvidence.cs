@@ -16,6 +16,13 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=object-reference-identity", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "nulls, aliases and distinct references; named arguments; identity rather than virtual equality; native proof/refutation controls in ReferenceEqualsApi tests",
+                    () => CheckReferenceIdentityIntrinsic(compilation, false), () => CheckReferenceIdentityIntrinsic(compilation, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=integer-comparison", StringComparison.Ordinal) || row.Evidence.Contains("intrinsic=default-integer-comparer-only", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 8/16/32/64 bit and UTF-16 code units; exact promoted differences; named argument reordering; compiled IR versus runtime", () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false), () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));
@@ -42,6 +49,36 @@ public sealed partial class DotnetApiInventoryTests
         ApiTestEvidence.Write(root, "intrinsic-test-evidence", rows);
         Assert.That(rows, Is.Not.Empty);
         Assert.That(rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status != "passed")).Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api + ": " + row.Detail)), Is.Empty, "Every inventoried intrinsic needs passing behavioral evidence; see intrinsic-test-evidence.md.");
+    }
+
+    private static bool CheckReferenceIdentityIntrinsic(CSharpCompilation references, bool wrongClaim)
+    {
+        ArgumentNullException.ThrowIfNull(references);
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static bool Check(object a, object b) => object.ReferenceEquals(objB: b, objA: a); }");
+        var compilation = references.AddSyntaxTrees(tree);
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        { return false; }
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(tree);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
+        var lowered = new RoslynTotalExpressionLowerer(context).LowerClause((IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!);
+        if (!lowered.Classification.IsExact)
+        { return false; }
+        object first = new object(), second = new object();
+        foreach (var (left, right) in new (object? Left, object? Right)[] { (null, null), (null, first), (first, null), (first, first), (first, second) })
+        {
+            var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
+            {
+                [context.Parameters[0].Current] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left),
+                [context.Parameters[1].Current] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right)
+            };
+            var interpreter = new IrInterpreter(factory);
+            if (interpreter.Evaluate(lowered.SafeCondition, inputs).Value?.Boolean != true ||
+                interpreter.Evaluate(lowered.Value, inputs).Value?.Boolean != (object.ReferenceEquals(left, right) ^ wrongClaim))
+            { return false; }
+        }
+        return true;
     }
 
     private static bool CheckEqualityIntrinsic(CSharpCompilation referenceCompilation, bool instance, bool wrongClaim)

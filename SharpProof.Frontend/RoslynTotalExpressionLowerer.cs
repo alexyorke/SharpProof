@@ -91,7 +91,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             case IParenthesizedOperation parenthesized:
                 return LowerClause(parenthesized.Operand, state, depth + 1);
             case IInvocationOperation invocation:
-                return Intrinsic?.Invoke(invocation, state) ?? IntegerComparisonClause(invocation, state, depth) ?? StringEqualsClause(invocation, state, depth) ??
+                return Intrinsic?.Invoke(invocation, state) ?? ReferenceEqualsClause(invocation, state, depth) ?? IntegerComparisonClause(invocation, state, depth) ?? StringEqualsClause(invocation, state, depth) ??
                     Failed(operation, FrontendAbstention.UnsupportedInvocationShape);
             case IConditionalOperation { WhenFalse: { } whenFalse } conditional:
                 {
@@ -375,6 +375,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
+        if (depth < 256 && operation is IInvocationOperation identity &&
+            ReferenceEqualsBody(identity, block, depth) is { } referenceEquality)
+        { return referenceEquality; }
         if (depth < 256 && operation is IInvocationOperation comparison &&
             IntegerComparisonBody(comparison, block, depth) is { } compared)
         { return compared; }

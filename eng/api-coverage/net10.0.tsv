@@ -29549,7 +29549,7 @@ System.Runtime	M:System.Object.Finalize	Method	unmodeled	-
 System.Runtime	M:System.Object.GetHashCode	Method	unmodeled	-
 System.Runtime	M:System.Object.GetType	Method	unmodeled	-
 System.Runtime	M:System.Object.MemberwiseClone	Method	unmodeled	-
-System.Runtime	M:System.Object.ReferenceEquals(System.Object,System.Object)	Method	unmodeled	-
+System.Runtime	M:System.Object.ReferenceEquals(System.Object,System.Object)	Method	partially-modeled	intrinsic=object-reference-identity
 System.Runtime	M:System.Object.ToString	Method	unmodeled	-
 System.Runtime	M:System.ObjectDisposedException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)	Method	unmodeled	-
 System.Runtime	M:System.ObjectDisposedException.#ctor(System.String)	Method	unmodeled	-
