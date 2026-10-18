@@ -88,9 +88,9 @@ function Get-GitUntrackedPaths {
         $length = $index - $start
         if ($length -gt 0) {
             $paths.Add([Text.Encoding]::UTF8.GetString(
-                $bytes,
-                $start,
-                $length))
+                    $bytes,
+                    $start,
+                    $length))
         }
         $start = $index + 1
     }
@@ -147,12 +147,12 @@ else {
     [StringComparison]::Ordinal
 }
 $repositoryPrefix =
-    $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) +
-    [IO.Path]::DirectorySeparatorChar
+$repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) +
+[IO.Path]::DirectorySeparatorChar
 $snapshotPrefix =
-    ([IO.Path]::GetFullPath($artifactsRoot)).TrimEnd(
-        [IO.Path]::DirectorySeparatorChar) +
-    [IO.Path]::DirectorySeparatorChar
+([IO.Path]::GetFullPath($artifactsRoot)).TrimEnd(
+    [IO.Path]::DirectorySeparatorChar) +
+[IO.Path]::DirectorySeparatorChar
 $exitCode = 1
 
 try {
@@ -237,19 +237,19 @@ try {
         $verificationPaths | Sort-Object -Unique -CaseSensitive)
     if ($verificationHead -cne $head -or
         @(Compare-Object `
-            -ReferenceObject $sourcePaths `
-            -DifferenceObject $verificationUntracked `
-            -CaseSensitive `
-            -SyncWindow 0).Count -ne 0 -or
+                -ReferenceObject $sourcePaths `
+                -DifferenceObject $verificationUntracked `
+                -CaseSensitive `
+                -SyncWindow 0).Count -ne 0 -or
         -not (Test-ExactFileBytes `
-            -LeftPath $sourcePatch `
-            -RightPath $verificationPatch)) {
+                -LeftPath $sourcePatch `
+                -RightPath $verificationPatch)) {
         throw 'The host source changed while its loop snapshot was captured.'
     }
     foreach ($relativePath in $sourcePaths) {
         if (-not (Test-ExactFileBytes `
-                -LeftPath (Join-Path $repositoryRoot $relativePath) `
-                -RightPath (Join-Path $snapshotFiles $relativePath))) {
+                    -LeftPath (Join-Path $repositoryRoot $relativePath) `
+                    -RightPath (Join-Path $snapshotFiles $relativePath))) {
             throw (
                 'An untracked source file changed while its loop snapshot ' +
                 "was captured: '$relativePath'.")
@@ -257,7 +257,7 @@ try {
     }
 
     $containerSnapshot =
-        '/workspace/LoopArtifacts/' + $snapshotName
+    '/workspace/LoopArtifacts/' + $snapshotName
     & docker compose exec -T `
         -e "SHARPPROOF_LOOP_SNAPSHOT_ROOT=$containerSnapshot" `
         loop `

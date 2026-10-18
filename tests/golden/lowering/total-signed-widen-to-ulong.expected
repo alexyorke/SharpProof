@@ -11,10 +11,10 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op2 Assign v4:sbyte[width=8,signed=True] = v1 source=total-signed-widen-to-ulong.cs:114+1
-  i6 op3 Assign v5:ulong[width=64,signed=False] = (("ulong"#t5)v4) source=total-signed-widen-to-ulong.cs:107+8
-  i7 op1 Assign v3:ulong[width=64,signed=False] = v5 source=total-signed-widen-to-ulong.cs:107+8
-  i8 op1 Return v3 source=total-signed-widen-to-ulong.cs:107+8
+  i5 op2 Assign v4:sbyte[width=8,signed=True] = v1 source=total-signed-widen-to-ulong.cs:tokens["x"]#2
+  i6 op3 Assign v5:ulong[width=64,signed=False] = (("ulong"#t5)v4) source=total-signed-widen-to-ulong.cs:tokens["(","ulong",")","x"]#1
+  i7 op1 Assign v3:ulong[width=64,signed=False] = v5 source=total-signed-widen-to-ulong.cs:tokens["(","ulong",")","x"]#1
+  i8 op1 Return v3 source=total-signed-widen-to-ulong.cs:tokens["(","ulong",")","x"]#1
 block: b3 cfg:2
   i9 op0 Return void source=none
 block: b4 exceptional:exit

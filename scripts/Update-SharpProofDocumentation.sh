@@ -9,7 +9,7 @@ if [[ "$(git rev-parse FETCH_HEAD)" != "$GITHUB_SHA" ]]; then
 fi
 mkdir -p docs/generated
 cp artifacts/docs/source-reference.md docs/generated/source-reference.md
-if git diff --quiet -- docs/generated/source-reference.md && git ls-files --error-unmatch docs/generated/source-reference.md >/dev/null 2>&1; then
+if git diff --quiet -- docs/generated/source-reference.md && git ls-files --error-unmatch docs/generated/source-reference.md > /dev/null 2>&1; then
   echo 'Reference is current; no branch or PR changes.'
   exit 0
 fi
@@ -25,7 +25,7 @@ if [[ -n "$existing" ]]; then
     exit 1
   fi
 fi
-if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
   git fetch origin "$branch:refs/remotes/origin/$branch"
   if [[ -z "$existing" ]]; then
     prior=$(gh pr list --head "$branch" --base "$DEFAULT_BRANCH" --state all --limit 1 --json number --jq '.[0].number // empty')
@@ -35,7 +35,7 @@ if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
     fi
     author=$(gh pr view "$prior" --json author --jq '.author.login')
     prior_head=$(gh pr view "$prior" --json headRefOid --jq '.headRefOid')
-    if [[ ( "$author" != 'app/github-actions' && "$author" != 'github-actions[bot]' ) || "$prior_head" != "$(git rev-parse "origin/$branch")" ]]; then
+    if [[ ("$author" != 'app/github-actions' && "$author" != 'github-actions[bot]') || "$prior_head" != "$(git rev-parse "origin/$branch")" ]]; then
       echo 'Closed updater branch changed ownership or content; refusing to replace it.' >&2
       exit 1
     fi
@@ -55,7 +55,7 @@ git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 git add -- docs/generated/source-reference.md
 git commit -m 'docs: refresh source declaration reference'
 git push --force-with-lease origin "$branch"
-cat > artifacts/docs/pr-body.md <<'BODY'
+cat > artifacts/docs/pr-body.md << 'BODY'
 Refreshes the deterministic reference from the current package property declarations, public attribute enums, release settings and tooling command declarations.
 
 Generated facts need review alongside any affected authored guides. Narrative behavior and external links are not automatically validated by generation. Existing analyzer tests compile maintained C# examples; generated literal source excerpts are text. The canonical documentation gate checks source drift and local Markdown links and anchors, and runs positive and negative regression fixtures.

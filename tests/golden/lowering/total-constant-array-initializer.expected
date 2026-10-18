@@ -8,44 +8,44 @@ block: b0 entry
 block: b1 cfg:0
   i2 op0 Goto b2 source=none
 block: b2 cfg:1
-  i3 op1 Assign v2:int[width=32,signed=True] = 2 source=total-constant-array-initializer.cs:136+19
-  i4 op2 Branch (v2 < 0) ? b5 : b6 source=total-constant-array-initializer.cs:136+19
+  i3 op1 Assign v2:int[width=32,signed=True] = 2 source=total-constant-array-initializer.cs:tokens["new","int","[","]","{","1",",","-","2","}"]#1
+  i4 op2 Branch (v2 < 0) ? b5 : b6 source=total-constant-array-initializer.cs:tokens["new","int","[","]","{","1",",","-","2","}"]#1
 block: b3 cfg:2
   i27 op0 Return void source=none
 block: b4 exceptional:exit
   i0 op0 ExceptionalExit source=none
 block: b5 throw
-  i5 op2 Throw Overflow -> b4 source=total-constant-array-initializer.cs:136+19
+  i5 op2 Throw Overflow -> b4 source=total-constant-array-initializer.cs:tokens["new","int","[","]","{","1",",","-","2","}"]#1
 block: b6 normal
-  i6 op3 Assign v3:int[width=32,signed=True] = v2 source=total-constant-array-initializer.cs:136+19
-  i7 op4 Allocate t4:<no-assembly>::System.Int32[] -> v4:<no-assembly>::System.Int32[][width=0,signed=False] length=2 elements=[1, -2] source=total-constant-array-initializer.cs:136+19
-  i8 op5 Assign v1:<no-assembly>::System.Int32[][width=0,signed=False] = v4 source=total-constant-array-initializer.cs:127+28
-  i9 op5 Write Local source=total-constant-array-initializer.cs:127+28
-  i10 op7 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:172+6
-  i11 op8 Assign v6:int[width=32,signed=True] = 0 source=total-constant-array-initializer.cs:179+1
-  i12 op9 Branch (v5 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b7 : b8 source=total-constant-array-initializer.cs:172+9
+  i6 op3 Assign v3:int[width=32,signed=True] = v2 source=total-constant-array-initializer.cs:tokens["new","int","[","]","{","1",",","-","2","}"]#1
+  i7 op4 Allocate t4:<no-assembly>::System.Int32[] -> v4:<no-assembly>::System.Int32[][width=0,signed=False] length=2 elements=[1, -2] source=total-constant-array-initializer.cs:tokens["new","int","[","]","{","1",",","-","2","}"]#1
+  i8 op5 Assign v1:<no-assembly>::System.Int32[][width=0,signed=False] = v4 source=total-constant-array-initializer.cs:tokens["values","=","new","int","[","]","{","1",",","-","2","}"]#1
+  i9 op5 Write Local source=total-constant-array-initializer.cs:tokens["values","=","new","int","[","]","{","1",",","-","2","}"]#1
+  i10 op7 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:tokens["values"]#2
+  i11 op8 Assign v6:int[width=32,signed=True] = 0 source=total-constant-array-initializer.cs:tokens["0"]#1
+  i12 op9 Branch (v5 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b7 : b8 source=total-constant-array-initializer.cs:tokens["values","[","0","]"]#1
 block: b7 throw
-  i13 op9 Throw NullReference -> b4 source=total-constant-array-initializer.cs:172+9
+  i13 op9 Throw NullReference -> b4 source=total-constant-array-initializer.cs:tokens["values","[","0","]"]#1
 block: b8 normal
-  i14 op10 Branch ((v6 < 0) || (v6 >= len(v5))) ? b9 : b10 source=total-constant-array-initializer.cs:172+9
+  i14 op10 Branch ((v6 < 0) || (v6 >= len(v5))) ? b9 : b10 source=total-constant-array-initializer.cs:tokens["values","[","0","]"]#1
 block: b9 throw
-  i15 op10 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:172+9
+  i15 op10 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:tokens["values","[","0","]"]#1
 block: b10 normal
-  i16 op11 Assign v7:int[width=32,signed=True] = v5[v6] source=total-constant-array-initializer.cs:172+9
-  i17 op12 Assign v8:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:184+6
-  i18 op13 Assign v9:int[width=32,signed=True] = 1 source=total-constant-array-initializer.cs:191+1
-  i19 op14 Branch (v8 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b11 : b12 source=total-constant-array-initializer.cs:184+9
+  i16 op11 Assign v7:int[width=32,signed=True] = v5[v6] source=total-constant-array-initializer.cs:tokens["values","[","0","]"]#1
+  i17 op12 Assign v8:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-constant-array-initializer.cs:tokens["values"]#3
+  i18 op13 Assign v9:int[width=32,signed=True] = 1 source=total-constant-array-initializer.cs:tokens["1"]#2
+  i19 op14 Branch (v8 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b11 : b12 source=total-constant-array-initializer.cs:tokens["values","[","1","]"]#1
 block: b11 throw
-  i20 op14 Throw NullReference -> b4 source=total-constant-array-initializer.cs:184+9
+  i20 op14 Throw NullReference -> b4 source=total-constant-array-initializer.cs:tokens["values","[","1","]"]#1
 block: b12 normal
-  i21 op15 Branch ((v9 < 0) || (v9 >= len(v8))) ? b13 : b14 source=total-constant-array-initializer.cs:184+9
+  i21 op15 Branch ((v9 < 0) || (v9 >= len(v8))) ? b13 : b14 source=total-constant-array-initializer.cs:tokens["values","[","1","]"]#1
 block: b13 throw
-  i22 op15 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:184+9
+  i22 op15 Throw IndexOutOfRange -> b4 source=total-constant-array-initializer.cs:tokens["values","[","1","]"]#1
 block: b14 normal
-  i23 op16 Assign v10:int[width=32,signed=True] = v8[v9] source=total-constant-array-initializer.cs:184+9
-  i24 op17 Assign v11:int[width=32,signed=True] = (v7 + v10) source=total-constant-array-initializer.cs:172+21
-  i25 op6 Assign v0:int[width=32,signed=True] = v11 source=total-constant-array-initializer.cs:172+21
-  i26 op6 Return v0 source=total-constant-array-initializer.cs:172+21
+  i23 op16 Assign v10:int[width=32,signed=True] = v8[v9] source=total-constant-array-initializer.cs:tokens["values","[","1","]"]#1
+  i24 op17 Assign v11:int[width=32,signed=True] = (v7 + v10) source=total-constant-array-initializer.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
+  i25 op6 Assign v0:int[width=32,signed=True] = v11 source=total-constant-array-initializer.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
+  i26 op6 Return v0 source=total-constant-array-initializer.cs:tokens["values","[","0","]","+","values","[","1","]"]#1
 term: ir0 Integer type=t1:int width=32 signed=True bits=2 value=2
 term: ir1 Variable type=t1:int width=32 signed=True value=v2
 term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0

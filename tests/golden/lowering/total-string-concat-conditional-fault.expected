@@ -11,72 +11,72 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:200+1
-  i6 op3 Assign v5:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:205+1
-  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 == v5) source=total-string-concat-conditional-fault.cs:200+6
-  i8 op1 Branch v6 ? b4 : b3 source=total-string-concat-conditional-fault.cs:200+6
+  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:tokens["x"]#2
+  i6 op3 Assign v5:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:tokens["0"]#1
+  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 == v5) source=total-string-concat-conditional-fault.cs:tokens["x","==","0"]#1
+  i8 op1 Branch v6 ? b4 : b3 source=total-string-concat-conditional-fault.cs:tokens["x","==","0"]#1
 block: b3 cfg:3
-  i9 op5 Assign v7:string[width=0,signed=False] = "b" source=total-string-concat-conditional-fault.cs:215+3
-  i10 op6 Assign v8:string[width=0,signed=False] = v7 source=total-string-concat-conditional-fault.cs:215+3
+  i9 op5 Assign v7:string[width=0,signed=False] = "b" source=total-string-concat-conditional-fault.cs:tokens["\"b\""]#1
+  i10 op6 Assign v8:string[width=0,signed=False] = v7 source=total-string-concat-conditional-fault.cs:tokens["\"b\""]#1
   i11 op0 Goto b5 source=none
 block: b4 cfg:2
-  i12 op7 Assign v9:string[width=0,signed=False] = "a" source=total-string-concat-conditional-fault.cs:209+3
-  i13 op8 Assign v8:string[width=0,signed=False] = v9 source=total-string-concat-conditional-fault.cs:209+3
+  i12 op7 Assign v9:string[width=0,signed=False] = "a" source=total-string-concat-conditional-fault.cs:tokens["\"a\""]#1
+  i13 op8 Assign v8:string[width=0,signed=False] = v9 source=total-string-concat-conditional-fault.cs:tokens["\"a\""]#1
   i14 op0 Goto b5 source=none
 block: b5 cfg:4
-  i15 op9 Assign v10:string[width=0,signed=False] = v8 source=total-string-concat-conditional-fault.cs:200+18
-  i16 op10 Assign v11:string[width=0,signed=False] = "c" source=total-string-concat-conditional-fault.cs:222+3
-  i17 op11 Branch false ? b12 : b13 source=total-string-concat-conditional-fault.cs:199+26
+  i15 op9 Assign v10:string[width=0,signed=False] = v8 source=total-string-concat-conditional-fault.cs:tokens["x","==","0","?","\"a\"",":","\"b\""]#1
+  i16 op10 Assign v11:string[width=0,signed=False] = "c" source=total-string-concat-conditional-fault.cs:tokens["\"c\""]#1
+  i17 op11 Branch false ? b12 : b13 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
 block: b6 cfg:5
-  i27 op16 Assign v15:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:229+1
-  i28 op17 Assign v16:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:234+1
-  i29 op18 Assign v17:bool[width=0,signed=False] = (v15 == v16) source=total-string-concat-conditional-fault.cs:229+6
-  i30 op15 Branch v17 ? b8 : b7 source=total-string-concat-conditional-fault.cs:229+6
+  i27 op16 Assign v15:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:tokens["x"]#3
+  i28 op17 Assign v16:int[width=32,signed=True] = 0 source=total-string-concat-conditional-fault.cs:tokens["0"]#2
+  i29 op18 Assign v17:bool[width=0,signed=False] = (v15 == v16) source=total-string-concat-conditional-fault.cs:tokens["x","==","0"]#2
+  i30 op15 Branch v17 ? b8 : b7 source=total-string-concat-conditional-fault.cs:tokens["x","==","0"]#2
 block: b7 cfg:7
-  i31 op19 Assign v18:string[width=0,signed=False] = "e" source=total-string-concat-conditional-fault.cs:258+3
-  i32 op20 Assign v19:string[width=0,signed=False] = v18 source=total-string-concat-conditional-fault.cs:258+3
+  i31 op19 Assign v18:string[width=0,signed=False] = "e" source=total-string-concat-conditional-fault.cs:tokens["\"e\""]#1
+  i32 op20 Assign v19:string[width=0,signed=False] = v18 source=total-string-concat-conditional-fault.cs:tokens["\"e\""]#1
   i33 op0 Goto b9 source=none
 block: b8 cfg:6
-  i34 op21 Assign v27:string[width=0,signed=False] = (("string"#t2)null) source=total-string-concat-conditional-fault.cs:238+17
-  i35 op22 Assign v28:string[width=0,signed=False] = "d" source=total-string-concat-conditional-fault.cs:243+3
-  i36 op23 Assign v29:int[width=32,signed=True] = 10 source=total-string-concat-conditional-fault.cs:248+2
-  i37 op24 Assign v30:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:253+1
-  i38 op25 Branch (v30 == 0) ? b17 : b18 source=total-string-concat-conditional-fault.cs:248+6
+  i34 op21 Assign v27:string[width=0,signed=False] = (("string"#t2)null) source=total-string-concat-conditional-fault.cs:tokens["Pass","(","\"d\"",",","10","/","x",")"]#1
+  i35 op22 Assign v28:string[width=0,signed=False] = "d" source=total-string-concat-conditional-fault.cs:tokens["\"d\""]#1
+  i36 op23 Assign v29:int[width=32,signed=True] = 10 source=total-string-concat-conditional-fault.cs:tokens["10"]#1
+  i37 op24 Assign v30:int[width=32,signed=True] = v1 source=total-string-concat-conditional-fault.cs:tokens["x"]#4
+  i38 op25 Branch (v30 == 0) ? b17 : b18 source=total-string-concat-conditional-fault.cs:tokens["10","/","x"]#1
 block: b9 cfg:8
-  i60 op33 Assign v33:string[width=0,signed=False] = v14 source=total-string-concat-conditional-fault.cs:199+26
-  i61 op34 Assign v34:string[width=0,signed=False] = v19 source=total-string-concat-conditional-fault.cs:229+32
-  i62 op35 Branch (((len(v10) > 0) && true) || (((len(v10) > 0) || true) && (len(v34) > 0))) ? b27 : b28 source=total-string-concat-conditional-fault.cs:199+63
+  i60 op33 Assign v33:string[width=0,signed=False] = v14 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
+  i61 op34 Assign v34:string[width=0,signed=False] = v19 source=total-string-concat-conditional-fault.cs:tokens["x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\""]#1
+  i62 op35 Branch (((len(v10) > 0) && true) || (((len(v10) > 0) || true) && (len(v34) > 0))) ? b27 : b28 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
 block: b10 cfg:9
   i75 op0 Return void source=none
 block: b11 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b12 concat:allocate
-  i18 op12 Branch ((len(v10) > 1073741791) || (1 > (1073741791 - len(v10)))) ? b14 : b16 source=total-string-concat-conditional-fault.cs:199+26
+  i18 op12 Branch ((len(v10) > 1073741791) || (1 > (1073741791 - len(v10)))) ? b14 : b16 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
 block: b13 concat:join
-  i24 op11 Assign v13:string[width=0,signed=False] = (v10 ++ "c") source=total-string-concat-conditional-fault.cs:199+26
-  i25 op14 Assign v14:string[width=0,signed=False] = v13 source=total-string-concat-conditional-fault.cs:199+26
+  i24 op11 Assign v13:string[width=0,signed=False] = (v10 ++ "c") source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
+  i25 op14 Assign v14:string[width=0,signed=False] = v13 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
   i26 op0 Goto b6 source=none
 block: b14 concat:beyond-maximum-length
-  i19 op13 Havoc Variables/Approximation [v12:bool[width=0,signed=False]] source=total-string-concat-conditional-fault.cs:199+26
-  i20 op12 Branch v12 ? b15 : b16 source=total-string-concat-conditional-fault.cs:199+26
+  i19 op13 Havoc Variables/Approximation [v12:bool[width=0,signed=False]] source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
+  i20 op12 Branch v12 ? b15 : b16 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
 block: b15 throw
-  i21 op12 Throw Unknown -> b11 source=total-string-concat-conditional-fault.cs:199+26
+  i21 op12 Throw Unknown -> b11 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
 block: b16 normal
-  i22 op11 Allocate t2:string source=total-string-concat-conditional-fault.cs:199+26
-  i23 op11 Goto b13 source=total-string-concat-conditional-fault.cs:199+26
+  i22 op11 Allocate t2:string source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
+  i23 op11 Goto b13 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\""]#1
 block: b17 throw
-  i39 op25 Throw DivideByZero -> b11 source=total-string-concat-conditional-fault.cs:248+6
+  i39 op25 Throw DivideByZero -> b11 source=total-string-concat-conditional-fault.cs:tokens["10","/","x"]#1
 block: b18 normal
-  i40 op26 Branch ((v29 == -2147483648) && (v30 == -1)) ? b19 : b20 source=total-string-concat-conditional-fault.cs:248+6
+  i40 op26 Branch ((v29 == -2147483648) && (v30 == -1)) ? b19 : b20 source=total-string-concat-conditional-fault.cs:tokens["10","/","x"]#1
 block: b19 throw
-  i41 op26 Throw Overflow -> b11 source=total-string-concat-conditional-fault.cs:248+6
+  i41 op26 Throw Overflow -> b11 source=total-string-concat-conditional-fault.cs:tokens["10","/","x"]#1
 block: b20 normal
-  i42 op27 Assign v31:int[width=32,signed=True] = (v29 / v30) source=total-string-concat-conditional-fault.cs:248+6
-  i43 op21 Assign v20:string[width=0,signed=False] = v28 source=total-string-concat-conditional-fault.cs:238+17
-  i44 op21 Assign v23:int[width=32,signed=True] = v31 source=total-string-concat-conditional-fault.cs:238+17
-  i45 op21 Goto b22 source=total-string-concat-conditional-fault.cs:238+17
+  i42 op27 Assign v31:int[width=32,signed=True] = (v29 / v30) source=total-string-concat-conditional-fault.cs:tokens["10","/","x"]#1
+  i43 op21 Assign v20:string[width=0,signed=False] = v28 source=total-string-concat-conditional-fault.cs:tokens["Pass","(","\"d\"",",","10","/","x",")"]#1
+  i44 op21 Assign v23:int[width=32,signed=True] = v31 source=total-string-concat-conditional-fault.cs:tokens["Pass","(","\"d\"",",","10","/","x",")"]#1
+  i45 op21 Goto b22 source=total-string-concat-conditional-fault.cs:tokens["Pass","(","\"d\"",",","10","/","x",")"]#1
 block: b21 call:continued
-  i58 op31 Assign v19:string[width=0,signed=False] = v27 source=total-string-concat-conditional-fault.cs:238+17
+  i58 op31 Assign v19:string[width=0,signed=False] = v27 source=total-string-concat-conditional-fault.cs:tokens["Pass","(","\"d\"",",","10","/","x",")"]#1
   i59 op0 Goto b9 source=none
 block: b22 call:body
   i46 op28 Assign v21:string[width=0,signed=False] = v20 source=none
@@ -87,33 +87,33 @@ block: b22 call:body
 block: b23 call:body
   i51 op28 Goto b24 source=none
 block: b24 call:body
-  i52 op30 Assign v32:string[width=0,signed=False] = v21 source=total-string-concat-conditional-fault.cs:134+4
-  i53 op29 Assign v26:string[width=0,signed=False] = v32 source=total-string-concat-conditional-fault.cs:134+4
-  i54 op29 Assign v27:string[width=0,signed=False] = v26 source=total-string-concat-conditional-fault.cs:134+4
-  i55 op29 Goto b21 source=total-string-concat-conditional-fault.cs:134+4
+  i52 op30 Assign v32:string[width=0,signed=False] = v21 source=total-string-concat-conditional-fault.cs:tokens["text"]#2
+  i53 op29 Assign v26:string[width=0,signed=False] = v32 source=total-string-concat-conditional-fault.cs:tokens["text"]#2
+  i54 op29 Assign v27:string[width=0,signed=False] = v26 source=total-string-concat-conditional-fault.cs:tokens["text"]#2
+  i55 op29 Goto b21 source=total-string-concat-conditional-fault.cs:tokens["text"]#2
 block: b25 call:body
   i56 op28 Goto b21 source=none
 block: b26 call:body
   i57 op28 ExceptionalExit source=none
 block: b27 concat:allocate
-  i63 op36 Branch (((len(v10) > 1073741791) || (1 > (1073741791 - len(v10)))) || (len(v34) > ((1073741791 - len(v10)) - 1))) ? b29 : b31 source=total-string-concat-conditional-fault.cs:199+63
+  i63 op36 Branch (((len(v10) > 1073741791) || (1 > (1073741791 - len(v10)))) || (len(v34) > ((1073741791 - len(v10)) - 1))) ? b29 : b31 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
 block: b28 concat:join
-  i69 op35 Assign v36:string[width=0,signed=False] = ((v10 ++ "c") ++ v34) source=total-string-concat-conditional-fault.cs:199+63
-  i70 op38 Branch (v36 == (("string"#t2)null)) ? b32 : b33 source=total-string-concat-conditional-fault.cs:198+72
+  i69 op35 Assign v36:string[width=0,signed=False] = ((v10 ++ "c") ++ v34) source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
+  i70 op38 Branch (v36 == (("string"#t2)null)) ? b32 : b33 source=total-string-concat-conditional-fault.cs:tokens["(","(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")",")",".","Length"]#1
 block: b29 concat:beyond-maximum-length
-  i64 op37 Havoc Variables/Approximation [v35:bool[width=0,signed=False]] source=total-string-concat-conditional-fault.cs:199+63
-  i65 op36 Branch v35 ? b30 : b31 source=total-string-concat-conditional-fault.cs:199+63
+  i64 op37 Havoc Variables/Approximation [v35:bool[width=0,signed=False]] source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
+  i65 op36 Branch v35 ? b30 : b31 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
 block: b30 throw
-  i66 op36 Throw Unknown -> b11 source=total-string-concat-conditional-fault.cs:199+63
+  i66 op36 Throw Unknown -> b11 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
 block: b31 normal
-  i67 op35 Allocate t2:string source=total-string-concat-conditional-fault.cs:199+63
-  i68 op35 Goto b28 source=total-string-concat-conditional-fault.cs:199+63
+  i67 op35 Allocate t2:string source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
+  i68 op35 Goto b28 source=total-string-concat-conditional-fault.cs:tokens["(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")"]#1
 block: b32 throw
-  i71 op38 Throw NullReference -> b11 source=total-string-concat-conditional-fault.cs:198+72
+  i71 op38 Throw NullReference -> b11 source=total-string-concat-conditional-fault.cs:tokens["(","(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")",")",".","Length"]#1
 block: b33 normal
-  i72 op39 Assign v37:int[width=32,signed=True] = len(v36) source=total-string-concat-conditional-fault.cs:198+72
-  i73 op32 Assign v3:int[width=32,signed=True] = v37 source=total-string-concat-conditional-fault.cs:198+72
-  i74 op32 Return v3 source=total-string-concat-conditional-fault.cs:198+72
+  i72 op39 Assign v37:int[width=32,signed=True] = len(v36) source=total-string-concat-conditional-fault.cs:tokens["(","(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")",")",".","Length"]#1
+  i73 op32 Assign v3:int[width=32,signed=True] = v37 source=total-string-concat-conditional-fault.cs:tokens["(","(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")",")",".","Length"]#1
+  i74 op32 Return v3 source=total-string-concat-conditional-fault.cs:tokens["(","(","x","==","0","?","\"a\"",":","\"b\"",")","+","\"c\"","+","(","x","==","0","?","Pass","(","\"d\"",",","10","/","x",")",":","\"e\"",")",")",".","Length"]#1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v1
 term: ir2 Variable type=t1:int width=32 signed=True value=v4

@@ -11,11 +11,11 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op1 Havoc Variables/Approximation [v4:int[width=32,signed=True]] source=total-ref-local-rejected.cs:112+9
-  i6 op3 Havoc Variables/Approximation [v5:int[width=32,signed=True]] source=total-ref-local-rejected.cs:131+3
-  i7 op6 Assign v6:int[width=32,signed=True] = v1 source=total-ref-local-rejected.cs:151+1
-  i8 op5 Assign v3:int[width=32,signed=True] = v6 source=total-ref-local-rejected.cs:151+1
-  i9 op5 Return v3 source=total-ref-local-rejected.cs:151+1
+  i5 op1 Havoc Variables/Approximation [v4:int[width=32,signed=True]] source=total-ref-local-rejected.cs:tokens["r","=","ref","x"]#1
+  i6 op3 Havoc Variables/Approximation [v5:int[width=32,signed=True]] source=total-ref-local-rejected.cs:tokens["r","++"]#1
+  i7 op6 Assign v6:int[width=32,signed=True] = v1 source=total-ref-local-rejected.cs:tokens["x"]#3
+  i8 op5 Assign v3:int[width=32,signed=True] = v6 source=total-ref-local-rejected.cs:tokens["x"]#3
+  i9 op5 Return v3 source=total-ref-local-rejected.cs:tokens["x"]#3
 block: b3 cfg:2
   i10 op0 Return void source=none
 block: b4 exceptional:exit
@@ -24,5 +24,5 @@ term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir3 Variable type=t1:int width=32 signed=True value=v1
 term: ir4 Variable type=t1:int width=32 signed=True value=v6
 term: ir5 Variable type=t1:int width=32 signed=True value=v3
-diagnostic: op2 UnsupportedOperationKind SimpleAssignment@112
-diagnostic: op4 UnsupportedOperationKind Increment@131
+diagnostic: op2 UnsupportedOperationKind SimpleAssignment@total-ref-local-rejected.cs:tokens["r"]#1
+diagnostic: op4 UnsupportedOperationKind Increment@total-ref-local-rejected.cs:tokens["r"]#2

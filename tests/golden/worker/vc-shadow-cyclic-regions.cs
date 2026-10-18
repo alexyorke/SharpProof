@@ -7,7 +7,8 @@ public static class Subject
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 1);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { try { return 10 / x; } finally { x = 10 / x; } }
+        try
+        { try { return 10 / x; } finally { x = 10 / x; } }
         catch (System.Exception) when (x == 0) { return 1; }
     }
     public static int BCaughtLoop(int x)
@@ -18,7 +19,8 @@ public static class Subject
         int i = 0;
         while (i < 2)
         {
-            try { x = 10 / x; }
+            try
+            { x = 10 / x; }
             catch (System.DivideByZeroException) { x = 1; }
             finally { i++; }
         }
@@ -32,7 +34,8 @@ public static class Subject
         int i = 0;
         while (i < 2)
         {
-            try { x = 10 / x; }
+            try
+            { x = 10 / x; }
             catch (System.DivideByZeroException) { x = 1; }
             finally { i++; }
         }
@@ -46,7 +49,8 @@ public static class Subject
         int i = 0;
         while (i < 8)
         {
-            try { x = 10 / x; }
+            try
+            { x = 10 / x; }
             catch (System.DivideByZeroException) { x = 1; }
             finally { i++; }
         }
@@ -60,7 +64,8 @@ public static class Subject
         {
             for (int i = 0; i < 2; i++)
             {
-                try { x = checked(x + 1); }
+                try
+                { x = checked(x + 1); }
                 finally { x = checked(x + 1); }
             }
             return x;
@@ -71,14 +76,16 @@ public static class Subject
     {
         Contract.Requires(x == 0);
         Contract.Ensures(false);
-        try { return 10 / x; }
+        try
+        { return 10 / x; }
         catch (System.DivideByZeroException) { if (x != 0) throw; return 1; }
     }
     public static int GConditionalFinallyCompletion(int x)
     {
         Contract.Requires(x == 1);
         Contract.Ensures(Contract.Result<int>() == 3);
-        try { x++; }
+        try
+        { x++; }
         finally { if (x++ == 1) x = 7; }
         return x;
     }

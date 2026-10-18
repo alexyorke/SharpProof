@@ -12,28 +12,28 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-argument-fault.cs:214+14
-  i6 op4 Assign v9:int[width=32,signed=True] = 10 source=total-call-precondition-argument-fault.cs:221+2
-  i7 op5 Assign v10:int[width=32,signed=True] = v1 source=total-call-precondition-argument-fault.cs:226+1
-  i8 op6 Branch (v10 == 0) ? b5 : b6 source=total-call-precondition-argument-fault.cs:221+6
+  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
+  i6 op4 Assign v9:int[width=32,signed=True] = 10 source=total-call-precondition-argument-fault.cs:tokens["10"]#1
+  i7 op5 Assign v10:int[width=32,signed=True] = v1 source=total-call-precondition-argument-fault.cs:tokens["x"]#2
+  i8 op6 Branch (v10 == 0) ? b5 : b6 source=total-call-precondition-argument-fault.cs:tokens["10","/","x"]#1
 block: b3 cfg:2
   i28 op0 Return void source=none
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b5 throw
-  i9 op6 Throw DivideByZero -> b4 source=total-call-precondition-argument-fault.cs:221+6
+  i9 op6 Throw DivideByZero -> b4 source=total-call-precondition-argument-fault.cs:tokens["10","/","x"]#1
 block: b6 normal
-  i10 op7 Branch ((v9 == -2147483648) && (v10 == -1)) ? b7 : b8 source=total-call-precondition-argument-fault.cs:221+6
+  i10 op7 Branch ((v9 == -2147483648) && (v10 == -1)) ? b7 : b8 source=total-call-precondition-argument-fault.cs:tokens["10","/","x"]#1
 block: b7 throw
-  i11 op7 Throw Overflow -> b4 source=total-call-precondition-argument-fault.cs:221+6
+  i11 op7 Throw Overflow -> b4 source=total-call-precondition-argument-fault.cs:tokens["10","/","x"]#1
 block: b8 normal
-  i12 op8 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-call-precondition-argument-fault.cs:221+6
-  i13 op3 Assign v12:bool[width=0,signed=False] = (v11 > 0) source=total-call-precondition-argument-fault.cs:214+14
-  i14 op3 Assign v4:int[width=32,signed=True] = v11 source=total-call-precondition-argument-fault.cs:214+14
-  i15 op3 Goto b10 source=total-call-precondition-argument-fault.cs:214+14
+  i12 op8 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-call-precondition-argument-fault.cs:tokens["10","/","x"]#1
+  i13 op3 Assign v12:bool[width=0,signed=False] = (v11 > 0) source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
+  i14 op3 Assign v4:int[width=32,signed=True] = v11 source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
+  i15 op3 Goto b10 source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
 block: b9 call:continued
-  i26 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-argument-fault.cs:214+14
-  i27 op1 Return v3 source=total-call-precondition-argument-fault.cs:214+14
+  i26 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
+  i27 op1 Return v3 source=total-call-precondition-argument-fault.cs:tokens["Helper","(","10","/","x",")"]#1
 block: b10 call:body
   i16 op9 Assign v5:int[width=32,signed=True] = v4 source=none
   i17 op9 Assign v6:int[width=32,signed=True] = v4 source=none
@@ -41,10 +41,10 @@ block: b10 call:body
 block: b11 call:body
   i19 op9 Goto b12 source=none
 block: b12 call:body
-  i20 op11 Assign v13:int[width=32,signed=True] = 1 source=total-call-precondition-argument-fault.cs:323+1
-  i21 op10 Assign v7:int[width=32,signed=True] = v13 source=total-call-precondition-argument-fault.cs:323+1
-  i22 op10 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-argument-fault.cs:323+1
-  i23 op10 Goto b9 source=total-call-precondition-argument-fault.cs:323+1
+  i20 op11 Assign v13:int[width=32,signed=True] = 1 source=total-call-precondition-argument-fault.cs:tokens["1"]#1
+  i21 op10 Assign v7:int[width=32,signed=True] = v13 source=total-call-precondition-argument-fault.cs:tokens["1"]#1
+  i22 op10 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-argument-fault.cs:tokens["1"]#1
+  i23 op10 Goto b9 source=total-call-precondition-argument-fault.cs:tokens["1"]#1
 block: b13 call:body
   i24 op9 Goto b9 source=none
 block: b14 call:body
