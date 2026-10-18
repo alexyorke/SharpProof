@@ -33,8 +33,8 @@ internal sealed class LongFuzzSession
     private static readonly object s_sync = new();
     private static DateTime? s_runDeadline;
 
-    private readonly Dictionary<string, int> _counts = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, int> _hitKinds = new(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, int>.Builder _counts = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, int>.Builder _hitKinds = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
     private readonly Stopwatch _elapsed = Stopwatch.StartNew();
     private readonly DateTime _deadline;
     private int _cases;

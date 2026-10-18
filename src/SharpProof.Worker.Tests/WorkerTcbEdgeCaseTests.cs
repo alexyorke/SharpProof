@@ -565,7 +565,7 @@ public sealed class WorkerTcbEdgeCaseTests
     private sealed class ScriptedBackend(
         params BackendCheckResult[] results) : ISmtBackend
     {
-        private readonly Queue<BackendCheckResult> _results = new((results ?? throw new System.ArgumentNullException(nameof(results))));
+        private ImmutableQueue<BackendCheckResult> _results = ImmutableQueue.CreateRange(results ?? throw new System.ArgumentNullException(nameof(results)));
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
@@ -577,7 +577,8 @@ public sealed class WorkerTcbEdgeCaseTests
             System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
-            return Task.FromResult(_results.Dequeue());
+            _results = _results.Dequeue(out var result);
+            return Task.FromResult(result);
         }
     }
 

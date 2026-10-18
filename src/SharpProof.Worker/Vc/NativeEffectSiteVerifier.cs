@@ -168,7 +168,7 @@ internal static class NativeEffectSiteVerifier
             if (allocated.Outcome is not ProvenOutcome)
             { return allocated with { HasFeasibleEntryWitness = allocated.Outcome is RefutedOutcome }; }
         }
-        var readFlags = AnyStateReads;
+        const WorkerEffectSet readFlags = AnyStateReads;
         var locksViolate = !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0;
         var sites = await solver.VerifyEffectSitesAsync(WriteViolates, !Allows(readFlags), locksViolate, CallViolates, cancellationToken)
             .ConfigureAwait(false);

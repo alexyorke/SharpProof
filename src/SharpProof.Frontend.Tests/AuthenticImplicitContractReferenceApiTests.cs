@@ -140,7 +140,10 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private sealed class AuthenticMissingReferenceResolver(AssemblyIdentity identity,
         PortableExecutableReference reference) : MetadataReferenceResolver
     {
-        internal List<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests { get; } = (reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (identity is null ? throw new System.ArgumentNullException(nameof(identity)) : []));
+        private readonly ImmutableArray<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)>.Builder _requests =
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : identity is null ? throw new System.ArgumentNullException(nameof(identity)) :
+            ImmutableArray.CreateBuilder<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)>();
+        internal ImmutableArray<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests => _requests.ToImmutable();
         public override bool ResolveMissingAssemblies => true;
 
         public override PortableExecutableReference? ResolveMissingAssembly(MetadataReference definition,
@@ -149,7 +152,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
             System.ArgumentNullException.ThrowIfNull(definition);
             System.ArgumentNullException.ThrowIfNull(referenceIdentity);
             var result = referenceIdentity.Equals(identity) ? reference : null;
-            Requests.Add((definition, referenceIdentity, result));
+            _requests.Add((definition, referenceIdentity, result));
             return result;
         }
 

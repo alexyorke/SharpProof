@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -32,7 +33,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
             .GetMembers("Callee").OfType<IMethodSymbol>().Single();
         Assert.That(parked, Has.Length.EqualTo(255));
 
-        var prepared = new List<IMethodSymbol>();
+        var prepared = ImmutableArray.CreateBuilder<IMethodSymbol>();
         var session = new TotalSourceCallSession(subject.Compilation,
             frame =>
             {
@@ -40,7 +41,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
                 prepared.Add(frame.Target);
                 return true;
             }, null, default);
-        var entered = new List<IMethodSymbol>();
+        var entered = ImmutableArray.CreateBuilder<IMethodSymbol>();
         try
         {
             foreach (var method in parked)

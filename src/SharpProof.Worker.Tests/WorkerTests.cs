@@ -6314,7 +6314,7 @@ public sealed partial class WorkerTests
         private static readonly ImmutableArray<MetadataReference>
             NetCoreReferencePack = CreateNetCoreReferencePack();
         private readonly TempDirectory _temporary;
-        private readonly List<string> _additionalReferencePaths = [];
+        private readonly ImmutableArray<string>.Builder _additionalReferencePaths = ImmutableArray.CreateBuilder<string>();
         private bool _useNetCoreReferencePack;
 
         private TestProject(TempDirectory temporary, string[] sourcePaths)
@@ -6530,7 +6530,7 @@ public sealed partial class WorkerTests
             var references = (_useNetCoreReferencePack
                     ? NetCoreReferencePack
                     : DefaultReferences)
-                .AddRange(_additionalReferencePaths.Select(static path =>
+                .AddRange(_additionalReferencePaths.ToImmutable().Select(static path =>
                     path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));
             return CSharpCompilation.Create(
                 "WorkerTest",

@@ -1662,12 +1662,12 @@ The coordinator inspected these additional sites and their consumers before edit
 
 | ID | Current file / member | Correction | Status |
 | --- | --- | --- | --- |
-| IMM-M009 | Frontend.Tests/AuthenticImplicitContractReferenceApiTests.AuthenticMissingReferenceResolver.Requests | Keep resolver reference identity and constructor guards; record requests in a private immutable-array builder and expose frozen snapshots. | Open |
-| IMM-M010 | Frontend.Tests/BulkFrontendCallsActiveSessionBoundaryTests observer lists | Use scoped immutable-array builders for prepared/entered method records; preserve callback order and reverse Leave order. | Open |
-| IMM-M011 | Worker.Tests/LongFuzz/LongFuzzSession counters | Use private immutable dictionary builders with Ordinal keys; retain scalar counters/resource clocks and freeze sorted statistics at publication. | Open |
-| IMM-M012 | Worker.Tests/WorkerTests.TestProject._additionalReferencePaths | Use a construction-owned immutable-array builder and snapshot before constructing metadata references. | Open |
-| IMM-M013 | Worker.Tests/WorkerTcbEdgeCaseTests.ScriptedBackend queue | Copy constructor inputs into an immutable queue and dequeue the immutable root; preserve result order, cancellation checks and call counting. | Open |
-| IMM-M014 | Worker/Vc/NativeEffectSiteVerifier readFlags | Declare the unchanged WorkerEffectSet constant as const; AnyStateReads is already a compile-time enum constant, with one read and no mutation/ref/capture/nameof-sensitive use. | Open |
+| IMM-M009 | Frontend.Tests/AuthenticImplicitContractReferenceApiTests.AuthenticMissingReferenceResolver.Requests | Keep resolver reference identity and constructor guards; record requests in a private immutable-array builder and expose frozen snapshots. | Implemented; focused checks passed |
+| IMM-M010 | Frontend.Tests/BulkFrontendCallsActiveSessionBoundaryTests observer lists | Use scoped immutable-array builders for prepared/entered method records; preserve callback order and reverse Leave order. | Implemented; focused checks passed |
+| IMM-M011 | Worker.Tests/LongFuzz/LongFuzzSession counters | Use private immutable dictionary builders with Ordinal keys; retain scalar counters/resource clocks and freeze sorted statistics at publication. | Implemented; focused checks passed |
+| IMM-M012 | Worker.Tests/WorkerTests.TestProject._additionalReferencePaths | Use a construction-owned immutable-array builder and snapshot before constructing metadata references. | Implemented; focused checks passed |
+| IMM-M013 | Worker.Tests/WorkerTcbEdgeCaseTests.ScriptedBackend queue | Copy constructor inputs into an immutable queue and dequeue the immutable root; preserve result order, cancellation checks and call counting. | Implemented; focused checks passed |
+| IMM-M014 | Worker/Vc/NativeEffectSiteVerifier readFlags | Declare the unchanged WorkerEffectSet constant as const; AnyStateReads is already a compile-time enum constant, with one read and no mutation/ref/capture/nameof-sensitive use. | Implemented; focused checks passed |
 
 Both current and exact-master full package cohorts now pass 384 tests with one
 platform skip. The optional CLI acceptance workflow passes after packing exact
@@ -1679,3 +1679,35 @@ is investigated; it has not reproduced in either isolated or full package runs.
 The literal comparison now covers 2,618 raw/interpolated tokens across 552 changed
 C# files, all unchanged. The increase reflects the newly changed tool/frontend
 files entering the comparison, not rewritten program text.
+
+
+## Fixture and canonical verification checkpoint
+
+IMM-M009 through IMM-M014 are implemented. Thirty-four focused frontend/worker
+tests pass, including resolver requests, active-session Leave ordering, scripted
+backend results and an added implementation-reference workflow. A bounded real
+analyzer-pipeline fuzz run passes with seeds 1 and 2: two cases, zero hits,
+compiled=2, manifest=2 and deterministically sorted statistic keys.
+Evidence: immutability-fixture-owned-builders-tests.log,
+immutability-fixture-longfuzz-stats-test.log and
+immutability-longfuzz-stats-check/stats-analyzer-pipeline.json.
+
+Exact committed source 5bacb4c2d passes the canonical Release semantic cohort:
+11,679 tests, zero failures/skips across six isolated tasks. Current and exact
+master package cohorts separately pass 384 tests with one platform skip.
+The optional CLI packs and executes from the exact 5bacb4c2d feed.
+Evidence: immutability-master-canonical-semantic-tests.log,
+immutability-master-current-package-tests.log,
+immutability-master-baseline-package-tests.log,
+immutability-master-tool-pack.log and immutability-master-tool-consumer.log.
+
+The all-project ordinary invocation's earlier NaN failure is retained as a
+workflow-sensitive observation. Read-only tracing found no Gates/Worker writer
+to the package's root Release outputs; those workflows use private temp copies.
+No feed tampering was found. The NaN consumer lacks the SharedCompilationId set
+by other package helpers, which is a plausible isolation gap, not a proven
+cause. No production cache or source change was made on that hypothesis.
+
+The original 17 const-string rows are implemented and covered by the semantic
+and package checks. The additional enum constant is recorded as IMM-M014.
+Additional test worklist and observation-return findings remain open.
