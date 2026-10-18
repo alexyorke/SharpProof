@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
+    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -89,7 +89,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'restore', 'dependency-audit') -and
+if ($Command -notin @('doctor', 'contract', 'restore', 'dependency-audit', 'format-check') -and
     -not $NoBuild -and -not $Fast) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -267,6 +267,10 @@ function Invoke-DependencyAudit {
 }
 
 switch ($Command) {
+    'format-check' {
+        Invoke-RequiredScript 'scripts/Format-CSharp.ps1' `
+            'Repository formatting check failed.' @{ VerifyNoChanges = $true }
+    }
     'doctor' {
         $doctorTarget = if ($PSBoundParameters.ContainsKey('Target')) { $Target } else { '' }
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofDoctor.ps1') -Target $doctorTarget -Format $Format -TargetFramework $TargetFramework

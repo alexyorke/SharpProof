@@ -23,6 +23,15 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Apply the repository's `.editorconfig` formatting rules before submitting changes:
+
+```text
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-CSharp.ps1'
+docker compose run --rm tooling format-check
+```
+
+For a Git worktree, use `pwsh -File scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
+
 ```text
 docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression
 docker compose run --rm tooling pr
