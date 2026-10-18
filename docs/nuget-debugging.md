@@ -99,6 +99,8 @@ the experiment; logs and a machine-readable `report.json` remain under
 `artifacts/reproducibility`. Use `-OutputDirectory` to select another child of
 the checkout's `artifacts` directory.
 
+The package CI job requires Full mode and uploads its `report.json` as an exact-run/source artifact. Managed payload equality is required; raw ZIP equality remains a separately reported result.
+
 Full mode also records raw `.nupkg` and `.snupkg` SHA-256 comparisons separately.
 Equal managed payloads do not establish equal ZIP containers. Microsoft's
 [deterministic package documentation](https://learn.microsoft.com/en-us/nuget/create-packages/deterministic-packages)
