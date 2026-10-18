@@ -683,8 +683,38 @@ public sealed class FinalCompilationCollectorTests
 
         var artifact = await EmitArtifact(compilation, path);
 
-        Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
-        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        var subject = compilation.GetTypeByMetadataName("Subject")!;
+        var constructors = subject.InstanceConstructors;
+        Assert.That(constructors, Has.Length.EqualTo(2));
+        var primaryConstructor = constructors.Single(constructor =>
+            constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
+        var stringOverload = constructors.Single(constructor =>
+            constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].Type.SpecialType == SpecialType.System_String);
+        var callableId = SemanticClaimIdentity.CreateCallableId(primaryConstructor);
+        var stringOverloadId = SemanticClaimIdentity.CreateCallableId(stringOverload);
+        var attribute = primaryConstructor.GetAttributes().Single(candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.DoesNotThrowAttribute");
+        var expectedClaimId = SemanticClaimIdentity.Create(
+            compilation.AssemblyName!,
+            callableId,
+            "effect:DoesNotThrow:" + SemanticClaimIdentity.CreateAttributeFingerprint(attribute, primaryConstructor),
+            duplicateRank: 0);
+        var callable = artifact.Manifest.Callables.Single();
+        var claim = artifact.Manifest.Claims.Single();
+
+        Assert.That(stringOverloadId, Is.Not.EqualTo(callableId));
+        Assert.That(stringOverload.GetAttributes().Any(candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.DoesNotThrowAttribute"), Is.False);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(callable.CallableId, Is.EqualTo(callableId));
+            Assert.That(claim.ClaimId, Is.EqualTo(expectedClaimId));
+            Assert.That(claim.CallableId, Is.EqualTo(callableId));
+            Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
+            Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+        }
     }
 
     [TestCase('\uD800')]

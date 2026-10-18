@@ -59,13 +59,29 @@ try {
     if (-not $rejectedEscape) { throw 'A source symlink escaped physical repository containment.' }
     $checks++
 
-    # Mapping changes identity syntax only; membership remains the caller's
-    # evaluated Compile/portable-PDB universe, never all existing source files.
+    # Exercise the same membership guard used by the PDB inventory: resolving
+    # an ordinary source path does not imply that it was compiled.
     $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     [void]$compilePaths.Add('Project/Source.cs')
+    $compiled = Resolve-SharpProofSourceDocument -RepositoryRoot $probeRoot `
+        -DocumentPath '/_/Project/Source.cs'
+    Assert-SharpProofSourceDocumentCompileMembership `
+        -RelativePath $compiled -CompilePaths $compilePaths
     $outside = Resolve-SharpProofSourceDocument -RepositoryRoot $probeRoot `
         -DocumentPath '/_/Project/NotCompiled.cs'
-    if ($compilePaths.Contains($outside)) { throw 'Mapped documents expanded the Compile universe.' }
+    $membershipMessage = "Production inventory PDB source is not an evaluated Compile item: '$outside'."
+    $rejectedUncompiledDocument = $false
+    try {
+        Assert-SharpProofSourceDocumentCompileMembership `
+            -RelativePath $outside -CompilePaths $compilePaths
+    }
+    catch {
+        if ($_.Exception.Message -cne $membershipMessage) { throw }
+        $rejectedUncompiledDocument = $true
+    }
+    if (-not $rejectedUncompiledDocument) {
+        throw 'An uncompiled source document was accepted into the production inventory.'
+    }
     $checks++
     Write-Host "Source document regressions passed: $checks checks."
 }

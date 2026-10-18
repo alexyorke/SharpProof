@@ -667,12 +667,14 @@ public sealed class FrontendLoweringTests
         var operations = compiled.TargetExpression
             .DescendantsAndSelf()
             .ToArray();
-        var visits = 0;
+        var visits = new Dictionary<IOperation, int>(
+            ReferenceEqualityComparer.Instance);
         var lowerer = new RoslynOperationLowerer(compiled.Factory)
         {
-            CustomLowering = _ =>
+            CustomLowering = operation =>
             {
-                visits++;
+                ArgumentNullException.ThrowIfNull(operation);
+                visits[operation] = visits.GetValueOrDefault(operation) + 1;
                 return default;
             }
         };
@@ -684,7 +686,13 @@ public sealed class FrontendLoweringTests
             Assert.That(
                 result.Classification.Abstention,
                 Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
-            Assert.That(visits, Is.LessThanOrEqualTo(operations.Length));
+            var expectedOperations = new HashSet<IOperation>(
+                operations,
+                ReferenceEqualityComparer.Instance);
+            Assert.That(expectedOperations.Count, Is.EqualTo(operations.Length));
+            Assert.That(visits.Count, Is.EqualTo(expectedOperations.Count));
+            Assert.That(expectedOperations.SetEquals(visits.Keys), Is.True);
+            Assert.That(visits.Values, Is.All.EqualTo(1));
         }
     }
 

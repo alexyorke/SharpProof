@@ -1,3 +1,7 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
@@ -55,19 +59,87 @@ public sealed class EffectContractWireParityTests
     ];
 
     [Test]
-    public void GeneratedEffectCatalogContainsNoAnalysisAlgorithms()
+    public void GeneratedEffectCatalogContainsOnlyDeclarationsAndData()
     {
         var source = File.ReadAllText(Path.Combine(
             TestRepository.FindRoot(),
             "SharpProof.Effects",
             "EffectContractMappings.generated.cs"));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview));
+        var parseErrors = syntaxTree.GetDiagnostics()
+            .Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        var executableSyntax = FindExecutableCatalogSyntax(syntaxTree.GetRoot());
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Not.Contain("if ("));
-            Assert.That(source, Does.Not.Contain("switch"));
-            Assert.That(source, Does.Not.Contain("foreach"));
+            Assert.That(parseErrors, Is.Empty, string.Join(
+                Environment.NewLine,
+                parseErrors.Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.ToString())));
+            Assert.That(
+                executableSyntax,
+                Is.Empty,
+                string.Join(
+                    ", ",
+                    executableSyntax.Select(node =>
+                        node is null ? throw new ArgumentNullException(nameof(node)) : $"{node.Kind()}@{node.GetLocation().GetLineSpan().StartLinePosition}")));
+
+            var executableProbe = CSharpSyntaxTree.ParseText("""
+                internal static class ExecutableProbe
+                {
+                    internal static bool IsParameter(int value) => value == 1;
+
+                    internal static bool HasBranch(int value)
+                    {
+                        if(value == 1) return true;
+                        return false;
+                    }
+                }
+                """, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
+            var probeSyntax = FindExecutableCatalogSyntax(executableProbe);
+            Assert.That(
+                probeSyntax.OfType<MethodDeclarationSyntax>()
+                    .Any(method => method.ExpressionBody is not null),
+                Is.True);
+            Assert.That(
+                probeSyntax.OfType<IfStatementSyntax>().ToArray(),
+                Has.Length.EqualTo(1));
         }
+    }
+
+    private static SyntaxNode[] FindExecutableCatalogSyntax(SyntaxNode root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        return root.DescendantNodesAndSelf()
+            .Where(node =>
+                node is null ? throw new ArgumentNullException(nameof(node)) : node is BaseMethodDeclarationSyntax
+                    or LocalFunctionStatementSyntax
+                    or AnonymousFunctionExpressionSyntax
+                    or StatementSyntax
+                    or ConditionalExpressionSyntax
+                    or SwitchExpressionSyntax
+                    or ThrowExpressionSyntax
+                    or QueryExpressionSyntax
+                || node is PropertyDeclarationSyntax property && property.ExpressionBody is not null
+                || node is AccessorDeclarationSyntax accessor &&
+                    (accessor.Body is not null || accessor.ExpressionBody is not null)
+                || node is InvocationExpressionSyntax invocation && !IsCatalogDataFactory(invocation))
+            .ToArray();
+    }
+
+    private static bool IsCatalogDataFactory(InvocationExpressionSyntax invocation)
+    {
+        var field = invocation.Ancestors().OfType<FieldDeclarationSyntax>().FirstOrDefault();
+        return field is not null
+            && field.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.StaticKeyword))
+            && field.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.ReadOnlyKeyword))
+            && invocation.Ancestors().OfType<EqualsValueClauseSyntax>().Any()
+            && invocation.Expression is MemberAccessExpressionSyntax member
+            && member.Expression is IdentifierNameSyntax owner
+            && owner.Identifier.ValueText == "EffectRegionId"
+            && member.Name.Identifier.ValueText is "Captured" or "Static";
     }
 
     [TestCase(
