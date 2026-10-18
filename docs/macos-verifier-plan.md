@@ -1,6 +1,6 @@
 # Native macOS verifier qualification
 
-Add one `SharpProof.Verifier` package reference and build with .NET SDK 10.0.100+ and the .NET 10 runtime on a supported macOS ARM64/x64 host. Strict full verification is automatic; no SharpProof activation properties or separate API/analyzer references are needed. Keep the standard reference without `PrivateAssets="all"` so application contracts propagate.
+Add one `SharpProof` package reference and build with .NET SDK 10.0.100+ and the .NET 10 runtime on a supported macOS ARM64/x64 host. Strict full verification is automatic; no SharpProof activation properties or separate API/analyzer references are needed. Keep the standard reference without `PrivateAssets="all"` so application contracts propagate.
 
 The verifier package includes pinned Z3 4.12.2 libraries for `osx-arm64` and `osx-x64`. The managed worker is under `tools/net10`; MSBuild selects the native library for the host and process architecture. The worker validates the package-owned managed assembly and native library hashes before creating a Z3 context. Ambient Z3 installations are not used.
 

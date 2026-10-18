@@ -11,19 +11,19 @@ From the repository root:
 ```text
 docker compose build tooling
 docker compose run --rm tooling contract
-docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfTest
+docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~NameOfTest
 docker compose run --rm tooling pr
 ```
 
-`tooling` starts a finite task. Its entrypoint clones/copies the source snapshot into a private workspace under `/tmp`, then invokes [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofContainer.ps1). Dirty tracked changes are included for ordinary development commands. Builds do not reuse host `bin` or `obj`. Artifacts are exported through the repository's `artifacts` mount.
+`tooling` starts a finite task. Its entrypoint clones/copies the source snapshot into a private workspace under `/tmp`, then invokes [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1). Dirty tracked changes are included for ordinary development commands. Builds do not reuse host `bin` or `obj`. Artifacts are exported through the repository's `artifacts` mount.
 
 `pack`, `nightly`, and `fuzz-nightly` require clean exact-commit source. Commands that need source comparison also require usable Git metadata. Ignored `nupkgs` release inputs are copied explicitly; do not assume arbitrary ignored host files enter a finite task.
 
 For Git worktrees with metadata outside the checkout, invoke the host wrapper instead of direct Compose:
 
 ```text
-pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
-pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target samples/Preconditions/Preconditions.csproj -Format Json
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target src/samples/Preconditions/Preconditions.csproj -Format Json
 ```
 
 The wrapper validates Git paths and supplies read-only metadata mounts. Doctor evaluates trusted project configuration and existing restore assets without restoring or building. It reports missing prerequisites and direct package references; it does not certify native loading or run a proof. Ordinary clone commands above remain valid.
@@ -36,7 +36,7 @@ Inside that workspace, `sp` dispatches the same command profiles:
 
 ```text
 sp contract
-sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
+sp test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
 sp pr
 ```
 
@@ -72,8 +72,8 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `corpus` | Canonical corpus and support-ratchet checks |
 | `corpus-update` | Intentional corpus observation update |
 | `coverage` | Release coverage and acceptance checks; requires a comparison ref |
-| `coverage-shard` | Collect one Release coverage half with `-CoveragePhase semantic` or `package` |
-| `coverage-gate` | Validate and merge both downloaded coverage shards; requires a comparison ref |
+| `coverage-shard` | Collect one Release coverage shard with `-CoveragePhase semantic-gates`, `semantic-worker`, `semantic-projects`, or `package` |
+| `coverage-gate` | Validate and merge all four downloaded coverage shards; requires a comparison ref |
 | `dependency-audit` | Locked restore and dependency vulnerability audit |
 | `security` | Dependency audit and full Release build with banned-API enforcement |
 | `fuzz-nightly` | Clean exact-commit fuzz campaign |
@@ -93,7 +93,7 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` is supported only by `pr` and `pr-gates`, for CI runs that execute the package phase in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
 
 After packing clean source, test the exported package bytes:
 
@@ -114,26 +114,28 @@ The Compose services also forward `SHARPPROOF_COVERAGE_COMPARISON_REF` from the 
 
 ```powershell
 $env:SHARPPROOF_COVERAGE_COMPARISON_REF = 'origin/master'
-pwsh -File scripts/Invoke-SharpProof.ps1 coverage -Configuration Release
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 coverage -Configuration Release
 ```
 
 The comparison ref must already be available in the checkout's Git metadata. The wrapper mounts that metadata read-only and does not fetch refs.
 
-CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) runs semantic and package coverage on separate runners, then downloads both for `coverage-gate`. Each shard records the source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence and independently rebuilds production authority before enforcing coverage. Inside the semantic run, the scheduler reserves the complete semantic project phase's worker slots so solver work does not overlap other worker-heavy shards. These scheduling rules do not alter proof budgets, timeouts, or coverage floors.
+CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) runs four coverage shards on separate runners (the Gates project, the Worker remainder, the other semantic tasks, and the package tests), then downloads all four for `coverage-gate`. Each shard records the source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence and independently rebuilds production authority before enforcing coverage. Inside the Gates shard, the scheduler reserves every worker slot so solver work does not overlap other worker-heavy tasks. These scheduling rules do not alter proof budgets, timeouts, or coverage floors.
 
 Coverage validation caches coverage credits for each production assembly, source, and line from that assembly's matching PDB ranges within one run. It preserves every overlapping sequence-point start and keeps lines that are permitted without granting coverage credit. The cache is rebuilt from independently authenticated current binaries and PDBs on each invocation. Project totals include every document owned by the project's evaluated `Compile` items and authenticated module, including linked sources outside its directory. Aggregate totals sum assembly/source/start obligations, so source compiled into two production assemblies contributes separately for each assembly. Repeated reports use maximum hits within the same assembly; another production or test assembly cannot supply its coverage.
 
-CI uploads the semantic and package coverage timing profiles from `artifacts/timings/*-coverage.json` alongside the coverage reports. These profiles show test phase and shard durations when investigating slow runs.
+Each CI shard uploads its timing profile from `artifacts/timings/*-coverage.json` in the same artifact as its coverage reports. These profiles show test phase and shard durations when investigating slow runs.
 
 ## Long-running fuzz campaign
 
-The `LongFuzz` NUnit category in `SharpProof.Worker.Test/LongFuzz` holds six explicit generative harnesses. `typed-features` rotates 15 compile-valid feature families, derives `Ensures` or `[DoesNotThrow]` claims from CLR observations, and records per-family Worker verdicts and Unknown reasons. Unknown outcomes remain recorded by feature family and reason. `analyzer-pipeline` runs generated `[DoesNotThrow]`, `[EnforcePure]`, `[ZeroAllocations]`, and `Ensures` claims through the analyzer, collector, worker, and a CLR oracle. `control-flow` nests exception and control-flow leaves in try/finally, filter, loop, switch, and goto wrappers and checks worker outcomes against CLR execution. `typed-width` covers all nine integral types with shift counts around 31/32 and 63/64, plus bounded and unbounded checked casts from signed and unsigned sources; it compares Worker verdicts with a Release CLR input grid. `composition` combines typed operations with cleanup and catch scopes, checking return values, exceptions, and state against CLR execution. `contract-matrix` varies precondition domains, direct and caller/callee claims, and paired `Ensures` and `[DoesNotThrow]` claims; it matches each Worker result by claim ID and checks admitted CLR inputs. All six are `[Explicit]`, so `semantic-tests`, `pr`, and required CI checks skip them. Select them by category:
+The `LongFuzz` NUnit category in `src/SharpProof.Worker.Tests/LongFuzz` holds six explicit generative harnesses. `typed-features` rotates 15 compile-valid feature families, derives `Ensures` or `[DoesNotThrow]` claims from CLR observations, and records per-family Worker verdicts and Unknown reasons. Unknown outcomes remain recorded by feature family and reason. `analyzer-pipeline` runs generated `[DoesNotThrow]`, `[EnforcePure]`, `[ZeroAllocations]`, and `Ensures` claims through the analyzer, collector, worker, and a CLR oracle. `control-flow` nests exception and control-flow leaves in try/finally, filter, loop, switch, and goto wrappers and checks worker outcomes against CLR execution. `typed-width` covers all nine integral types with shift counts around 31/32 and 63/64, plus bounded and unbounded checked casts from signed and unsigned sources; it compares Worker verdicts with a Release CLR input grid. `composition` combines typed operations with cleanup and catch scopes, checking return values, exceptions, and state against CLR execution. `contract-matrix` varies precondition domains, direct and caller/callee claims, and paired `Ensures` and `[DoesNotThrow]` claims; it matches each Worker result by claim ID and checks admitted CLR inputs. All six are `[Explicit]`, so `semantic-tests`, `pr`, and required CI checks skip them. Select them by category:
 
 ```text
-docker compose run --rm -e SHARPPROOF_LONGFUZZ_MINUTES=5 -e SHARPPROOF_LONGFUZZ_SEED_START=1000 tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter TestCategory=LongFuzz
+docker compose run --rm -e SHARPPROOF_LONGFUZZ_MINUTES=5 -e SHARPPROOF_LONGFUZZ_SEED_START=1000 tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter TestCategory=LongFuzz
 ```
 
 `SHARPPROOF_LONGFUZZ_MINUTES` is the budget for the whole selection. The harnesses share it and generate new seeds until the deadline, then pass. `SHARPPROOF_LONGFUZZ_SEED_START` and the optional exclusive `SHARPPROOF_LONGFUZZ_SEED_END` bound the seeds. A harness name and seed identify one generated case; retain both when replaying a finding. `SHARPPROOF_LONGFUZZ_OUTPUT` defaults to `artifacts/long-fuzz`.
+
+For each analyzer-pipeline postcondition refutation, exact replay decodes the worker's reported entry model and runs only those inputs against Release-compiled C#. It checks the CLR precondition and requires a normal return that falsifies the mirrored postcondition. It currently supports the generator's two Int32 parameters, null array parameter, and null or quoted UTF-16 string parameter. Opaque arrays/references and effect refutations without executable entry models are counted as `exact-replay:Unsupported`; no replacement inputs are guessed. Replay mismatches, invalid bindings, and CLR harness failures are error-severity findings retaining the model and generated source. Reproduced witnesses are counted as `exact-replay:Reproduced`. The existing input-grid search remains independent, and Unknown verdicts remain undecided.
 
 Findings never fail the test. Each finding is written when it is found to `hits.jsonl` (harness, kind, severity, seed, claim, worker outcome, runtime observation, and full source) and as a standalone `hits/<harness>-seed<N>-<kind>.cs`. `stats-<harness>.json` holds the case and outcome counts. `events.log` carries live progress and `::error::`/`::warning::` lines, so `tail -F artifacts/long-fuzz/events.log` follows a local run. `FalseProven`, escaped exceptions, and worker errors are errors. `RefutedNotObserved` (a refutation that no grid input witnesses) is a warning.
 
@@ -144,7 +146,7 @@ Findings never fail the test. Each finding is written when it is found to `hits.
 For local test iteration, combine related filters in one finite task to pay for one restore and build:
 
 ```text
-docker compose run --rm tooling test -Configuration Release -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter "FullyQualifiedName~ClaimManifestBuilderTests|FullyQualifiedName~CompilerManifestArtifactTests"
+docker compose run --rm tooling test -Configuration Release -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter "FullyQualifiedName~ClaimManifestBuilderTests|FullyQualifiedName~CompilerManifestArtifactTests"
 ```
 
 Use the persistent development workspace for repeated edits so normal builds reuse unchanged outputs. Separate finite tasks cannot share build outputs with `-NoBuild`.

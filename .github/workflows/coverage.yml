@@ -22,26 +22,31 @@ env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
-# Two shards run on separate runners: "semantic" (semantic tests plus the
-# isolated Attributes run) and "package" (package tests). Each uploads its own
-# normalized Cobertura reports and coverage-authority.json. The coverage-gate
-# job downloads both, fails closed if their authority evidence differs, merges
-# the reports with the same max-hits union as before, and enforces the
-# unchanged floors, aggregate minimum, and changed-TCB check.
+# Four shards run on separate runners: "semantic-gates" (the Gates project),
+# "semantic-worker" (the Worker remainder shards), "semantic-projects" (every
+# other semantic task plus the isolated Attributes and Fuzz console runs), and
+# "package" (package tests). Each uploads its own normalized Cobertura reports,
+# coverage-authority.json, and timing profile. The coverage-gate job downloads
+# all four, fails closed if their authority evidence differs, merges the
+# reports with the same max-hits union as before, and enforces the unchanged
+# floors, aggregate minimum, and changed-TCB check.
 jobs:
   coverage-shard:
     name: coverage shard (${{ matrix.shard }})
     runs-on: ubuntu-latest
     outputs:
-      semantic-attempt: ${{ steps.shard-identity.outputs.semantic-attempt }}
+      semantic-gates-attempt: ${{ steps.shard-identity.outputs.semantic-gates-attempt }}
+      semantic-worker-attempt: ${{ steps.shard-identity.outputs.semantic-worker-attempt }}
+      semantic-projects-attempt: ${{ steps.shard-identity.outputs.semantic-projects-attempt }}
       package-attempt: ${{ steps.shard-identity.outputs.package-attempt }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [semantic, package]
+        shard: [semantic-gates, semantic-worker, semantic-projects, package]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -54,21 +59,16 @@ jobs:
           tooling coverage-shard -Configuration Release
           -CoveragePhase ${{ matrix.shard }}
 
-      - name: Upload coverage shard
+      # One artifact per shard holds artifacts/coverage/<shard> and the
+      # shard's uniquely named timing profiles under artifacts/timings.
+      - name: Upload coverage shard and timing profile
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-shard-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/coverage/${{ matrix.shard }}
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload coverage shard timing profile
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-timings-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/timings/*-coverage.json
+          path: |
+            artifacts/coverage/${{ matrix.shard }}
+            artifacts/timings/*-coverage.json
           if-no-files-found: error
           retention-days: 30
 
@@ -81,6 +81,13 @@ jobs:
           SHARPPROOF_SHARD: ${{ matrix.shard }}
         run: echo "${SHARPPROOF_SHARD}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+          name: ${{ github.job }}-${{ matrix.shard }}
+
   coverage-gate:
     name: coverage
     # Keep the existing required-check identity and explicitly reject failed
@@ -89,7 +96,7 @@ jobs:
     needs: coverage-shard
     runs-on: ubuntu-latest
     steps:
-      - name: Require both successful coverage shards
+      - name: Require every successful coverage shard
         env:
           SHARPPROOF_SHARD_RESULT: ${{ needs.coverage-shard.result }}
         run: |
@@ -99,6 +106,7 @@ jobs:
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Select changed-TCB comparison commit
@@ -128,29 +136,29 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Download semantic coverage shard
+      - name: Download semantic-gates coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: coverage-shard-semantic-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-attempt }}
-          path: artifacts/coverage/semantic
+          name: coverage-shard-semantic-gates-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-gates-attempt }}
+          path: artifacts
+
+      - name: Download semantic-worker coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-worker-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-worker-attempt }}
+          path: artifacts
+
+      - name: Download semantic-projects coverage shard
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-shard-semantic-projects-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-projects-attempt }}
+          path: artifacts
 
       - name: Download package coverage shard
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-shard-package-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-attempt }}
-          path: artifacts/coverage/package
-
-      - name: Download semantic coverage shard timing profile
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: coverage-timings-semantic-${{ github.sha }}-${{ needs.coverage-shard.outputs.semantic-attempt }}
-          path: artifacts/timings
-
-      - name: Download package coverage shard timing profile
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: coverage-timings-package-${{ github.sha }}-${{ needs.coverage-shard.outputs.package-attempt }}
-          path: artifacts/timings
+          path: artifacts
 
       - name: Merge and enforce container coverage
         run: >-
@@ -168,3 +176,9 @@ jobs:
             artifacts/timings/*-coverage.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report

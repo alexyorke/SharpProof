@@ -53,7 +53,7 @@ A correct postcondition says nothing by itself about exceptions or termination. 
 
 Good candidates include permission decisions, selecting configuration values, simple state transitions, and arithmetic with a precise valid-input envelope. Keep contracts aligned with real requirements and use focused counterexamples when changing behavior.
 
-The existing [Library sample](../../samples/README.md) demonstrates the same style across multiple files and verifies five selected postconditions.
+The existing [Library sample](../../src/samples/README.md) demonstrates the same style across multiple files and verifies five selected postconditions.
 
 ## Captured output
 

@@ -1,6 +1,6 @@
 # Default API specification catalog
 
-This is a hand-maintained reference to [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The C# declarations are the runtime authority. The filename is retained for existing references; there is no active Markdown generator or JSON review source.
+This is a hand-maintained reference to [DefaultApiSpecCatalog.generated.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The C# declarations are the runtime authority. The filename is retained for existing references; there is no active Markdown generator or JSON review source.
 
 - Table identity: `SharpProof.ApiSpec.Default`
 - Table version: `7`
@@ -50,7 +50,7 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 
 ## Optional relational specification packs
 
-The default table above is distinct from the opt-in [relational pack catalog](../SharpProof.Specs/RelationalSpecPackCatalog.generated.cs). A default effect or exception facet does not supply a relational postcondition automatically.
+The default table above is distinct from the opt-in [relational pack catalog](../src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs). A default effect or exception facet does not supply a relational postcondition automatically.
 
 | Pack ID | Pack version | Catalog version | Member relation |
 | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ The default table above is distinct from the opt-in [relational pack catalog](..
 
 Enable the pack with the consumer property `SharpProofSpecificationPacks` set to `dotnet.scalar`; the version is catalog evidence rather than part of the property value. Multiple enabled IDs are separated by semicolons. Unknown IDs, duplicate IDs, and empty entries in a nonempty list are rejected. The compiler binds exact member/assembly shapes and carries the resolved evidence into the closed artifact; a same-named source method cannot acquire the relation.
 
-See [configuration](configuration.md), [compiler pack parsing](../SharpProof.CompilerCollector/FinalCompilationCollector.cs), [pack-provider tests](../SharpProof.Worker.Test/CompilerSpecificationPackProviderTests.cs), and [coverage and limits](coverage-and-limits.md). The catalog's member, pack, and catalog versions are separate from the compiler artifact's specification-pack wire schema; use [release constants](release-constants.md) when changing them.
+See [configuration](configuration.md), [compiler pack parsing](../src/SharpProof.CompilerCollector/FinalCompilationCollector.cs), [pack-provider tests](../src/SharpProof.Worker.Tests/CompilerSpecificationPackProviderTests.cs), and [coverage and limits](coverage-and-limits.md). The catalog's member, pack, and catalog versions are separate from the compiler artifact's specification-pack wire schema; use [release constants](release-constants.md) when changing them.
 
 ## Concrete collection getters
 

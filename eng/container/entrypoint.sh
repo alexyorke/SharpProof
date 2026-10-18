@@ -58,14 +58,14 @@ if [[ "${command_name}" = "doctor" ]]; then
   # Inspect the selected consumer and its existing imports/assets in place.
   # A disposable task clone intentionally omits ignored restore outputs.
   cd "${repo_root}"
-  exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofDoctor.ps1 "$@"
+  exec pwsh -NoLogo -NoProfile -File ./eng/scripts/Invoke-SharpProofDoctor.ps1 "$@"
 fi
 
 case "${command_name}" in
   test | test-changed | semantic-tests | portable-tests | worker-tests | package-tests)
     golden_source_root="$(realpath -e "${SHARPPROOF_LOOP_SOURCE_ROOT:-${repo_root}}")"
     if [[ ! -f "${golden_source_root}/SharpProof.slnx" ||
-      ! -f "${golden_source_root}/SharpProof.Release.props" ]]; then
+      ! -f "${golden_source_root}/eng/Versions.props" ]]; then
       echo "SharpProof golden source root is not a repository." >&2
       exit 125
     fi
@@ -78,7 +78,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly | fuzz-nightly | pack)
+    nightly | fuzz-nightly | pack | pack-tool)
       return 0
       ;;
     *)
@@ -92,7 +92,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    quick | pr | security | pr-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate)
+    layout | lint | quick | pr | security | pr-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate)
       return 0
       ;;
     *)
@@ -126,7 +126,7 @@ assert_clean_exact_commit_source() {
 
 if requires_git_source "${command_name}" &&
   [[ "${source_has_git}" != "true" ]]; then
-  echo "SharpProof ${command_name} requires accessible Git metadata for source comparison or certifying evidence. For host Git worktrees, run: pwsh -File scripts/Invoke-SharpProof.ps1 ${command_name} (the wrapper mounts resolved Git metadata read-only)." >&2
+  echo "SharpProof ${command_name} requires accessible Git metadata for source comparison or certifying evidence. For host Git worktrees, run: pwsh -File eng/scripts/Invoke-SharpProof.ps1 ${command_name} (the wrapper mounts resolved Git metadata read-only)." >&2
   exit 2
 fi
 
@@ -187,21 +187,93 @@ else
     --exclude='./.claude/*' \
     -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
 fi
-ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
+mkdir -p "${task_root}/artifacts"
+# The optional tool feed is an explicit input to its following qualification
+# task. Copy only its release archives and known identity sidecars; keep all
+# other ignored artifact output outside the private workspace snapshot.
+if [[ "${command_name}" == tool-consumer ]]; then
+  package_source=""
+  previous_argument=""
+  for argument in "$@"; do
+    if [[ "${previous_argument,,}" == -packagesource ]]; then
+      package_source="${argument}"
+      break
+    fi
+    previous_argument="${argument}"
+  done
+  case "${package_source}" in
+    artifacts/tool-packages | artifacts/tool-packages/ | ./artifacts/tool-packages | ./artifacts/tool-packages/)
+      mkdir -p "${task_root}/artifacts/tool-packages"
+      for package_input in "${repo_root}"/artifacts/tool-packages/*.nupkg \
+        "${repo_root}"/artifacts/tool-packages/packages.tsv \
+        "${repo_root}"/artifacts/tool-packages/packages.lock.json \
+        "${repo_root}"/artifacts/tool-packages/Test-SharpProofPublishedPackages.sh; do
+        if [[ -f "${package_input}" && ! -L "${package_input}" ]]; then
+          cp -a -- "${package_input}" "${task_root}/artifacts/tool-packages/"
+        fi
+      done
+      ;;
+  esac
+fi
+# Build outputs are centralized by Arcade. Keep bin/obj/toolset private to
+# this task instead of writing them through a shared host artifacts symlink.
+case "${command_name}" in
+  coverage-gate)
+    if [[ -d "${repo_root}/artifacts/coverage" ]]; then
+      cp -a "${repo_root}/artifacts/coverage" "${task_root}/artifacts/"
+    fi
+    ;;
+  canonical-cohort-gate)
+    if [[ -d "${repo_root}/artifacts/canonical-cohorts" ]]; then
+      cp -a "${repo_root}/artifacts/canonical-cohorts" "${task_root}/artifacts/"
+    fi
+    ;;
+esac
 if [[ "${source_has_git}" = "true" ]] &&
   [[ -d "${task_root}/.git" ]]; then
-  # The disposable clone uses a symlink so evidence lands in the host
-  # artifact mount. A trailing-slash ignore rule matches directories but
-  # not this symlink, so exclude the exact task-local link explicitly.
+  # Keep generated task artifacts outside tracked-file discovery.
   printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
-  # Both copied source and additions from the applied snapshot must appear
-  # in changed-line checks. Only the disposable task index is modified.
-  while IFS= read -r -d '' untracked_path; do
-    git -C "${task_root}" add --intent-to-add -- "${untracked_path}"
-  done < <(git -C "${task_root}" ls-files \
-    --others --exclude-standard -z --)
+  # Include copied additions in changed-line checks and remove deleted paths
+  # from tracked-file discovery after moves. Only the disposable task index
+  # is modified; existing content edits remain unstaged.
+  git -C "${task_root}" add --intent-to-add --all -- .
 fi
 export SHARPPROOF_REPO_ROOT="${task_root}"
 cd "${task_root}"
-exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
-  -Command "${command_name}" "$@"
+set +e
+if [[ "${command_name}" == arcade ]]; then
+  bash ./eng/build.sh "$@"
+else
+  pwsh -NoLogo -NoProfile -File ./eng/scripts/Invoke-SharpProofContainer.ps1 \
+    -Command "${command_name}" "$@"
+fi
+task_status=$?
+set -e
+# Export evidence and packages on success or failure. Compiler intermediates,
+# tool restore output and temporary build roots stay in the disposable task.
+# Aggregate gates consume downloaded evidence owned by the runner. Export only
+# their new results, preserving the authenticated inputs and their ownership.
+case "${command_name}" in
+  canonical-cohort-gate)
+    result_paths=(canonical-cohorts/canonical-cohort-validation.json)
+    ;;
+  coverage-gate)
+    result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json)
+    ;;
+  *)
+    result_paths=(.)
+    ;;
+esac
+export_paths=()
+for result_path in "${result_paths[@]}"; do
+  if [[ -e "${task_root}/artifacts/${result_path}" ]]; then
+    export_paths+=("${result_path}")
+  fi
+done
+if [[ ${#export_paths[@]} -eq 0 ]]; then
+  exit "${task_status}"
+fi
+tar -C "${task_root}/artifacts" \
+  --exclude='./bin' --exclude='./obj' --exclude='./toolset' --exclude='./tmp' \
+  -cf - "${export_paths[@]}" | tar -C "${repo_root}/artifacts" -xf -
+exit "${task_status}"

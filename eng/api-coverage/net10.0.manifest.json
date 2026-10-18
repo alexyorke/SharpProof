@@ -4,7 +4,7 @@
   "pack": "Microsoft.NETCore.App.Ref",
   "version": "10.0.13",
   "framework": "net10.0",
-  "catalogSha256": "a6030895a3357c77be237ccbb9f9c5f91bebfff3ef4397bede827d2fb0ec9bb2",
+  "catalogSha256": "9e661fa8bd365791d02e7e9aab183a049c0a3ebbf8aea4da67fe111e8ecbd5d0",
   "assemblies": [
     {
       "name": "Microsoft.CSharp.dll",

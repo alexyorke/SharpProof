@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SharpProof.Testing.Test</AssemblyName>
+    <RootNamespace>SharpProof.Testing.Test</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
+  </ItemGroup>
+</Project>

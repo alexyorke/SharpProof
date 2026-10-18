@@ -1515,3 +1515,51 @@ Evidence: immutability-const-local-review2.log. Implementation and focused tests
 follow this committed inventory. Numeric/computed constants and other filtered
 binding-sensitive cases still require semantic review; this focused inventory
 is not represented as exhaustive local-constant coverage.
+
+
+## Master conflict integration checkpoint
+
+Merged source: origin/master e97c6c56d58fba9f5c5c20ac59f4c7f44ff4424a.
+The prior branch and unfinished const/fuzz work are preserved by local checkpoint
+fab1ec540d7d50b7296d21037def5ae7ec12f7c4.
+
+The coordinator resolved all 23 conflicted paths after read-only reviews by the
+ten existing agents. Master's src/ project layout, eng/scripts/ paths, compiler
+semantics split, strong-name payload checks, package publication order, indexed
+field-store codec and keyed replay/resource accounting are retained. The older
+combined analyzer/worker test source was split into the two canonical fixtures;
+the immutable fixture updates were transferred to the worker file.
+
+New integration sites requiring adaptation:
+- ToolApplicationTests constructs a copied immutable response instead of assigning
+  init-only fields.
+- KeyedEntryModelTests accepts the decoder's immutable variable map.
+- ExactCounterexampleReplayTests copies immutable model rows while preserving the
+  deliberately mutable invalid-model array subject and its null/slice/reorder tests.
+- AnalyzerPipelineLongFuzzTests explicitly adapts the protocol snapshot to the
+  replay helper's array boundary.
+- ListRuntimeEffects adapts its local argument array to the immutable opaque-call
+  API.
+- PackagedProductFeed materializes immutable package arrays before transferring
+  TempDirectory ownership; its validation helper accepts immutable expected IDs.
+- RunIndexedAsync keeps the cancellation token last and replay status projections
+  retain explicit guards. Its indexed builder freezes only after every task joins.
+
+Canonical tooling image rebuilt for the new entrypoint and pinned runtime.
+Layout passed: 2,607 source files, 59 projects, 151 pinned Arcade common files and
+59 evaluated projects. The new-master literal comparison preserves 2,591
+raw/interpolated tokens across 547 changed C# files; newly introduced files are
+outside this comparison. C# whitespace required no changes on the resolved files.
+Script formatting checked 87 PowerShell files and 19 shell scripts; the one
+PackageIdentity formatting patch was applied.
+
+The first four merged-tree builds exposed the compatibility sites above; their
+failed logs are not successful validation. The next solution build passed with
+zero warnings and zero errors (immutability-master-all-tests5.log). Its unfiltered
+test run included an isolated-host-only Coverage fixture; that run was stopped.
+Ordinary solution verification is in progress with the repository filter excluding
+Performance, Coverage and Corpus in immutability-master-ordinary-tests.log.
+Evidence: immutability-master-layout.log,
+immutability-master-literals.log and immutability-master-script-format.log.
+The comprehensive residual inventories still describe the preceding checkpoint;
+current-path coverage must be refreshed after master integration.

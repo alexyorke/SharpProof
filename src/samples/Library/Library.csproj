@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
+    <SharpProofProfile>strict</SharpProofProfile>
+    <SharpProofFeatures>contracts</SharpProofFeatures>
+  </PropertyGroup>
+</Project>

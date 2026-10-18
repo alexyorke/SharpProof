@@ -13,6 +13,9 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
+| [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest SDK discovery and scoped explanation of stored evidence |
+| [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
+| [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
 | [Consumer performance](consumer-performance.md) | Comparable build measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
@@ -25,7 +28,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
 | [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |
 | [Preview support](preview-support.md) | Container, filesystem, and threat-model boundary |
-| [Samples](../samples/README.md) | Executable package-consumer examples |
+| [Samples](../src/samples/README.md) | Executable package-consumer examples |
 
 ## Understand the implementation
 
@@ -38,7 +41,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Source declaration reference](generated/source-reference.md) | Generated literal configuration, API, diagnostic, and command declarations |
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
-| [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64 proofs, supported paths, resource boundary, and CI |
+| [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64/ARM64 proofs, static runtime payloads, supported paths, and CI |
 
 ## Develop and qualify
 
@@ -46,13 +49,13 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 - [Container development](container-development.md): all commands and workspace modes.
 - [Documentation maintenance](documentation-maintenance.md): source-reference generation, local link checks, and automatic update PRs.
 - [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
-- [Corpus gate](../SharpProof.Gates/README.md) and [source provenance](../SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
+- [Corpus gate](../src/SharpProof.Gates/README.md) and [source provenance](../src/SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
 - [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
 - [Release process](../eng/release/README.md): tag checks, consumer matrix, and publication.
 - [Security policy](../SECURITY.md): private reporting and scope.
 
-The analyzer's [unshipped](../SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
+The analyzer's [unshipped](../src/SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../src/SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
 
 ## Documentation validation
 
-`SharpProof.Analyzer.Test/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. `tooling docs` checks generated source-reference drift, tracked local Markdown targets/heading anchors, and documentation automation regressions; `pr-gates` includes this check. External links and authored behavioral claims still need review against their supporting sources. See [documentation maintenance](documentation-maintenance.md).
+`src/SharpProof.Analyzer.Tests/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `src/SharpProof.Attributes.Tests/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. `tooling docs` checks generated source-reference drift, tracked local Markdown targets/heading anchors, and documentation automation regressions; `pr-gates` includes this check. External links and authored behavioral claims still need review against their supporting sources. See [documentation maintenance](documentation-maintenance.md).

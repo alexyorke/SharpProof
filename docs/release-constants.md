@@ -4,16 +4,16 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 
 | Value | Current value | Owner |
 | --- | --- | --- |
-| Package version | `1.0.0-preview.1` | [SharpProof.Release.props](../SharpProof.Release.props) |
-| Assembly version | `1.0.0.0` | [SharpProof.Release.props](../SharpProof.Release.props) |
-| Worker protocol | `13` | [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) |
+| Package version | `1.0.0-preview.1` | [eng/Versions.props](../eng/Versions.props) |
+| Assembly version | `1.0.0.0` | [eng/Versions.props](../eng/Versions.props) |
+| Worker protocol | `13` | [ProtocolModel.generated.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) |
 | Worker manifest schema | `5` | Same protocol model |
 | Response cache schema | `15` | Same protocol model |
-| Compiler artifact schema | `31` | [CompilerArtifactModel.generated.cs](../SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs) |
+| Compiler artifact schema | `31` | [CompilerArtifactModel.generated.cs](../src/SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs) |
 | Relational summary schema | `2` | Same compiler artifact model |
 | Specification pack schema | `1` | Same compiler artifact model |
 | Specification pack catalog version | `2` | Same compiler artifact model |
-| Default API table version | `6` | [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs) |
+| Default API table version | `6` | [DefaultApiSpecCatalog.generated.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs) |
 | Canonical container platform | `linux/amd64` | [toolchain.json](../eng/container/toolchain.json) and [compose.yaml](../compose.yaml) |
 
 ## Coordinated changes

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SharpProof.Tool.Test</AssemblyName>
+    <RootNamespace>SharpProof.Tool.Test</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Tool\SharpProof.Tool.csproj" />
+  </ItemGroup>
+</Project>

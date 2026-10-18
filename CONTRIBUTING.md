@@ -23,22 +23,32 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Run every repository quality and link check with one command, including image setup:
+
+```sh
+docker compose run --rm --build lint
+```
+
+Reports are saved under `artifacts/lint`; findings return a failing exit code.
+For host Git worktrees, use `pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`.
+See [quality gates](eng/lint/README.md) for the check scope.
+
 Apply the repository's `.editorconfig` formatting rules before submitting changes:
 
 ```text
-docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-CSharp.ps1'
-docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-Scripts.ps1'
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File eng/scripts/Format-CSharp.ps1'
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File eng/scripts/Format-Scripts.ps1'
 docker compose run --rm tooling format-check
 ```
 
-For a Git worktree, use `pwsh -File scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
+For a Git worktree, use `pwsh -File eng/scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
 
 `Format-Scripts.ps1` formats all tracked `.ps1`, `.psm1`, and `.psd1` files with PSScriptAnalyzer's formatter and checks parsing plus warning/error rules. It also runs ShellCheck and shfmt on every tracked `.sh`/`.bash` file and shell shebang script, including extensionless files. PowerShell uses four-space indentation; shell scripts use two spaces, indented case arms, and spaces after redirections. Check mode never rewrites sources. `format-check` includes these checks and regression tests proving that lint, syntax, and formatting failures are rejected.
 
 Tool versions and download SHA256 values are pinned in [the container catalog](eng/container/toolchain.json). PowerShell [lint settings](eng/PSScriptAnalyzerSettings.psd1) retain default warning/error rules except host status output, plural helper nouns, and interactive `ShouldProcess` requirements: these are unattended build/test utilities with existing helper APIs, and status output must not pollute data pipelines. The [formatter settings](eng/PowerShellFormatting.psd1) are separate from lint policy. A narrowly scoped suppression documents the legacy `RepositoryRoot` compatibility parameter in the framework-feed helper; its targeting packs come from the selected SDK.
 
 ```text
-docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression
+docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~NameOfRegression
 docker compose run --rm tooling pr
 ```
 
@@ -65,6 +75,6 @@ Update versioned artifacts when their meaning or shape changes. Declarative file
 
 ## Documentation and review
 
-Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in the root README, Markdown files under `docs/`, and `samples/README.md` are compiled by [DocumentationSnippetTests](SharpProof.Analyzer.Test/DocumentationSnippetTests.cs); each fence must be a complete compilation unit.
+Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in the root README, Markdown files under `docs/`, and `src/samples/README.md` are compiled by [DocumentationSnippetTests](src/SharpProof.Analyzer.Tests/DocumentationSnippetTests.cs); each fence must be a complete compilation unit.
 
 Describe the user-visible before/after behavior, relevant validation, and material limits in the pull request. Review the resulting diff and stage explicit paths.

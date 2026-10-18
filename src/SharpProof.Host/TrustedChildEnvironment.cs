@@ -1,0 +1,113 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.InteropServices;
+namespace SharpProof.Host;
+
+internal static class TrustedChildEnvironment
+{
+    private static readonly ImmutableArray<string> AllowedVariables =
+    [
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "SystemRoot",
+        "TEMP",
+        "TMP",
+        "USERPROFILE",
+        HostEnvironmentVariables.Container,
+        HostEnvironmentVariables.ContainerContract,
+        HostEnvironmentVariables.NativeRoot,
+        "DOTNET_CLI_TELEMETRY_OPTOUT"
+    ];
+
+    private static readonly ImmutableArray<string> UnsafeRuntimeVariables =
+    [
+        "DOTNET_STARTUP_HOOKS",
+        "DOTNET_ADDITIONAL_DEPS",
+        "DOTNET_SHARED_STORE",
+        "DOTNET_ROLL_FORWARD",
+        "DOTNET_ROLL_FORWARD_TO_PRERELEASE",
+        "DOTNET_ROOT_X64",
+        "DOTNET_ROOT_X86",
+        "DOTNET_MULTILEVEL_LOOKUP",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "LD_AUDIT"
+    ];
+
+    internal static void Apply(
+        ProcessStartInfo startInfo,
+        string? validatedDotNetHostPath,
+        Func<string, string?>? readEnvironmentVariable = null)
+    {
+        ArgumentNullException.ThrowIfNull(startInfo);
+        readEnvironmentVariable ??= Environment.GetEnvironmentVariable;
+        var inheritedValues = AllowedVariables
+            .Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ((Name: name, Value: readEnvironmentVariable(name))))
+            .Where(static item => item.Value is not null)
+            .ToImmutableArray();
+        string? dotNetRoot = null;
+        if (validatedDotNetHostPath is not null)
+        {
+            if (!Path.IsPathFullyQualified(validatedDotNetHostPath) ||
+                !DotNetMuxer.IsFileName(
+                    Path.GetFileName(validatedDotNetHostPath),
+                    OperatingSystem.IsWindows()))
+            {
+                throw new InvalidOperationException(
+                    "SharpProof child runtime must use a validated absolute dotnet muxer.");
+            }
+            // A fully qualified muxer path has a directory root.
+            dotNetRoot = Path.GetDirectoryName(validatedDotNetHostPath) ?? throw new InvalidOperationException(
+                "SharpProof child runtime must use a validated absolute dotnet muxer.");
+        }
+
+        startInfo.Environment.Clear();
+        foreach (var item in inheritedValues)
+        {
+            startInfo.Environment[item.Name] = item.Value;
+        }
+        if (dotNetRoot is not null)
+        {
+            startInfo.Environment["DOTNET_ROOT"] = dotNetRoot;
+        }
+    }
+
+    internal static string? FindUnsafeRuntimeVariable(
+        Func<string, string?>? readEnvironmentVariable = null)
+    {
+        readEnvironmentVariable ??= Environment.GetEnvironmentVariable;
+        foreach (var name in UnsafeRuntimeVariables)
+        {
+            if (!string.IsNullOrWhiteSpace(readEnvironmentVariable(name)))
+            {
+                return name;
+            }
+        }
+        var dotNetRoot = readEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrWhiteSpace(dotNetRoot))
+        {
+            var processPath = Environment.ProcessPath;
+            var processRoot = processPath is null
+                ? null
+                : Path.GetDirectoryName(processPath);
+            if (!Path.IsPathFullyQualified(dotNetRoot) ||
+                processRoot is null ||
+                !string.Equals(
+                    Path.GetFullPath(dotNetRoot),
+                    Path.GetFullPath(processRoot),
+                DotNetMuxer.PathComparison(OperatingSystem.IsWindows())))
+            {
+                return "DOTNET_ROOT";
+            }
+        }
+        return null;
+    }
+}
+
+internal static class LinuxProcessControlConstants
+{
+    // Match GNU timeout's conventional status codes at process boundaries.
+    internal const int TimeoutExitCode = 124;
+}

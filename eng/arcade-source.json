@@ -1,0 +1,913 @@
+{
+  "repository": "https://github.com/dotnet/arcade",
+  "commit": "ca4c91e56da9ae88fc62578058d8aee531679dba",
+  "sdkVersion": "9.0.0-beta.26507.8",
+  "commonFiles": [
+    {
+      "path": "eng/common/BuildConfiguration/build-configuration.json",
+      "gitBlob": "3d1cc89894c94b21156545e183ad6a0bb47a348f",
+      "sha256": "9a0cd7d5a238f53c2f53fc4ac5cbbfc067aa689079051c119c12141538462dd2",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/CIBuild.cmd",
+      "gitBlob": "56c2f25ac22ffa438d8c0cdcfab09f9b691d6b55",
+      "sha256": "d93c9756abf62c5f6147b25dab16019a5924c8c8236af72f45ab569c8e2b1d42",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/Get-GitHubAppToken.ps1",
+      "gitBlob": "ea776bd6bc28a823956426294a133b2162e8715b",
+      "sha256": "d11dc2244f17e3582c995186158cb1ef219b42dd78191f1db9e8e4691f340661",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/PSScriptAnalyzerSettings.psd1",
+      "gitBlob": "4c1ea7c98ea4d101c0ac3f0d4972e55b243ca5f1",
+      "sha256": "f1f241cc8da6bafbe51edb1962fa6fb69231eba85229de56a69a9c3440f9680c",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/README.md",
+      "gitBlob": "ff49c371527a031605d4570a18804b8de3621812",
+      "sha256": "ad96a46ccc85321a20f83f321be36f4b45acca985936baea8925d52422aecc3a",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/SetupNugetSources.ps1",
+      "gitBlob": "792b60b49d424d51f3107d2aa3896621cc427054",
+      "sha256": "c382a2657a37dab1d3d5d756debe304d9682d138cd297cbba9a1b7a63a9506d3",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/SetupNugetSources.sh",
+      "gitBlob": "facb415ca6ff353227d863babfc6046509fe2eee",
+      "sha256": "f6008798bce7ec16c7a312ff295e3cd448d3370ec2eda34fcdd2ddebf5777798",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/build.cmd",
+      "gitBlob": "99daf368abae7404a16bd0b8af18f21ff5f34928",
+      "sha256": "211a2ca8ead6fe975d8c6374c0dd08921b30dad8d008d3b9290f6cb9b6ca8502",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/build.ps1",
+      "gitBlob": "438f9920c43e4edd983f0f927b4ec5b606bdcc6c",
+      "sha256": "21162e817c4e442b576fe320bd655fb2b0a2a7094549c063e2a0f76fd1fc9067",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/build.sh",
+      "gitBlob": "ac1ee8620cd2ab5ffe6a8646d4a9ab1877af52a4",
+      "sha256": "4a818905037e659a4bde18c23383a3a0797c1613a31a2e72c47c7a09609ff20d",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/cibuild.sh",
+      "gitBlob": "1a02c0dec8fd7b1abf9143e183c5415ba4b15a8b",
+      "sha256": "5998e656e9dbc66304c12fdad41c6d3b355341a1d1f41621a5e29e19975029a4",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/core-templates/job/job.yml",
+      "gitBlob": "b0020eb392f43e13c3e2fdf4476a2c3080ee9733",
+      "sha256": "07172e2dc9d1cb878659b4269267accf798f3d03b6414801322bce3a67abe835",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/job/onelocbuild.yml",
+      "gitBlob": "ea590495fb0d5e130e4c6ff51f7b20c89598fb58",
+      "sha256": "f60d282e7af22850c5e7aa267b0dec6c86373e9735271b0febde26f2d02f86c6",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/job/publish-build-assets.yml",
+      "gitBlob": "5a0343f9738816932061b2f31f3adfbcf31726cf",
+      "sha256": "f3caae2f35bf8b77b3475e82040ab9dad7870b62cbb67d5bafb5bcbdbbf6f21b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/job/source-build.yml",
+      "gitBlob": "d943748ac10e92d18a7ee132d53535dd58dcdaaa",
+      "sha256": "ac95af2221527095a2bd93caca0b337827a94798f42123a8a26aefb854e2e473",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/job/source-index-stage1.yml",
+      "gitBlob": "ddf8c2e00d803574b9cecedb5cefcaa764e1b96a",
+      "sha256": "49367a4e7524201dee2acc04615392a8466accf2596bce5a9961f25fba27ee4e",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/jobs/codeql-build.yml",
+      "gitBlob": "87c2c4c2096c7f4d525865c29d399088553742bb",
+      "sha256": "10d7e60a03db1cd9cef09a53365a8cc4be4b193ed52304f68f09c5de85d4b34a",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/jobs/jobs.yml",
+      "gitBlob": "bf33cdc2cc7787710a944b596abd3014648accdb",
+      "sha256": "d479265ce9569125ae421621e565f842e038795d43974043d6161134483cc0ff",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/jobs/source-build.yml",
+      "gitBlob": "0b408a67bd51cd2273f5b30ef4f12f50bf33d8c1",
+      "sha256": "ce2d4aaeff847eeabbbbcb20488c3b0ba5857b21a3a09a19405a3d594f5b4bc7",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/post-build/common-variables.yml",
+      "gitBlob": "3413a9a573e5b43e571d3c9e2bc8c6bdf8283894",
+      "sha256": "1e7d84d2566214dbab700384a0edbfd96e2053129204df31d88d20076293654e",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/post-build/post-build.yml",
+      "gitBlob": "864427d9694ab319f3ffdad4076b1bb65d9bd7d7",
+      "sha256": "4f6800e874d83e4aa6c603614010fd1e2013d42f67e8cb223fbfdae87ff706f5",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/post-build/setup-maestro-vars.yml",
+      "gitBlob": "a7abd58c4bb6098f60dd08b0286bb44c11704570",
+      "sha256": "519f488eb4587a851401ae9f127583498dd52ab1625297234496ac328757d538",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/component-governance.yml",
+      "gitBlob": "cf0649aa95653f6b94a72abbd40379c55f17e257",
+      "sha256": "027ad1377ced4b603a656154724b24248f361931201e28b20f532c4c02c64c50",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/enable-internal-runtimes.yml",
+      "gitBlob": "6bdbf62ac500f4de80311b589cf6dd49f9e5a236",
+      "sha256": "55831df0752d2ea99092d046ae3678dc65604c04da5135aae6c7c4375e584a8f",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/enable-internal-sources.yml",
+      "gitBlob": "4085512b690910e97340ef7083fb8e9ce34453e8",
+      "sha256": "59707007d15914ff53e62795127b08a0ef293354ef11c90a123f6e719430fc3f",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/generate-sbom.yml",
+      "gitBlob": "7f5b84c4cb827f9c9196577c48eef37010aaeb0f",
+      "sha256": "9f52ac5821e30a9156128c72d108c0d08669cc8c6ce050d154e2a95905e5ec5b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/get-delegation-sas.yml",
+      "gitBlob": "9db5617ea7dea12ee4165988cdea8f5eea7e372d",
+      "sha256": "47c025a62f20735cd1e65bff642ad494eb45e9e90a118cad21a3c9edc1b862e4",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/get-federated-access-token.yml",
+      "gitBlob": "3a4d4410c48294f38678c41629b0a49aedc245ad",
+      "sha256": "66cc3d3422b40b83722ab95ea32612edea01b50a75625535354dd73d2a07b79c",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/get-github-app-token.yml",
+      "gitBlob": "6d42a48d3c3671f73b9bb5dec01b61104648faae",
+      "sha256": "bd3ab496f1811206845f794ca6d5d1d754871b1c47ec90ccc2855db7a2dc88c4",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/publish-build-artifacts.yml",
+      "gitBlob": "f24ce346684e60c2e9de1886f3dcb53d89e58837",
+      "sha256": "19b9462e4c7f68374394527f72b4ce03ee5a67321b89e8357c8ae0cec77f612f",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/publish-logs.yml",
+      "gitBlob": "f460b24eb9580712c5f3fe535a5c9c5469ac301d",
+      "sha256": "5a7d9074751cddcb3d1dcea37987da860d0e9aa1cff3d59e21581fe608eda9f9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/publish-pipeline-artifacts.yml",
+      "gitBlob": "2efec04dc2c16326d0195c91600d1ca909bdf1b1",
+      "sha256": "43ead8a77d121ead2b7ad3b84401f4715ec19e504f2dd7d221c4a12d78116129",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/retain-build.yml",
+      "gitBlob": "83d97a26a01ff987b66f4614a6cd8ecd71bcd738",
+      "sha256": "8787b577fa3e18ed43815b322c15da6ef0b6bc1f6cb83c639fd098e1db324b96",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/send-to-helix.yml",
+      "gitBlob": "064580818f79b6ed1571d4082d2537b660f4b3f3",
+      "sha256": "a76957a4cdf78f6eb105fcd4a470c5aa4c04e304d019f8e9c89c06c2776af568",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/steps/source-build.yml",
+      "gitBlob": "7846584d2a77ee4447da997e19f3db092fdfeb8f",
+      "sha256": "af463b7251dcca4ffdbaacf2ca9a97450391853b339897460269ab300b404d8b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/core-templates/variables/pool-providers.yml",
+      "gitBlob": "41053d382a2e103baa6c960d4eaea635539e4907",
+      "sha256": "707d0e28003cf2049ca1c79bd34fe89f91ef0609feb9d046de11e111cbb3401d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/arm/tizen/tizen.patch",
+      "gitBlob": "fb12ade7250ae9e44d7099b3e7034dcd53749bd9",
+      "sha256": "9d77e68e8e64a3c08f6932dec1a2745510c61d8148acae8fa33f5064fe51851d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/arm64/tizen/tizen.patch",
+      "gitBlob": "af7c8be0590684c50c0a2161c5fede800ad746c0",
+      "sha256": "db0ff2d7a7fdcc8635d9a0397292e9656482e5c79efb20340b579abe854d8d10",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/armel/armel.jessie.patch",
+      "gitBlob": "2d2615619351fc9b4fb92f64dcac9f39b31ea2bf",
+      "sha256": "bee6746320a0ded81d82deb86cac117fb3a8f6a4e05a395b9286a0157b9a1379",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/armel/tizen/tizen.patch",
+      "gitBlob": "ca7c7c1ff751fe59d95511af999f8ac2fd9fbba6",
+      "sha256": "7aec9df302c459bc6a68cf9cffe2935f5d728162c31876194e55557e37f466b5",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/build-android-rootfs.sh",
+      "gitBlob": "7e9ba2b75ed35bdf6947216508b9cdc4b853ffcb",
+      "sha256": "9cbeab6a1c7fb246ff489cf3b87af335ccaf9eb09f17c99d7cd98d4059bbdc17",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/cross/build-rootfs.sh",
+      "gitBlob": "4b5e8d7166bd9cb72b32eb3269a6b6068524602c",
+      "sha256": "78e9d3d820f63aca93b702035343eb1002fee839feb108d81694a881aea3d3b1",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/cross/riscv64/tizen/tizen.patch",
+      "gitBlob": "eb6d1c07470bffb3d2d4a0651844395b902914bd",
+      "sha256": "608c03696811ddf4c8b10fc726db290f4e38a3b55d78c759bffe9b73d133a15d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/tizen-build-rootfs.sh",
+      "gitBlob": "ba31c93285f631979d04617cd0c7116e0c7145bf",
+      "sha256": "8967bd295aa349775c17c393d588a25ccf545d8a40f2b293e0b83adab15a18d8",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/cross/tizen-fetch.sh",
+      "gitBlob": "28936ceef3a716b83bdafdd90d9f90171992308a",
+      "sha256": "fff3ccf38ec2a803150c49861ee42c65ae124a42f3ba3a2099a0c79bb77448d6",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/cross/toolchain.cmake",
+      "gitBlob": "9a7ecfbd42c5f38494892360c2ccf206daaf8863",
+      "sha256": "81e46be062df56dc342aef6aa1d49e6808f3c7de8db61d8bd029c5063a08719b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/x64/tizen/tizen.patch",
+      "gitBlob": "56fbc881095b383a86047486c3b12ab936aaabd4",
+      "sha256": "26332420d1aedcacddbea969892718e07aef1c710e5f823f88b1618e675c246c",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/cross/x86/tizen/tizen.patch",
+      "gitBlob": "f4fe8838ad6687bc55975f42b62751d8baf7abe9",
+      "sha256": "c2bd182264a1099005832705937fa8e8690dea86fdd78f7e8a3fc21bf32ffcf3",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/darc-init.ps1",
+      "gitBlob": "e337431056354969ff9e649c20eeb87053a60ae3",
+      "sha256": "9eec25627eb49beee72ab8833b28699e54bdcdc0050dc5134dc431e455bc3846",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/darc-init.sh",
+      "gitBlob": "36dbd45e1ce8667bcb73dd91cd5672e4b90a8b8e",
+      "sha256": "90d032fa0518b86ccfaea0ec5f44442dd3382541f8724324155b26db3ae0054d",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/dotnet-install.cmd",
+      "gitBlob": "b1c2642e76f7253e66c65d967056d8cceca6b631",
+      "sha256": "2c8be2c4cb3af5096d7541b490999093c70f464d76a9665aabe33567a7338072",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/dotnet-install.ps1",
+      "gitBlob": "811f0f717f736aaa0c0125e5bc80f2c3f3504164",
+      "sha256": "e40262b233f48b95a14002e0da923ae65e30b6db6aaf5642e2562232159c2ab9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/dotnet-install.sh",
+      "gitBlob": "7b9d97e3bd4dcfa45f8fb2e51c7a184c159f856e",
+      "sha256": "9088924294f00023fa94a0c866600a64a08042ccb06ce6ac90aadeba063b536e",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/enable-cross-org-publishing.ps1",
+      "gitBlob": "da09da4f1fc445eea2444af715442160f2e82f75",
+      "sha256": "294e2178e335a0beaaf34636b698558c26ea856f9de4006fb2a1633e3ee1d0aa",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/generate-locproject.ps1",
+      "gitBlob": "524aaa57f2b7425bb3b6034a30db7d57395d9885",
+      "sha256": "8d77a341ee4a027818873d677c70adac5d115393479c540aa470e57e723e1765",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/generate-sbom-prep.ps1",
+      "gitBlob": "a0c7d792a76fbe9006eb9e0ab2567de94b9186d4",
+      "sha256": "8e96f4e27a9f75af191ca799c39c85001bc236d8afe4070e1a280288677c8711",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/generate-sbom-prep.sh",
+      "gitBlob": "b8ecca72bbf506f42a74eab71e68080d307a8436",
+      "sha256": "7e79434174087cb010e4c7ba08ba6e2463139c172444fa3cb42a22d388f29e77",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/helixpublish.proj",
+      "gitBlob": "c1323bf412105266c33a00d58cf82711e6ccff27",
+      "sha256": "3cd7ef55c2057814b5a06e54e7535c6c02ce90c78ace2f40ce6a3816524efec8",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/init-tools-native.cmd",
+      "gitBlob": "438cd548c452ccf60b9077fb60d142f56c5488d5",
+      "sha256": "5902941ba081b5fd8c7fa2b227e1a6f95a18cca6a33a4f7f185125911cbe17fc",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/init-tools-native.ps1",
+      "gitBlob": "27ccdb9ecc95163a079ea7d864a9b031e69d578f",
+      "sha256": "3ddade7ac19f8cbdeb908c44f93a3e9cbfcd60e0811ebfae1f6bb4015de43c54",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/init-tools-native.sh",
+      "gitBlob": "3e6a8d6acf2f572e8255a69469a220214d2c5351",
+      "sha256": "3de2475d7eb816faed0997cf69a7a425f1f0cb201a30e5e126091a316fab3cb4",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/internal-feed-operations.ps1",
+      "gitBlob": "c282d3ae403a098c930811311d9fd9f359c959a0",
+      "sha256": "cc0a0929c873044cdb4dcb5d63dceb9fd120f9ad647fbf7f70ef5b10c1457c67",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/internal-feed-operations.sh",
+      "gitBlob": "9378223ba0955b3c8e769033871f1f65ca3ecd85",
+      "sha256": "59e22f7fb5342db8fdc5cdf51e9b836d07a85607f28f6e9cb4bc5e326b618c77",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/internal/Directory.Build.props",
+      "gitBlob": "f1d041c33da51e4a461c2fcb72be1173367253a6",
+      "sha256": "796477de714f29121850a955ab051eaeea0fddd27ef6c47e67320136110dfcdf",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/internal/NuGet.config",
+      "gitBlob": "f70261ed689bce269a6545c89fd57f58b76229b6",
+      "sha256": "94d98c0d46fcd7c8420687366d64910f10fbe01655105251f229901410bbed55",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/internal/Tools.csproj",
+      "gitBlob": "feaa6d20812d8f8c01d782807f6aa747e09fb280",
+      "sha256": "8a98f29854cdf5f8a4f7af8d3e7bc04183ad5d8b35b858e282d2a5b505e13b9e",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/loc/P22DotNetHtmlLocalization.lss",
+      "gitBlob": "5d892d619398f9feeac4cefc1c53ff18a807f732",
+      "sha256": "67e30f2e7af022f693867e60941248c9b58413c307e7effc07194a076286d45b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/msbuild.ps1",
+      "gitBlob": "f041e5ddd95892b0e39e8c3a6ff35f8605a73877",
+      "sha256": "7954e457790e64b407575dac2eab51edf62ac9c4e3896c0eebc344cdcd376a15",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/msbuild.sh",
+      "gitBlob": "20d3dad543520089f303cd09c30d3ee59489aae9",
+      "sha256": "8923bb5b3a7713ea6c7da1f9745fbe9fa192b12a323488110804e65b35421981",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/native/CommonLibrary.psm1",
+      "gitBlob": "f71f6af6cdbc5cc5b1ab94c1a16ba7abf8dd92ec",
+      "sha256": "b62e3c47fa169bf65a2d353b7144dccec7a6f191cd8d7834703e9ed71b91498a",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/native/common-library.sh",
+      "gitBlob": "080c2c283ae4689a7c259b3d3b1ba5ea54b50c00",
+      "sha256": "78d161a763230f455c7dce36a24f044416f6b74409bee7e244407fd2b37e50ca",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/native/init-compiler.sh",
+      "gitBlob": "9a0e1f2b4567b5f72d99e9d80bcf9ae7d316d3a1",
+      "sha256": "e16e57b23b2ddf44d198425d08c043b020adf3e67ad6a5b9cf58c1f5efd4c952",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/native/init-distro-rid.sh",
+      "gitBlob": "83ea7aab0e081c89f35aea7aa599fc10d710fc2e",
+      "sha256": "2846081e4ebdb33e4bd905c918955adbf2b89575e4b77f8d60a5378ce4a84292",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/native/init-os-and-arch.sh",
+      "gitBlob": "38921d4338f744ed2fee9ba57102dcdad5c42220",
+      "sha256": "0523a9b94bbb486e657db4c2fdc5c5810b1ce2f7064e41354b56c0d94a48ee42",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/native/install-cmake-test.sh",
+      "gitBlob": "8a5e7cf0db5a92a40869f1532ad7b389010cb20e",
+      "sha256": "c5447804b3220b1f7c77c399e42235ba7637910692f786564966875a8ef744f4",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/native/install-cmake.sh",
+      "gitBlob": "de496beebc5acff8a5ffcc3f5e2479fe816ad2cc",
+      "sha256": "7e4889ad690ed779ab33e92f8b8abba5c77f66ccac4efcfc8cfc54b60e1ed90e",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/native/install-tool.ps1",
+      "gitBlob": "78f2d84a4e4b11046a4a694a46694fb9d4e49593",
+      "sha256": "5b0bd0b09f26ad2313ce28bb4a96c224d669bb9e902947cefd8157bed0b80da4",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/pipeline-logging-functions.ps1",
+      "gitBlob": "8e422c561e4bdb9fc494dfebe372297d87bbee12",
+      "sha256": "79434d8aa660090baa0df111de63d875cc7791f33fd49725d8c785320aa8beb5",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/pipeline-logging-functions.sh",
+      "gitBlob": "6a0b2255e91186c464882a6b64d9a2c28fa70d6f",
+      "sha256": "cb47ccfcb09bda5d5b10fcd24cf53d5fc26b1afca7725e3e36b7bc225e641405",
+      "mode": "100755"
+    },
+    {
+      "path": "eng/common/post-build/check-channel-consistency.ps1",
+      "gitBlob": "61208d2d1351484fbf2a305e90c801d8cc6eb6b3",
+      "sha256": "5bead8bb1ca359e36d9c2f116c5b36e2397be22c0cee5ebc9bcfa8f221739bce",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/nuget-validation.ps1",
+      "gitBlob": "e5de00c89836ba863b9ac52b96f7810150c85fec",
+      "sha256": "6222a0e6238d791b85aafae86c3f14a44dad99420296ea3e6abf135d5fa6ea33",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/nuget-verification.ps1",
+      "gitBlob": "eea88e653c911de8fcd658a4c1fe6a36aeea876b",
+      "sha256": "88db6ef0c93a68b2fa544987d835804669cda03478c1f491fa58553aa09a093e",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/publish-using-darc.ps1",
+      "gitBlob": "a261517ef9067993f4ef8a96c949f54df3eebb0a",
+      "sha256": "6766ba071af9a8460118a237aa5bceff3a17f1412eb1ea6a4a3585e699a7243f",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/redact-logs.ps1",
+      "gitBlob": "b7fc195915079f93830d72732f06c5b4130335ee",
+      "sha256": "b6771e29219939f55faf72c9755ef89e12ddb63601af89fa36264541afe84827",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/sourcelink-validation.ps1",
+      "gitBlob": "1976ef70fb850861f21bee99588a85ceb16b4cd3",
+      "sha256": "c9aa97b6c86ff9e87c7a12d0aa853950cf61e4042b3e743cc25e200e40f207b7",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/post-build/symbols-validation.ps1",
+      "gitBlob": "7146e593ffae8a2f5573c8764914cdb3c13686f0",
+      "sha256": "d1bd342a810a3ecf06d9cb6a25a69e8124441f2357cadf8280d8970fad1772df",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/retain-build.ps1",
+      "gitBlob": "e7ba975adeb6b1840861f02c40184337de1f483f",
+      "sha256": "f39ef923776d1cd855d612d13df4e6a3b4569df5e55de2241d973e567dbbeeef",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdk-task.ps1",
+      "gitBlob": "4f0546dce1208de596a627e6b07351d2d5719b44",
+      "sha256": "e26b094f638648433d748cce40eefb32818e0bfbe1f606c46b14af535f283cc0",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/NuGet.config",
+      "gitBlob": "3849bdb3cf51e825645701daeb514a4a50de427a",
+      "sha256": "eb590cd8e7bbd5493141a3d67052e2ea3a5e7cd1446ec411af79c5c985f28db9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/configure-sdl-tool.ps1",
+      "gitBlob": "27f5a4115fc74140891bb6e0a642dfcb1e988c2c",
+      "sha256": "bed2c900ba69786825d6b9ff49276205e7f32dfc0d20cabd59441f763d8d979d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/execute-all-sdl-tools.ps1",
+      "gitBlob": "4715d75e974d3c97f3663c030ce2d939fbd0f2ec",
+      "sha256": "654460464aab24b1dd9698fdfbd8b0e928baf0a6a490b36fb19442575cd111e9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/extract-artifact-archives.ps1",
+      "gitBlob": "68da4fbf257171d350896b917bc26bedd326de46",
+      "sha256": "ca1cef42e520942e28a5270c7ec53beeb9c18e5485c496ea9321f950c2603440",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/init-sdl.ps1",
+      "gitBlob": "3ac1d92b37006fcd6e44fc33a34c8d5463163831",
+      "sha256": "91027ab46544b1698299542db338e894b3816f7b96d56772c0bb7576473dd7b7",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/packages.config",
+      "gitBlob": "e5f543ea68c270b30eb6a48b94702da5c0ab9b55",
+      "sha256": "f5224d4d6c9faa6142f2b03bdadbcca053f84ba8f0d5981b09c3c25c5b4a5a73",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/run-sdl.ps1",
+      "gitBlob": "2eac8c78f103d1a590d635606d7bbb3c6f4e1742",
+      "sha256": "d89ac8cb94a0bd78fa5ba164350cb152b43e73324280f8416404755901bc6261",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/sdl.ps1",
+      "gitBlob": "648c5068d7d60f86b0a1076fd2564f6aeef3d41c",
+      "sha256": "c255df5af58772ec1ec5cffc4d1737b7bcc51b81d113a7603c787042cb34c688",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/sdl/trim-assets-version.ps1",
+      "gitBlob": "0daa2a9e946289f5c5db94018bf693ad5d1bdf21",
+      "sha256": "e646dcd1bb654a61a195be38e5d49eaf814bb7ab057fdcc96f153c5ed52e549a",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/template-guidance.md",
+      "gitBlob": "4bf4cf41bd7c7659ae2c56bff737d77a0133224d",
+      "sha256": "2a88cde620a9406162c7a8a8d5c91ed9b5a5aa796c8cd5ab3a6baf4ee89bc886",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/job/job.yml",
+      "gitBlob": "81ea7a261f2d4aaff41c1faa3aaa2e915963a568",
+      "sha256": "6b98237e866831a2ca34b13a1002700eb789187758858999c2963fd34fc6c432",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/job/onelocbuild.yml",
+      "gitBlob": "0f0c514b912dfc9da146095dbe226a8a2e603040",
+      "sha256": "9bff6e629bdeaa673b4a654182fe2b8ee56a81e75acf3b8c152f942990a8fda6",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/job/publish-build-assets.yml",
+      "gitBlob": "d667a70e8de7431ad9d37409896055a346714ef3",
+      "sha256": "6b54633424d7ac415e9eb2f0640291ae960934024a5d95f6d5392792a85f740d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/job/source-build.yml",
+      "gitBlob": "1a480034b678ebce724a10dbc2ffc9fe7d93cc19",
+      "sha256": "926a7d7aadbd26a6f3b579583b63a6a0ae0d84dedb78cb4639b092fd632eba05",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/job/source-index-stage1.yml",
+      "gitBlob": "6d5ead316f92b57463e1b8948b983239fee036e6",
+      "sha256": "55c210b346a5addf3c1e2e29e81ccdeb1f7742af40aabbc280225362de2923b0",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/jobs/codeql-build.yml",
+      "gitBlob": "a726322ecfe0167d8f52848780612fbe44487b85",
+      "sha256": "78b633dd0b4a832eddaafd38f5ce3412ec3fad59e8a6d5311f7094c9bd458921",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/jobs/jobs.yml",
+      "gitBlob": "007deddaea0f53d43ad2112232c070321a75671a",
+      "sha256": "528648406937ab9aa1fbfd7fcb5ece79d6de1ee2207d4c0e5ab05aa1b1d1bb61",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/jobs/source-build.yml",
+      "gitBlob": "483e7b611f346b5073be20ecdca9f7d31540f595",
+      "sha256": "8fc1d4d021c15f830ea7368b9bc21db0d28ca64841d2f47d228cb641a97eb2ea",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/post-build/common-variables.yml",
+      "gitBlob": "c32fc49233f8fd8d516422ea48b3c4a13b19cd5a",
+      "sha256": "9b01ed91b548c59503413a6095c422b369e615ca9e9537fada6745d93a7fc6c4",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/post-build/post-build.yml",
+      "gitBlob": "2364c0fd4a527e7d574df4828b415ba0568b96af",
+      "sha256": "5585813ca430c43351ca78efb07c59216ce1147be8911725555bf3721ee212b8",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/post-build/setup-maestro-vars.yml",
+      "gitBlob": "024397d8786452f089864159c6a69f559fa884c0",
+      "sha256": "bf2df3b527ae0154a1792f334afbbadf7f3101e5b5a86238870c7f5194177844",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/component-governance.yml",
+      "gitBlob": "30bb3985ca2bf48f859ffee67bf97474a1d56512",
+      "sha256": "d9a6bf52dd164263b33141939b822676f28018fd5e3f68bb0eb091678a3652e5",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/enable-internal-runtimes.yml",
+      "gitBlob": "f9dd238c6cd5493b0724caf76d71322a4cde2eb7",
+      "sha256": "615a01fe7d0881373120d4e596b989c9c20ed02ffc9b7864f64d3f1412e63069",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/enable-internal-sources.yml",
+      "gitBlob": "e6d57182284df6e0a46ae90e44b142c6a000eb30",
+      "sha256": "82b27f6642190a8f9bc01ea1f9e8a313b1461c4b8ca33de883de112061dac1d4",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/generate-sbom.yml",
+      "gitBlob": "9a89a4706d94e48315e754fa2359daa05ca07126",
+      "sha256": "eff94747d6206fcca62df1a9564022d1d4c8a1ab68ddc5bc5e9d789cd95fa7ba",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/get-delegation-sas.yml",
+      "gitBlob": "c5a9c1f8275c5f709fe3db91d494cd603af76b90",
+      "sha256": "f310223fac462b9f3f91aeb73e07718081c38876d485433b0f7fd1f48d8a8fcb",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/get-federated-access-token.yml",
+      "gitBlob": "c8dcf6b813920525cae13320aff6e0501757bc9b",
+      "sha256": "73dcd9808e4e7eca9429d9210c67024aa5f1f2b1a88db94b09911bf1a0d5c0ba",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/get-github-app-token.yml",
+      "gitBlob": "c89f3641a4dbe009c68d4ccdbb66d2f96ffe7458",
+      "sha256": "d2ae5cc379114da284040a02b6282d7bc2c9cb9a7f9b29823f2ad7639c39cb18",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/publish-build-artifacts.yml",
+      "gitBlob": "100a3fc98493cd486cf90b66528a7b46d4869ff1",
+      "sha256": "87deb24ec4bbb0016efb40ffded548140c87f9b618197b284edd934292a07de2",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/publish-logs.yml",
+      "gitBlob": "579fd531e94c38ea76b1bb973e221b5c84d017ba",
+      "sha256": "4d6b78fdd1663136ed42c46f5665e9e6f13b09bc5b0e307d3b79616d0e4c7ef9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/publish-pipeline-artifacts.yml",
+      "gitBlob": "172f9f0fdc9701ea7090523fabc15e36cccfed93",
+      "sha256": "a76d3546a8eaba94f9784cd4d052c1d8a2f542f13dcff4e1f1703eea6728ee36",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/retain-build.yml",
+      "gitBlob": "5594551508a3cfded06c54b37a043bade257491c",
+      "sha256": "576cd9b8c80b5e3d0ed2c6dd858a06afa2ac81bf651d55969c47aef5be4b2e18",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/send-to-helix.yml",
+      "gitBlob": "6500f21bf845ce70daaa8abcd78debcdb598a4ef",
+      "sha256": "0d5d69686fa048c72281876d1fc6ed9f91d978ffda5d1056030a3a1a7f511a97",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/steps/source-build.yml",
+      "gitBlob": "8f92c49e7b06fc5707ea6e24dbae9296ab635700",
+      "sha256": "08df0273319b401bdff4e83a74ed239c7d22fe7e2f310b0aef50ebfbfc1142e7",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/variables/pool-providers.yml",
+      "gitBlob": "1f308b24efc43d1fe541a707b8c0c4920860418d",
+      "sha256": "431d0da4111c4de766499c7bcc70143cd72e47a86efe13e69a964cbecaf9110b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates-official/variables/sdl-variables.yml",
+      "gitBlob": "f1311bbb1b33d9af41f23900d72ef2178c848431",
+      "sha256": "82a1749f5057bdada3efb2b5aadcc4e60739903039fdc8fac903a78ff85a6417",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/job/job.yml",
+      "gitBlob": "5bdd3dd85fd2be8afb3521373857495fbe8509ff",
+      "sha256": "ddba92d1d2908f5bebdfb48e20d9bd4094fc74d7af243f2bc575f996c993fe94",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/job/onelocbuild.yml",
+      "gitBlob": "ff829dc4c700c633f84e406997660f932131e9e7",
+      "sha256": "36dd7e9fd6ea5d057c515473b1123f6d29664d4205b70f92eacccb2d0678f022",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/job/publish-build-assets.yml",
+      "gitBlob": "ab2edec2adb5413c7c0244bb0202243f458ded30",
+      "sha256": "83614f46bcb8a44f80a0600a02d1632b35d31f8b9ad24ab3a2bed982595fa254",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/job/source-build.yml",
+      "gitBlob": "e44d47b1d760c4fcf2247199345aa8b935f03292",
+      "sha256": "4f13e3ea9302bfdb4af0a4db405bb1750fbaa798be63d3e4a7bd79d257782f14",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/job/source-index-stage1.yml",
+      "gitBlob": "89f3291593cb78ff10924b812c373dbf6c68bf8a",
+      "sha256": "291653607d92639674ed9d6b4dabd9cdf38ea4368702195823e3a02634342cda",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/jobs/codeql-build.yml",
+      "gitBlob": "517f24d6a52ce738d1ae93fc29dc3a21bbca4286",
+      "sha256": "ff146313854f73802e82a3c5dc7a8226ae397adf5105e2bebb8815203ae685de",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/jobs/jobs.yml",
+      "gitBlob": "388e9037b3e6014da691131c78e2c03fe67446fd",
+      "sha256": "91abc7617a627f16b8685ab77e9a53364918f6d60869298cb24d121534b5da4d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/jobs/source-build.yml",
+      "gitBlob": "818d4c326dbbf17668ab177caccfb258737815e8",
+      "sha256": "3de6e8185c5532676ea0beaa79ffae2a54d106e4dbc91a2064012a1e83c5534a",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/post-build/common-variables.yml",
+      "gitBlob": "7fa105875592c853671e4c7aa71d77e0acada370",
+      "sha256": "5d2f55b0a14b5ad9c7bd7a64e1c7e06d260a679ceac9a0a044b6764219865927",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/post-build/post-build.yml",
+      "gitBlob": "53ede714bdd2073230a480f878135401e06a511a",
+      "sha256": "8cbf5fa247ee31c630347d6852c097d7e75620aa400ea11a25a573376a71eb6b",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/post-build/setup-maestro-vars.yml",
+      "gitBlob": "a79fab5b441e84f8b4688bc4ea77a7edb1e58865",
+      "sha256": "2d9cc0b4ea7ceb4eaf5c2627fd29ebd60beb0f64a514c44bc20a8a35e9461d38",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/component-governance.yml",
+      "gitBlob": "c12a5f8d21d76589138af11548b66c55f7d6674e",
+      "sha256": "8076ad6fe0b965d451b1ea4251fc529fb24e0d4c7eb191c37ad9b770392426c6",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/enable-internal-runtimes.yml",
+      "gitBlob": "b21a8038cc1cb2c6e6246db5cb2073e843a7b009",
+      "sha256": "4fa2bec6a70a620b0c072a234d32793a36cb461b6f4d26153c348a758fa2e0dd",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/enable-internal-sources.yml",
+      "gitBlob": "5f87e9abb8aaab64731dd8735261242348094215",
+      "sha256": "bbebb60a8682f12975e69e92563927717035a03ad95c5a217fab307eb92088d8",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/generate-sbom.yml",
+      "gitBlob": "26dc00a2e0f31e078d8d0d2ffd109c142774e993",
+      "sha256": "85293c3298cca92a958f120ee999f0cd492bfaab59e53bd0ee31c16928eaa9c9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/get-delegation-sas.yml",
+      "gitBlob": "83760c9798e3693985db813dab7c0e9e94315be3",
+      "sha256": "34ff235ae8a5a826b78b076255d72fdede298ced91c5b9f4e5c9fdb1e440430d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/get-federated-access-token.yml",
+      "gitBlob": "31e151d9d9e796ae51334d6c9fd1832271cc1d61",
+      "sha256": "d706dac9399f01cad969b0a89cf87e6472354569f92d166c96bce2f5260125ec",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/get-github-app-token.yml",
+      "gitBlob": "79e182c64167afb0fac5d4d01fc7aed3ab801d2b",
+      "sha256": "5ae3221b0e8e14480be2882d0e0ff8fd14a24d699e72b602d34b077f91355e7d",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/publish-build-artifacts.yml",
+      "gitBlob": "6428a98dfef68eefc1f669508c83a527b9a8f534",
+      "sha256": "12dd07c81ce6484ec951b7cf93fb5a3a3f919800b927c72d25a0b1423a5c54a6",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/publish-logs.yml",
+      "gitBlob": "4ea86bd8823555576c5bcd785f28888e5527cc87",
+      "sha256": "0190eb398474db283cc8add7547696d45ce98cbca875350a5990db1651ce89c1",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/publish-pipeline-artifacts.yml",
+      "gitBlob": "5dd698b212fc6b892da0de8323b78f0193e918f2",
+      "sha256": "9477c08da4eb2beeb623ad83269f118e1f26838074b53a3613f059873230dfa6",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/retain-build.yml",
+      "gitBlob": "8e841ace3d293fcee51bd9264e54f93da0a96fc5",
+      "sha256": "3d954adc950dd9c55eef9c3a6a055ff859ae19863086f35f475572494d515c3e",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/send-to-helix.yml",
+      "gitBlob": "39f99fc2762d015691837f5142433a00fab4d9f8",
+      "sha256": "fb2d150431a3e6780c6f1906580cdd9d2e7973f0c5550d33d54cd04419e5fb19",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/steps/source-build.yml",
+      "gitBlob": "23c1d6f4e9f8d411a9af447a5bb7be71e0c4884d",
+      "sha256": "27659905311468c0c135695e1a2e2767e060025d3c977c064be444ac03b7199f",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/templates/variables/pool-providers.yml",
+      "gitBlob": "18693ea120d57bab0c15b428552b9075a05a58c2",
+      "sha256": "13aa68fb7a897ece750fac470d77ddb44bc3b144ee529af84a7e178f5515268c",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/tools.ps1",
+      "gitBlob": "d89aa48781b1419a088106fa56a9c6dfed610dd4",
+      "sha256": "da93e049da0e136fd387a9add177f3ed3b53e60fb2a4099abb5e5a372256eab9",
+      "mode": "100644"
+    },
+    {
+      "path": "eng/common/tools.sh",
+      "gitBlob": "c412703d1bae9c033c4d0ea857e0ef0abc3861c7",
+      "sha256": "f27d3656ea215ef340da630f003818ccb54f5f50a037fca3655a58f9cdfdf634",
+      "mode": "100755"
+    }
+  ]
+}

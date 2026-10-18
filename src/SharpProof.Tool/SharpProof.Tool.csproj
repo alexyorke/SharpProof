@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable Condition="'$(SharpProofPackTool)' != 'true'">false</IsPackable>
+    <IsPackable Condition="'$(SharpProofPackTool)' == 'true'">true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-sharpproof</ToolCommandName>
+    <PackageId>SharpProof.Tool</PackageId>
+    <Description>Optional read-only SharpProof diagnostics and stored verification result explanations.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
+    <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
+    <Authors>$(SharpProofPublisher)</Authors>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)../../eng/branding/icon.png</PackageIconFullPath>
+    <PackageTags>SharpProof;formal-verification;smt;z3;contracts;diagnostics;dotnet-tool</PackageTags>
+    <Copyright>Copyright (c) $(SharpProofPublisher)</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="SharpProof.Tool.Test" />
+  </ItemGroup>
+</Project>
