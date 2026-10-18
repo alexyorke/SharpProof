@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
@@ -1441,7 +1441,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         public AnalyzerSession Create(
             Compilation compilation,
-            AnalyzerConfiguration configuration,
+            CompilerConfiguration configuration,
             CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(compilation);

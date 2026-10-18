@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.VisualBasic;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Worker.Test;
 
@@ -50,7 +50,7 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
         Assert.That(compilation.ContainsSyntaxTree(declaration.SyntaxTree), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(
             compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration), method), Is.True);
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
+        var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.Compilation, Is.SameAs(compilation));
         var diagnostics = new List<Diagnostic>();
         var outcome = AdvisoryRequiresDiagnostics.Analyze(method, declaration, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);

@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
@@ -45,7 +45,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
         Assert.That(method.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(libraryTree));
         Assert.That(method.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),
             Is.EqualTo("SharpProof.Attributes.PositiveAttribute"));
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
+        var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.HasPotentialCallPreconditions(method), Is.True);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
