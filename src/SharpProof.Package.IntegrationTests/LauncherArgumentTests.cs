@@ -293,8 +293,8 @@ public sealed class LauncherArgumentTests
     [Test]
     public void MaximumProjectTimeoutAndAllowedGraceUseLongPublicationTimeout()
     {
-        var graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
-        var expectedMilliseconds = (long)int.MaxValue +
+        const int graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
+        const long expectedMilliseconds = (long)int.MaxValue +
             graceMilliseconds +
             PublicationLease.TimeoutMilliseconds;
 

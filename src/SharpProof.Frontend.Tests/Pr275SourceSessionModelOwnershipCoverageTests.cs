@@ -82,7 +82,7 @@ public sealed class Pr275SourceSessionModelOwnershipCoverageTests
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame!);
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-            var inputs = frame!.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+            var inputs = ImmutableDictionaryCapture.Create(frame!.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
                 parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 3)));
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, inputs);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

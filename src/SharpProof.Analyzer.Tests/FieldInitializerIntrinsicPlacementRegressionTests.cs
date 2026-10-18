@@ -40,7 +40,7 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
             operationRoot = operationRoot.Parent;
         }
         // An auto-property initializer is enclosed by the implicit backing field.
-        var expectedOwnerKind = SymbolKind.Field;
+        const SymbolKind expectedOwnerKind = SymbolKind.Field;
         var expectedRootKind = property ? OperationKind.PropertyInitializer : OperationKind.FieldInitializer;
         using (Assert.EnterMultipleScope())
         {

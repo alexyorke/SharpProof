@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Build.Framework;
 using SharpProof.Host;
 
@@ -23,7 +24,7 @@ public sealed class ResetPublishedVerification : CancelableBuildTask
         try
         {
             var paths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
-                .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ResolveProjectRelativePath(ProjectDirectory, path))).ToArray();
+                .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ResolveProjectRelativePath(ProjectDirectory, path))).ToImmutableArray();
             using var lease = PublicationLease.Acquire(paths, cancellationToken);
             foreach (var path in paths)
             {

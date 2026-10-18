@@ -394,7 +394,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             {
                 var reset = method.CreateDelegate<Action<int>>(instance);
                 execute = reset;
-                var callerValue = 1;
+                const int callerValue = 1;
                 before = callerValue;
                 reset(callerValue);
                 after = callerValue;

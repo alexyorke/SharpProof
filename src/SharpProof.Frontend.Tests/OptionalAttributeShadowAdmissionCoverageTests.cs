@@ -64,7 +64,7 @@ public sealed class OptionalAttributeShadowAdmissionCoverageTests
         Assert.That(direct.IsExact, Is.True);
         Assert.That(direct.ConstructionLimitExceeded, Is.False);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(direct.Program,
-            helperContext.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry),
+            ImmutableDictionaryCapture.Create(helperContext.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry),
                 p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (subject.Factory.CreateIntegerValue(subject.Factory.GetVariableInfo(p.Entry).Type,
                     (int)argument.Value.ConstantValue.Value!))));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

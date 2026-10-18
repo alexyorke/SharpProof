@@ -21,7 +21,7 @@ public sealed class SourceLoweringNullBoundaryCoverageTests
         var operation = FrontendTestHelpers.TryGetExpressionOperation(subject.Compilation.GetSemanticModel(tree), method.ExpressionBody!.Expression)!;
         var lowering = lowerer.Lower(operation);
         Assert.That(lowering.IsExact, Is.True);
-        var inputs = lowering.Variables.ToDictionary(binding => binding.Variable, _ => factory.CreateIntegerValue(9L));
+        var inputs = ImmutableDictionaryCapture.Create(lowering.Variables, binding => binding.Variable.IsDefault ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : binding.Variable, _ => factory.CreateIntegerValue(9L));
         var execution = new IrInterpreter(factory).Evaluate(lowering.Term, inputs);
         Assert.That(execution.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(execution.Value!.Integer, Is.EqualTo(10L));

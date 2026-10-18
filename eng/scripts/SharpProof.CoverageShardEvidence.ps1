@@ -65,7 +65,7 @@ function Save-SharpProofCoverageCohort {
                 }
                 $assemblyName + '.dll'
             } | Sort-Object -Unique)
-        $observedAssemblies = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $observedAssemblyBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
         foreach ($receipt in $receipts) {
             [xml]$trx = Get-Content -LiteralPath $receipt.FullName -Raw
             $counters = $trx.SelectSingleNode('//*[local-name()="Counters"]')
@@ -76,7 +76,7 @@ function Save-SharpProofCoverageCohort {
             if ($architectureEvidence -and [int]$counters.total -lt 5) {
                 throw 'Architecture-only evidence must retain all five established architecture tests.'
             }
-            $definitions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+            $definitionBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
             foreach ($definition in $trx.SelectNodes('//*[local-name()="TestDefinitions"]/*[local-name()="UnitTest"]')) {
                 $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
                 if ($null -eq $method -or [string]::IsNullOrWhiteSpace([string]$definition.id)) {
@@ -87,11 +87,12 @@ function Save-SharpProofCoverageCohort {
                     throw 'Architecture-only receipt evidence cannot contain production or other test assemblies.'
                 }
                 $id = [string]$definition.id
-                if ($definitions.ContainsKey($id) -and $definitions[$id] -cne $assembly) {
+                if ($definitionBuilder.ContainsKey($id) -and $definitionBuilder[$id] -cne $assembly) {
                     throw "Coverage task '$name' has inconsistent test definitions."
                 }
-                $definitions[$id] = $assembly
+                $definitionBuilder[$id] = $assembly
             }
+            $definitions = $definitionBuilder.ToImmutable()
             $results = @($trx.SelectNodes('//*[local-name()="UnitTestResult"]'))
             if ($results.Count -ne [int]$counters.total) {
                 throw "Coverage task '$name' result count differs from its TRX counters."
@@ -104,7 +105,7 @@ function Save-SharpProofCoverageCohort {
                     throw "Coverage task '$name' has a dangling or unsuccessful test result."
                 }
                 if ([string]$result.outcome -ceq 'Passed') {
-                    [void]$observedAssemblies.Add($definitions[$id])
+                    [void]$observedAssemblyBuilder.Add($definitions[$id])
                 }
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
@@ -128,6 +129,7 @@ function Save-SharpProofCoverageCohort {
                 }
             }
         }
+        $observedAssemblies = $observedAssemblyBuilder.ToImmutable()
         foreach ($assembly in $requiredAssemblies) {
             if (-not $observedAssemblies.Contains($assembly)) {
                 throw "Coverage task '$name' has no test receipt for expected assembly '$assembly'."

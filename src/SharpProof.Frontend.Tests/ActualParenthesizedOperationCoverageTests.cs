@@ -36,7 +36,7 @@ public sealed class ActualParenthesizedOperationCoverageTests
             var entry = builder.CreateBlock("entry");
             builder.SetEntry(entry);
             var lowerer = new RoslynTotalExpressionLowerer(context, builder);
-            var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), _ => factory.CreateIntegerValue(17));
+            var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), _ => factory.CreateIntegerValue(17));
             var clause = lowerer.LowerClause(operation);
             Assert.That(clause.Classification.IsExact, Is.True);
             Assert.That(new IrInterpreter(factory).Evaluate(clause.SafeCondition, environment).Value!.Boolean, Is.True);

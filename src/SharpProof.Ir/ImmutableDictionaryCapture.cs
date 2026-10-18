@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Ir;
 
 // Preserve Dictionary.Add's rejection of identical duplicate key/value pairs.
@@ -9,7 +11,7 @@ internal static class ImmutableDictionaryCapture
         TValue value /* SPINT001: all values valid - maps support null values when TValue permits them */)
         where TKey : notnull
     {
-        map = RepositoryParameterGuard.NotNull(map, nameof(map));
+        map = map ?? throw new ArgumentNullException(nameof(map));
         if (map.ContainsKey(key))
         {
             throw new ArgumentException("An item with the same key has already been added. Key: " + key);
@@ -23,7 +25,7 @@ internal static class ImmutableDictionaryCapture
         TValue value /* SPINT001: all values valid - builders support null values when TValue permits them */)
         where TKey : notnull
     {
-        map = RepositoryParameterGuard.NotNull(map, nameof(map));
+        map = map ?? throw new ArgumentNullException(nameof(map));
         if (map.ContainsKey(key))
         {
             throw new ArgumentException("An item with the same key has already been added. Key: " + key);
@@ -38,9 +40,9 @@ internal static class ImmutableDictionaryCapture
         IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        keySelector = RepositoryParameterGuard.NotNull(keySelector, nameof(keySelector));
-        valueSelector = RepositoryParameterGuard.NotNull(valueSelector, nameof(valueSelector));
+        source = source ?? throw new ArgumentNullException(nameof(source));
+        keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
+        valueSelector = valueSelector ?? throw new ArgumentNullException(nameof(valueSelector));
         var result = ImmutableDictionary.CreateBuilder<TKey, TValue>(comparer);
         foreach (var item in source)
         {

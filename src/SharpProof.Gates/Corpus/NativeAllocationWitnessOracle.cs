@@ -112,8 +112,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         try
         {
             var assembly = context.LoadFromStream(image);
-            _assemblies = _assemblies.AddUnique(optimization, (context, assembly));
+            var assemblies = _assemblies.AddUnique(optimization, (context, assembly));
             _assemblyOrder.Add((context, assembly));
+            _assemblies = assemblies;
             return assembly;
         }
         catch

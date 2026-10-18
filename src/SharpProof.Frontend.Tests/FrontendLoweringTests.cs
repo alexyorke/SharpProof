@@ -699,7 +699,7 @@ public sealed class FrontendLoweringTests
     [Test]
     public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
     {
-        var stage = OperationSupportStage.ContractExpressionLowering;
+        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
         Assert.That(kinds, Is.Not.Empty);
         Assert.That(kinds, Is.Ordered);
@@ -740,7 +740,7 @@ public sealed class FrontendLoweringTests
     [Test]
     public void FieldReferencesAreAdmittedToContractExpressionStage()
     {
-        var stage = OperationSupportStage.ContractExpressionLowering;
+        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         Assert.That(
             OperationSubsetClassifier.Classify(stage, OperationKind.FieldReference)
                 .IsExact,

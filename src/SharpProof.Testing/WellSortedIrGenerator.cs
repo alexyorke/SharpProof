@@ -117,37 +117,37 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         var textChoice = _random.Next(4);
         var sequenceIsNull = _random.Next(4) == 0;
         var sequenceLength = sequenceIsNull ? 0 : _random.Next(4);
-        long[]? sequenceElements = referenced.Contains(_values) && !sequenceIsNull
-            ? new long[sequenceLength]
+        var sequenceElements = referenced.Contains(_values) && !sequenceIsNull
+            ? ImmutableArray.CreateBuilder<long>(sequenceLength)
             : null;
         for (var index = 0; index < sequenceLength; index++)
         {
             var value = NextInteger();
             if (sequenceElements != null)
             {
-                sequenceElements[index] = value;
+                sequenceElements.Add(value);
             }
         }
 
         var leftValue = NextInteger();
         var rightValue = NextInteger();
         var conditionValue = _random.Next(2) == 0;
-        var variables = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var variables = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (referenced.Contains(_left))
         {
-            variables = variables.Add(_left, _factory.CreateIntegerValue(leftValue));
+            variables.Add(_left, _factory.CreateIntegerValue(leftValue));
         }
         if (referenced.Contains(_right))
         {
-            variables = variables.Add(_right, _factory.CreateIntegerValue(rightValue));
+            variables.Add(_right, _factory.CreateIntegerValue(rightValue));
         }
         if (referenced.Contains(_condition))
         {
-            variables = variables.Add(_condition, _factory.CreateBooleanValue(conditionValue));
+            variables.Add(_condition, _factory.CreateBooleanValue(conditionValue));
         }
         if (referenced.Contains(_text))
         {
-            variables = variables.Add(_text, textChoice switch
+            variables.Add(_text, textChoice switch
             {
                 0 => _factory.CreateNullValue(_factory.StringType),
                 1 => _factory.CreateStringValue(""),
@@ -157,39 +157,39 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         }
         if (referenced.Contains(_reference))
         {
-            variables = variables.Add(_reference, _factory.CreateNullValue(_factory.ObjectType));
+            variables.Add(_reference, _factory.CreateNullValue(_factory.ObjectType));
         }
         if (referenced.Contains(_values))
         {
-            variables = variables.Add(_values, sequenceIsNull
+            variables.Add(_values, sequenceIsNull
                 ? _factory.CreateNullValue(_integerSequence)
                 : _factory.CreateSequenceValue(
                     _integerSequence,
-                    sequenceElements!.Select(_factory.CreateIntegerValue)));
+                    sequenceElements!.ToImmutable().Select(_factory.CreateIntegerValue)));
         }
-        return new GeneratedIrCase(term, variables, category);
+        return new GeneratedIrCase(term, variables.ToImmutable(), category);
     }
 
     private static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
         System.ArgumentNullException.ThrowIfNull(root);
-        var variables = ImmutableHashSet<IrVarId>.Empty;
-        var visited = ImmutableHashSet<IrId>.Empty;
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
         var pending = ImmutableStack<IrTerm>.Empty;
         pending = pending.Push(root);
         while (!pending.IsEmpty)
         {
             var current = pending.Peek();
             pending = pending.Pop();
-            if (visited.Contains(current.Id))
+            if (!visited.Add(current.Id))
             {
                 continue;
             }
-            visited = visited.Add(current.Id);
+
 
             if (current is IrVariableTerm variable)
             {
-                variables = variables.Add(variable.Variable);
+                variables.Add(variable.Variable);
             }
 
             switch (current)
@@ -228,7 +228,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
                     break;
             }
         }
-        return variables;
+        return variables.ToImmutable();
     }
 
     private IrTerm Integer(int depth)

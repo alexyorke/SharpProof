@@ -13,7 +13,7 @@ internal static partial class ApiSpecTermValidator
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
+        ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm>.Builder validatedTerms,
         bool allowResult = true)
     {
         variables = ArgumentNullGuard.NotNull(variables, nameof(variables));
@@ -28,7 +28,7 @@ internal static partial class ApiSpecTermValidator
         // Digests and instantiation expand shared subtrees. Bound that work
         // before either traversal, without changing the digest representation.
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        var measured = new Dictionary<SpecTermDeclaration, (int Height, int Nodes)>(
+        var measured = ImmutableDictionary.CreateBuilder<SpecTermDeclaration, (int Height, int Nodes)>(
             DeclarationReferenceComparer.Instance);
         _ = Measure(declaration, 1);
 
@@ -75,7 +75,7 @@ internal static partial class ApiSpecTermValidator
                 throw new ArgumentException("Spec expressions exceed the expanded expression work limit.", nameof(declaration));
             }
             var result = (height, nodes);
-            measured.Add(term, result);
+            measured.AddUnique(term, result);
             return result;
 
             void Include(SpecTermDeclaration child)
@@ -93,11 +93,11 @@ internal static partial class ApiSpecTermValidator
         private sealed class ValidationContext(
             IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
             ApiSpecFacets facets,
-            IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
+            ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm>.Builder validatedTerms,
             bool allowResult)
         {
-            private readonly Dictionary<SpecTermDeclaration, TermFacts> _validated =
-                (validatedTerms is null ? throw new System.ArgumentNullException(nameof(validatedTerms)) : (facets is null ? throw new System.ArgumentNullException(nameof(facets)) : (variables is null ? throw new System.ArgumentNullException(nameof(variables)) : new(DeclarationReferenceComparer.Instance))));
+            private readonly ImmutableDictionary<SpecTermDeclaration, TermFacts>.Builder _validated =
+                (validatedTerms is null ? throw new System.ArgumentNullException(nameof(validatedTerms)) : (facets is null ? throw new System.ArgumentNullException(nameof(facets)) : (variables is null ? throw new System.ArgumentNullException(nameof(variables)) : ImmutableDictionary.CreateBuilder<SpecTermDeclaration, TermFacts>(DeclarationReferenceComparer.Instance))));
 
             internal TermFacts Validate(SpecTermDeclaration declaration, int depth)
             {
@@ -122,7 +122,7 @@ internal static partial class ApiSpecTermValidator
 
                 var validated = ValidateCore(declaration, depth);
                 facts = validated.Facts;
-                _validated.Add(declaration, facts);
+                _validated.AddUnique(declaration, facts);
                 validatedTerms[declaration] = validated.Node;
                 return facts;
             }

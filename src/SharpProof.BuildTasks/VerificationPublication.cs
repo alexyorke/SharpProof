@@ -26,18 +26,19 @@ internal sealed class VerificationPublication
         ArgumentNullException.ThrowIfNull(workingDirectory);
         if (arguments.Any(static argument => argument is null))
         { throw new ArgumentException("Verification publication arguments must not be null.", nameof(arguments)); }
-        var options = ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+        var optionBuilder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < arguments.Length - 1; index++)
         {
             if (arguments[index] is "--request" or "--result" or "--publish-request" or "--publish-result" or
                 "--publish-compiler-manifest" or "--publish-sarif" or "--compiler-manifest" or "--worker")
             {
-                options = options.Add(arguments[index], index + 1);
+                optionBuilder.Add(arguments[index], index + 1);
             }
         }
+        var options = optionBuilder.ToImmutable();
         if (!options.Keys.Any(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (key.StartsWith("--publish-", StringComparison.Ordinal))))
         { return null; }
-        foreach (var required in new[] { "--request", "--result", "--publish-request", "--publish-result", "--publish-compiler-manifest" })
+        foreach (var required in ImmutableArray.Create("--request", "--result", "--publish-request", "--publish-result", "--publish-compiler-manifest"))
         {
             if (!options.ContainsKey(required))
             { throw new ArgumentException("Verification publication options must be complete.", nameof(arguments)); }
@@ -50,16 +51,23 @@ internal sealed class VerificationPublication
         var request = Resolve(arguments[options["--request"]]);
         var result = Resolve(arguments[options["--result"]]);
         var privateDirectory = Path.Combine(Path.GetDirectoryName(request) ?? throw new ArgumentException("Verification request path must name a file.", nameof(arguments)), "publication-" + Guid.NewGuid().ToString("N"));
-        var paths = ImmutableDictionary.Create<string, (string Stable, string Prepared)>(StringComparer.Ordinal);
+        var pathBuilder = ImmutableDictionary.CreateBuilder<string, (string Stable, string Prepared)>(StringComparer.Ordinal);
         foreach (var option in options.Where(option => option.Key.StartsWith("--publish-", StringComparison.Ordinal)))
         {
             var stable = Resolve(arguments[option.Value]);
             var prepared = Path.Combine(privateDirectory, option.Key[2..] + ".json");
-            paths = paths.Add(option.Key, (stable, prepared));
+            pathBuilder.Add(option.Key, (stable, prepared));
         }
+        var paths = pathBuilder.ToImmutable();
         var members = PublicationLease.ValidateMembers(paths.Values.Select(path => path.Stable));
-        var inputs = new[] { request, result }.Concat(options.TryGetValue("--compiler-manifest", out var inputManifest)
-            ? new[] { Resolve(arguments[inputManifest]) } : []).Select(PublicationLease.CanonicalMember);
+        var inputBuilder = ImmutableArray.CreateBuilder<string>();
+        inputBuilder.Add(request);
+        inputBuilder.Add(result);
+        if (options.TryGetValue("--compiler-manifest", out var inputManifest))
+        {
+            inputBuilder.Add(Resolve(arguments[inputManifest]));
+        }
+        var inputs = inputBuilder.ToImmutable().Select(PublicationLease.CanonicalMember);
         if (members.Intersect(inputs, PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable verification outputs must be distinct from private invocation outputs.", nameof(arguments));

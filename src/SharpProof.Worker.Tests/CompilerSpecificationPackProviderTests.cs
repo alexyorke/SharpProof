@@ -52,8 +52,8 @@ public sealed class CompilerSpecificationPackProviderTests
     [Test]
     public void SerializedPackSelectionsRejectAmbiguousAndForeignIdentities()
     {
-        var version = CompilerSpecificationPackCatalogVersions.Current;
-        var hash = CompilerSpecificationPackCatalogVersions.Sha256;
+        const int version = CompilerSpecificationPackCatalogVersions.Current;
+        const string hash = CompilerSpecificationPackCatalogVersions.Sha256;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(CompilerSpecificationPackSelection.IsValid(["dotnet.scalar"], version, hash), Is.True);

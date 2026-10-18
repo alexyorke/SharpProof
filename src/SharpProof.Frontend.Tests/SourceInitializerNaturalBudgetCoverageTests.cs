@@ -10,7 +10,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
     [Test]
     public void ActualStaticFieldDeclarationsConsumeTheDefaultSessionBudget()
     {
-        var fieldCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
+        const int fieldCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
         var fields = string.Join("\n", Enumerable.Range(0, fieldCount)
             .Select(static ordinal => $"public static int Field{ordinal};"));
         var cells = "public sealed class LargeCell { " + fields + " } " +

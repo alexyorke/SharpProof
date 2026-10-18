@@ -61,7 +61,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             var add = new RoslynTotalExpressionLowerer(addContext, builder, exceptionalExit).LowerBodyValue(addOperation, entry);
             Assert.That(add.Classification.IsExact, Is.True);
             builder.Return(add.Continuation, addContext.Site(addOperation), add.Value);
-            var environment = addContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2)));
+            var environment = ImmutableDictionaryCapture.Create(addContext.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(binding.Parameter.Ordinal == 0 ? 7 : 2)));
             var replay = new IrProgramInterpreter(factory).Execute(builder.Build(), environment);
             Assert.That(type.GetMethod("Add")!.Invoke(null, [7, 2]), Is.EqualTo(9));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

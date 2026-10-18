@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -64,8 +65,8 @@ public sealed class TypedReferenceProgramLoweringTests
         }
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
                 arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
@@ -92,10 +93,12 @@ public sealed class TypedReferenceProgramLoweringTests
         var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
         var interpreter = new IrInterpreter(factory);
         var shared = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
-        var model = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, shared).SetItem(right, shared);
-        Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.True);
-        model = model.SetItem(right, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]));
-        Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.False);
+        var model = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        model[left] = shared;
+        model[right] = shared;
+        Assert.That(interpreter.Evaluate(equal, model.ToImmutable()).Value!.Boolean, Is.True);
+        model[right] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
+        Assert.That(interpreter.Evaluate(equal, model.ToImmutable()).Value!.Boolean, Is.False);
         var nullLength = interpreter.Evaluate(factory.Length(factory.Null(sequenceType))).Value!;
         Assert.That(nullLength.IntegerWidth, Is.EqualTo(32));
         Assert.That(nullLength.Integer, Is.Zero);
@@ -121,7 +124,7 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var entry = subject.Context.Parameters.Single().Entry;
-        var value = Value(subject.Factory, subject.Factory.GetVariableInfo(entry).Type, input, []);
+        var value = Value(subject.Factory, subject.Factory.GetVariableInfo(entry).Type, input, ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>());
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -204,8 +207,8 @@ public sealed class TypedReferenceProgramLoweringTests
             "Compiled result type: " + actual?.GetType().FullName);
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: opaqueCalls);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-        var inputs = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -253,7 +256,7 @@ public sealed class TypedReferenceProgramLoweringTests
     }
 
     private static IrValue Value(IrFactory factory, IrTypeId type, object? input,
-        Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
+        ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases)
     {
         if (type.IsDefault)
         {
@@ -273,8 +276,8 @@ public sealed class TypedReferenceProgramLoweringTests
         }
         if (!aliases.TryGetValue(type, out var typedAliases))
         {
-            typedAliases = new Dictionary<object, IrValue>(ReferenceEqualityComparer.Instance);
-            aliases.Add(type, typedAliases);
+            typedAliases = ImmutableDictionary.CreateBuilder<object, IrValue>(ReferenceEqualityComparer.Instance);
+            aliases.AddUnique(type, typedAliases);
         }
         if (typedAliases.TryGetValue(input, out var shared))
         { return shared; }
@@ -289,7 +292,7 @@ public sealed class TypedReferenceProgramLoweringTests
             IrTypeKind.Reference => factory.CreateReferenceValue(type, input),
             _ => throw new ArgumentException("The runtime value does not match the reference oracle type.", nameof(input))
         };
-        typedAliases.Add(input, value);
+        typedAliases.AddUnique(input, value);
         return value;
     }
 }

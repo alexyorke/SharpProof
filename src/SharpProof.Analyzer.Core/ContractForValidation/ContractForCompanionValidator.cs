@@ -98,11 +98,11 @@ internal static class ContractForCompanionValidator
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
         var targetMatches = ImmutableDictionaryCapture.Create(targets,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target),
-            static _ => ImmutableArray<IMethodSymbol>.Empty,
+            static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         var candidateMatches = ImmutableDictionaryCapture.Create(candidates,
             static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate),
-            static _ => ImmutableArray<IMethodSymbol>.Empty,
+            static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         foreach (var target in targets)
         {
@@ -113,19 +113,19 @@ internal static class ContractForCompanionValidator
                 cancellationToken.ThrowIfCancellationRequested();
                 if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
                 {
-                    matches = matches.Add(candidate);
-                    candidateMatches = candidateMatches.SetItem(candidate, candidateMatches[candidate].Add(target));
+                    matches.Add(candidate);
+                    candidateMatches[candidate].Add(target);
                 }
             }
-            targetMatches = targetMatches.SetItem(target, matches);
+
         }
 
-        var byTarget = targetMatches;
-        var byCandidate = candidateMatches;
+        var byTarget = ImmutableDictionaryCapture.Create(targetMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
+        var byCandidate = ImmutableDictionaryCapture.Create(candidateMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
         var targetSurfaceIsComplete = targets.All(target =>
             target is null ? throw new System.ArgumentNullException(nameof(target)) : (byTarget[target] is { Length: 1 } matches &&
             byCandidate[matches[0]].Length == 1));
-        var diagnosed = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var diagnosed = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Diagnose(
             DiagnosticDescriptor descriptor,
@@ -154,7 +154,7 @@ internal static class ContractForCompanionValidator
                     ContractForDiagnosticDescriptors.AmbiguousMember,
                     target,
                     target.Name);
-                diagnosed = diagnosed.Union(matches);
+                diagnosed.UnionWith(matches);
                 continue;
             }
 
@@ -182,9 +182,8 @@ internal static class ContractForCompanionValidator
 
             foreach (var mismatch in mismatches)
             {
-                if (!diagnosed.Contains(mismatch))
+                if (diagnosed.Add(mismatch))
                 {
-                    diagnosed = diagnosed.Add(mismatch);
                     Diagnose(
                         ContractForDiagnosticDescriptors.SignatureMismatch,
                         mismatch,
@@ -197,9 +196,8 @@ internal static class ContractForCompanionValidator
         {
             cancellationToken.ThrowIfCancellationRequested();
             var matches = byCandidate[candidate];
-            if (matches.Length > 1 && !diagnosed.Contains(candidate))
+            if (matches.Length > 1 && diagnosed.Add(candidate))
             {
-                diagnosed = diagnosed.Add(candidate);
                 Diagnose(
                     ContractForDiagnosticDescriptors.AmbiguousMember,
                     candidate,
@@ -207,9 +205,8 @@ internal static class ContractForCompanionValidator
             }
             else if (targetSurfaceIsComplete &&
                      matches.IsDefaultOrEmpty &&
-                     !diagnosed.Contains(candidate))
+                     diagnosed.Add(candidate))
             {
-                diagnosed = diagnosed.Add(candidate);
                 Diagnose(
                     ContractForDiagnosticDescriptors.SignatureMismatch,
                     candidate,

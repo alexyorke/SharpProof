@@ -2859,7 +2859,7 @@ public sealed partial class WorkerTests
     [Test]
     public void ImplementationIlRejectsOversizedLocalSignatureBeforeMaterialization()
     {
-        var localCount =
+        const int localCount =
             129;
         var localDeclarations = string.Join(
             Environment.NewLine,

@@ -25,7 +25,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
             object[] inputs = [flag, 17, 23];
             var expected = flag ? 17 : 23;
             Assert.That(subject.Invoke(inputs), Is.EqualTo(expected));
-            var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
+            var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.SafeCondition, environment).Value!.Boolean, Is.True);
             Assert.That(new IrInterpreter(subject.Factory).Evaluate(clause.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
             Replay(subject, inputs, expected);
@@ -95,7 +95,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var rule = CSharpOperationSemantics.Bitwise(supported.Factory, binary.Operator, binary.Left, binary.Right);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = supported.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3)));
+        var environment = ImmutableDictionaryCapture.Create(supported.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (supported.Value(binding.Current, binding.Parameter.Ordinal == 0 ? 7 : 3)));
         Assert.That(new IrInterpreter(supported.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(3)));
         Replay(supported, [7, 3], 3);
     }
@@ -111,7 +111,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), _ => subject.Factory.CreateStringValue("word"));
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), _ => subject.Factory.CreateStringValue("word"));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);

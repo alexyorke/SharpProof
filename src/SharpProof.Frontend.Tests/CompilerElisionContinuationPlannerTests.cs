@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -110,12 +111,13 @@ public sealed class CompilerElisionContinuationPlannerTests
         var children = subject.Graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None &&
             block.BranchValue != null && subject.Emission.IsElided(block.BranchValue)).ToArray();
         Assert.That(children, Has.Length.EqualTo(2));
-        var targets = new HashSet<BasicBlock>();
+        var targetBuilder = ImmutableHashSet.CreateBuilder<BasicBlock>();
         foreach (var child in children)
         {
             Assert.That(subject.Planner.TryElidedSpecificationContinuation(child, out var continuation, compilerMode: true), Is.True);
-            targets.Add(continuation);
+            targetBuilder.Add(continuation);
         }
+        var targets = targetBuilder.ToImmutable();
         Assert.That(targets, Has.Count.EqualTo(2));
         var source = subject.Graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
             block.BranchValue != null && !subject.Emission.IsElided(block.BranchValue));

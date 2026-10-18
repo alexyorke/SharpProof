@@ -31,7 +31,7 @@ public sealed class SourceVariableBindingCoverageTests
         Assert.That(ids, Has.Length.EqualTo(1));
         var bare = lowerer.LowerTerm(operation);
         Assert.That(bare.Classification.IsExact, Is.True);
-        var environment = ids.ToDictionary(id => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (id), _ => factory.CreateIntegerValue(input));
+        var environment = ImmutableDictionaryCapture.Create(ids, id => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (id), _ => factory.CreateIntegerValue(input));
         var evaluated = new IrInterpreter(factory).Evaluate(bare.Term, environment);
         Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(evaluated.Value!.Integer, Is.EqualTo(expected));
@@ -49,7 +49,7 @@ public sealed class SourceVariableBindingCoverageTests
         var result = lowerer.Lower(operation);
         Assert.That(result.IsExact, Is.True);
         Assert.That(result.Variables, Has.Length.EqualTo(2));
-        var inputs = result.Variables.ToDictionary(binding => binding.Variable,
+        var inputs = ImmutableDictionaryCapture.Create(result.Variables, binding => binding.Variable.IsDefault ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : binding.Variable,
             binding => ((binding.Variable.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : (factory.CreateIntegerValue(binding.Symbol.Name == "left" ? 3L : 7L))));
         var ids = lowerer.CreateVariableIds();
         Assert.That(ids, Is.EquivalentTo(inputs.Keys));

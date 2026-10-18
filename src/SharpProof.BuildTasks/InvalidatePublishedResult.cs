@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Framework;
 using SharpProof.Host;
@@ -54,7 +55,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
-        var outputPaths = Present(ResultPath, SarifPath).Select(ResolvePath).ToArray();
+        var outputPaths = Present(ResultPath, SarifPath).Select(ResolvePath).ToImmutableArray();
         var inputPaths = Present(
                 RequestPath,
                 ManifestPath,
@@ -65,11 +66,11 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
                 LauncherPath,
                 WorkerProtocolPath)
             .Select(ResolvePath)
-            .ToArray();
+            .ToImmutableArray();
         var compilerOutputPaths = CompilerOutputPaths
             .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!string.IsNullOrWhiteSpace(item.ItemSpec)))
             .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ResolvePath(item.ItemSpec)))
-            .ToArray();
+            .ToImmutableArray();
         var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
         var workerDirectory = workerFile != null && File.Exists(workerFile)
             ? Path.GetDirectoryName(workerFile)
@@ -77,8 +78,8 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         var cachePath = string.IsNullOrWhiteSpace(CachePath) ? null : ResolvePath(CachePath!);
         var publicationPaths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
             .Select(ResolvePath)
-            .ToArray();
-        string[] capturePaths = string.IsNullOrWhiteSpace(CompilerCaptureRequestPath)
+            .ToImmutableArray();
+        ImmutableArray<string> capturePaths = string.IsNullOrWhiteSpace(CompilerCaptureRequestPath)
             ? []
             : [ResolvePath(CompilerCaptureRequestPath), ResolvePath(CompilerCaptureRequestPath + ".completed")];
 

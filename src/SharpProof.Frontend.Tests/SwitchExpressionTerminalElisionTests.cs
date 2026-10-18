@@ -156,7 +156,7 @@ public sealed class SwitchExpressionTerminalElisionTests
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             foreach (var input in Inputs)
             {
-                var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
                         binding.Parameter.Ordinal == 0 ? input.Value : input.Other)));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, environment);

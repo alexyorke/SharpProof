@@ -13,7 +13,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
     [Test]
     public void ActualParamsInvocationsConsumeTheDefaultArrayModelScanBudget()
     {
-        var callCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
+        const int callCount = RoslynTotalProgramLowerer.MaximumRegionSteps / 2;
         var callsSource = string.Join("\n", Enumerable.Repeat("sum += Helper();", callCount));
         var source = "int Target() { int sum = 0; " + callsSource +
             " return sum; } static int Helper(params int[] values) => values.Length + 1;";

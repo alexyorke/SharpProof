@@ -2132,3 +2132,34 @@ map builder plus first-insertion order sidecar, retaining later value overwrites
 final ordered value output. Keep ordered JSON records as serializer adapters; preserve
 all package/component/file/relationship/checksum order and exact hashing inputs.
 Status: open before edits.
+## M030-M039 verified implementation checkpoint
+
+M030 corpus tests pass 150; M031 ordinary Analyzer tests pass 1,134; M032-M034 focused
+solution cohort passes 292 across nine projects; M035 build task/publication tests pass
+95; M037-M038 full ordinary Frontend suite passes 2,051. Builds have zero warnings/errors.
+M036 formatter/coverage regressions pass; M039 release security/evidence/attestation
+fixtures pass, including 27 release-security cases and real pinned NuGet content probes.
+Script formatter checks 87 PowerShell and 19 shell files with zero changes. Layout
+passes 2,609 source files, 59 projects, 151 pinned common files and 59 evaluated projects.
+Literal preservation passes 2,803 raw/interpolated tokens across 598 changed C# files.
+
+The initial M031 build caught redundant set guards (CA1868), corrected using Add's
+Boolean result. M034's first build caught a missed DFS-frame deconstruction, now fixed.
+M037/M038 builds exposed missing helper access and a missed builder factory call.
+Broad IR friend access also exposed existing null-validation diagnostics; that approach
+was rejected. The test project now links the self-contained capture helper, with
+explicit immutable imports and standard coalescing null guards. Its full ordinary
+suite passes; unrelated guarded tests were not modified. Failed attempts remain in
+artifacts/immutability-frontend-input-alias-builders-tests*.log for traceability.
+
+Current regenerated universe: 1,867 non-vendored C# files, 3306 candidates
+(2954 open), and 84 PowerShell scripts, 1117 candidates (966 open),
+with zero parse failures. Coordinator classified 48 new C# builder/snapshot rows,
+33 script builder rows and 16 additional verified constants. Open rows remain syntax
+candidates requiring contract-based classification; this checkpoint is not completion.
+
+Evidence: immutability-advisory-publication-builders-tests2.log,
+immutability-spec-oracle-constant-tests2.log, immutability-build-task-paths-tests.log,
+immutability-frontend-input-alias-builders-tests6.log, immutability-m036-script-tests.log,
+immutability-m039-script-tests.log, immutability-m039-script-format.log,
+immutability-m039-layout.log and immutability-second-master-literals.log.

@@ -86,7 +86,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
                 Assert.That(graph.Blocks.Length, Is.LessThan(RoslynTotalProgramLowerer.MaximumRegionSteps));
                 Assert.That(lowering.IsExact, Is.True);
                 Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-                var inputs = context.Parameters.ToDictionary(
+                var inputs = ImmutableDictionaryCapture.Create(context.Parameters,
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                     binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, -1L)));
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, inputs);

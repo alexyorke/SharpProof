@@ -79,7 +79,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(direct.IsExact, Is.True);
             Assert.That(direct.ConstructionLimitExceeded, Is.False);
             var replay = new IrProgramInterpreter(factory).Execute(direct.Program,
-                helperContext.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type))));
+                ImmutableDictionaryCapture.Create(helperContext.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateNullValue(factory.GetVariableInfo(p.Entry).Type))));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17)));

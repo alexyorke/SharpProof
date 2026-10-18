@@ -80,7 +80,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(prepared.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrAssumeInstruction>().Count(),
                     Is.EqualTo(clauseKind == "assume" ? 1 : 0));
                 var direct = new IrProgramInterpreter(factory).Execute(prepared.Program,
-                    candidate.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(candidate.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
                 Assert.That(direct.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(direct.ConsumedApproximation, Is.False);
                 Assert.That(direct.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));
@@ -102,7 +102,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauseKind == "requires" ? 1 : 0));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    context.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(context.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));

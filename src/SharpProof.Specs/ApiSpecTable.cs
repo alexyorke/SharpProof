@@ -119,7 +119,7 @@ public sealed partial class ApiSpecTable
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
             static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((variable.Role, variable.Ordinal)));
-        var validatedTerms = new Dictionary<SpecTermDeclaration, ValidatedSpecTerm>(
+        var validatedTerms = ImmutableDictionary.CreateBuilder<SpecTermDeclaration, ValidatedSpecTerm>(
             ApiSpecTermValidator.DeclarationReferenceComparer.Instance);
         var facets = NormalizeFacets(
             declaration.Facets,
@@ -186,8 +186,7 @@ public sealed partial class ApiSpecTable
             id, declaration.Target, facets,
             variableArray, receiver, bySlot, parameters.MoveToImmutable(), result,
             postconditions,
-            validatedTerms.ToImmutableDictionary(
-                ApiSpecTermValidator.DeclarationReferenceComparer.Instance));
+            validatedTerms.ToImmutable());
     }
 
     private static SpecVarId AddVariable(

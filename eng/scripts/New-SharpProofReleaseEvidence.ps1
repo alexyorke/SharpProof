@@ -31,11 +31,12 @@ $artifacts = @($identitySet.Identities | ForEach-Object {
     })
 $namespaceInput = $RepositoryCommit + $inventoryDigest + $created + (($artifacts | ForEach-Object sha256) -join '')
 $namespaceDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($namespaceInput))).ToLowerInvariant()
-$packages = [Collections.Generic.List[object]]::new()
-$binaryFiles = [Collections.Generic.List[object]]::new()
-$relationships = [Collections.Generic.List[object]]::new()
-$extractedLicenses = [ordered]@{}
-$archiveIds = @{}
+$packages = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$binaryFiles = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$relationships = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$extractedLicenseBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
+$extractedLicenseOrder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$archiveIdBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::OrdinalIgnoreCase)
 for ($index = 0; $index -lt $artifacts.Count; $index++) {
     $artifact = $artifacts[$index]
     $id = "SPDXRef-Artifact-$index"
@@ -46,14 +47,15 @@ for ($index = 0; $index -lt $artifacts.Count; $index++) {
             checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $artifact.sha256 })
         })
     $relationships.Add([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $id })
-    if ($artifact.kind -ceq 'nupkg') { $archiveIds[$artifact.packageId] = $id }
+    if ($artifact.kind -ceq 'nupkg') { $archiveIdBuilder[$artifact.packageId] = $id }
 }
+$archiveIds = $archiveIdBuilder.ToImmutable()
 $componentIndex = 0
 foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive)) {
     $artifact = @($artifacts | Where-Object { $_.packageId -ceq $packageId -and $_.kind -ceq 'nupkg' })[0]
     $archive = [IO.Compression.ZipFile]::OpenRead((Join-Path $PackageSource $artifact.fileName))
     try {
-        $entryIds = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+        $entryIds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
         foreach ($component in @($inventory.packages[$packageId])) {
             $componentId = "SPDXRef-Component-$componentIndex"
             $componentIndex++
@@ -65,7 +67,8 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
                     sourceInfo = if ($component.Contains('source')) { [string]$component.source } else { 'Source and version as recorded in the reviewed third-party inventory.' }
                 })
             if ($license.StartsWith('LicenseRef-', [StringComparison]::Ordinal)) {
-                $extractedLicenses[$license] = [ordered]@{
+                if (-not $extractedLicenseBuilder.ContainsKey($license)) { $extractedLicenseOrder.Add($license) }
+                $extractedLicenseBuilder[$license] = [ordered]@{
                     licenseId = $license; name = 'Complete distributed third-party notice bundle'
                     extractedText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '../../THIRD-PARTY-NOTICES.txt'))
                 }
@@ -94,15 +97,18 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
     }
     finally { $archive.Dispose() }
 }
+$extractedLicenseSnapshot = $extractedLicenseBuilder.ToImmutable()
+$extractedLicenses = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+foreach ($license in $extractedLicenseOrder.ToImmutable()) { $extractedLicenses.Add($extractedLicenseSnapshot[$license]) }
 $sbom = [ordered]@{
     spdxVersion = 'SPDX-2.3'; dataLicense = 'CC0-1.0'; SPDXID = 'SPDXRef-DOCUMENT'
     name              = "SharpProof $($identitySet.Version) shipped payload"
     documentNamespace = "https://github.com/alexyorke/SharpProof/sbom/$RepositoryCommit/$namespaceDigest"
     creationInfo      = [ordered]@{ created = $created; creators = @('Tool: SharpProof release evidence exporter') }
-    comment = $scope; packages = @($packages.ToArray()); files = @($binaryFiles.ToArray())
-    relationships     = @($relationships.ToArray())
+    comment = $scope; packages = @($packages.ToImmutable()); files = @($binaryFiles.ToImmutable())
+    relationships     = @($relationships.ToImmutable())
 }
-if ($extractedLicenses.Count -gt 0) { $sbom.hasExtractedLicensingInfos = @($extractedLicenses.Values) }
+if ($extractedLicenses.Count -gt 0) { $sbom.hasExtractedLicensingInfos = @($extractedLicenses.ToImmutable()) }
 [IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($OutputDirectory)) | Out-Null
 $sbomPath = Join-Path $OutputDirectory 'sbom.spdx.json'
 $sbom | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $sbomPath -Encoding utf8NoBOM
@@ -114,8 +120,9 @@ $manifest = [ordered]@{
 }
 $manifestPath = Join-Path $OutputDirectory 'release-manifest.json'
 $manifest | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
-$checksums = @($artifacts | ForEach-Object { "$($_.sha256)  $($_.fileName)" })
-$checksums += "$($manifest.sbom.sha256)  sbom.spdx.json"
-$checksums += "$((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant())  release-manifest.json"
-$checksums | Set-Content -LiteralPath (Join-Path $OutputDirectory 'SHA256SUMS') -Encoding utf8NoBOM
+$checksumBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($artifact in $artifacts) { $checksumBuilder.Add("$($artifact.sha256)  $($artifact.fileName)") }
+$checksumBuilder.Add("$($manifest.sbom.sha256)  sbom.spdx.json")
+$checksumBuilder.Add("$((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant())  release-manifest.json")
+$checksumBuilder.ToImmutable() | Set-Content -LiteralPath (Join-Path $OutputDirectory 'SHA256SUMS') -Encoding utf8NoBOM
 Write-Host "Release evidence generated: five archives, $componentIndex reviewed components, $($binaryFiles.Count) distinct packaged third-party binaries."

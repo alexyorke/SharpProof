@@ -48,8 +48,8 @@ public sealed class EffectValueValidationTests
                 EffectCompleteness.Complete, uncertainty, incompleteReason);
         }
 
-        var allocationMarker = EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative;
-        var uncertaintyMarker = EffectUncertainty.Unknown & ~EffectUncertainty.All;
+        const EffectAllocationKind allocationMarker = EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative;
+        const EffectUncertainty uncertaintyMarker = EffectUncertainty.Unknown & ~EffectUncertainty.All;
         var invalidClaims = new (string Name, Action Construct, string Parameter)[]
         {
             ("unknown allocation bit", () => _ = Summary(allocation: (EffectAllocationKind)(-1)), "allocation"),

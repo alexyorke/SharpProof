@@ -145,7 +145,7 @@ internal sealed class ContractApiTests
     public void CompanionAndAllowanceAttributesPreserveTheirTypedArguments()
     {
         Type[] exceptions = [typeof(IOException), typeof(InvalidOperationException)];
-        var capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
+        const SharpProofCapability capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(new AllowedExceptionsAttribute(exceptions).ExceptionTypes, Is.SameAs(exceptions));
