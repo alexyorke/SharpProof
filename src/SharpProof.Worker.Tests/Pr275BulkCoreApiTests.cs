@@ -252,6 +252,12 @@ public sealed class Pr275BulkCoreApiTests
                     Complete = true)]
                 public static void AddToList(List<int> values) => values.Add(1);
 
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
+                public static int ReadListCount(List<int> values) => values.Count;
+
                 [EffectContract(SharpProofEffect.None, Complete = true)]
                 public static void UnknownExternalCall() => Console.WriteLine(1);
 
@@ -326,6 +332,7 @@ public sealed class Pr275BulkCoreApiTests
         var listCall = Analyze(compilation, session, "AddToList");
         var unknownCall = Analyze(compilation, session, "UnknownExternalCall");
         var allocation = Analyze(compilation, session, "Allocate");
+        var listRead = Analyze(compilation, session, "ReadListCount");
         var purity = Analyze(compilation, session, "PureWrite");
         var throwing = Analyze(compilation, session, "Throw");
         var allowedThrow = Analyze(compilation, session, "AllowedThrow");
@@ -361,6 +368,7 @@ public sealed class Pr275BulkCoreApiTests
             AssertOutcomeWithDiagnostic(argumentWrite, "SP0052", "WritesArgumentState");
             AssertOutcomeWithDiagnostic(receiverWrite, "SP0052", "WritesReceiverState");
             AssertOutcomeWithDiagnostic(listCall, "SP0052", "WritesReceiverState");
+            AssertOutcomeWithDiagnostic(listRead, "SP0052", "ReadsReceiverState");
             AssertOutcomeWithDiagnostic(unknownCall, "SP0052", "may have undeclared effects");
             AssertOutcomeWithDiagnostic(allocation, "SP0045", "may allocate");
             AssertOutcomeWithDiagnostic(purity, "SP0002", "do not prove observable purity");

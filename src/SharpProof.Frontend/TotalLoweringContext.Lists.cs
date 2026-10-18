@@ -23,6 +23,15 @@ internal static partial class CSharpOperationSemantics
                 type.TypeArguments[0] is ITypeParameterSymbol { IsReferenceType: true });
     }
 
+    internal static bool IsConcreteListStateMember(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        // A subclass can replace interface dispatch or hide a public member,
+        // but a bound nonvirtual List member still uses the base List storage.
+        return IsListStateMember(method) && !method.IsVirtual && method.MethodKind != MethodKind.Constructor &&
+            method.ContainingType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.List`1";
+    }
+
     internal static bool IsEmptyListCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));

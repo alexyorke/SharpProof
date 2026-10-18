@@ -21,7 +21,7 @@ language lowering is missing.
 
 The source-use universe is all 200 selected original OSS targets, 28 original
 synthetic targets and 10 sample files: 641 resolved sites, zero unresolved sites,
-115 API/access/status rows. Every one is listed below, including partial models
+116 API/access/status rows. Every one is listed below, including partial models
 that still have gaps. Dependency-only methods, metamorphic duplicates, repository
 implementation code, dynamic/reflection calls and unexecuted workloads do not
 contribute to this ranking. The CI JSON has source hashes and exact locations;
@@ -44,7 +44,7 @@ access kind and value domains satisfy the production guard.
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and fresh exact List receivers/aliases are supported; incoming interface parameters still require implementation evidence. |
 | D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key membership and scalar/reference contents remain separate; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
-| L: Lists and collection contents | Fresh List construction, Count, Add and scalar/reference get/set now share owned state; incoming receivers, unsupported value domains and other operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
+| L: Lists and collection contents | Fresh List construction and concrete List Count, Add and scalar/reference get/set now share state; arbitrary interface receivers, unsupported value domains and other operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
@@ -276,6 +276,61 @@ updates, range/removal/sort operations, capacity/version/enumeration relationshi
 precise growth failure state and concrete replay remain open. No complete API or
 work item is closed by this slice.
 
+## Verified incoming concrete List state
+
+Framework `List<T>` Count, Add and simple indexed get/set bound to base members use
+shared Count and keyed content state for incoming concrete receivers as well as
+fresh instances. Count and indexed reads can appear in contracts, including entry
+preconditions and Old snapshots. The value domain remains supported scalar and
+reference types; Count does not interpret the element type. A subclass hiding or
+reimplementing a member cannot change an explicitly bound base List operation.
+Arbitrary incoming IList/ICollection calls still require implementation evidence.
+
+Replay reconstructs only queried owner/key entry cells, preserving typed keys,
+reference/null identity and cycles. Other cells remain unavailable. Unknown writes
+invalidate entry fallback; ordered stores and Old snapshots retain their distinct
+semantics. Oversized List witnesses are rejected under the query resource budget;
+this does not constrain the universal SMT proof domain. A solver choosing such a
+witness can still yield Unknown, so this slice does not promise every unbounded
+List claim can be decided. Growth, allocation and fault uncertainty remain.
+Reviewed effect facets bound growth-failure calls just as they bound ordinary
+calls; missing evidence still uses the opaque fallback. Known capabilities do not
+imply no faults or no allocations.
+
+Six more corpus sites gain partial support: indexed reads in PrimesList lines 148
+and 149 and BTree line 53, plus Add in BucketSorter lines 32 and 72 and BTree line
+44. This leaves 13 concrete List reads and seven Add calls without the required
+value domain or dispatch evidence. The ranking has 116 API/access/status rows at
+641 sites, with zero unresolved sites. The three direct List declarations gain
+`intrinsic=concrete-list-state`; all 45 partial declarations retain their other
+facets, and the SDK, reference bytes and catalog pins are unchanged.
+
+Native tests cover shared Count/content proofs, wrong-claim refutations, incoming
+scalar boundaries, Boolean/reference/null values, source helpers, aliases, Old
+snapshots and unknown writers. Keyed IR and SMT tests cover owner/key separation,
+full-width keys, missing cells, cycles, invalidation and oversized witnesses.
+Executed inventory probes compare incoming Count, set, Add and get against CLR
+behavior; their selected normal growth path consumes approximation and grants no
+concrete growth replay authority. Remaining interfaces, opaque generic contents,
+compound updates, other List operations and precise growth behavior stay open.
+
+Canonical container validation passes 2,041 frontend tests, 983 selected worker
+tests, 481 IR tests, 363 SMT tests, 640 contract tests, 29 inventory/evidence tests
+and eight usage-ranking tests. All 63 analyzer mode/effect controls pass, including capability evidence alongside
+unknown growth faults and allocation. Layout passes for all 59 projects. CI still
+requires aggregate and changed-code coverage plus platform/package consumers.
+
+Worker verification includes the complete 5,505-test suite plus the receiver-assignment
+proof, and the complete analyzer
+suite passes all 1,134 tests. Effect-contract diagnostics
+retain the first source location and prefer a mutation/call summary at that same
+operation over its broad internal read site. A compiled read-only List control
+still reports the read violation; the existing mutation assertion is unchanged.
+
+Assignment-receiver controls distinguish assigning a fresh List to a local
+interface receiver from assigning an unknown incoming implementation. The native
+Count proof and both provenance controls retain the existing freshness path.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -317,7 +372,7 @@ work item is closed by this slice.
   with native proofs/refutations and compiled CLR/IR normal/fault agreement.
 - Count >= 0 is weaker than a collection representation invariant. Fresh integer-key
   dictionary Count/content consistency is verified within the documented domain.
-  Fresh owned Lists now also relate Count to contents. Other list receivers, arbitrary dictionary receivers, queues and stacks remain open.
+  Fresh owned Lists and incoming concrete Lists now also relate Count to contents. Arbitrary list interfaces, opaque value domains, dictionary receivers, queues and stacks remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
   state. Proving a comparison result does not erase these effects. Parameters that
   may be custom comparers and generic types without concrete evidence still need
@@ -405,19 +460,20 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | P:System.Collections.Generic.List`1.Count | read | 18 | partially-modeled | L |
 | P:System.String.Chars(System.Int32) | read | 18 | partially-modeled | T |
 | M:System.Collections.Generic.HashSet`1.Contains(`0) | call | 16 | unmodeled | S |
-| P:System.Collections.Generic.List`1.Item(System.Int32) | read | 16 | unmodeled-dispatch | L |
 | P:System.Collections.Generic.Comparer`1.Default | read | 13 | unmodeled | C |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | unmodeled-dispatch | A |
+| P:System.Collections.Generic.List`1.Item(System.Int32) | read | 13 | unmodeled-dispatch | L |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 12 | unmodeled | S |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | partially-modeled | L |
-| M:System.Collections.Generic.List`1.Add(`0) | call | 10 | unmodeled-dispatch | L |
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | unmodeled | S |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | unmodeled | S |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | unmodeled | C |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | partially-modeled | D |
 | M:System.Action`1.Invoke(`0) | call | 7 | unmodeled | F |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | unmodeled | T |
+| M:System.Collections.Generic.List`1.Add(`0) | call | 7 | unmodeled-dispatch | L |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | partially-modeled | T |
+| M:System.Collections.Generic.List`1.Add(`0) | call | 6 | partially-modeled | L |
 | M:System.ArgumentException.#ctor(System.String) | call | 5 | unmodeled | T |
 | M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | unmodeled | D |
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | unmodeled | S |
@@ -435,7 +491,6 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.ArgumentNullException.#ctor(System.String) | call | 3 | unmodeled | T |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | unmodeled | R |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | unmodeled | S |
-| M:System.Collections.Generic.List`1.Add(`0) | call | 3 | partially-modeled | L |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | unmodeled | S |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | unmodeled | N |
 | M:System.Convert.ToInt64(System.Int32) | call | 3 | unmodeled | N |
@@ -446,6 +501,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Object.#ctor | call | 3 | partially-modeled | O |
 | M:System.Object.Equals(System.Object) | call | 3 | unmodeled | O |
 | P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | unmodeled | O |
+| P:System.Collections.Generic.List`1.Item(System.Int32) | read | 3 | partially-modeled | L |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | unmodeled | L |
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | unmodeled | S |
 | M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | unmodeled | S |
@@ -462,8 +518,8 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.ArgumentException.#ctor(System.String,System.String) | call | 1 | unmodeled | T |
 | M:System.ArgumentNullException.ThrowIfNull(System.Object,System.String) | call | 1 | unmodeled | T |
 | M:System.ArgumentOutOfRangeException.ThrowIfGreaterThan``1(``0,``0,System.String) | call | 1 | unmodeled | T |
-| M:System.ArgumentOutOfRangeException.ThrowIfNegative``1(``0,System.String) | call | 1 | unmodeled | T |
 | M:System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero``1(``0,System.String) | call | 1 | unmodeled | T |
+| M:System.ArgumentOutOfRangeException.ThrowIfNegative``1(``0,System.String) | call | 1 | unmodeled | T |
 | M:System.Array.Copy(System.Array,System.Int32,System.Array,System.Int32,System.Int32) | call | 1 | unmodeled | R |
 | M:System.Array.Resize``1(``0[]@,System.Int32) | call | 1 | unmodeled | R |
 | M:System.Collections.Generic.EqualityComparer`1.Equals(`0,`0) | call | 1 | unmodeled | C |
@@ -524,7 +580,7 @@ These 45 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
-| M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state |
+| M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=concrete-list-state |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Int16.CompareTo(System.Int16) | intrinsic=integer-comparison |
@@ -552,8 +608,8 @@ These 45 rows record the supplied facets; Unknown facets, zero postconditions an
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state |
-| P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state |
-| P:System.Collections.Generic.List`1.Item(System.Int32) | catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state |
+| P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state;intrinsic=concrete-list-state |
+| P:System.Collections.Generic.List`1.Item(System.Int32) | catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=concrete-list-state |
 | P:System.Collections.Generic.Queue`1.Count | catalog=bcl.queue.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative |
 | P:System.Collections.Generic.Stack`1.Count | catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative |
 | P:System.Nullable`1.HasValue | catalog=bcl.nullable.has-value;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |

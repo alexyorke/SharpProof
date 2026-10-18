@@ -19,12 +19,25 @@ internal static class AdvisoryEffectClaims
         RepositoryParameterGuard.ThrowIfInvalid(sites.IsDefault, nameof(sites));
         ArgumentNullGuard.NotNull(constraint, nameof(constraint));
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        (AdvisoryEffectSite Site, string Detail)? firstRead = null;
         foreach (var site in sites)
         {
             if (Violation(kind, constraint, site, compilation) is { } detail)
-            { return (site, detail); }
+            {
+                // A modeled operation can expose conservative reads before its
+                // mutation/call summary. Keep the first diagnostic location,
+                // preferring that summary at the same location when available.
+                if (firstRead is not { } read)
+                {
+                    if (kind != EffectEvaluationContractKind.EffectContract || site.Kind != AdvisoryEffectSiteKind.Read)
+                    { return (site, detail); }
+                    firstRead = (site, detail);
+                }
+                else if (site.Kind != AdvisoryEffectSiteKind.Read && site.Location.Equals(read.Site.Location))
+                { return (site, detail); }
+            }
         }
-        return null;
+        return firstRead;
     }
 
     private static string? Violation(EffectEvaluationContractKind kind, EffectClaimConstraint constraint,

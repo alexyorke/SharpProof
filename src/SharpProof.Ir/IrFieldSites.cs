@@ -25,6 +25,26 @@ public sealed class IrObjectState
 {
     internal Dictionary<IrMemberId, IrValue> Fields { get; } = [];
 
+    internal Dictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue> KeyedFields { get; } = [];
+
+    internal IrObjectState WithKeyedField(IrMemberId field, IrValue key, IrValue value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        key = ArgumentNullGuard.NotNull(key, nameof(key));
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        if (key.Kind != IrValueKind.Integer)
+        { throw new ArgumentException("A keyed field requires an integer key.", nameof(key)); }
+        KeyedFields[(field, key.Type, key.IntegerBits)] = value;
+        return this;
+    }
+
+    internal bool TryRead(IrMemberId field, IrValue? key, out IrValue value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        return key == null ? Fields.TryGetValue(field, out value!)
+            : KeyedFields.TryGetValue((field, key.Type, key.IntegerBits), out value!);
+    }
+
     public IrObjectState WithField(IrMemberId field, IrValue value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
@@ -151,7 +171,7 @@ internal sealed class IrHeap
         }
         if (UnknownContents)
         { ConsumedApproximation = true; value = null!; return false; }
-        if (key == null && owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(field, out value!))
+        if (owner.Reference is IrObjectState entry && entry.TryRead(field, key, out value!))
         { return true; }
         value = null!;
         return false;

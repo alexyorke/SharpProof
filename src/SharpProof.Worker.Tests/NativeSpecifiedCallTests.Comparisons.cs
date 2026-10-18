@@ -70,12 +70,12 @@ public sealed partial class NativeSpecifiedCallTests
         Assert.That(allocations.Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
 
-    [TestCase("System.Collections.Generic.List<int>")]
-    [TestCase("System.Collections.Generic.Dictionary<int, int>")]
-    [TestCase("System.Collections.Generic.Queue<int>")]
-    [TestCase("System.Collections.Generic.Stack<int>")]
-    [TestCase("System.Collections.Generic.ICollection<int>")]
-    public async Task CountDoesNotProveStrictPositivityOrAnInterfaceInvariant(string type)
+    [TestCase("System.Collections.Generic.List<int>", WorkerClaimOutcome.Refuted)]
+    [TestCase("System.Collections.Generic.Dictionary<int, int>", WorkerClaimOutcome.Unknown)]
+    [TestCase("System.Collections.Generic.Queue<int>", WorkerClaimOutcome.Unknown)]
+    [TestCase("System.Collections.Generic.Stack<int>", WorkerClaimOutcome.Unknown)]
+    [TestCase("System.Collections.Generic.ICollection<int>", WorkerClaimOutcome.Unknown)]
+    public async Task CountDoesNotProveStrictPositivityOrAnInterfaceInvariant(string type, WorkerClaimOutcome expected)
     {
         System.ArgumentNullException.ThrowIfNull(type);
         var comparison = type == "System.Collections.Generic.ICollection<int>" ? ">= 0" : "> 0";
@@ -85,7 +85,7 @@ public sealed partial class NativeSpecifiedCallTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
     }
 
     [TestCase("int")]

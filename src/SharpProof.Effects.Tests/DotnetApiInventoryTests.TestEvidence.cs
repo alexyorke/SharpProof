@@ -50,13 +50,15 @@ public sealed partial class DotnetApiInventoryTests
                 var arrays = row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal);
                 var nonnegative = row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal);
                 var empty = row.Id is "M:System.Collections.Generic.List`1.#ctor" or "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.ICollection`1.Count";
+                var incoming = row.Evidence.Contains("intrinsic=concrete-list-state", StringComparison.Ordinal);
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
-                    "compiled owned List construction, Count, Add and scalar/reference content state through concrete/interface aliases versus runtime; optional initialization/growth and bounds faults retained; ListStateOracleTests checks typed boundaries and faults; existing array and nonnegative probes retained",
+                    "compiled owned List construction, Count, Add and scalar/reference content state through concrete/interface aliases versus runtime; incoming concrete List Count, set, Add and get versus runtime where declared; optional initialization/growth and bounds faults retained; native entry-cell proof/refutation controls; existing array and nonnegative probes retained",
                     () => CheckListStateIntrinsic(compilation, false) && CheckListStateIntrinsic(compilation, false, referenceValues: true) &&
                         (!empty || CheckListStateIntrinsic(compilation, false, opaqueValues: true)) &&
+                        (!incoming || CheckListStateIntrinsic(compilation, false, incoming: true)) &&
                         (!arrays || CheckInterfaceArrayIntrinsic(compilation, row.Id, false)) && (!nonnegative || CheckCountInvariant(row.Id, false)),
                     () => CheckListStateIntrinsic(compilation, true) || CheckListStateIntrinsic(compilation, true, referenceValues: true) ||
-                        empty && CheckListStateIntrinsic(compilation, true, opaqueValues: true) ||
+                        empty && CheckListStateIntrinsic(compilation, true, opaqueValues: true) || incoming && CheckListStateIntrinsic(compilation, true, incoming: true) ||
                         arrays && CheckInterfaceArrayIntrinsic(compilation, row.Id, true) || nonnegative && CheckCountInvariant(row.Id, true));
             }
 

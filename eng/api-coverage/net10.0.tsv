@@ -1309,7 +1309,7 @@ System.Collections	M:System.Collections.Generic.LinkedList`1.RemoveLast	Method	u
 System.Collections	M:System.Collections.Generic.List`1.#ctor	Method	partially-modeled	intrinsic=fresh-list-state
 System.Collections	M:System.Collections.Generic.List`1.#ctor(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.#ctor(System.Int32)	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.List`1.Add(`0)	Method	partially-modeled	catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state
+System.Collections	M:System.Collections.Generic.List`1.Add(`0)	Method	partially-modeled	catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=concrete-list-state
 System.Collections	M:System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.AsReadOnly	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.List`1.BinarySearch(System.Int32,System.Int32,`0,System.Collections.Generic.IComparer{`0})	Method	unmodeled	-
@@ -1580,9 +1580,9 @@ System.Collections	P:System.Collections.Generic.LinkedList`1.Enumerator.Current	
 System.Collections	P:System.Collections.Generic.LinkedList`1.First	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.LinkedList`1.Last	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.List`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.List`1.Count	Property	partially-modeled	catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state
+System.Collections	P:System.Collections.Generic.List`1.Count	Property	partially-modeled	catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state;intrinsic=concrete-list-state
 System.Collections	P:System.Collections.Generic.List`1.Enumerator.Current	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.List`1.Item(System.Int32)	Property	partially-modeled	catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state
+System.Collections	P:System.Collections.Generic.List`1.Item(System.Int32)	Property	partially-modeled	catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=concrete-list-state
 System.Collections	P:System.Collections.Generic.OrderedDictionary`2.Capacity	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.OrderedDictionary`2.Comparer	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.OrderedDictionary`2.Count	Property	unmodeled	-

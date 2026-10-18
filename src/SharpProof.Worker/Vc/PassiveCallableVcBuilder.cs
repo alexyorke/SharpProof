@@ -722,8 +722,8 @@ internal sealed class PassiveCallableVcBuilder
             // Entry heap values predate every allocation, including when the
             // body first reads them after allocating. Apply this to the entry
             // seed; ordered stores still allow a field to hold the new object.
-            // Keyed entry cells have no replay reconstruction. Do not require
-            // witnesses to read those cells solely to justify freshness; retain
+            // Only queried keyed entry cells have replay reconstruction. Do not
+            // require extra cells solely to justify freshness; retain
             // an overapproximation until an ordered store supplies their value.
             if (key == null && _factory.GetTypeInfo(entry.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
             {
