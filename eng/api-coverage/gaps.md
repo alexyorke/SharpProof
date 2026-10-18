@@ -278,7 +278,7 @@ work item is closed by this slice.
 
 ## Verified incoming concrete List state
 
-Bound nonvirtual framework `List<T>` Count, Add and simple indexed get/set now use
+Framework `List<T>` Count, Add and simple indexed get/set bound to base members use
 shared Count and keyed content state for incoming concrete receivers as well as
 fresh instances. Count and indexed reads can appear in contracts, including entry
 preconditions and Old snapshots. The value domain remains supported scalar and
@@ -293,6 +293,9 @@ semantics. Oversized List witnesses are rejected under the query resource budget
 this does not constrain the universal SMT proof domain. A solver choosing such a
 witness can still yield Unknown, so this slice does not promise every unbounded
 List claim can be decided. Growth, allocation and fault uncertainty remain.
+Reviewed effect facets bound growth-failure calls just as they bound ordinary
+calls; missing evidence still uses the opaque fallback. Known capabilities do not
+imply no faults or no allocations.
 
 Six more corpus sites gain partial support: indexed reads in PrimesList lines 148
 and 149 and BTree line 53, plus Add in BucketSorter lines 32 and 72 and BTree line
@@ -313,7 +316,8 @@ compound updates, other List operations and precise growth behavior stay open.
 
 Canonical container validation passes 2,039 frontend tests, 983 selected worker
 tests, 481 IR tests, 363 SMT tests, 640 contract tests, 29 inventory/evidence tests
-and eight usage-ranking tests. Layout passes for all 59 projects. CI still
+and eight usage-ranking tests. All 63 analyzer mode/effect controls pass, including capability evidence alongside
+unknown growth faults and allocation. Layout passes for all 59 projects. CI still
 requires aggregate and changed-code coverage plus platform/package consumers.
 
 ## Cross-cutting gaps previously identified

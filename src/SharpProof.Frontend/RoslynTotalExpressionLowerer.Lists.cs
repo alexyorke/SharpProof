@@ -143,7 +143,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var normal = _builder.CreateBlock("list:growth-normal");
         _builder.Branch(block, site, _factory.Binary(IrBinaryOperator.OrElse, _factory.Variable(fails),
             full), failure, normal);
-        var effects = EmitOpaqueCall(operation, method, values, failure, null, IrOpaqueCallEffects.All).Continuation;
+        // Preserve independently reviewed effect facets just as an ordinary
+        // bound call does. Missing facets still use the opaque fallback.
+        var effects = EmitOpaqueCall(operation, method, values, failure, null,
+            OpaqueEffects?.Invoke(method) ?? IrOpaqueCallEffects.All).Continuation;
         _builder.Throw(effects, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
         // Growth is possible, not guaranteed. A successful scalar/reference copy

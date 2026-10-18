@@ -471,6 +471,28 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task ListStateHonorsKnownEffectsWithoutInventingGrowthGuarantees()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [AllowedCapabilities(SharpProofCapability.None), DoesNotThrow, ZeroAllocations]
+                public static void Add(List<int> values) {
+                    Contract.Requires(values != null);
+                    values.Add(1);
+                }
+            }
+            """,
+            "effects",
+            ["SP0016", "SP0045", "SP0046"]);
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0045", "SP0046");
+    }
+
     [TestCase("definition")]
     [TestCase("implementation")]
     [TestCase("both")]
