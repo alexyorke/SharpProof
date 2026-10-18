@@ -1926,7 +1926,7 @@ assertions, evaluation and graph publication. Preserve callback order, duplicate
 finite transfer order, default enum/IR comparers and raw domain values.
 
 The coordinator rejects the agent's IrTraversal Stack conversion: this test explicitly
-passes a mutable stack to the public PushChildren overload and observes its mutation.
+passes a mutable stack to the mutable PushChildren overload and observes its mutation.
 Keep that SUT stack; only its separate popped-observation list is construction state.
 Likewise keep IrInputSnapshot mutation/comparer tests and keyed heap mutation subjects.
 Fixed expected operation arrays and occurrence vectors can be immutable snapshots.
@@ -1939,3 +1939,23 @@ IMM-M027 passes 1,134 Analyzer tests; the M026 build's moved null guard hit CA22
 then was changed to the repository guard helper retaining parameter name body.
 Evidence: immutability-analyzer-scoped-builders-tests.log and
 immutability-effect-fixpoint-builders-tests.log; corrected fixpoint rerun pending.
+## Worker native evidence snapshot inventory
+
+IMM-M029: Coordinator traced completed/pending result maps and effect lookups in
+CallableVerificationPolicy, assumption declarations in CallableClaimResultAssembler,
+trusted-boundary membership in EffectClaimResultAssembler, native claim/Requires
+snapshots and used-ID accumulation in NativeEffectClaims, and exception/site verifier
+snapshots. These do not reach native array APIs. Use scoped result-map/set builders
+and immutable filtered arrays/maps, preserving Ordinal keys, claim order, first invalid
+results, assumption ordinals and callback overwrite semantics. Freeze used IDs on return.
+Private VerifyValidAsync accepts initialized immutable claims and rejects default input.
+
+Reject plain ToImmutableDictionary for old strict ToDictionary sites: identical duplicate
+key/value pairs may be accepted by immutable-map construction. Use the established
+ImmutableDictionaryCapture.Create helper with explicit selectors to retain strict rejection.
+Status: open before edits.
+
+IMM-M026 passes 77 focused Worker tests after the guard fix. IMM-M028 passes all
+485 ordinary IR tests and 118 Dataflow tests, including existing mutation-under-test
+coverage. Evidence: immutability-effect-fixpoint-builders-tests2.log,
+immutability-ir-fixture-builders-tests.log and immutability-dataflow-fixture-builders-tests.log.
