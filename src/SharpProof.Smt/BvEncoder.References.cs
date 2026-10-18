@@ -9,7 +9,7 @@ internal sealed partial class BvEncoder
     private readonly Dictionary<IrStringId, Expr> _stringLiterals = [];
     internal List<BoolExpr> ReferenceFacts { get; } = [];
 
-    // Witness lengths are charged when decoded. Prefer small string/array
+    // Witness sizes are charged when decoded. Prefer small string/array/List
     // models without restricting the unbounded query used for proofs.
     internal BoolExpr? SmallReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)
     {
@@ -23,6 +23,20 @@ internal sealed partial class BvEncoder
             {
                 bounds.Add(owner.Own(context.MkBVULE((BitVecExpr)EncodeLength(GetVariable(variable, meter), meter),
                     owner.Own(context.MkBV(MaximumSmallReference, 32)))));
+            }
+        }
+        foreach (var field in _fieldReads)
+        {
+            meter.Consume();
+            var member = factory.GetMemberInfo(field.Key);
+            if (!member.ParameterTypes.IsEmpty || member.ReturnType != factory.IntegerType || factory.GetString(member.Name) != IrFieldSites.Prefix + "list:count")
+            { continue; }
+            foreach (var observed in field.Value.Values)
+            {
+                meter.Consume();
+                var count = owner.Own(context.MkApp(_fields[field.Key], observed.Owner));
+                var size = owner.Own(context.MkBVAND((BitVecExpr)count, owner.Own(context.MkBV(int.MaxValue, 32))));
+                bounds.Add(owner.Own(context.MkBVULE(size, owner.Own(context.MkBV(MaximumSmallReference, 32)))));
             }
         }
         return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));

@@ -28,8 +28,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private GuardedExpression? ListClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
         property = RepositoryParameterGuard.NotNull(property, nameof(property));
-        if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter ||
-            !CSharpOperationSemantics.IsConcreteListStateMember(getter))
+        if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter)
+        { return null; }
+        var knownElement = _context.KnownValueType(getter.ContainingType.TypeArguments.FirstOrDefault());
+        if (!CSharpOperationSemantics.IsListStateMember(getter, knownElement) ||
+            !CSharpOperationSemantics.IsConcreteListStateMember(getter, knownElement) && !_context.IsExactList(instance))
         { return null; }
         var receiver = LowerClause(instance, state, depth + 1);
         if (!receiver.Classification.IsExact)
@@ -68,8 +71,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var property = access as IPropertyReferenceOperation;
         var method = invocation?.TargetMethod ?? (assigned == null ? property?.Property.GetMethod : property?.Property.SetMethod);
         var instance = invocation?.Instance ?? property?.Instance;
-        if (method == null || instance == null || !CSharpOperationSemantics.IsListStateMember(method) ||
-            !CSharpOperationSemantics.IsConcreteListStateMember(method) && !_context.IsFreshList(instance))
+        if (method == null || instance == null)
+        { return null; }
+        var knownElement = _context.KnownValueType(method.ContainingType.TypeArguments.FirstOrDefault());
+        if (!CSharpOperationSemantics.IsListStateMember(method, knownElement) ||
+            !CSharpOperationSemantics.IsConcreteListStateMember(method, knownElement) && !_context.IsExactList(instance))
         { return null; }
         var receiver = LowerBodyValue(instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
