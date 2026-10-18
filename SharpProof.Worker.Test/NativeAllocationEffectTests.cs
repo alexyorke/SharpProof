@@ -308,8 +308,9 @@ public sealed class NativeAllocationEffectTests
         }
         finally { context.Unload(); }
         var native = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(native.Outcome, Is.Null);
+        Assert.That(native.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         Assert.That(native.ExceptionWitness, Is.Null);
-        Assert.That(native.Outcome, Is.Not.TypeOf<RefutedOutcome>());
     }
 
     [Test]

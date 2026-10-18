@@ -505,8 +505,9 @@ internal static class Program
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
         }
         using var publicationDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        publicationDeadline.CancelAfter(TimeSpan.FromMilliseconds(
-            (long)request.Budgets.ProjectWallTimeMilliseconds + arguments.TerminationGraceMilliseconds + PublicationLease.TimeoutMilliseconds));
+        publicationDeadline.CancelAfter(GetPublicationTimeout(
+            request.Budgets.ProjectWallTimeMilliseconds,
+            arguments.TerminationGraceMilliseconds));
         using var lease = await PublicationLease.AcquireAsync(members, publicationDeadline.Token).ConfigureAwait(false);
 
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
@@ -539,6 +540,16 @@ internal static class Program
         Log.Info("SharpProof evidence: request=" + arguments.PublishRequestPath +
             "; result=" + arguments.PublishResultPath + "; compiler manifest=" + arguments.PublishCompilerManifestPath +
             (arguments.PublishSarifPath == null ? string.Empty : "; SARIF=" + arguments.PublishSarifPath));
+    }
+
+    internal static TimeSpan GetPublicationTimeout(
+        int projectMilliseconds,
+        int terminationGraceMilliseconds)
+    {
+        return TimeSpan.FromMilliseconds(
+            (long)projectMilliseconds +
+            terminationGraceMilliseconds +
+            PublicationLease.TimeoutMilliseconds);
     }
 
     // A failed run must still publish a typed failure result after cancellation.
