@@ -24,6 +24,7 @@ internal static partial class CSharpOperationSemantics
     // This deliberately requires a visible array-to-interface conversion.
     // A statically typed List can be subclassed and reimplement its interfaces;
     // a scalar SZ array has one known implementation and cannot be covariant.
+    // A matching `as` conversion preserves the same reference, including null.
     internal static IOperation? ArrayCollectionReceiver(IPropertyReferenceOperation property)
     {
         property = RepositoryParameterGuard.NotNull(property, nameof(property));
@@ -31,7 +32,7 @@ internal static partial class CSharpOperationSemantics
         { return null; }
         var receiver = property.Instance;
         if (receiver is not IConversionOperation
-            { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsReference: true } } conversion)
+            { OperatorMethod: null, Conversion: { Exists: true, IsReference: true } } conversion)
         { return null; }
         if (conversion.Type is not INamedTypeSymbol target ||
             target.OriginalDefinition.GetDocumentationCommentId() is not

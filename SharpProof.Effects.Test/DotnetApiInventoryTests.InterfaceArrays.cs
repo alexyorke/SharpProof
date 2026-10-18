@@ -61,6 +61,8 @@ public sealed partial class DotnetApiInventoryTests
                 public static int D(int[] values) => ((System.Collections.Generic.IList<int>)(object)values)[0];
                 public static int E(int[] values) => ((System.Collections.Generic.IList<int>)(values))[0];
                 public static int F(int[] values) => (values as System.Collections.Generic.IList<int>)[0];
+                public static int G(int[] values) => ((object)values as System.Collections.Generic.IList<uint>).Count;
+                public static int H(int[] values) => (values as System.Collections.Generic.ICollection<int>).Count;
             }
             """);
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
@@ -70,7 +72,7 @@ public sealed partial class DotnetApiInventoryTests
         foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
             var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(method.ExpressionBody!.Expression)!;
-            Assert.That(CSharpOperationSemantics.ArrayCollectionReceiver(property) != null, Is.EqualTo(method.Identifier.ValueText == "E"));
+            Assert.That(CSharpOperationSemantics.ArrayCollectionReceiver(property) != null, Is.EqualTo(method.Identifier.ValueText is "E" or "F" or "H"));
         }
     }
 
@@ -157,7 +159,7 @@ public sealed partial class DotnetApiInventoryTests
     [TestCase("System.Collections.Generic.IList<int> list = values; System.Action action = () => list = unknown; return list.Count;", false)]
     [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : unknown).Count;", false)]
     [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : (System.Collections.Generic.IList<int>)values).Count;", true)]
-    [TestCase("System.Collections.Generic.IList<int> list = values as System.Collections.Generic.IList<int>; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values as System.Collections.Generic.IList<int>; return list.Count;", true)]
     [TestCase("System.Collections.Generic.IList<long> list = (System.Collections.Generic.IList<long>)(System.Collections.Generic.IList<int>)values; return list.Count;", false)]
     public void ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(string body, bool expected)
     {

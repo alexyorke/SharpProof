@@ -96,7 +96,7 @@ public sealed partial class TotalLoweringContext
             operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return null; }
-            if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion &&
+            if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && IsArrayInterface(conversion.Type)))
             {
                 var array = Resolve(conversion.Operand, depth + 1);
@@ -256,7 +256,7 @@ public sealed partial class TotalLoweringContext
         { return null; }
         if (operation.Type is IArrayTypeSymbol { IsSZArray: true } array && CSharpOperationSemantics.IsScalar(array.ElementType))
         { return array; }
-        if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion &&
+        if (operation is IConversionOperation { OperatorMethod: null } conversion &&
             (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && IsArrayInterface(conversion.Type)))
         {
             var converted = ConcreteArray(conversion.Operand, depth + 1);

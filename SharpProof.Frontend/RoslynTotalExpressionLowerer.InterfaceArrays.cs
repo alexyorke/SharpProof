@@ -6,7 +6,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        if (depth < 256 && operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion &&
+        if (depth < 256 && operation is IConversionOperation { OperatorMethod: null } conversion &&
             (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && TotalLoweringContext.IsArrayInterface(conversion.Type)) &&
             _context.ConcreteArray(operation) != null)
         { return LowerReceiverValue(conversion.Operand, block, depth + 1); }
