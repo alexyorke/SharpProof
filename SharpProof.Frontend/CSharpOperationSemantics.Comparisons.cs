@@ -9,8 +9,7 @@ internal static partial class CSharpOperationSemantics
         return !method.IsStatic && method.Name == "CompareTo" && method.DeclaringSyntaxReferences.IsEmpty &&
             method.ReturnType.SpecialType == SpecialType.System_Int32 && method.Parameters.Length == 1 &&
             method.Parameters[0].RefKind == RefKind.None &&
-            method.ContainingType.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 or
-                SpecialType.System_UInt32 or SpecialType.System_UInt64 &&
+            IsComparisonIntegerType(method.ContainingType) &&
             SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ContainingType);
     }
 
@@ -40,8 +39,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsComparisonIntegerType(ITypeSymbol? type)
     {
-        return type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 or
-            SpecialType.System_UInt32 or SpecialType.System_UInt64;
+        return type != null && TryGetScalarInteger(type.SpecialType, out _);
     }
 
     internal static ITypeSymbol? DefaultComparerElement(IOperation operation)
@@ -84,6 +82,10 @@ internal static partial class CSharpOperationSemantics
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        // CoreLib's 8/16-bit CompareTo returns the promoted difference, not its sign.
+        // Both operand domains fit Int32, so this subtraction cannot overflow.
+        if (factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer, Width: < 32 })
+        { return factory.Binary(IrBinaryOperator.Subtract, factory.Cast(factory.IntegerType, left), factory.Cast(factory.IntegerType, right)); }
         return factory.Conditional(factory.Binary(IrBinaryOperator.LessThan, left, right), factory.Integer(-1),
             factory.Conditional(factory.Binary(IrBinaryOperator.GreaterThan, left, right), factory.Integer(1), factory.Integer(0)));
     }

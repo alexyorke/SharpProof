@@ -25495,7 +25495,7 @@ System.Runtime	M:System.Buffers.Text.Base64Url.TryEncodeToUtf8(System.ReadOnlySp
 System.Runtime	M:System.Buffers.Text.Base64Url.TryEncodeToUtf8InPlace(System.Span{System.Byte},System.Int32,System.Int32@)	Method	unmodeled	-
 System.Runtime	M:System.Byte.#ctor	Method	unmodeled	-
 System.Runtime	M:System.Byte.Clamp(System.Byte,System.Byte,System.Byte)	Method	unmodeled	-
-System.Runtime	M:System.Byte.CompareTo(System.Byte)	Method	unmodeled	-
+System.Runtime	M:System.Byte.CompareTo(System.Byte)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.Byte.CompareTo(System.Object)	Method	unmodeled	-
 System.Runtime	M:System.Byte.CreateChecked``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.Byte.CreateSaturating``1(``0)	Method	unmodeled	-
@@ -25546,7 +25546,7 @@ System.Runtime	M:System.CannotUnloadAppDomainException.#ctor(System.Runtime.Seri
 System.Runtime	M:System.CannotUnloadAppDomainException.#ctor(System.String)	Method	unmodeled	-
 System.Runtime	M:System.CannotUnloadAppDomainException.#ctor(System.String,System.Exception)	Method	unmodeled	-
 System.Runtime	M:System.Char.#ctor	Method	unmodeled	-
-System.Runtime	M:System.Char.CompareTo(System.Char)	Method	unmodeled	-
+System.Runtime	M:System.Char.CompareTo(System.Char)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.Char.CompareTo(System.Object)	Method	unmodeled	-
 System.Runtime	M:System.Char.ConvertFromUtf32(System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Char.ConvertToUtf32(System.Char,System.Char)	Method	unmodeled	-
@@ -28771,7 +28771,7 @@ System.Runtime	M:System.Int128.op_UnsignedRightShift(System.Int128,System.Int32)
 System.Runtime	M:System.Int16.#ctor	Method	unmodeled	-
 System.Runtime	M:System.Int16.Abs(System.Int16)	Method	unmodeled	-
 System.Runtime	M:System.Int16.Clamp(System.Int16,System.Int16,System.Int16)	Method	unmodeled	-
-System.Runtime	M:System.Int16.CompareTo(System.Int16)	Method	unmodeled	-
+System.Runtime	M:System.Int16.CompareTo(System.Int16)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.Int16.CompareTo(System.Object)	Method	unmodeled	-
 System.Runtime	M:System.Int16.CopySign(System.Int16,System.Int16)	Method	unmodeled	-
 System.Runtime	M:System.Int16.CreateChecked``1(``0)	Method	unmodeled	-
@@ -30936,7 +30936,7 @@ System.Runtime	M:System.SByte.#ctor	Method	unmodeled	-
 System.Runtime	M:System.SByte.Abs(System.SByte)	Method	unmodeled	-
 System.Runtime	M:System.SByte.Clamp(System.SByte,System.SByte,System.SByte)	Method	unmodeled	-
 System.Runtime	M:System.SByte.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.SByte.CompareTo(System.SByte)	Method	unmodeled	-
+System.Runtime	M:System.SByte.CompareTo(System.SByte)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.SByte.CopySign(System.SByte,System.SByte)	Method	unmodeled	-
 System.Runtime	M:System.SByte.CreateChecked``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.SByte.CreateSaturating``1(``0)	Method	unmodeled	-
@@ -32879,7 +32879,7 @@ System.Runtime	M:System.UInt128.op_UnsignedRightShift(System.UInt128,System.Int3
 System.Runtime	M:System.UInt16.#ctor	Method	unmodeled	-
 System.Runtime	M:System.UInt16.Clamp(System.UInt16,System.UInt16,System.UInt16)	Method	unmodeled	-
 System.Runtime	M:System.UInt16.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.UInt16.CompareTo(System.UInt16)	Method	unmodeled	-
+System.Runtime	M:System.UInt16.CompareTo(System.UInt16)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.UInt16.CreateChecked``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt16.CreateSaturating``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt16.CreateTruncating``1(``0)	Method	unmodeled	-

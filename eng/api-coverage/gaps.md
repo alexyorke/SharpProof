@@ -12,9 +12,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,640 declarations have no catalog/audited-intrinsic evidence, and 33 have partial
+55,635 declarations have no catalog/audited-intrinsic evidence, and 38 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,640 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,635 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -252,7 +252,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 33 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 38 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -265,8 +265,11 @@ These 33 rows record the supplied facets; Unknown facets, zero postconditions an
 | P:System.Collections.Generic.Stack`1.Count | catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative |
 | M:System.Linq.Enumerable.Empty``1 | catalog=bcl.enumerable.empty;effects=Unknown;allocation=Unknown;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=Empty;termination=Unknown;postconditions=0 |
 | M:System.Array.Empty``1 | catalog=bcl.array.empty;effects=Unknown;allocation=Unknown;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=Empty;termination=Unknown;postconditions=0 |
+| M:System.Byte.CompareTo(System.Byte) | intrinsic=integer-comparison |
+| M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.Int16.CompareTo(System.Int16) | intrinsic=integer-comparison |
 | M:System.Int32.CompareTo(System.Int32) | intrinsic=integer-comparison |
 | M:System.Int64.CompareTo(System.Int64) | intrinsic=integer-comparison |
 | M:System.InvalidOperationException.#ctor | catalog=bcl.invalid-operation-exception.ctor;effects=WritesReceiverState, ReadsAmbientState, Synchronization;allocation=MayAllocate;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
@@ -277,10 +280,12 @@ These 33 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Nullable`1.GetValueOrDefault | catalog=bcl.nullable.get-value-or-default;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Nullable`1.GetValueOrDefault(`0) | catalog=bcl.nullable.get-value-or-default.value;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Object.#ctor | catalog=bcl.object.ctor;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.SByte.CompareTo(System.SByte) | intrinsic=integer-comparison |
 | M:System.String.Concat(System.String,System.String) | catalog=bcl.string.concat.string-string;effects=None;allocation=MayAllocate;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.String.Equals(System.String) | intrinsic=string-instance-equality |
 | M:System.String.Equals(System.String,System.String) | intrinsic=string-static-equality |
 | M:System.String.IsNullOrEmpty(System.String) | catalog=bcl.string.is-null-or-empty;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface |

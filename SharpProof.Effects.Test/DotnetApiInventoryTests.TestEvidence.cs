@@ -18,7 +18,7 @@ public sealed partial class DotnetApiInventoryTests
         {
             if (row.Evidence.Contains("intrinsic=integer-comparison", StringComparison.Ordinal) || row.Evidence.Contains("intrinsic=default-integer-comparer-only", StringComparison.Ordinal))
             {
-                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 32/64 bit; named argument reordering; compiled IR versus runtime", () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false), () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 8/16/32/64 bit and UTF-16 code units; exact promoted differences; named argument reordering; compiled IR versus runtime", () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false), () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));
             }
 
             if (row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal))

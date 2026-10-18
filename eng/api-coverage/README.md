@@ -157,13 +157,21 @@ partial API models, not collection-content or full heap models.
 
 ### Integer comparisons and Count result guarantees
 
-The frontend now models the exact -1/0/1 result of the typed
-`Int32/Int64/UInt32/UInt64.CompareTo` overloads, and proved direct or aliased
-`Comparer<int/long/uint/ulong>.Default.Compare` calls. Default identity can flow through local aliases, compatible joins, CFG captures, and immutable source parameters. Generic interface-array helpers can use their proven scalar element type for a default comparison. It evaluates receivers
-and arguments in source order, including named argument reordering. The Default
-getter still executes as an opaque call: its initialization, allocation, and
-exception possibilities are retained. Custom comparers, generic type parameters,
-object overloads, and smaller integer types do not inherit this model.
+The frontend models typed comparisons for all nine supported integer types.
+`SByte/Byte/Int16/UInt16/Char.CompareTo` return the exact Int32-promoted difference;
+`Int32/Int64/UInt32/UInt64.CompareTo` return -1/0/1. Proven default comparers use
+the corresponding result, retaining non-unit differences for smaller types.
+The runtime/IR witnesses cover each overload and default comparer across ordered
+boundary pairs, including signed extrema and UTF-16 surrogate code units.
+Default identity flows through aliases, compatible joins, CFG captures and
+immutable source parameters. Generic helpers use declaration-owned scalar type
+arguments or proven array element types, including local-function symbol clones.
+Receivers and arguments retain source order, including named arguments. The
+Default getter remains an opaque call with initialization, allocation and exception
+possibilities; wrong-contract replay after that call remains a separate gap.
+Custom comparers, unbound generic types, Boolean and object overloads do not inherit
+integer semantics. The promoted-difference behavior is also visible in the
+[CoreLib implementation](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/SByte.cs).
 
 The four concrete Count getters above now additionally constrain normal results to
 `Count >= 0` in native lowering. This does not imply strict positivity, collection

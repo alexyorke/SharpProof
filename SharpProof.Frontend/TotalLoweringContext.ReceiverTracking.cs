@@ -232,7 +232,7 @@ public sealed partial class TotalLoweringContext
         if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion.IsIdentity: true } conversion)
         { return IsDefaultIntegerComparer(conversion.Operand, depth + 1); }
         return CSharpOperationSemantics.DefaultComparerElement(operation) is { } element &&
-            CSharpOperationSemantics.IsComparisonIntegerType(_receiverElements.TryGetValue(element, out var concrete) ? concrete : element) ||
+            CSharpOperationSemantics.IsComparisonIntegerType(SpecializeReceiverElement(element)) ||
             Symbol(operation) is { } symbol && _defaultComparers.Contains(symbol) ||
             operation is IFlowCaptureReferenceOperation capture && _defaultComparerCaptures.Contains(capture.Id);
     }
