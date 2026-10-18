@@ -117,7 +117,7 @@ function Assert-DockerfileAuthority {
         },
         [pscustomobject]@{
             Argument = 'DOTNET_API_REFERENCE_IMAGE'
-            Image = "$($ToolchainCatalog.dotnet.apiReferenceImage)@$($ToolchainCatalog.dotnet.apiReferenceImageDigest)"
+            Image    = "$($ToolchainCatalog.dotnet.apiReferenceImage)@$($ToolchainCatalog.dotnet.apiReferenceImageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
@@ -196,7 +196,7 @@ function Assert-DockerfileAuthority {
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
     $apiReferencePack = 'Microsoft.NETCore.App.Ref/' +
-        [string]$ToolchainCatalog.dotnet.apiReferencePackVersion
+    [string]$ToolchainCatalog.dotnet.apiReferencePackVersion
     Assert-SingleMatchingLine `
         $toolchainLines `
         '^COPY --from=api-reference ' `
