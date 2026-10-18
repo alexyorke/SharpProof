@@ -15,6 +15,12 @@ inputs:
 runs:
   using: composite
   steps:
+    # Temporary diagnostics: sample runner CPU and memory for the whole job.
+    # The job's final runner-telemetry report step stops it and summarizes.
+    - name: Start runner telemetry
+      uses: ./.github/actions/runner-telemetry
+      with:
+        mode: start
     - name: Require an immutable qualified artifact identity
       if: inputs.download-packages == 'true'
       shell: bash
@@ -28,6 +34,9 @@ runs:
         artifact-ids: ${{ inputs.artifact-id }}
         merge-multiple: true
         path: nupkgs
+    # The default docker driver writes the image straight into the daemon.
+    # A buildx layer cache needs the docker-container driver, whose extra
+    # tarball export and load cost more than the base-image pulls it saves.
     - name: Build the pinned Linux amd64 toolchain
       shell: bash
       run: |

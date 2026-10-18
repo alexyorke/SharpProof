@@ -47,3 +47,9 @@ jobs:
           path: artifacts/lint
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report

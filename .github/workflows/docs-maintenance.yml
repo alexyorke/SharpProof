@@ -39,6 +39,12 @@ jobs:
           path: artifacts/docs/source-reference.md
           if-no-files-found: error
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   update:
     needs: reference
     if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)

@@ -147,6 +147,12 @@ jobs:
           path: artifacts/container-packages/*
           if-no-files-found: error
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   container-verifier:
     name: Canonical Linux analyzer and verifier consumers
     needs: package
@@ -167,6 +173,13 @@ jobs:
           -Configuration Release
           -PackageSource nupkgs
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  # x64 runs inside the Linux portable consumer job below, sharing its setup.
   native-linux-verifier:
     name: Plug-and-play native Linux verifier (${{ matrix.architecture }})
     needs: package
@@ -174,8 +187,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            architecture: x64
           - os: ubuntu-24.04-arm
             architecture: arm64
     runs-on: ${{ matrix.os }}
@@ -198,6 +209,9 @@ jobs:
           -PackageSource nupkgs -PackageId SharpProof -OsFamily linux
           -Architecture ${{ matrix.architecture }}
 
+  # Each job shares one checkout, SDK setup, and package download across the
+  # portable consumer and that platform's native verifier checks, which keeps
+  # pull requests within the account's concurrent (especially macOS) job limit.
   portable-consumers:
     name: Portable package consumer (${{ matrix.os }})
     needs: package
@@ -256,6 +270,25 @@ jobs:
         if: matrix.family == 'windows'
         run: >-
           pwsh scripts/Test-SharpProofWindowsProofs.ps1
+          -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
+
+      - name: Prove and refute with one package and default settings on Linux
+        if: matrix.family == 'linux'
+        shell: pwsh
+        run: >-
+          ./scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          -PackageSource nupkgs -PackageId SharpProof -OsFamily linux
+          -Architecture ${{ matrix.architecture }}
+      - name: Prove and refute with one package and default settings on macOS
+        if: matrix.family == 'macos'
+        run: >-
+          pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          -PackageSource nupkgs -PackageId SharpProof -OsFamily macos
+          -Architecture ${{ matrix.architecture }}
+      - name: Prove a claim and reject a modified native payload
+        if: matrix.family == 'macos'
+        run: >-
+          pwsh scripts/Test-SharpProofMacOsVerifierConsumer.ps1
           -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
 
   visual-studio-consumers:
@@ -324,40 +357,6 @@ jobs:
           ./scripts/Test-SharpProofWindowsProofs.ps1
           -PackageSource nupkgs -Architecture arm64
 
-  macos-verifier:
-    name: Native macOS verifier (${{ matrix.os }})
-    needs: package
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15
-            architecture: arm64
-          - os: macos-15-intel
-            architecture: x64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
-          merge-multiple: true
-          path: nupkgs
-      - name: Prove and refute with one package and default settings on macOS
-        run: >-
-          pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
-          -PackageSource nupkgs -PackageId SharpProof -OsFamily macos
-          -Architecture ${{ matrix.architecture }}
-      - name: Prove a claim and reject a modified native payload
-        run: >-
-          pwsh scripts/Test-SharpProofMacOsVerifierConsumer.ps1
-          -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
-
   optional-tool:
     name: Pack and qualify the optional CLI tool
     outputs:
@@ -392,7 +391,7 @@ jobs:
   provenance:
     name: Attest qualified release packages
     if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-    needs: [release-qualification, security, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, macos-verifier, optional-tool]
+    needs: [release-qualification, security, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -553,7 +552,6 @@ jobs:
       - native-windows-arm64-verifier
       - portable-consumers
       - visual-studio-consumers
-      - macos-verifier
       - optional-tool
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'v1.0.0-preview.1' && 'nuget.private-preview' || 'nuget.org' }}

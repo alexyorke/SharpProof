@@ -3,6 +3,7 @@ apphost
 authenticode
 binlogs
 bodyless
+buildx
 callees
 cifs
 csharp
