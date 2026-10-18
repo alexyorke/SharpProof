@@ -2163,3 +2163,17 @@ immutability-spec-oracle-constant-tests2.log, immutability-build-task-paths-test
 immutability-frontend-input-alias-builders-tests6.log, immutability-m036-script-tests.log,
 immutability-m039-script-tests.log, immutability-m039-script-format.log,
 immutability-m039-layout.log and immutability-second-master-literals.log.
+## Passive verification-condition builder inventory
+
+IMM-M040: Coordinator traced PassiveCallableVcBuilder's 23 private list/map fields,
+per-block state, exception-code membership and substitution construction through plan,
+edge and exit publication. Use scoped/lifecycle immutable builders and freeze getters,
+Edge.State, Exit.State and substitutions. Preserve strict Dictionary.Add with AddUnique,
+index overwrites and append duplicates/order. Incoming edge buckets stay builder-owned.
+
+Two insertion orders affect freshness facts/labels: per-block state.Values and entry
+field-reference values. Retain explicit first-insertion order sidecars, including
+assignment overwrites and RHS evaluation before insertion. Heap.Stores, Edge/Exit
+state and fact snapshots remain persistent immutable values; historical returns retain
+their exact heap contents. IrSnapshotReads' immutable selector memo contract remains
+unchanged in this bounded batch. Status: open before edits.
