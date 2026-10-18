@@ -487,7 +487,7 @@ public sealed class TypedContractLoweringTests
     [TestCase(true)]
     public void RequiresOnlyIgnoresUnsupportedSpecificationPredicates(bool companion)
     {
-        var clauses = """
+        const string clauses = """
             Contract.Requires(x > 0);
             Contract.Ensures(System.DateTime.Now.Ticks > x);
             Contract.Assume(System.DateTime.Now.Ticks != x);

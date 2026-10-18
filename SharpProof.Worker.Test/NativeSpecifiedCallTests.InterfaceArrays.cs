@@ -42,7 +42,7 @@ public sealed partial class NativeSpecifiedCallTests
     public async Task ArrayBackedListStoreProvesStoredValueAndRetainsMutationEffects(string element)
     {
         var store = "((System.Collections.Generic.IList<" + element + ">)values)[index] = replacement;";
-        var requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
+        const string requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
         var parameters = element + "[] values, int index, " + element + " replacement";
         await CheckInterfaceArrayContract(parameters,
             requires + "Contract.Ensures(Contract.Result<" + element + ">() == replacement); " + store + " return values[index];",
@@ -281,7 +281,7 @@ public sealed partial class NativeSpecifiedCallTests
         System.ArgumentNullException.ThrowIfNull(prefix);
         System.ArgumentNullException.ThrowIfNull(postfix);
         System.ArgumentNullException.ThrowIfNull(delta);
-        var previous = "Contract.Old(values[0])";
+        const string previous = "Contract.Old(values[0])";
         var updated = "unchecked((" + type + ")(" + previous + " + (" + delta + ")))";
         await CheckInterfaceArrayContract(type + "[] values",
             "Contract.Requires(values != null && values.Length > 0); " +
@@ -314,7 +314,7 @@ public sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task InterfaceArrayCompoundReadPrecedesRhsMutationAndRebinding()
     {
-        var requires = "Contract.Requires(values != null && values.Length > 1); ";
+        const string requires = "Contract.Requires(values != null && values.Length > 1); ";
         await CheckInterfaceArrayContract("int[] values, int replacement",
             requires + "Contract.Ensures(Contract.Result<int>() == unchecked(Contract.Old(values[0]) + replacement)); " +
             "((System.Collections.Generic.IList<int>)values)[0] += (values[0] = replacement); return values[0];", WorkerClaimOutcome.Proven);

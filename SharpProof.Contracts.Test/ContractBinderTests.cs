@@ -325,7 +325,7 @@ public sealed class ContractBinderTests
     [Test]
     public void DirectCompilerBoundContractWinsAndSymbolIdentityRejectsShadows()
     {
-        var source =
+        const string source =
             """
             using SharpProof.Attributes;
             public static class Shadow {

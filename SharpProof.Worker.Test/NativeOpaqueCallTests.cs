@@ -205,7 +205,7 @@ public sealed class NativeOpaqueCallTests
     [TestCase(false, null)]
     public async Task CatchAllHandlesDispatchedAndConstrainedCalls(bool guarded, Type? outcome)
     {
-        var body = "var entry = _collection.Find(item.Key); return entry.Value.Equals(item.Value);";
+        const string body = "var entry = _collection.Find(item.Key); return entry.Value.Equals(item.Value);";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
             using System.Collections.Generic;
             using SharpProof.Attributes;

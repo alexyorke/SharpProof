@@ -17,7 +17,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("bool Target(int[] x, int[] y) => x != y;", [shared, shared], false);
         yield return Case("bool Target(int[] x, int[] y) => x != y;", [shared, shared.ToArray()], true);
         yield return Case("int Target(int[] x) => x.Length;", [null!], typeof(NullReferenceException));
-        var sharedText = "a";
+        const string sharedText = "a";
         var mixed = new object[] { sharedText, shared };
         var wide = new[] { ulong.MaxValue };
         yield return Case("bool Target(object x) => x != null;", [sharedText], true, "string as object");

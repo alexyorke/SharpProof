@@ -833,7 +833,7 @@ public sealed class BuildTaskTests
     {
         var engine = new RecordingBuildEngine();
         using var task = new RunVerifier { BuildEngine = engine };
-        var path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
+        const string path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
         var warning = VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
                 "warning",

@@ -45,7 +45,7 @@ public sealed class FuzzSourceBooleanInputControls
         AssertActualBooleanParameters(finite, inputs, false);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, inputs.Select(input => (object?)input).ToArray(),
+            [new(positive, finite, inputs.Select(input => (object?)input).ToImmutableArray(),
                 Partial, [[false, false]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo(
@@ -82,7 +82,7 @@ public sealed class FuzzSourceBooleanInputControls
             Assert.That(runtime, Is.Not.Null);
             var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
             Assert.That(target, Is.Not.Null);
-            Assert.That(target!.Invoke(null, inputs.Select(input => (object?)input).ToArray()), Is.EqualTo(expected));
+            Assert.That(target!.Invoke(null, inputs.Select(input => (object?)input).ToImmutableArray()), Is.EqualTo(expected));
         }
         finally
         {

@@ -52,7 +52,7 @@ public sealed class TypedCrossFrameExceptionSearchTests
         using var unsupported = TypedProgramSubject.Create("int Target(int x) { try { return Callee(x); } catch (System.DivideByZeroException) when (x > 0) { return x; } } static int Callee(int value) { value++; return System.Math.Abs(value); }");
         Assert.That(unsupported.LowerSourceCalls().IsExact, Is.False);
         var steps = string.Concat(Enumerable.Repeat("value++; ", 500));
-        var root = "int Target(int x) { try { return A(x); } catch (System.DivideByZeroException) when (x > 0) { return x; } } ";
+        const string root = "int Target(int x) { try { return A(x); } catch (System.DivideByZeroException) when (x > 0) { return x; } } ";
         using var individual = TypedProgramSubject.Create(root + "static int A(int value) { " + steps + "return value; }");
         Assert.That(individual.LowerSourceCalls().IsExact, Is.True);
         using var nested = TypedProgramSubject.Create(root + "static int A(int value) { " + steps + "return B(value); } static int B(int value) { " + steps + "return value; }");

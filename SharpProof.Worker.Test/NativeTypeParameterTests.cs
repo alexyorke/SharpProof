@@ -50,8 +50,8 @@ public sealed class NativeTypeParameterTests
     [TestCase(true)]
     public async Task AllocationWitnessRespectsGenericDefaultReadOrder(bool defaultFirst)
     {
-        var approximation = "T ignored = default(T); ";
-        var allocation = "var items = new int[1]; ";
+        const string approximation = "T ignored = default(T); ";
+        const string allocation = "var items = new int[1]; ";
         var preparation = Prepare("[ZeroAllocations] public static int Target<T>() { " +
             (defaultFirst ? approximation + allocation : allocation + approximation) + "return items.Length; }");
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);

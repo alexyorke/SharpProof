@@ -1136,7 +1136,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 }
             }
             """;
-        var suppression = "[SharpProofSuppress(\"reviewed scope\")]";
+        const string suppression = "[SharpProofSuppress(\"reviewed scope\")]";
         var source = template
             .Replace(
                 "ASSEMBLY_SUPPRESSION",

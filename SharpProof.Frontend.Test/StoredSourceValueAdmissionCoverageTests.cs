@@ -20,7 +20,7 @@ public sealed class StoredSourceValueAdmissionCoverageTests
         var setup = array ? "var storage = new int[1];" : "var storage = new Cell();";
         var access = array ? "storage[0]" : "storage.Value";
         var assignment = compound ? " += " : " = ";
-        var additional = "public sealed class Cell { public int Value; }";
+        const string additional = "public sealed class Cell { public int Value; }";
         var prefix = "int Target(int value) { " + setup + access + assignment;
         var suffix = "; return " + access + "; }";
         using var subject = TypedProgramSubject.Create(prefix + "Helper(ref value)" + suffix +
