@@ -61,7 +61,15 @@ internal static class SarifProjection
                 {
                     name = "SharpProof",
                     informationUri = "https://github.com/alexyorke/SharpProof",
-                    version = summary.Versions.WorkerVersion
+                    version = summary.Versions.WorkerVersion,
+                    rules = new[]
+                    {
+                        new { id = "SharpProof.Proven", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" },
+                        new { id = "SharpProof.Refuted", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" },
+                        new { id = "SharpProof.Unknown", helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md" },
+                        new { id = VerifierDiagnosticCodes.IncompleteSelectedCallable, helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md" },
+                        new { id = VerifierDiagnosticCodes.AssumptionsDeclared, helpUri = "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#worker-reporting" }
+                    }
                 }
             },
             automationDetails = new

@@ -34,7 +34,7 @@ The worker consumes this closed artifact rather than reparsing a guessed source 
 
 The build integration also checks that the artifact belongs to the current compiler capture. The collector publishes a completion token after writing the artifact, while MSBuild validates the matching invocation before verification. A stable capture-request path avoids adding a new incremental compiler input for every build. Request, compiler manifest, and response publication then bind the same invocation; reusing an unrelated result file cannot satisfy that check. See [collector publication](../SharpProof.CompilerCollector/FinalCompilationCollector.cs), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [capture/cache regression tests](../SharpProof.Worker.Test/Pr275ActualCompilerCaptureCacheTests.cs).
 
-The public contract assembly is checked by exact supported identity and payload evidence. The unsigned package does not supply public-key authentication. Lookalikes do not create assumptions.
+The public contract assembly is checked by exact supported identity and payload evidence. Attributes is fully strong-named with a deliberately public, stable open-source identity key; that provides Framework reference compatibility, not publisher authentication. Package/repository signatures and release attestations have separate verification scopes described in the [release process](../eng/release/README.md). Lookalikes do not create assumptions.
 
 ## Native verification
 

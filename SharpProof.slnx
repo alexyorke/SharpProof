@@ -40,6 +40,8 @@
   <Project Path="SharpProof.Specs/SharpProof.Specs.csproj" />
   <Project Path="SharpProof.Testing.Test/SharpProof.Testing.Test.csproj" />
   <Project Path="SharpProof.Testing/SharpProof.Testing.csproj" />
+  <Project Path="SharpProof.Tool/SharpProof.Tool.csproj" />
+  <Project Path="SharpProof.Tool.Test/SharpProof.Tool.Test.csproj" />
   <Project Path="SharpProof.Verifier/SharpProof.Verifier.csproj" />
   <Project Path="SharpProof.Verify.Test/SharpProof.Verify.Test.csproj" />
   <Project Path="SharpProof.Verify/SharpProof.Verify.csproj" />

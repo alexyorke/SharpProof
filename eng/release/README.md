@@ -27,3 +27,100 @@ Before tagging, review [the changelog](../../CHANGELOG.md), [upgrade guidance](.
 Preview the rendered package README and check its relative links on the destination feed. Validate that each package's identity, dependency graph, XML documentation, symbols/source information, and platform payloads match the release artifacts. Keep release-only security and publication dependencies intact.
 
 Run the [project template smoke check](../../templates/README.md#maintainer-validation) against the exact packed feed before publication. Templates obtain the version from release props rather than maintaining their own release number.
+
+## Release SBOM and signed evidence
+
+Public tag publication authenticates the existing three main packages and two
+symbol packages, then generates `sbom.spdx.json`, `release-manifest.json`, and
+`SHA256SUMS` with [New-SharpProofReleaseEvidence.ps1](../../scripts/New-SharpProofReleaseEvidence.ps1).
+The SPDX 2.3 document describes the shipped payload: all reviewed inventory
+components (currently 18), every distinct third-party binary and its archive
+entry hash, static runtime relationships, and the five complete archive hashes.
+The manifest binds those bytes to the source commit and inventory digest. This
+scope excludes SDKs, build tools and dependencies not redistributed in the
+packages; it is not a complete source/build dependency SBOM or vulnerability scan.
+Custom license references include the distributed notice bundle rather than an
+invented SPDX license classification.
+
+[Test-SharpProofReleaseEvidence.ps1](../../scripts/Test-SharpProofReleaseEvidence.ps1)
+regenerates the evidence from the actual archives and reviewed inventory and
+rejects any changed bytes or missing component. Synthetic regression fixtures
+exercise altered archives, omitted SBOM components, provenance mismatch and
+missing symbol packages. These checks run in the canonical Linux amd64 container.
+
+The public release job uses the SHA-pinned, official
+[actions/attest](https://github.com/actions/attest) action twice: release workflow
+provenance for the packages/SBOM/manifest, and an SPDX SBOM attestation for the
+same five packages. Before NuGet upload,
+[Test-SharpProofReleaseAttestations.sh](../../scripts/Test-SharpProofReleaseAttestations.sh)
+uses `gh attestation verify` to check each subject against its signed bundle,
+the canonical repository, exact signer workflow, source commit, predicate type
+and hosted-runner policy. Its fixture tests policy propagation and rejection of
+CLI verification failures; it does not fabricate a successful signature check.
+The real keyless signature/service exchange is exercised only by an authorized
+public tag run. See [GitHub's verification reference](https://cli.github.com/manual/gh_attestation_verify).
+
+After successful NuGet push, the job creates a draft GitHub release, uploads the
+same unmodified `.nupkg`/`.snupkg` files plus SBOM, manifest, checksums and both
+Sigstore bundles, then publishes the release. Existing releases/assets are not
+overwritten on reruns; inspect and reconcile a partial prior run explicitly.
+NuGet and GitHub publication are separate operations: a GitHub release failure
+after NuGet upload does not roll back already published packages.
+
+The optional `SharpProof.Tool` has its own pack/manifest-restore qualification
+job, exact-run/source artifact and separate NuGet push. Its single archive is
+kept outside the main three-package/two-symbol feed. Public releases include
+its independent `TOOL-SHA256SUMS` and workflow provenance bundle; the core SBOM
+does not claim to describe the tool's dependency closure. A separate reviewed
+tool dependency inventory/SBOM remains future work. Its original archive is
+verified against the same signer/source policy before public publication.
+
+The private-preview tag `v1.0.0-preview.1` still uses its private feed credentials.
+It generates/checks local evidence but skips public attestations and GitHub
+release assets. No private-preview package is newly exposed by these steps.
+The qualified optional tool is also pushed only to that private feed for this
+tag, using the existing private credentials.
+
+Consumers can download the public GitHub release assets into one directory,
+run `sha256sum -c SHA256SUMS`, and verify a package's workflow provenance:
+
+```sh
+gh attestation verify SharpProof.<version>.nupkg \
+  --bundle provenance.sigstore.json --repo alexyorke/SharpProof \
+  --signer-workflow alexyorke/SharpProof/.github/workflows/package-consumers.yml \
+  --source-digest <release-commit> --deny-self-hosted-runners
+```
+
+Use `sbom.sigstore.json` and `--predicate-type https://spdx.dev/Document/v2.3` to
+verify the SBOM attestation. These attestations identify this release workflow's
+claims about qualified artifact bytes. They do not establish an isolated trusted
+builder, a SLSA level, or a NuGet author signature. NuGet OIDC authenticates the
+publisher; it does not author-sign packages.
+
+NuGet.org [automatically repository-signs uploaded packages](https://learn.microsoft.com/en-us/nuget/reference/signed-packages-reference).
+Adding that signature can change the archive bytes, so a NuGet.org download may
+have a different whole-file digest than the original GitHub release asset and
+its attestation. Verify the downloaded NuGet package using `dotnet nuget verify
+--all`, and use the original release assets for these pre-upload digest checks.
+Do not remove `.signature.p7s`, rewrite ZIPs, or treat a stripped archive hash as
+an equivalent signed-package verification. Duplicate-skipping upload still does
+not prove an existing feed package has the intended bytes.
+
+## Required account setup
+
+The public release environment must permit `contents: write`,
+`attestations: write` and `id-token: write` for the release job and allow the
+pinned official action. Registry storage records are disabled, so
+`artifact-metadata: write` is not required. GitHub attestations are available for
+public repositories on current plans; private/internal repositories require
+Enterprise Cloud and GitHub Enterprise Server is unsupported by this action.
+See the [official action requirements](https://github.com/actions/attest#usage).
+
+Maintainers must configure the NuGet trusted publisher for this repository,
+workflow and `nuget.org` environment, including permission/ownership for the new
+`SharpProof.Tool` package ID, set `NUGET_USER`, and maintain the private
+preview environment's existing feed URL/key. Tag protection, environment
+reviewers, organization action allowlists and release immutability are account
+settings; changing this workflow does not configure or verify those settings.
+No publication, trusted-publisher registration or signing credential setup is
+performed during ordinary branch/PR validation.

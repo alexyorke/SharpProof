@@ -523,7 +523,13 @@
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
-          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets",
+          "SharpProof.Attributes/SharpProof.Attributes.csproj",
+          "SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj",
+          "Directory.Build.props",
+          "SharpProof.PackageMetadata.props",
+          "SharpProof.Release.props",
+          "eng/signing/SharpProof.Attributes.snk"
         ]
       },
       {
@@ -562,7 +568,10 @@
           "scripts/Test-SharpProofVisualStudioConsumer.ps1",
           "scripts/Test-SharpProofWindowsNativePayload.ps1",
           "scripts/Test-SharpProofWindowsProofs.ps1",
-          "scripts/Test-SharpProofMacOsVerifierConsumer.ps1"
+          "scripts/Test-SharpProofMacOsVerifierConsumer.ps1",
+          "scripts/SharpProof.EmbeddedSymbols.psm1",
+          "scripts/Export-SharpProofEmbeddedSymbols.ps1",
+          "SharpProof.slnx"
         ]
       },
       {
@@ -591,7 +600,29 @@
           "scripts/Test-SharpProofThirdPartyInventory.ps1",
           "scripts/Test-SharpProofThirdPartyInventoryRegression.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
-          "scripts/package-projects.json"
+          "scripts/package-projects.json",
+          "eng/branding/icon.png",
+          "eng/branding/icon.svg",
+          "eng/signing/README.md",
+          "SharpProof.Attributes/README.md",
+          "SharpProof.Package/README.md",
+          "SharpProof.Verifier/README.md",
+          "SharpProof.Tool/SharpProof.Tool.csproj",
+          "SharpProof.Tool/packages.lock.json",
+          "SharpProof.Tool/README.md",
+          "SharpProof.Tool.Test/SharpProof.Tool.Test.csproj",
+          "SharpProof.Tool.Test/packages.lock.json",
+          "scripts/Test-SharpProofEmbeddedSymbolsRegression.ps1",
+          "scripts/Test-SharpProofOfflineStackTraces.ps1",
+          "scripts/Test-SharpProofReproduciblePackages.ps1",
+          "scripts/New-SharpProofReleaseEvidence.ps1",
+          "scripts/New-SharpProofToolReleaseEvidence.ps1",
+          "scripts/Test-SharpProofReleaseEvidence.ps1",
+          "scripts/Test-SharpProofReleaseEvidenceRegression.ps1",
+          "scripts/Test-SharpProofReleaseAttestations.sh",
+          "scripts/Test-SharpProofReleaseAttestationsRegression.sh",
+          "scripts/Pack-SharpProofTool.ps1",
+          "scripts/Test-SharpProofToolConsumer.ps1"
         ]
       },
       {
@@ -646,8 +677,7 @@
       },
       {
         "name": "partialTypeSourceClosure",
-        "paths": [
-        ],
+        "paths": [],
         "rationale": "These files complete partial types that already have trusted declarations in other source files."
       },
       {

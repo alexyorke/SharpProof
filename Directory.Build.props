@@ -56,6 +56,10 @@
       '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">true</SharpProofUsesIrIdentifiers>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true' AND $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('SharpProof.')) AND '$(MSBuildProjectName)' != 'SharpProof.Attributes'">
+    <!-- Tooling carries symbols into Roslyn shadow copies and MSBuild task hosts. -->
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
   <ItemGroup Condition="'$(SharpProofUsesIrIdentifiers)' == 'true'">
     <!--
       These aliases keep the internal IR vocabulary readable while all ID
@@ -234,6 +238,6 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes'">
-    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017;RS0041</WarningsAsErrors>
   </PropertyGroup>
 </Project>

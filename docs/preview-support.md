@@ -53,7 +53,7 @@ Native Windows uses the same solver and wall-clock budgets and process-tree term
 
 Hostile concurrent host mutation after validation is outside this preview threat model: for example, swapping a bind mount or directory during publication. This is not a sandbox for arbitrary malicious host processes.
 
-The package payload is unsigned. Exact package/assembly identity, payload evidence, and pinned inputs establish the implemented compatibility boundary; no public-key authenticity claim is made.
+Attributes is fully strong-named with a deliberately public, stable open-source identity key for Framework compatibility. This is not publisher authentication or proof authority; exact assembly/payload admission and pinned inputs remain required. Public-release workflow provenance and SPDX attestations have separate subject/workflow/source checks in the [release process](../eng/release/README.md). Packages are not author-signed merely because the assembly has a strong name or the workflow uses OIDC; NuGet repository signatures and original GitHub release-asset digests are separate verification domains.
 
 ## Unsupported hosts and workflows
 

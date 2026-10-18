@@ -206,9 +206,10 @@ try {
 <configuration><packageSources><clear /><add key="exact-packed-feed" value="$escapedSource" />$frameworkSources</packageSources><packageSourceMapping><packageSource key="exact-packed-feed"><package pattern="SharpProof*" /></packageSource>$frameworkMapping</packageSourceMapping></configuration>
 "@, $encoding)
     $escapedVersion = [Security.SecurityElement]::Escape($version)
+    [IO.File]::Copy((Join-Path $PSScriptRoot '../eng/signing/SharpProof.Attributes.snk'), (Join-Path $consumer 'Consumer.snk'))
     [IO.File]::WriteAllText((Join-Path $consumer 'Consumer.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>$TargetFramework</TargetFramework><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <PropertyGroup><TargetFramework>$TargetFramework</TargetFramework><NuGetAudit>false</NuGetAudit><SignAssembly>true</SignAssembly><PublicSign>false</PublicSign><AssemblyOriginatorKeyFile>Consumer.snk</AssemblyOriginatorKeyFile><WarningsAsErrors>CS8002</WarningsAsErrors></PropertyGroup>
   <ItemGroup><PackageReference Include="$PackageId" Version="$escapedVersion" /></ItemGroup>
 </Project>
 "@, $encoding)
@@ -275,9 +276,10 @@ public static class Program
     {
         var result = Subject.Identity(42);
         var attributes = typeof(SharpProof.Attributes.ZeroAllocationsAttribute).Assembly.GetName().Name;
-        System.Console.WriteLine($"Subject.Identity={result}; Attributes={attributes}");
+        var token = System.BitConverter.ToString(typeof(SharpProof.Attributes.ZeroAllocationsAttribute).Assembly.GetName().GetPublicKeyToken()).Replace("-", "").ToLowerInvariant();
+        System.Console.WriteLine($"Subject.Identity={result}; Attributes={attributes}; Token={token}");
         System.Console.WriteLine($"RuntimeCore={typeof(object).Assembly.GetName().Name}; CLR={System.Environment.Version.Major}");
-        return result == 42 && attributes == "SharpProof.Attributes" ? 0 : 1;
+        return result == 42 && attributes == "SharpProof.Attributes" && token == "75825c3e099f5fac" ? 0 : 1;
     }
 }
 '@, $encoding)

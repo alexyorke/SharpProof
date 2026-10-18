@@ -30,6 +30,8 @@ public sealed class PackageLayoutSmokeTests
         PackageWorkspace.DisposeSharedPackageCache();
     }
 
+    private static readonly byte[] PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
@@ -1911,6 +1913,18 @@ public sealed class PackageLayoutSmokeTests
                 metadata.Elements().Single(element =>
                     element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "version")).Value,
                 Is.EqualTo(feed.Version));
+            Assert.That(
+                metadata.Elements().Single(element =>
+                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "icon")).Value,
+                Is.EqualTo("icon.png"));
+            using (var icon = archive.GetEntry("icon.png")!.Open())
+            {
+                var header = new byte[24];
+                icon.ReadExactly(header);
+                Assert.That(header[..8], Is.EqualTo(PngSignature));
+                Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(16, 4)), Is.EqualTo(128));
+                Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(20, 4)), Is.EqualTo(128));
+            }
             var authors = metadata.Elements().Single(element =>
                 element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "authors")).Value;
             if (package.Id is PackagedProductFeed.MainPackageId or
@@ -1958,6 +1972,7 @@ public sealed class PackageLayoutSmokeTests
                 "lib/netstandard2.0/SharpProof.Attributes.dll",
                 "lib/netstandard2.0/SharpProof.Attributes.xml",
                 "LICENSE",
+                "icon.png",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",
                 "README.md",
@@ -1972,6 +1987,7 @@ public sealed class PackageLayoutSmokeTests
                 "_rels/.rels",
                 "[Content_Types].xml",
                 "LICENSE",
+                "icon.png",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",
                 "README.md",
@@ -1993,6 +2009,7 @@ public sealed class PackageLayoutSmokeTests
                 "buildTransitive/SharpProof.Verifier.defaults.props",
                 "buildTransitive/SharpProof.Verifier.targets",
                 "LICENSE",
+                "icon.png",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",
                 "README.md",

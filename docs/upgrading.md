@@ -34,6 +34,12 @@ For the standard setup, replace the old separate Attributes/analyzer/Verifier re
 
 ## Maintainer release review
 
-Maintain public API declarations and package validation. When a previous package is available on a trusted feed, configure a reviewed previous-package compatibility baseline as part of the release change; do not fabricate a baseline against an unpublished package or disable validation for convenience. Document intentional breaks in release notes, including non-API changes that affect proof evidence.
+Attributes now carries a full strong-name signature for signed Framework consumers. Its deliberately public open-source identity key is stable and is not an authentication secret. Introducing that identity into the preview requires existing consumers to rebuild; changing the key again would break compiled references. Keep exact API/payload admission intact, and use the [signing policy](../eng/signing/README.md) when reviewing the identity.
+
+Maintain public API declarations and package validation. Set `SharpProofPackageValidationBaselineVersion` to a reviewed, actually published compatible version to opt into a previous-package baseline; [package metadata](../SharpProof.PackageMetadata.props) forwards it to the SDK validation setting. The initial preview supplies no fabricated prior baseline. Do not disable validation for convenience. Document intentional breaks in release notes, including non-API changes that affect proof evidence.
+
+Tooling now embeds portable PDBs and tracked/untracked source documents. Matching symbol packages and coverage authority use the PDB extracted from the same compiled assembly rather than a second build. Attributes retains portable symbols; main is an assembly-free facade. See [NuGet debugging](nuget-debugging.md) for the actual debugger and artifact checks.
+
+The optional [SharpProof.Tool](../SharpProof.Tool/README.md) has its own versioned manifest installation. It is not required by the normal application package. Its `explain` command reports stored evidence and does not establish current-source freshness or perform a new proof; upgrade and restore it separately if your team uses it.
 
 The [release process](../eng/release/README.md) owns exact-artifact qualification and publication. A development branch passing tests is not release qualification.

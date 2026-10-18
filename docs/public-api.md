@@ -44,7 +44,11 @@ effective source-local or generated definition.
 
 Analyzer-side binding requires the referenced API assembly's exact
 name/version identity and embedded payload SHA-256 to match the analyzer
-payload. The package is unsigned and makes no public-key authenticity claim.
+payload. Attributes is fully strong-named with a stable, deliberately public
+open-source identity key. The strong name enables signed Framework consumers;
+it is not publisher authentication and does not replace exact payload admission.
+See the [identity-key policy](../eng/signing/README.md). Package signatures and
+release attestations are separate from this assembly identity.
 The `Contract` type must have the exact supported signatures, and each clause
 method must carry exactly one real
 `Conditional("SHARPPROOF_CONTRACTS")` attribute. Source/project shadows,

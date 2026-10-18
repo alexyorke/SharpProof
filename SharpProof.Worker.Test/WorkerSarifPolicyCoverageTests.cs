@@ -27,6 +27,14 @@ public sealed partial class WorkerTests
         using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, response, project.DirectoryPath));
         var result = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
             .EnumerateArray().Single(entry => entry.GetProperty("ruleId").GetString() == "SharpProof.Unknown");
+        var rules = sarif.RootElement.GetProperty("runs")[0].GetProperty("tool").GetProperty("driver").GetProperty("rules");
+        Assert.That(rules.GetArrayLength(), Is.EqualTo(5));
+        foreach (var rule in rules.EnumerateArray())
+        {
+            Assert.That(rule.GetProperty("helpUri").GetString(), Does.StartWith("https://github.com/alexyorke/SharpProof/blob/master/docs/"));
+        }
+        Assert.That(rules.EnumerateArray().Single(rule => rule.GetProperty("id").GetString() == "SharpProof.Unknown")
+            .GetProperty("helpUri").GetString(), Does.EndWith("unknown-reasons.md"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.GetProperty("kind").GetString(), Is.EqualTo("fail"));

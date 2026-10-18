@@ -7,6 +7,7 @@
     <authors>$authors$</authors>
     <license type="expression">$license$</license>
     <readme>$readme$</readme>
+    <icon>icon.png</icon>
     <projectUrl>$projecturl$</projectUrl>
     <description>Complete one-package postcondition verifier for SharpProof on native Windows, macOS, and glibc Linux, each on x64 and ARM64. Includes automatic MSBuild integration, worker, launcher, and pinned native Z3 payloads.</description>
     <releaseNotes>Automatic verification with one PackageReference on Windows, macOS, and glibc Linux x64/ARM64 using the .NET 10 SDK. Windows solver payloads include their C++ runtime.</releaseNotes>
@@ -56,7 +57,8 @@
     <file src="buildTransitive\SharpProof.Verifier.props" target="buildTransitive" />
     <file src="buildTransitive\SharpProof.Verifier.defaults.props" target="buildTransitive" />
     <file src="buildTransitive\SharpProof.Verifier.targets" target="buildTransitive" />
-    <file src="..\README.md" />
+    <file src="README.md" />
+    <file src="..\eng\branding\icon.png" target="" />
     <file src="..\LICENSE" />
     <file src="..\THIRD-PARTY-NOTICES.txt" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/Microsoft.Z3.dll" target="tools/net10" />

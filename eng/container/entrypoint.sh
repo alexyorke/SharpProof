@@ -78,7 +78,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly|fuzz-nightly|pack)
+    nightly|fuzz-nightly|pack|pack-tool)
       return 0
       ;;
     *)

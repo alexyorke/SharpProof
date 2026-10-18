@@ -7,6 +7,8 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 [*.cs]
+dotnet_public_api_analyzer.require_api_files = true
+dotnet_public_api_analyzer.internal_api_skip_ivt = *.Test, *.Tests, *.UnitTests
 indent_style = space
 indent_size = 4
 tab_width = 4

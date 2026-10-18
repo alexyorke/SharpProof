@@ -39,4 +39,10 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
 
+  <Target Name="_EmbedSharpProofSourceDocuments" BeforeTargets="CoreCompile"
+          Condition="'$(SharpProofProductionProject)' == 'true' AND $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('SharpProof.'))">
+    <ItemGroup>
+      <EmbeddedFiles Include="@(Compile)" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -2,6 +2,9 @@
   <Import Project="..\SharpProof.PackageMetadata.props" />
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <SignAssembly>true</SignAssembly>
+    <PublicSign>false</PublicSign>
+    <AssemblyOriginatorKeyFile>..\eng\signing\SharpProof.Attributes.snk</AssemblyOriginatorKeyFile>
     <IsPackable>true</IsPackable> 
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>SharpProof.Attributes</PackageId>
@@ -13,7 +16,7 @@
   <ItemGroup>
     <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
-    <None Include="..\README.md">
+    <None Update="README.md">
       <Pack>True</Pack>
       <PackagePath>/</PackagePath>
     </None>

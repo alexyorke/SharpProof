@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
+    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -139,6 +139,7 @@ function Invoke-TestProject([string]$ProjectPath) {
             '--no-restore')
         $buildArguments += $fastBuildArguments
         Invoke-SharpProofRequiredDotnet $buildArguments
+        & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
 
     $assembly = Get-SharpProofTestAssemblyPath `
@@ -163,6 +164,8 @@ function Invoke-PackageTests {
 function Invoke-SolutionTests([string]$SolutionPath) {
     if (-not $NoBuild) {
         Invoke-SharpProofRequiredDotnet @('restore', $SolutionPath, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet (@('build', $SolutionPath, '--configuration', $Configuration, '--no-restore') + $fastBuildArguments)
+        & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
     $isMainSolution = [IO.Path]::GetFileName($SolutionPath) -ceq
         'SharpProof.slnx'
@@ -174,9 +177,7 @@ function Invoke-SolutionTests([string]$SolutionPath) {
         'test', $SolutionPath, '--configuration', $Configuration,
         '--no-restore')
     $arguments += $fastBuildArguments
-    if ($NoBuild) {
-        $arguments += '--no-build'
-    }
+    $arguments += '--no-build'
     $arguments += "/m:$testProjectParallelism"
     if ($runPackageTestsSeparately) {
         $arguments += @(
@@ -215,6 +216,7 @@ function Invoke-SharpProofSolutionBuild(
         '--no-restore')
     $buildArguments += $AdditionalBuildArguments
     Invoke-SharpProofRequiredDotnet $buildArguments
+    & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $BuildConfiguration
 }
 
 function Invoke-SharpProofCoverageAuthorityBuild {
@@ -244,6 +246,7 @@ function Invoke-SharpProofCoverageAuthorityBuild {
         Invoke-SharpProofRequiredDotnet @(
             'build', $filterPath, '--configuration', 'Release', '--no-restore',
             '-p:ContinuousIntegrationBuild=true')
+        & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration Release
     }
     finally {
         foreach ($temporaryPath in @($filterPath, $selectionPath)) {
@@ -319,6 +322,7 @@ switch ($Command) {
         Invoke-SharpProofRequiredDotnet @('restore', $Target, '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
             'build', $Target, '--configuration', $Configuration, '--no-restore')
+        & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
     'self-apply' {
         $trackedProjects = @(
@@ -395,6 +399,10 @@ switch ($Command) {
             'Third-party inventory regressions failed.'
         Invoke-RequiredScript 'scripts/Test-SharpProofFacadePackageRegression.ps1' `
             'Metadata facade package regressions failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofEmbeddedSymbolsRegression.ps1' `
+            'Embedded symbol package regressions failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
+            'Release SBOM and attestation policy regressions failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
@@ -679,6 +687,17 @@ switch ($Command) {
     }
     'dependency-audit' {
         Invoke-DependencyAudit
+    }
+    'pack-tool' {
+        Invoke-RequiredScript 'scripts/Pack-SharpProofTool.ps1' `
+            'Optional Tool packing failed.' @{ Configuration = $Configuration }
+    }
+    'tool-consumer' {
+        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
+            throw 'tool-consumer requires -PackageSource.'
+        }
+        Invoke-RequiredScript 'scripts/Test-SharpProofToolConsumer.ps1' `
+            'Optional Tool consumer validation failed.' @{ PackageSource = $PackageSource }
     }
     'pack' {
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'

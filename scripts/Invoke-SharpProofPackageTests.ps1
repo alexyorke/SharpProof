@@ -450,6 +450,10 @@ try {
         }
     }
 
+    & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
+    if ($Configuration -ne 'Release') {
+        & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration Release
+    }
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
         Invoke-SharpProofTimedPhase -Name 'pack' `
             -Timings $phaseTimings -RecordOnFailure -Action {
