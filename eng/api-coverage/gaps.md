@@ -68,11 +68,11 @@ access kind and value domains satisfy the production guard.
   covariance need their own sound models. Rebinding must preserve identity
   snapshots; opaque writers must invalidate content knowledge.
 - Generic helpers returning scalar T still need result representation specialization
-  from concrete array evidence. Generic local collection helpers also lose receiver
-  provenance: a Count-based branch retains opaque interface dispatch and cannot
-  establish a replayable normal witness, for both implicit and `as` conversions.
-  Tests keep these abstentions explicit; matching receiver conversions alone do
-  not establish full generic helper support.
+  from concrete array evidence. Immutable generic local IList/ICollection parameters
+  now retain known scalar-array elements through Roslyn's cloned type parameters:
+  Count branches and full Swap postconditions have native proofs/refutations, plus
+  compiled CLR/IR normal/fault agreement. Other parameter declarations and other
+  compilations cannot borrow this evidence; generic return signatures remain open.
 - Count >= 0 is weaker than a collection representation invariant. List/dictionary/
   queue/stack count/content relations and repeated getter consistency remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
