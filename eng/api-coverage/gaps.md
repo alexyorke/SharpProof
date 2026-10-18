@@ -41,7 +41,7 @@ access kind and value domains satisfy the production guard.
 
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
-| A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and fresh exact List receivers/aliases are supported; incoming interface parameters still require implementation evidence. |
+| A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and exact List allocations/aliases are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
 | D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key membership and scalar/reference contents remain separate; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add and scalar/reference get/set now share state; arbitrary interface receivers, unsupported value domains and other operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
@@ -330,6 +330,53 @@ still reports the read violation; the existing mutation assertion is unchanged.
 Assignment-receiver controls distinguish assigning a fresh List to a local
 interface receiver from assigning an unknown incoming implementation. The native
 Count proof and both provenance controls retain the existing freshness path.
+
+## Verified exact List receivers in source helpers
+
+An exact framework List allocation now preserves its runtime implementation through
+by-value publication and immutable source-helper IList/ICollection parameters.
+Generic Count, Add and simple indexed get/set share the caller's storage through
+nested calls and extension-method syntax. Scalar and admitted reference element
+representations follow their own declaration symbols into the helper, including
+class-constrained caller types. Reference specialization is scoped to helpers
+declaring a supported List/IList/ICollection parameter; unrelated generic source
+calls retain their existing scalar domain and corpus diagnostics. Knowing an element representation alone never
+establishes an interface implementation. An incoming List-typed parameter can hold
+a subclass that reimplements interfaces, so it supplies no interface dispatch proof.
+
+Allocation identity is separate from content knowledge. Unknown writers invalidate
+contents even after by-value publication. Rebinding, ref escape, closure capture,
+mixed definitions and unknown interface implementations retain conservative fallback.
+Helper contracts use caller entry state and Old values; a standalone arbitrary
+interface claim remains Unknown even when a proven call context can model its body.
+
+Native tests include scalar limits, Boolean/reference/null identity, shared mutation,
+nested/extension calls, contracts and negative dispatch/escape controls. Six compiled
+CLR/IR oracle cases execute the original OSS0002 generic Swap from the pinned corpus,
+including early returns, normal swapping and invalid indexes. The inventory's List
+probes additionally execute scalar and reference source-helper Count/Add/get/set and
+compare results with CLR behavior; these remain approximation evidence for normal
+growth, not concrete replay authority for growth or initialization.
+
+A feasibility query could previously choose an oversized irrelevant entry List size
+and hit the replay budget even when its postcondition was provable. SAT witness
+selection now prefers small observed List sizes, like existing string/array witnesses.
+Failed preferences retry the unbounded query. Tests retain large counterexamples,
+full-domain proofs and oversized-witness rejection under the unchanged resource limit.
+
+Canonical container validation passes 5,548 worker tests, 2,049 frontend tests,
+368 SMT tests, 481 IR tests, 640 contract tests, 1,128 analyzer tests,
+29 inventory/evidence tests and eight usage-ranking tests. The full 471-test Gates
+suite also passes, preserving the canonical corpus snapshots and Unknown-reason
+ratchets without baseline changes.
+
+This closes a contextual source-helper slice. The static report still has 116 rows
+at 641 sites and zero unresolved sites: the original generic interface declarations
+have no caller allocation evidence. Their 56 IList reads, 13 writes and 40 ICollection
+Count reads therefore remain actionable; they must not all be credited as modeled.
+The declaration universe, support statuses, SDK/reference pins and coverage floors
+are unchanged. Other List operations, opaque value domains and precise growth/fault
+semantics remain open.
 
 ## Cross-cutting gaps previously identified
 

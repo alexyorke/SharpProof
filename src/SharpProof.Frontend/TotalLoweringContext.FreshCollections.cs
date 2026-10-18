@@ -5,8 +5,8 @@ public sealed partial class TotalLoweringContext
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var tracked = lists ? _freshLists : _defaultDictionaries;
-        var trackedCaptures = lists ? _freshListCaptures : _defaultDictionaryCaptures;
+        var tracked = lists ? _exactLists : _defaultDictionaries;
+        var trackedCaptures = lists ? _exactListCaptures : _defaultDictionaryCaptures;
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToArray();
         var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
@@ -29,15 +29,17 @@ public sealed partial class TotalLoweringContext
                 { captures.Add(capture.Id, values = []); }
                 values.Add(capture.Value);
             }
-            // Publishing the reference can expose comparer/deserialization state.
-            // Until call ownership is proven, reject every escaping binding.
-            if (operation is IArgumentOperation argument && !CSharpOperationSemantics.IsScalar(argument.Value.Type))
+            // Ownership rejects publication of comparer/deserialization state.
+            // A List's allocation identity survives by-value publication;
+            // opaque heap effects separately invalidate its content knowledge.
+            if (operation is IArgumentOperation argument && !CSharpOperationSemantics.IsScalar(argument.Value.Type) &&
+                (!lists || argument.Parameter?.RefKind != RefKind.None))
             { Exclude(argument.Value); }
             if (operation is ISimpleAssignmentOperation { IsRef: true } referenceAssignment)
             { Exclude(referenceAssignment.Value); }
             if (operation is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None, Initializer: { } initializer })
             { Exclude(initializer.Value); }
-            if (operation is ISimpleAssignmentOperation publication && Symbol(publication.Target) == null &&
+            if (!lists && operation is ISimpleAssignmentOperation publication && Symbol(publication.Target) == null &&
                 publication.Target is not IFlowCaptureReferenceOperation && !CSharpOperationSemantics.IsScalar(publication.Value.Type))
             { Exclude(publication.Value); }
             if (operation is IDeconstructionAssignmentOperation deconstruction)
@@ -116,11 +118,13 @@ public sealed partial class TotalLoweringContext
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || lists && conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { return Resolve(conversion.Operand, depth + 1); }
-            if (lists && operation is ISimpleAssignmentOperation { IsRef: false } assignment &&
-                Symbol(assignment.Target) is ILocalSymbol { RefKind: RefKind.None })
+            if (lists && operation is ISimpleAssignmentOperation { IsRef: false } assignment)
             { return Resolve(assignment.Value, depth + 1); }
             if (Symbol(operation) is { } symbol)
-            { return symbol is ILocalSymbol && !excluded.Contains(symbol) && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1); }
+            {
+                return !excluded.Contains(symbol) && (lists && symbol is IParameterSymbol && tracked.Contains(symbol) ||
+                    symbol is ILocalSymbol && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1));
+            }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
             return lists ? CSharpOperationSemantics.IsEmptyListCreation(operation) : CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);

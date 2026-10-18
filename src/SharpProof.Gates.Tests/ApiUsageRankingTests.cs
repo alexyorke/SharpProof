@@ -466,7 +466,7 @@ public sealed class ApiUsageRankingTests
                     invocation.Instance != null && CSharpOperationSemantics.IsDefaultDictionaryStateMember(invocation.TargetMethod) &&
                     CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) &&
-                    (CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod) || context.IsFreshList(invocation.Instance)))
+                    (CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod) || context.IsExactList(invocation.Instance)))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
@@ -475,7 +475,7 @@ public sealed class ApiUsageRankingTests
                     property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter) &&
                     CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance) ||
                     property.Instance != null && property.Property.GetMethod is { } listGetter && CSharpOperationSemantics.IsListStateMember(listGetter) &&
-                    (CSharpOperationSemantics.IsConcreteListStateMember(listGetter) || context.IsFreshList(property.Instance)) &&
+                    (CSharpOperationSemantics.IsConcreteListStateMember(listGetter) || context.IsExactList(property.Instance)) &&
                     property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation))
                 {
                     known.Add(property.Syntax.SpanStart);
