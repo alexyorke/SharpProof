@@ -1,21 +1,23 @@
 # Consumer configuration
 
-The standard SDK-style consumer needs one `SharpProof.Verifier` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
+Maintainers: see [configuration ownership](configuration-ownership.md) for runtime and automation setting authorities.
 
-The implementation authority is [the consumer contract](../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
+The standard SDK-style consumer needs one `SharpProof` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
+
+The implementation authority is [the consumer contract](../src/SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../src/SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
 
 ## Activation and claim selection
 
 | Property | Default | Accepted values and effect |
 | --- | --- | --- |
-| `SharpProofProfile` | `strict` with Verifier; `advisory` for portable-only SharpProof | `advisory`, `strict`, `off`; controls package activation and worker defaults |
+| `SharpProofProfile` | `strict` | `advisory`, `strict`, `off`; advisory explicitly opts into portable defaults; off disables analysis and verification |
 | `SharpProofFeatures` | `all` | `effects`, `contracts`, `all`; selects the analyzer features and compiler-artifact feature set |
 | `SharpProofVerify` | `true` for strict; `false` otherwise | `true`, `false`; enables full verification when the profile is active |
 | `SharpProofVerifyPolicy` | `require-proven` for strict; `advisory` otherwise | `advisory`, `warn-on-unknown`, `require-proven`; controls incomplete selected coverage |
 | `SharpProofAssumptionPolicy` | `error` for strict; `allow` otherwise | `allow`, `warn`, `error`; governs declared user assumptions and trusted boundaries |
 | `SharpProofSpecificationPacks` | Unset | Semicolon-delimited embedded pack IDs; currently `dotnet.scalar` |
 
-`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, Core MSBuild, and a host/filesystem in the [qualified support matrix](preview-support.md): the canonical Linux amd64 container, native Windows x64, or native macOS ARM64/x64. Design-time builds do not run the worker.
+`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, SDK 10.0.100+, Core MSBuild or the supported Windows MSBuild 18+ task-host path, and a host/filesystem in the [support matrix](preview-support.md): the canonical Linux amd64 container or native Windows, macOS, or glibc Linux on x64/ARM64. Design-time builds do not run the worker.
 
 Feature selection does not mean that every method receives every possible proof. Effect annotations select effect obligations; postconditions and return contracts select normal-return obligations. A precondition describes an entry/call obligation and does not by itself assert a return relationship. Selected unsupported callables remain accountable through incomplete coverage and typed Unknown results. See [coverage and limits](coverage-and-limits.md) and [public API](public-api.md).
 
@@ -25,7 +27,7 @@ Specification packs add reviewed relational semantics for exact supported member
 
 ## A CI consumer example
 
-The single standard Verifier reference already enables strict CI policy. To customize report locations, optionally apply these properties and build on a supported host:
+The single standard SharpProof reference already enables strict CI policy. To customize report locations, optionally apply these properties and build on a supported host:
 
 ```xml
 <PropertyGroup>
@@ -81,7 +83,7 @@ is_global = true
 sharpproof_features = contracts
 ```
 
-An explicit analyzer feature value can replace the package's defaulted `all`. Conflicting explicit aliases are invalid. An analyzer profile must agree with the effective MSBuild profile, including its default, because MSBuild controls package activation and verification. A per-file option that changes compilation-global selection is invalid; a redundant matching value is accepted. Invalid global analyzer configuration reports SP0025 and disables semantic analysis. These rules are exercised by [configuration regression tests](../SharpProof.Analyzer.Test/ConfigurationDiagnosticsRegressionTests.cs), [package-default tests](../SharpProof.Analyzer.Test/AnalyzerConfigurationPackageDefaultTests.cs), and [unit tests](../SharpProof.Analyzer.Test/AnalyzerConfigurationUnitTests.cs).
+An explicit analyzer feature value can replace the package's defaulted `all`. Conflicting explicit aliases are invalid. An analyzer profile must agree with the effective MSBuild profile, including its default, because MSBuild controls package activation and verification. A per-file option that changes compilation-global selection is invalid; a redundant matching value is accepted. Invalid global analyzer configuration reports SP0025 and disables semantic analysis. These rules are exercised by [configuration regression tests](../src/SharpProof.Analyzer.Tests/ConfigurationDiagnosticsRegressionTests.cs), [package-default tests](../src/SharpProof.Analyzer.Tests/AnalyzerConfigurationPackageDefaultTests.cs), and [unit tests](../src/SharpProof.Analyzer.Tests/AnalyzerConfigurationUnitTests.cs).
 
 Normal Roslyn severity configuration belongs in `.editorconfig`, for example:
 
@@ -93,7 +95,7 @@ dotnet_diagnostic.SP0047.severity = warning
 
 Severity changes affect diagnostic reporting, while worker verification and assumption policies decide their respective build gates. `SharpProofSuppress` also changes reporting only. Portable generated-code filtering uses compiler generated-code classification, known generated filenames/headers, and supported generated-code attributes; portable silence does not establish worker coverage. Companion validation runs at compilation end after generators have added syntax. See [diagnostics](diagnostic-examples.md).
 
-Active package analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer), independently of the application's target framework. Full verification is unavailable in design-time builds and unsupported hosts; an IDE's portable diagnostics are not a native proof report.
+Explicit advisory-only package analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer), independently of the application's target framework. The standard strict configuration requires SDK 10.0.100+ and the .NET 10 runtime. Full verification is unavailable in design-time builds and unsupported hosts; an IDE's portable diagnostics are not a native proof report.
 
 ## Reserved and removed settings
 

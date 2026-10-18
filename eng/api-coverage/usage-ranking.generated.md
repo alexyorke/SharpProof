@@ -7,12 +7,12 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | API | Access | Sites | Caller units | Samples | OSS | Synthetic | Status |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | 20 | 0 | 56 | 0 | unmodeled-dispatch |
-| P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | 23 | 0 | 40 | 0 | unmodeled |
+| P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | 23 | 0 | 40 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.ICollection`1.Count | read | 40 | 24 | 0 | 40 | 0 | unmodeled-dispatch |
 | P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | partially-modeled |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | call | 26 | 21 | 0 | 26 | 0 | unmodeled-dispatch |
-| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | 11 | 0 | 22 | 0 | unmodeled |
-| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | 16 | 0 | 22 | 0 | unmodeled |
+| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | 11 | 0 | 22 | 0 | unmodeled-dispatch |
+| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | 16 | 0 | 22 | 0 | unmodeled-dispatch |
 | P:System.String.Length | read | 22 | 13 | 2 | 20 | 0 | partially-modeled |
 | M:System.Exception.#ctor(System.String) | call | 18 | 12 | 0 | 18 | 0 | partially-modeled |
 | P:System.Collections.Generic.List`1.Count | read | 18 | 10 | 0 | 18 | 0 | partially-modeled |
@@ -27,7 +27,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | 8 | 0 | 9 | 0 | unmodeled |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled |
-| M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | 4 | 0 | 8 | 0 | unmodeled |
+| M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | 4 | 0 | 8 | 0 | partially-modeled |
 | M:System.Action`1.Invoke(`0) | call | 7 | 6 | 0 | 7 | 0 | unmodeled |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | 5 | 0 | 7 | 0 | unmodeled |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | 7 | 0 | 7 | 0 | partially-modeled |
@@ -114,7 +114,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Threading.Volatile.Read(System.Int64@) | call | 1 | 1 | 1 | 0 | 0 | unmodeled |
 | M:System.Type.GetTypeCode(System.Type) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | P:System.Collections.Generic.Dictionary`2.Count | read | 1 | 1 | 0 | 1 | 0 | partially-modeled |
-| P:System.Collections.Generic.Dictionary`2.Item(`0) | write | 1 | 1 | 0 | 1 | 0 | unmodeled-setter |
+| P:System.Collections.Generic.Dictionary`2.Item(`0) | write | 1 | 1 | 0 | 1 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.Dictionary`2.Keys | read | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | P:System.Collections.Generic.IEnumerator`1.Current | read | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | P:System.Collections.Generic.Stack`1.Count | read | 1 | 1 | 0 | 1 | 0 | partially-modeled |

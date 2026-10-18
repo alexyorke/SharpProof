@@ -1,0 +1,12 @@
+# GO-2026-6604 affects Windows os.Root junction handling only. This exact
+# shfmt binary executes only on Linux amd64 in the canonical tooling image.
+# Upstream: https://vuln.go.dev/ID/GO-2026-6604.json
+# Owner: alexyorke. Review when updating shfmt; remove after a patched rebuild.
+ignore:
+  - vulnerability: GO-2026-6604
+    package:
+      name: stdlib
+      version: go1.27.1
+      type: go-module
+      location: /usr/local/bin/shfmt
+    reason: "Windows-only os.Root junction issue is not applicable to the pinned Linux amd64 shfmt binary."

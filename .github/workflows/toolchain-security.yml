@@ -1,0 +1,56 @@
+name: Toolchain image security
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "13 10 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolchain-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-image-security-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
+jobs:
+  toolchain-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Exercise release security failure paths in the canonical container
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseSecurity.ps1'
+      - name: Scan the actual qualified tooling image
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ env.COMPOSE_PROJECT_NAME }}-tooling:local
+          grype-version: v0.120.1
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: json
+          output-file: ${{ runner.temp }}/toolchain-vulnerabilities.json
+          cache-db: false
+          config: .grype.yaml
+      - name: Retain the complete image vulnerability report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: toolchain-vulnerabilities-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/toolchain-vulnerabilities.json
+          if-no-files-found: error
+          retention-days: 30

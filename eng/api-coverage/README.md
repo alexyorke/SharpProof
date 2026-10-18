@@ -31,7 +31,7 @@ Run the same required gate as CI:
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj \
+  -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
   -TestFilter FullyQualifiedName~DotnetApiInventoryTests
 ```
 
@@ -66,7 +66,7 @@ duplicate registrations. Mutation controls verify that removing an API/facet or
 postcondition witness, accepting a wrong claim, or omitting edge inputs is detected.
 
 `intrinsic-test-evidence.json` and `.md` cover the audited string, integer comparison,
-and concrete Count invariants. The inventory test compiles comparison expressions through the
+concrete Count invariants, and the guarded fresh-dictionary state slice. The inventory test compiles expressions through the
 production frontend, and interprets their result and receiver-safety conditions against
 runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
 and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
@@ -78,7 +78,7 @@ matrices appear in the CI job summary. To reproduce the catalog gate separately:
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj \
+  -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj \
   -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
 ```
 
@@ -93,7 +93,7 @@ Generate a candidate; this does **not** change the reviewed baseline:
 
 ```sh
 docker compose run --rm -e SHARPPROOF_API_INVENTORY_CANDIDATE=1 tooling test \
-  -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj \
+  -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
   -TestFilter FullyQualifiedName~DotnetApiInventoryTests
 ```
 
@@ -120,7 +120,7 @@ both with the inventory artifact and the Markdown report in its job summary. Rep
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj \
+  -Target src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj \
   -TestFilter FullyQualifiedName~ApiUsageRankingTests
 ```
 
@@ -156,7 +156,6 @@ and retain conservative results for abstract getters, comparator-driven dictiona
 lookups, invalid indexes, setters, and unmodeled collection-content relationships. These are
 partial API models, not collection-content or full heap models.
 
-
 ### Integer comparisons and Count result guarantees
 
 The frontend models typed comparisons for all nine supported integer types.
@@ -187,6 +186,7 @@ regression tests. The usage report splits rows by contextual support status:
 `unmodeled-dispatch` means the API declaration has a guarded intrinsic but this
 call does not meet its guards. Generic comparer calls in the original corpus
 therefore remain visible as gaps; this batch does not claim all 26 are covered.
+
 ### Array-backed IList and ICollection
 
 The frontend models `ICollection<T>.Count` and `IList<T>.Item` when the receiver is
@@ -246,6 +246,50 @@ arbitrary callers receive no implementation assumptions. Alias and smaller sourc
 helper postconditions also run through the worker. The full swap postcondition
 currently reaches the worker verification-condition construction budget; runtime
 model evidence does not turn that Unknown into a proof.
+
+### Fresh integer-key dictionary state
+
+Parameterless framework `Dictionary<TKey,TValue>` construction now establishes
+empty shared state for proven local, unescaped receivers with primitive integer
+keys. Empty Count and membership do not require interpreting the value type.
+Successful Add, present-key index reads and simple index assignments retain the
+scalar/reference value domain and observe shared state through aliases. Key equality
+preserves the full integer width; argument evaluation captures values before later
+mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
+closure escape, published references and unsupported type domains keep fallback.
+
+Initialization retains conservative allocation, static cache/capability and fault
+paths. Native replay observes fixed real CoreLib primitive dictionary operations
+before selecting an initialized normal return. Resource/error paths and precise
+capacity/growth behavior remain open. These five partial declaration registrations
+have executed normal-state and wrong-claim evidence; CLR/IR oracle and native tests
+cover all nine integer key types. They grant no universal API, exception, allocation
+or callback guarantee. The complete boundaries and remaining corpus sites are in
+[gaps.md](gaps.md#verified-dictionary-state-slice).
+
+Reference values retain identity, stored nulls and alias updates. Supported class,
+interface, delegate and array domains include reference-constrained type parameters;
+unconstrained generic value contents and arrays of arrays remain outside the content model. Pure
+ReferenceEquals clauses retain reference identity when converting these values to
+object. Publishing a fetched value does not publish its dictionary owner; capturing
+or publishing the owner still removes its ownership fact. CLR/IR comparisons and
+native proof/refutation controls cover the new behavior. See the
+[reference-value evidence and remaining boundaries](gaps.md#verified-reference-dictionary-values).
+
+Empty-state support also applies to opaque structure and unconstrained generic
+value types, without invoking their value constructors. This covers four actual
+integer-key corpus constructions. Opaque value writes still invalidate empty-state
+facts; generic/reference-key operations and custom/incoming comparer state remain open. See
+[empty-state evidence and remaining gaps](gaps.md#verified-empty-dictionary-state-across-value-domains).
+
+Parameterless default construction and owned Count also support generic/reference
+keys. Non-primitive-key comparer initialization retains arbitrary heap, allocation
+and fault effects before fresh zero-Count state is established. This covers the
+four paired generic-key corpus constructions; hashing, membership and contents for
+those keys still need models. Native refutation remains Unknown without concrete
+initialization replay. See the
+[generic-key construction evidence](gaps.md#verified-default-construction-and-count-for-generic-keys).
+
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |

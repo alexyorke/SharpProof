@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Arcade 9's consolidated NuGet restore predates .slnx discovery. -->
+    <RestoreUsingNuGetTargets>false</RestoreUsingNuGetTargets>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectToBuild Include="$(RepoRoot)SharpProof.slnx" />
+  </ItemGroup>
+</Project>

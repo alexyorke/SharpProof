@@ -2,23 +2,24 @@
   "solution": {
     "path": "SharpProof.slnx",
     "projects": [
-      "eng\\ConsoleLoggingAnalyzer.Test\\ConsoleLoggingAnalyzer.Test.csproj",
-      "SharpProof.Analyzer.Test\\SharpProof.Analyzer.Test.csproj",
-      "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj",
-      "SharpProof.Attributes.Test\\SharpProof.Attributes.Test.csproj",
-      "SharpProof.CodeFixes.Test\\SharpProof.CodeFixes.Test.csproj",
-      "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj",
-      "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj",
-      "SharpProof.Dataflow.Test\\SharpProof.Dataflow.Test.csproj",
-      "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj",
-      "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj",
-      "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj",
-      "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj",
-      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj",
-      "SharpProof.Testing.Test\\SharpProof.Testing.Test.csproj",
-      "SharpProof.Fuzz.Test\\SharpProof.Fuzz.Test.csproj",
-      "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj",
-      "SharpProof.Verify.Test\\SharpProof.Verify.Test.csproj"
+      "src\\ConsoleLoggingAnalyzer.Tests\\ConsoleLoggingAnalyzer.Tests.csproj",
+      "src\\SharpProof.Analyzer.Tests\\SharpProof.Analyzer.Tests.csproj",
+      "src\\SharpProof.Architecture.Tests\\SharpProof.Architecture.Tests.csproj",
+      "src\\SharpProof.Attributes.Tests\\SharpProof.Attributes.Tests.csproj",
+      "src\\SharpProof.CodeFixes.Tests\\SharpProof.CodeFixes.Tests.csproj",
+      "src\\SharpProof.ContractForGenerator.Tests\\SharpProof.ContractForGenerator.Tests.csproj",
+      "src\\SharpProof.Contracts.Tests\\SharpProof.Contracts.Tests.csproj",
+      "src\\SharpProof.Dataflow.Tests\\SharpProof.Dataflow.Tests.csproj",
+      "src\\SharpProof.Effects.Tests\\SharpProof.Effects.Tests.csproj",
+      "src\\SharpProof.Frontend.Tests\\SharpProof.Frontend.Tests.csproj",
+      "src\\SharpProof.Ir.Tests\\SharpProof.Ir.Tests.csproj",
+      "src\\SharpProof.Smt.Tests\\SharpProof.Smt.Tests.csproj",
+      "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj",
+      "src\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
+      "src\\SharpProof.Tool.Tests\\SharpProof.Tool.Tests.csproj",
+      "src\\SharpProof.Fuzz.Tests\\SharpProof.Fuzz.Tests.csproj",
+      "src\\SharpProof.Gates.Tests\\SharpProof.Gates.Tests.csproj",
+      "src\\SharpProof.Verify.Tests\\SharpProof.Verify.Tests.csproj"
     ]
   }
 }

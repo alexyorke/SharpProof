@@ -6,7 +6,9 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Developer experience
 
-- Make `SharpProof.Verifier` the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. Keep `SharpProof` portable-only and advisory by default. Existing Verifier consumers without an explicit profile now receive strict policy; review upgrade guidance.
+- Extend the native verifier payload/matrix to Windows, macOS, and glibc Linux on x64/ARM64. Windows solver payloads link their C++ runtime statically, removing the separate Visual C++ redistributable prerequisite. .NET SDK 10.0.100+ remains required; musl and other OS/CPU combinations are outside this support boundary. Exact-artifact native ABI checks establish release qualification separately from compilation/import audits.
+
+- Make the main `SharpProof` package the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. The cycle-free graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`; Verifier remains a compatibility entrypoint. Advisory/off are explicit opt-outs. Existing main-package consumers without an explicit profile now receive strict policy and require SDK 10; review upgrade guidance.
 
 - Separate portable first feedback, full verification, and incremental adoption instructions.
 - Reconcile qualified consumer hosts with the container-only contributor workflow.

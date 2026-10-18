@@ -6,9 +6,9 @@ Start with a caller obligation, then progress to native proofs, branching, loops
 
 | Lesson | You will learn |
 | --- | --- |
-| [1. Your first contract](01-first-contract.md) | Install the packages, declare preconditions, and use closed attributes |
+| [1. Your first contract](01-first-contract.md) | Install one main package, deliberately inspect portable feedback, and use closed attributes |
 | [2. Catch mistakes while compiling](02-diagnostics.md) | Trigger real diagnostics and configure their severity |
-| [3. Prove four effect contracts](03-effects.md) | Enable the worker and distinguish analyzer feedback from proof |
+| [3. Prove four effect contracts](03-effects.md) | Restore full verification on the same package and distinguish feedback from proof |
 | [4. Verify decision logic](04-branching.md) | Write postconditions for branches, multiple returns, and entry values |
 | [5. Verify loops and mutable state](05-loops-and-state.md) | Use supported loop, array, and field reasoning |
 | [6. Read failures and Unknown](06-outcomes.md) | Interpret structured evidence and a build that correctly fails |
@@ -28,7 +28,7 @@ docker compose build tooling
 docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File docs/tutorials/Run-Tutorials.ps1'
 ```
 
-The runner builds a local three-package feed and creates separate net8.0 consumer projects. It tests portable examples, enables the native worker for proof examples, and checks the intentional failure in lesson 6. It never executes the native function declared in lesson 8.
+The runner builds the internal local three-package feed and creates separate net8.0 consumer projects, each with just one `SharpProof` reference. The SDK is .NET 10; the application target remains net8.0. Standard installation enables strict verification without properties. The teaching harness deliberately uses explicit advisory profiles and per-lesson worker/assumption policies to distinguish portable feedback, proof, and the intentional failure in lesson 6 while preserving captured expectations. It never executes the native function declared in lesson 8.
 
 Builds happen in private temporary directories. The runner snapshots HEAD plus tracked working-tree changes and reads tutorial source files directly. Commit other untracked production source before running; it is not included in that snapshot. This demonstration feed is for local learning, not exact-commit release qualification.
 
