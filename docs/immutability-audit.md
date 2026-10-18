@@ -1915,3 +1915,27 @@ publication. Retain immutable traversal stacks and callback lifecycle. Status: o
 The read-only conflict review also found no defect in pushed merge f0e3b6fc8;
 GitHub confirms its exact head is MERGEABLE. Campaign runtime verification uses a
 private clean clone of that exact commit, independently of subsequent edits.
+## IR and finite-domain fixture construction inventory
+
+IMM-M028: Coordinator inspected observer/budget/term lists in IrPurityWriteWitnessTests,
+IrTotalExecutionTests, Pr275AcyclicOrderCoverageTests, Pr275SemanticGuardCoverageTests,
+and IrTraversalTests; expected operator maps in IrOperatorCatalogTests; ascending
+chains in GeneratedDomainPropertyTests; and finite CFG edge/transfer construction in
+FiniteCfgConcreteOracleTests. Use scoped array/hash/map builders and freeze before
+assertions, evaluation and graph publication. Preserve callback order, duplicate edges,
+finite transfer order, default enum/IR comparers and raw domain values.
+
+The coordinator rejects the agent's IrTraversal Stack conversion: this test explicitly
+passes a mutable stack to the public PushChildren overload and observes its mutation.
+Keep that SUT stack; only its separate popped-observation list is construction state.
+Likewise keep IrInputSnapshot mutation/comparer tests and keyed heap mutation subjects.
+Fixed expected operation arrays and occurrence vectors can be immutable snapshots.
+Status: open before edits.
+
+IMM-M025 campaign publication is verified on exact clean f0e3b6fc8: rotating seed 1 and
+retained seed 23063, one case each, two validated agreements, zero failing runs.
+Evidence: immutability-campaign-builders-runtime.log and its campaign.json.
+IMM-M027 passes 1,134 Analyzer tests; the M026 build's moved null guard hit CA2208,
+then was changed to the repository guard helper retaining parameter name body.
+Evidence: immutability-analyzer-scoped-builders-tests.log and
+immutability-effect-fixpoint-builders-tests.log; corrected fixpoint rerun pending.
