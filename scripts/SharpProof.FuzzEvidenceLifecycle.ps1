@@ -29,7 +29,7 @@ function Get-SharpProofCleanFuzzSourceCommit {
         throw 'Unable to bind fuzz evidence to the exact source commit.'
     }
     $dirty = @(& git -C $RepositoryRoot status `
-        --porcelain=v1 --untracked-files=all)
+            --porcelain=v1 --untracked-files=all)
     if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
         throw 'Fuzz evidence requires a clean repository source tree.'
     }
@@ -65,7 +65,7 @@ function Assert-SharpProofFuzzCampaignBudget {
         throw 'Fuzz campaign budget inputs are invalid.'
     }
     [long]$requestedCases = [long]$RotatingCases +
-        [long]$RetainedCases * [long]$RetainedRunCount
+    [long]$RetainedCases * [long]$RetainedRunCount
     if ($requestedCases -gt $MaximumCases) {
         throw "Fuzz campaign requests $requestedCases cases; maximum is $MaximumCases."
     }
@@ -115,13 +115,13 @@ function Get-SharpProofFuzzCampaignSchedule {
         -MaximumCases $maximumCaseCount
 
     return [pscustomobject]@{
-        RotatingCases = $scheduledRotatingCases
+        RotatingCases          = $scheduledRotatingCases
         RequestedRotatingCases = $rotatingCaseCount
-        RetainedCasesPerSeed = $retainedCaseCount
-        RetainedSeeds = [int[]]$RetainedSeeds
-        RetainedRunSeeds = $retainedRunSeeds.ToArray()
-        SharedRetainedSeed = $sharedRetainedSeed
-        RequestedCases = $requestedCases
+        RetainedCasesPerSeed   = $retainedCaseCount
+        RetainedSeeds          = [int[]]$RetainedSeeds
+        RetainedRunSeeds       = $retainedRunSeeds.ToArray()
+        SharedRetainedSeed     = $sharedRetainedSeed
+        RequestedCases         = $requestedCases
     }
 }
 
@@ -194,8 +194,8 @@ function Read-SharpProofRetainedFuzzSeedManifest {
 
         return [pscustomobject]@{
             SchemaVersion = $schemaVersion
-            CasesPerSeed = $casesPerSeed
-            Seeds = @($seeds)
+            CasesPerSeed  = $casesPerSeed
+            Seeds         = @($seeds)
         }
     }
     finally {

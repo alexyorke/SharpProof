@@ -20,6 +20,17 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  formatting:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Require C#, PowerShell, and shell linting and formatting
+        run: docker compose run --rm tooling format-check
+
   dotnet-api-inventory:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -141,7 +152,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory]
+    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, formatting]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -150,7 +161,12 @@ jobs:
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
           SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
+          SHARPPROOF_FORMATTING_RESULT: ${{ needs.formatting.result }}
         run: |
+          if [[ "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
+            echo "Repository formatting failed: $SHARPPROOF_FORMATTING_RESULT" >&2
+            exit 1
+          fi
           if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success ]]; then
             echo "Canonical jobs, self-application, or API inventory failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT" >&2
             exit 1

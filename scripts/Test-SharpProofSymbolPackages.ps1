@@ -26,7 +26,7 @@ function Test-SharpProofSymbolPackagePair {
                     $PSScriptRoot `
                     'SharpProof.SymbolPackageValidator.cs') `
                 -PassThru |
-                Where-Object Name -eq 'SharpProofSymbolPackageValidator'
+                Where-Object Name -EQ 'SharpProofSymbolPackageValidator'
         )[0]
     }
     try {

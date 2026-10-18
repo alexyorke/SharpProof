@@ -43,7 +43,8 @@ public static class Subject
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 1 && x == 11);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return Library.Div(x); }
+        try
+        { return Library.Div(x); }
         catch (System.DivideByZeroException) when (++x > 0) { return x; }
         finally { x += 10; }
     }
@@ -52,7 +53,8 @@ public static class Subject
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 1 && x == 11);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return 10 / x; }
+        try
+        { return 10 / x; }
         catch (System.DivideByZeroException) when (++x > 0 && Library.Div(x - 1) > 0) { return 7; }
         catch (System.DivideByZeroException) { return x; }
         finally { x += 10; }
@@ -62,7 +64,8 @@ public static class Subject
         Contract.Requires(x == int.MaxValue);
         Contract.Ensures(Contract.Result<int>() == Contract.Old(x) && x == int.MinValue);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return Library.Target(x); }
+        try
+        { return Library.Target(x); }
         catch (System.OverflowException) { return x; }
         finally { x = unchecked(x + 1); }
     }
@@ -88,7 +91,8 @@ public static class Library
     public static byte Store(byte value) { value++; return value; }
     public static int Handled(int value)
     {
-        try { return 10 / value; }
+        try
+        { return 10 / value; }
         catch (System.DivideByZeroException) { return 1; }
     }
 }

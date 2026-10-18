@@ -21,9 +21,28 @@ public sealed class GoldenLoweringTests
     [TestCaseSource(nameof(Cases))]
     public void ProgramLoweringMatchesGolden(string caseName)
     {
+        ArgumentNullException.ThrowIfNull(caseName);
+        CompareLowering(caseName, reformat: false);
+    }
+
+    [TestCaseSource(nameof(Cases))]
+    public void ProgramLoweringMatchesGoldenAfterFormatting(string caseName)
+    {
+        ArgumentNullException.ThrowIfNull(caseName);
+        CompareLowering(caseName, reformat: true);
+    }
+
+    private static void CompareLowering(string caseName, bool reformat)
+    {
         System.ArgumentNullException.ThrowIfNull(caseName);
         var fixture = GoldenTest.Load("lowering", caseName);
-        var tree = CSharpSyntaxTree.ParseText(fixture.Source, new CSharpParseOptions(LanguageVersion.CSharp12), caseName + ".cs");
+        var sourceText = reformat
+            ? "\n// Relocated and reformatted fixture.\n" + CSharpSyntaxTree.ParseText(fixture.Source,
+                new CSharpParseOptions(LanguageVersion.CSharp12))
+                .GetRoot().NormalizeWhitespace(indentation: "  ", eol: "\n").ToFullString()
+            : fixture.Source;
+        var tree = CSharpSyntaxTree.ParseText(sourceText, new CSharpParseOptions(LanguageVersion.CSharp12), caseName + ".cs");
+        var sourceAnchors = new GoldenSourceAnchors(tree);
         var bindContracts = fixture.Source.Contains("// golden-contracts: true", StringComparison.Ordinal);
         var references = bindContracts ? TestMetadataReferences.Platform.Add(
             MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location)) : TestMetadataReferences.Platform;
@@ -97,7 +116,8 @@ public sealed class GoldenLoweringTests
             foreach (var instruction in block.Instructions)
             {
                 var span = factory.GetOperationInfo(instruction.Operation).SourceSpan;
-                var source = total ? span == null ? " source=none" : $" source={span.Document}:{span.Start}+{span.Length}" : "";
+                var source = total ? span == null ? " source=none" :
+                    " source=" + sourceAnchors.Format(span.Document, span.Start, span.Length) : "";
                 output.AppendLine(CultureInfo.InvariantCulture, $"  {instruction.Id} {instruction.Operation} {Format(instruction)}{source}");
                 RememberInstruction(instruction);
             }
@@ -111,7 +131,8 @@ public sealed class GoldenLoweringTests
         foreach (var diagnostic in result.Abstentions.OrderBy(diagnostic => ((diagnostic.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(diagnostic)) : (diagnostic.Operation.Value))))
         {
             var description = factory.GetOperationInfo(diagnostic.Operation).Description;
-            output.AppendLine(CultureInfo.InvariantCulture, $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? factory.GetString(text) : "none")}");
+            output.AppendLine(CultureInfo.InvariantCulture,
+                $"diagnostic: {diagnostic.Operation} {diagnostic.Reason} {(description is { } text ? sourceAnchors.FormatOperationDescription(factory.GetString(text)) : "none")}");
         }
         const string callInputPrefix = "// golden-call-precondition-input: ";
         var callInput = fixture.Source.Split('\n').SingleOrDefault(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith(callInputPrefix, StringComparison.Ordinal)));

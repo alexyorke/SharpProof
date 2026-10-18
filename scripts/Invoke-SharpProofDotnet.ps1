@@ -15,7 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 Assert-SharpProofContainer `
     'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
 $effectiveArguments = @(
@@ -44,12 +44,14 @@ try {
     $started = $true
     $standardOutput = if ($capture) {
         $process.StandardOutput.ReadToEndAsync()
-    } else {
+    }
+    else {
         $null
     }
     $standardError = if ($capture) {
         $process.StandardError.ReadToEndAsync()
-    } else {
+    }
+    else {
         $null
     }
 

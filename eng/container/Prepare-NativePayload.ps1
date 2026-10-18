@@ -73,18 +73,18 @@ try {
 
     $manifest = [ordered]@{
         schemaVersion = 1
-        platform = [string]$catalog.platform
-        version = [string]$z3.version
-        sourceUrl = [string]$z3.archiveUrl
-        files = @(
+        platform      = [string]$catalog.platform
+        version       = [string]$z3.version
+        sourceUrl     = [string]$z3.archiveUrl
+        files         = @(
             [ordered]@{
-                name = 'libz3.so'
-                bytes = [int64]$z3.libraryBytes
+                name   = 'libz3.so'
+                bytes  = [int64]$z3.libraryBytes
                 sha256 = [string]$z3.librarySha256
             },
             [ordered]@{
-                name = 'Microsoft.Z3.dll'
-                bytes = [int64]$z3.managedAssemblyBytes
+                name   = 'Microsoft.Z3.dll'
+                bytes  = [int64]$z3.managedAssemblyBytes
                 sha256 = [string]$z3.managedAssemblySha256
             }
         )
@@ -126,14 +126,14 @@ try {
     [System.IO.Directory]::CreateDirectory($linuxArm64PayloadDirectory) | Out-Null
     Copy-Item -LiteralPath $linuxArm64StagingLibrary -Destination (Join-Path $linuxArm64PayloadDirectory 'libz3.so') -Force
     [ordered]@{
-        schemaVersion = 1
-        platform = 'linux/arm64'
-        version = [string]$z3.version
-        sourceUrl = [string]$linuxArm64.archiveUrl
+        schemaVersion     = 1
+        platform          = 'linux/arm64'
+        version           = [string]$z3.version
+        sourceUrl         = [string]$linuxArm64.archiveUrl
         sourceMetadataUrl = [string]$linuxArm64.sourceMetadataUrl
-        files = @([ordered]@{
-                name = 'libz3.so'
-                bytes = [int64]$linuxArm64.libraryBytes
+        files             = @([ordered]@{
+                name   = 'libz3.so'
+                bytes  = [int64]$linuxArm64.libraryBytes
                 sha256 = [string]$linuxArm64.librarySha256
             })
     } | ConvertTo-Json -Depth 5 |
@@ -181,18 +181,18 @@ try {
 
     $windowsManifest = [ordered]@{
         schemaVersion = 1
-        platform = 'windows/amd64'
-        version = [string]$z3.version
-        sourceUrl = [string]$windows.archiveUrl
-        files = @(
+        platform      = 'windows/amd64'
+        version       = [string]$z3.version
+        sourceUrl     = [string]$windows.archiveUrl
+        files         = @(
             [ordered]@{
-                name = 'libz3.dll'
-                bytes = [int64]$windows.libraryBytes
+                name   = 'libz3.dll'
+                bytes  = [int64]$windows.libraryBytes
                 sha256 = [string]$windows.librarySha256
             },
             [ordered]@{
-                name = 'Microsoft.Z3.dll'
-                bytes = [int64]$windows.managedAssemblyBytes
+                name   = 'Microsoft.Z3.dll'
+                bytes  = [int64]$windows.managedAssemblyBytes
                 sha256 = [string]$windows.managedAssemblySha256
             }
         )
