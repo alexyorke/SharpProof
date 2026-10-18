@@ -89,6 +89,17 @@ public sealed class DictionaryStateOracleTests
         }
     }
 
+    [TestCase("decimal")]
+    [TestCase("System.DateTime")]
+    [TestCase("System.Guid")]
+    [TestCase("System.Numerics.BigInteger")]
+    public void EmptyDictionaryWithOpaqueValueTypeAgreesWithCompiledClr(string type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        Compare("var data = new System.Collections.Generic.Dictionary<int, " + type + ">(); var alias = data; " +
+            "return data.Count + alias.Count + (alias.ContainsKey(17) ? 100 : 0);");
+    }
+
     private static void Compare(string body, params object?[] inputs)
     {
         ArgumentNullException.ThrowIfNull(body);

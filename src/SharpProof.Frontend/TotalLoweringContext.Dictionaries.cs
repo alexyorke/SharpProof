@@ -19,7 +19,11 @@ internal static partial class CSharpOperationSemantics
             method.ContainingType is { TypeArguments.Length: 2 } type &&
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
             IsComparisonIntegerType(type.TypeArguments[0]) &&
-            (IsScalar(type.TypeArguments[1]) || IsReferenceDomain(type.TypeArguments[1]) ||
+            // Empty construction, Count and key membership do not inspect values.
+            // Contents still require the supported scalar/reference value domain.
+            (method.MethodKind == MethodKind.Constructor || method.Name == "ContainsKey" ||
+                method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
+                IsScalar(type.TypeArguments[1]) || IsReferenceDomain(type.TypeArguments[1]) ||
                 type.TypeArguments[1] is ITypeParameterSymbol { IsReferenceType: true });
     }
 

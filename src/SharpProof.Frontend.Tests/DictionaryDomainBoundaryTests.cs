@@ -84,20 +84,20 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(expected));
     }
 
-    [TestCase("int", "T", "", false)]
-    [TestCase("int", "T", "where T : class", true)]
-    [TestCase("int", "T", "where T : struct", false)]
-    [TestCase("int", "T", "where T : unmanaged", false)]
-    [TestCase("int", "T", "where T : notnull", false)]
-    [TestCase("int", "T", "where T : System.IDisposable", false)]
-    [TestCase("int", "T", "where T : class, System.IDisposable", true)]
-    [TestCase("int", "T", "where T : System.Exception", true)]
-    [TestCase("string", "object", "", false)]
-    [TestCase("int", "decimal", "", false)]
-    [TestCase("int", "object[][]", "", false)]
-    [TestCase("int", "object[]", "", true)]
-    [TestCase("int", "int[,]", "", true)]
-    public void DictionaryValueDomainsRequireScalarOrReferenceEvidence(string key, string value, string constraints, bool expected)
+    [TestCase("int", "T", "", true, false)]
+    [TestCase("int", "T", "where T : class", true, true)]
+    [TestCase("int", "T", "where T : struct", true, false)]
+    [TestCase("int", "T", "where T : unmanaged", true, false)]
+    [TestCase("int", "T", "where T : notnull", true, false)]
+    [TestCase("int", "T", "where T : System.IDisposable", true, false)]
+    [TestCase("int", "T", "where T : class, System.IDisposable", true, true)]
+    [TestCase("int", "T", "where T : System.Exception", true, true)]
+    [TestCase("string", "object", "", false, false)]
+    [TestCase("int", "decimal", "", true, false)]
+    [TestCase("int", "object[][]", "", true, false)]
+    [TestCase("int", "object[]", "", true, true)]
+    [TestCase("int", "int[,]", "", true, true)]
+    public void DictionaryValueDomainsLimitContentsRatherThanEmptyState(string key, string value, string constraints, bool emptyState, bool contents)
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
@@ -109,7 +109,32 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         var constructor = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(creation).Symbol!;
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(constructor), Is.EqualTo(expected));
+        var type = constructor.ContainingType;
+        var count = type.GetMembers("Count").OfType<IPropertySymbol>().Single();
+        var contains = type.GetMembers("ContainsKey").OfType<IMethodSymbol>().Single();
+        var add = type.GetMembers("Add").OfType<IMethodSymbol>().Single();
+        var indexer = type.GetMembers().OfType<IPropertySymbol>().Single(property => property is null ? throw new ArgumentNullException(nameof(property)) : property.IsIndexer);
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(constructor), Is.EqualTo(emptyState));
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(count.GetMethod!), Is.EqualTo(emptyState));
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(contains), Is.EqualTo(emptyState));
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(add), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(indexer.GetMethod!), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(indexer.SetMethod!), Is.EqualTo(contents));
+    }
+
+    [TestCase("new System.Collections.Generic.Dictionary<int, decimal>()", true, true)]
+    [TestCase("new System.Collections.Generic.Dictionary<int, decimal>(3)", false, false)]
+    [TestCase("new System.Collections.Generic.Dictionary<int, decimal>((System.Collections.Generic.IEqualityComparer<int>)null)", false, false)]
+    [TestCase("new System.Collections.Generic.Dictionary<int, decimal> { }", false, true)]
+    public void OpaqueValueEmptyCreationAndDefaultReceiverAreDistinctFacts(string expression, bool syntaxEmpty, bool trackedDefaultComparer)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var (model, syntax, graph, context) = Prepare("", "var data = " + expression + "; return data.Count;");
+        var creation = syntax.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        Assert.That(CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(model.GetOperation(creation)!), Is.EqualTo(syntaxEmpty));
+        context.TrackDefaultDictionaries(graph);
+        var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(trackedDefaultComparer));
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)
