@@ -32,6 +32,18 @@ public sealed class ListStateDomainBoundaryTests
         Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
     }
 
+    [TestCase("new System.Collections.Generic.List<int>()", true)]
+    [TestCase("incoming", false)]
+    public void LocalAssignmentReceiverUsesTheAssignedImplementation(string value, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var (model, syntax, graph, context) = Prepare("System.Collections.Generic.IList<int> incoming",
+            "System.Collections.Generic.IList<int> alias = null; return (alias = " + value + ").Count;");
+        context.TrackFreshLists(graph);
+        var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
+    }
+
     [TestCase("int", true)]
     [TestCase("long", true)]
     [TestCase("object", true)]
@@ -47,9 +59,11 @@ public sealed class ListStateDomainBoundaryTests
         var invocation = (IInvocationOperation)model.GetOperation(syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
         var properties = syntax.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Select(node => node is null ? throw new ArgumentNullException(nameof(node)) : (IPropertyReferenceOperation)model.GetOperation(node)!).ToArray();
         Assert.That(CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
         Assert.That(CSharpOperationSemantics.IsListStateMember(properties.Single().Property.GetMethod!), Is.EqualTo(contents));
         var count = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
         Assert.That(CSharpOperationSemantics.IsListStateMember(count.Property.GetMethod!), Is.True);
+        Assert.That(CSharpOperationSemantics.IsConcreteListStateMember(count.Property.GetMethod!), Is.True);
     }
 
     [TestCase("new System.Collections.Generic.List<int>()", true)]
@@ -111,6 +125,23 @@ public sealed class ListStateDomainBoundaryTests
         context.TrackFreshLists(ControlFlowGraph.Create(syntax, model)!);
         var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
         Assert.That(context.IsFreshList(property.Instance!), Is.False);
+    }
+
+    [TestCase("data.Count", 255)]
+    [TestCase("Get().Count", 0)]
+    [TestCase("data[Index()]", 0)]
+    public void ListClausesDeclineUnsupportedReceiversIndexesAndDepth(string expression, int depth)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.List<int> data) { return " + expression + "; } static System.Collections.Generic.List<int> Get() => null; static int Index() => 0; }");
+        var compilation = CSharpCompilation.Create("ListClauseBoundary", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var operation = model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        var lowered = new RoslynTotalExpressionLowerer(context).LowerClause(operation, depth: depth);
+        Assert.That(lowered.Classification.IsExact, Is.False);
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)

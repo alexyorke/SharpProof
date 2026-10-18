@@ -257,7 +257,7 @@ public sealed class ApiUsageRankingTests
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "read")), Is.EqualTo(1));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "write")), Is.EqualTo(1));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "read-write")), Is.EqualTo(1));
-            Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(3));
+            Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(1));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call")), Is.EqualTo(1));
             Assert.That(gaps.Single(), Does.Contain("System.Double"));
         }
@@ -413,6 +413,29 @@ public sealed class ApiUsageRankingTests
             Is.EqualTo(FreshListIndexers));
     }
 
+    [Test]
+    public void UsageScanCreditsConcreteListParametersWithinTheirValueDomain()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class ConcreteListProbe {
+                public static void Target(System.Collections.Generic.List<int> data,
+                    System.Collections.Generic.IList<int> unknown, System.Collections.Generic.List<decimal> opaque) {
+                    data.Add(23); unknown.Add(23); opaque.Add(1M);
+                    _ = data[0]; _ = unknown[0]; _ = opaque[0]; data[0]++;
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var tree = compilation.SyntaxTrees.Single();
+        var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        Assert.That(known.Contains(calls[0].SpanStart), Is.True);
+        Assert.That(known.Contains(calls[1].SpanStart), Is.False);
+        Assert.That(known.Contains(calls[2].SpanStart), Is.False);
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        Assert.That(known.Contains(indexers[0].SpanStart), Is.True);
+        Assert.That(indexers.Skip(1).Any(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)), Is.False);
+    }
+
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
@@ -442,7 +465,8 @@ public sealed class ApiUsageRankingTests
                 if (context.IsDefaultIntegerComparison(invocation) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsDefaultDictionaryStateMember(invocation.TargetMethod) &&
                     CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance) ||
-                    invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) && context.IsFreshList(invocation.Instance))
+                    invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) &&
+                    (CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod) || context.IsFreshList(invocation.Instance)))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
@@ -450,7 +474,8 @@ public sealed class ApiUsageRankingTests
                 if (context.ArrayCollectionReceiver(property) != null ||
                     property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter) &&
                     CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance) ||
-                    property.Instance != null && property.Property.GetMethod is { } listGetter && CSharpOperationSemantics.IsListStateMember(listGetter) && context.IsFreshList(property.Instance) &&
+                    property.Instance != null && property.Property.GetMethod is { } listGetter && CSharpOperationSemantics.IsListStateMember(listGetter) &&
+                    (CSharpOperationSemantics.IsConcreteListStateMember(listGetter) || context.IsFreshList(property.Instance)) &&
                     property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation))
                 {
                     known.Add(property.Syntax.SpanStart);

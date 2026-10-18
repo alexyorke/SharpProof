@@ -6,6 +6,7 @@ namespace SharpProof.Smt;
 internal sealed partial class BvEncoder
 {
     private readonly Dictionary<IrMemberId, FuncDecl> _fields = [];
+    private readonly Dictionary<IrMemberId, Dictionary<IrId, (IrOpaqueTerm Read, Expr Owner, Expr? Key)>> _fieldReads = [];
 
     private Expr EncodeFieldRead(IrOpaqueTerm read, SmtQueryResourceMeter meter)
     {
@@ -31,11 +32,14 @@ internal sealed partial class BvEncoder
             }
             _fields.Add(read.Member, field);
         }
-        return owner.Own(read.Arguments.IsEmpty ? context.MkApp(field, receiver)
-            : context.MkApp(field, receiver, Encode(read.Arguments[0], meter)));
+        var keyValue = read.Arguments.IsEmpty ? null : Encode(read.Arguments[0], meter);
+        if (!_fieldReads.TryGetValue(read.Member, out var observations))
+        { _fieldReads.Add(read.Member, observations = []); }
+        observations[read.Id] = (read, receiver, keyValue);
+        return owner.Own(keyValue == null ? context.MkApp(field, receiver) : context.MkApp(field, receiver, keyValue));
     }
 
-    // Fills an object of the model with every encoded field's entry value.
+    // Fills entry fields and only the keyed cells observed for this owner.
     private void FillObjectState(IrObjectState state, Expr reference, Model model, SmtQueryResourceMeter meter,
         Func<IrTypeId, Expr, IrValue?> decode)
     {
@@ -47,14 +51,42 @@ internal sealed partial class BvEncoder
         foreach (var field in _fields.ToArray())
         {
             meter.Consume();
-            // Entry keyed contents are not reconstructed from a finite sample.
-            // Replay must decline any witness that needs such an unknown cell.
-            if (!factory.GetMemberInfo(field.Key).ParameterTypes.IsEmpty)
-            { continue; }
-            using var application = context.MkApp(field.Value, reference);
-            using var value = model.Evaluate(application, true);
-            if (decode(factory.GetMemberInfo(field.Key).ReturnType, value) is { } decoded)
-            { state.Fields[field.Key] = decoded; }
+            var observations = new List<(IrOpaqueTerm Read, Expr Owner, Expr? Key)>();
+            foreach (var observed in _fieldReads[field.Key].Values)
+            {
+                meter.Consume();
+                using var observedOwner = model.Evaluate(observed.Owner, true);
+                if (observedOwner.Equals(reference))
+                { observations.Add(observed); }
+            }
+            var member = factory.GetMemberInfo(field.Key);
+            if (member.ParameterTypes.IsEmpty)
+            {
+                using var application = context.MkApp(field.Value, reference);
+                using var value = model.Evaluate(application, true);
+                if (decode(member.ReturnType, value) is { } decoded)
+                {
+                    // List witnesses must describe a materializable finite size.
+                    // Charging the logical Count rejects oversized SAT witnesses,
+                    // without narrowing the SMT domain used for universal proofs.
+                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) == IrFieldSites.Prefix + "list:count")
+                    { meter.Consume((long)(decoded.IntegerBits & int.MaxValue) + 1L); }
+                    state.Fields[field.Key] = decoded;
+                }
+                continue;
+            }
+            // Reconstruct only cells actually queried for this owner and key.
+            // An unobserved key remains unavailable to replay, never a default.
+            foreach (var observed in observations)
+            {
+                meter.Consume();
+                using var key = model.Evaluate(observed.Key!, true);
+                using var application = context.MkApp(field.Value, reference, key);
+                using var value = model.Evaluate(application, true);
+                if (decode(observed.Read.Arguments[0].Type, key) is { } decodedKey &&
+                    decode(member.ReturnType, value) is { } decodedValue)
+                { state.WithKeyedField(field.Key, decodedKey, decodedValue); }
+            }
         }
     }
 

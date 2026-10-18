@@ -111,7 +111,12 @@ internal static class DotnetApiInventory
         }
 
         if (CSharpOperationSemantics.IsListStateDeclaration(symbol))
-        { evidence.Add("intrinsic=fresh-list-state"); }
+        {
+            evidence.Add("intrinsic=fresh-list-state");
+            if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.List`1.Add(`0)" or
+                "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.List`1.Item(System.Int32)")
+            { evidence.Add("intrinsic=concrete-list-state"); }
+        }
 
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {

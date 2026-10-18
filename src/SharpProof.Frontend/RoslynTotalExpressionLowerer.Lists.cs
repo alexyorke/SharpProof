@@ -18,6 +18,36 @@ internal sealed partial class RoslynTotalExpressionLowerer
         return field;
     }
 
+    private IrTerm ListCount(IrTerm owner)
+    {
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        return _factory.Binary(IrBinaryOperator.BitwiseAnd,
+            _factory.PureOpaque(ListField("count", _factory.IntegerType), owner), _factory.Integer(int.MaxValue));
+    }
+
+    private GuardedExpression? ListClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter ||
+            !CSharpOperationSemantics.IsConcreteListStateMember(getter))
+        { return null; }
+        var receiver = LowerClause(instance, state, depth + 1);
+        if (!receiver.Classification.IsExact)
+        { return Failed(property, receiver.Classification.Abstention); }
+        var owner = AsObject(receiver.Value);
+        var safe = And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type))));
+        var count = ListCount(owner);
+        if (property.Arguments.IsEmpty)
+        { return new(count, safe, FrontendSubsetClassification.Exact); }
+        var index = LowerClause(property.Arguments[0].Value, state, depth + 1);
+        if (!index.Classification.IsExact)
+        { return Failed(property, index.Classification.Abstention); }
+        safe = And(safe, And(index.SafeCondition, And(
+            _factory.Binary(IrBinaryOperator.GreaterThanOrEqual, index.Value, _factory.Integer(0)),
+            _factory.Binary(IrBinaryOperator.LessThan, index.Value, count))));
+        return new(_factory.PureOpaque(ListField("value", _context.Type(property.Type)), owner, index.Value), safe, FrontendSubsetClassification.Exact);
+    }
+
     private TotalBodyValue? ListBody(IOperation operation, IrBlockId block, int depth)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
@@ -38,7 +68,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var property = access as IPropertyReferenceOperation;
         var method = invocation?.TargetMethod ?? (assigned == null ? property?.Property.GetMethod : property?.Property.SetMethod);
         var instance = invocation?.Instance ?? property?.Instance;
-        if (method == null || instance == null || !CSharpOperationSemantics.IsListStateMember(method) || !_context.IsFreshList(instance))
+        if (method == null || instance == null || !CSharpOperationSemantics.IsListStateMember(method) ||
+            !CSharpOperationSemantics.IsConcreteListStateMember(method) && !_context.IsFreshList(instance))
         { return null; }
         var receiver = LowerBodyValue(instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
@@ -67,7 +98,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         block = CheckReceiver(operation, receiver.Value, block);
         var owner = AsObject(receiver.Value);
         var countField = ListField("count", _factory.IntegerType);
-        var count = _factory.Binary(IrBinaryOperator.BitwiseAnd, _factory.PureOpaque(countField, owner), _factory.Integer(int.MaxValue));
+        var count = ListCount(owner);
         var name = method.AssociatedSymbol?.Name ?? method.Name;
         if (name == "Count")
         { return new(count, block, FrontendSubsetClassification.Exact); }
@@ -112,7 +143,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var normal = _builder.CreateBlock("list:growth-normal");
         _builder.Branch(block, site, _factory.Binary(IrBinaryOperator.OrElse, _factory.Variable(fails),
             full), failure, normal);
-        var effects = EmitOpaqueCall(operation, method, values, failure, null, IrOpaqueCallEffects.All).Continuation;
+        // Preserve independently reviewed effect facets just as an ordinary
+        // bound call does. Missing facets still use the opaque fallback.
+        var effects = EmitOpaqueCall(operation, method, values, failure, null,
+            OpaqueEffects?.Invoke(method) ?? IrOpaqueCallEffects.All).Continuation;
         _builder.Throw(effects, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
         // Growth is possible, not guaranteed. A successful scalar/reference copy
