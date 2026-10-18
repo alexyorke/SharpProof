@@ -107,4 +107,80 @@ public sealed class ArrayReceiverModelOwnershipTests
         var comparison = (IInvocationOperation)model.GetOperation(methods[1].Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
         Assert.That(frame!.IsDefaultIntegerComparison(comparison), Is.EqualTo(expected));
     }
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void GenericCollectionHelpersPreserveConcreteParameterRepresentation(bool local, bool cfg)
+    {
+        const string helper = "static int Read<T>(System.Collections.Generic.IList<T> list) => list.Count == 0 ? 0 : 17;";
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) { return Read<int>(values); " +
+            (local ? helper + " }" : " } " + helper) + " }");
+        var compilation = CSharpCompilation.Create("GenericCollectionOwner", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) :
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var rootGraph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
+        var invocation = cfg ? rootGraph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
+            block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+            .SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf())
+            .OfType<IInvocationOperation>().Single() :
+            (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
+        var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
+        Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
+        Assert.That(factory.GetTypeInfo(factory.GetVariableInfo(frame!.Parameters[0].Entry).Type).Kind, Is.EqualTo(IrTypeKind.Sequence),
+            "The helper's immutable array-backed parameter must be specialized before lowering its body.");
+        frame.TrackArrayReceivers(graph!);
+        var property = graph!.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
+            block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+            .SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf())
+            .OfType<IPropertyReferenceOperation>().Single();
+        Assert.That(frame.ConcreteArray(property.Instance!), Is.Not.Null,
+            "A prepared helper's body must retain its specialized receiver binding.");
+        Assert.That(frame.ArrayCollectionReceiver(property), Is.Not.Null,
+            "property-element=" + property.Property.ContainingType.TypeArguments[0].ToDisplayString() +
+            "; element-kind=" + factory.GetTypeInfo(frame.Type(property.Property.ContainingType.TypeArguments[0])).Kind +
+            "; same-original=" + SymbolEqualityComparer.Default.Equals(property.Property.ContainingType.TypeArguments[0].OriginalDefinition,
+                ((INamedTypeSymbol)frame.Parameters[0].Parameter.Type).TypeArguments[0].OriginalDefinition) +
+            "; same-symbol=" + SymbolEqualityComparer.Default.Equals(property.Property.ContainingType.TypeArguments[0],
+                ((INamedTypeSymbol)frame.Parameters[0].Parameter.Type).TypeArguments[0]));
+        Assert.That(frame.HasScalarSignature, Is.True);
+        Assert.That(frame.OwnsBody(graph.OriginalOperation), Is.True);
+        var isolated = new RoslynProgramLowerer(factory).LowerCandidate(graph, frame);
+        Assert.That(isolated.IsExact, Is.True, isolated.Classification.Abstention + "; " +
+            "The prepared helper must lower exactly in isolation.");
+        Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(rootGraph, context,
+            static prepared => { ArgumentNullException.ThrowIfNull(prepared); return true; }, TestContext.CurrentContext.CancellationToken).IsExact,
+            Is.True, "Inlining the prepared helper must preserve its exact array receiver model.");
+    }
+    [Test]
+    public void LocalReceiverElementSpecializationRequiresTheSameDeclaredParameterAndAssembly()
+    {
+        const string source = "public static class Subject { public static void Target() { " +
+            "static int Read<T, U>(System.Collections.Generic.IList<T> list) => list.Count; " +
+            "static int Other<T>(System.Collections.Generic.IList<T> list) => list.Count; } }";
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("LocalElementOwner", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().ToArray();
+        var read = (IMethodSymbol)model.GetDeclaredSymbol(locals[0])!;
+        var other = (IMethodSymbol)model.GetDeclaredSymbol(locals[1])!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var frame = new TotalLoweringContext(factory, read);
+        frame.SpecializeArrayParameter(read.Parameters[0], compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Int32)));
+        Assert.That(frame.Type(read.TypeParameters[0]), Is.EqualTo(factory.IntegerType));
+        Assert.That(factory.GetTypeInfo(frame.Type(read.TypeParameters[1])).Kind, Is.EqualTo(IrTypeKind.Reference));
+        Assert.That(factory.GetTypeInfo(frame.Type(other.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
+        Assert.That(frame.Type(null), Is.EqualTo(factory.ObjectType));
+        // Reusing a syntax tree does not establish the same compilation owner.
+        var foreign = compilation.WithAssemblyName("ForeignLocalElementOwner").GetSemanticModel(tree);
+        var foreignRead = (IMethodSymbol)foreign.GetDeclaredSymbol(locals[0])!;
+        Assert.That(factory.GetTypeInfo(frame.Type(foreignRead.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
+    }
 }

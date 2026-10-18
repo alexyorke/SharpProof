@@ -159,27 +159,47 @@ public sealed partial class NativeSpecifiedCallTests
         { load.Unload(); }
     }
 
-    [TestCase("bool", true)]
-    [TestCase("char", true)]
-    [TestCase("sbyte", true)]
-    [TestCase("byte", true)]
-    [TestCase("short", true)]
-    [TestCase("ushort", true)]
-    [TestCase("int", true)]
-    [TestCase("uint", true)]
-    [TestCase("long", true)]
-    [TestCase("ulong", true)]
-    [TestCase("bool", false)]
-    [TestCase("char", false)]
-    [TestCase("sbyte", false)]
-    [TestCase("byte", false)]
-    [TestCase("short", false)]
-    [TestCase("ushort", false)]
-    [TestCase("int", false)]
-    [TestCase("uint", false)]
-    [TestCase("long", false)]
-    [TestCase("ulong", false)]
-    public async Task CorpusArraySwapProvesItsFullContentsPostcondition(string elementType, bool correct)
+    [TestCase("bool", true, false)]
+    [TestCase("char", true, false)]
+    [TestCase("sbyte", true, false)]
+    [TestCase("byte", true, false)]
+    [TestCase("short", true, false)]
+    [TestCase("ushort", true, false)]
+    [TestCase("int", true, false)]
+    [TestCase("uint", true, false)]
+    [TestCase("long", true, false)]
+    [TestCase("ulong", true, false)]
+    [TestCase("bool", false, false)]
+    [TestCase("char", false, false)]
+    [TestCase("sbyte", false, false)]
+    [TestCase("byte", false, false)]
+    [TestCase("short", false, false)]
+    [TestCase("ushort", false, false)]
+    [TestCase("int", false, false)]
+    [TestCase("uint", false, false)]
+    [TestCase("long", false, false)]
+    [TestCase("ulong", false, false)]
+    [TestCase("bool", true, true)]
+    [TestCase("char", true, true)]
+    [TestCase("sbyte", true, true)]
+    [TestCase("byte", true, true)]
+    [TestCase("short", true, true)]
+    [TestCase("ushort", true, true)]
+    [TestCase("int", true, true)]
+    [TestCase("uint", true, true)]
+    [TestCase("long", true, true)]
+    [TestCase("ulong", true, true)]
+    [TestCase("bool", false, true)]
+    [TestCase("char", false, true)]
+    [TestCase("sbyte", false, true)]
+    [TestCase("byte", false, true)]
+    [TestCase("short", false, true)]
+    [TestCase("ushort", false, true)]
+    [TestCase("int", false, true)]
+    [TestCase("uint", false, true)]
+    [TestCase("long", false, true)]
+    [TestCase("ulong", false, true)]
+    public async Task CorpusArraySwapProvesItsFullContentsPostcondition(string elementType, bool correct, bool local)
     {
         ArgumentNullException.ThrowIfNull(elementType);
         var declaration = (await CorpusSwapDeclaration()).Replace("IList<T>", "System.Collections.Generic.IList<T>", StringComparison.Ordinal);
@@ -188,8 +208,10 @@ public sealed partial class NativeSpecifiedCallTests
         var body = "Contract.Requires(values != null && first >= 0 && first < values.Length && second >= 0 && second < values.Length && read >= 0 && read < values.Length); " +
             "Contract.Ensures(Contract.Result<" + elementType + ">() == " + expected + "); " +
             "Swap<" + elementType + ">(values, first, second); return values[read];";
+        if (local)
+        { body += declaration.Replace("public static void Swap<T>(this ", "static void Swap<T>(", StringComparison.Ordinal); }
         await CheckInterfaceArrayContract(elementType + "[] values, int first, int second, int read", body,
-            correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted, result: elementType, members: declaration);
+            correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted, result: elementType, members: local ? "" : declaration);
     }
     private static async Task<string> CorpusSwapDeclaration()
     {

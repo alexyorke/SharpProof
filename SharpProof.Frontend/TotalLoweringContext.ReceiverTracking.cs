@@ -274,6 +274,30 @@ public sealed partial class TotalLoweringContext
             Type(named.TypeArguments[0]) == Type(array.ElementType);
     }
 
+    private ITypeSymbol? SpecializeReceiverElement(ITypeSymbol? type)
+    {
+        if (type == null)
+        { return null; }
+        if (_receiverElements.TryGetValue(type, out var concrete))
+        { return concrete; }
+        // Roslyn clones local-function type parameters for its CFG. Match only
+        // the same source declaration and ordinal in the same assembly; a name
+        // or ordinal alone cannot establish a generic argument's representation.
+        if (type is not ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } parameter ||
+            parameter.ContainingSymbol is not IMethodSymbol { MethodKind: MethodKind.LocalFunction, DeclaringSyntaxReferences.Length: 1 } owner)
+        { return type; }
+        foreach (var pair in _receiverElements)
+        {
+            if (pair.Key is ITypeParameterSymbol declared && declared.Ordinal == parameter.Ordinal &&
+                declared.TypeParameterKind == parameter.TypeParameterKind &&
+                declared.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.LocalFunction, DeclaringSyntaxReferences.Length: 1 } original &&
+                SymbolEqualityComparer.Default.Equals(parameter.ContainingAssembly, declared.ContainingAssembly) &&
+                ReferenceEquals(owner.DeclaringSyntaxReferences[0].SyntaxTree, original.DeclaringSyntaxReferences[0].SyntaxTree) &&
+                owner.DeclaringSyntaxReferences[0].Span == original.DeclaringSyntaxReferences[0].Span)
+            { return pair.Value; }
+        }
+        return type;
+    }
     internal void SpecializeArrayParameter(IParameterSymbol parameter, IArrayTypeSymbol array)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
@@ -282,7 +306,7 @@ public sealed partial class TotalLoweringContext
         if (((INamedTypeSymbol)parameter.Type).TypeArguments[0] is ITypeParameterSymbol element)
         {
             _receiverElements[element] = array.ElementType;
-            _types.TypeSpecializer = type => type != null && _receiverElements.TryGetValue(type, out var concrete) ? concrete : type;
+            _types.TypeSpecializer = SpecializeReceiverElement;
         }
         Parameters = [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
             ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(array)),

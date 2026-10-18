@@ -147,14 +147,17 @@ public sealed partial class NativeSpecifiedCallTests
             members: "private static int Count<T>(System.Collections.Generic.ICollection<T> list) => list.Count;");
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task GenericLocalCollectionBranchesRetainTheirExistingReplayAbstention(bool tryCast)
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    public async Task GenericLocalCollectionBranchesPreserveConcreteArrayReceivers(bool tryCast, bool correct)
     {
         var argument = tryCast ? "values as System.Collections.Generic.IList<int>" : "values";
-        await CheckInterfaceArrayContract("int[] values", "Contract.Requires(values != null && values.Length > 0); " +
-            "Contract.Ensures(Contract.Result<int>() == 17); return Read<int>(" + argument + "); " +
-            "static int Read<T>(System.Collections.Generic.IList<T> list) => list.Count == 0 ? 0 : 17;", WorkerClaimOutcome.Unknown);
+        var body = "Contract.Requires(values != null && values.Length > 0); " +
+            "Contract.Ensures(Contract.Result<int>() == " + (correct ? "17" : "0") + "); return Read<int>(" + argument + "); " +
+            "static int Read<T>(System.Collections.Generic.IList<T> list) => list.Count == 0 ? 0 : 17;";
+        await CheckInterfaceArrayContract("int[] values", body, correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted);
     }
     [Test]
     public async Task ArrayTryCastNullCheckPreservesTheArrayIdentity()
