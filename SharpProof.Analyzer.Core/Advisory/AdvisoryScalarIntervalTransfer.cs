@@ -2,13 +2,7 @@ using SharpProof.Dataflow;
 using SharpProof.Ir;
 using System.Numerics;
 
-#if SHARPPROOF_WORKER_ADVISORY_TRANSFER
-namespace SharpProof.Advisory.Worker;
-
-#else
 namespace SharpProof.Advisory.Core;
-
-#endif
 
 // Advisory transfer for Total integer terms. These facts do not enter VCs.
 // UInt64 cannot be represented by the signed Int64 interval carrier.

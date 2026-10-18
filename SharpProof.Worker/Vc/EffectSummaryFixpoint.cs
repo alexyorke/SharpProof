@@ -1,5 +1,3 @@
-using SharpProof.Advisory.Worker;
-
 namespace SharpProof.Worker;
 
 [Flags]

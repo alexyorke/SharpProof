@@ -1,17 +1,17 @@
-namespace SharpProof.Analyzer.Configuration;
+namespace SharpProof.Compiler.Semantics;
 
-internal static class AnalyzerConfigurationOptionRegistry
+internal static class CompilerConfigurationOptionRegistry
 {
-    internal static AnalyzerConfigurationOption Profile { get; } =
+    internal static CompilerConfigurationOption Profile { get; } =
         new(
             SharpProofConfigurationCatalog.ProfileKey,
             ["advisory", "strict", SharpProofConfigurationCatalog.ProfileOff],
             SharpProofConfigurationCatalog.ProfileBuildPropertyName);
 
-    internal static AnalyzerConfigurationOption Features { get; } =
+    internal static CompilerConfigurationOption Features { get; } =
         new("sharpproof_features", ["effects", "contracts", "all"], "SharpProofFeatures");
 
-    public static ImmutableArray<AnalyzerConfigurationOption> All
+    public static ImmutableArray<CompilerConfigurationOption> All
     {
         get;
     } = [
@@ -19,7 +19,7 @@ internal static class AnalyzerConfigurationOptionRegistry
         Features
     ];
 
-    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)
+    internal static bool IsAcceptedValue(CompilerConfigurationOption option, string? value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
@@ -28,7 +28,7 @@ internal static class AnalyzerConfigurationOptionRegistry
     }
 }
 
-internal sealed class AnalyzerConfigurationOption(
+internal sealed class CompilerConfigurationOption(
     string key,
     ImmutableArray<string> allowedValues,
     string buildPropertyName)

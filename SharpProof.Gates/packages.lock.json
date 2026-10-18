@@ -19,12 +19,18 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Contracts": "[1.0.0-preview.1, )",
-          "SharpProof.Effects": "[1.0.0-preview.1, )"
+          "SharpProof.Compiler.Semantics": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.attributes": {
         "type": "Project"
+      },
+      "sharpproof.compiler.semantics": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Contracts": "[1.0.0-preview.1, )",
+          "SharpProof.Effects": "[1.0.0-preview.1, )"
+        }
       },
       "sharpproof.compilerartifact": {
         "type": "Project",
@@ -37,7 +43,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Analyzer.Core": "[1.0.0-preview.1, )",
+          "SharpProof.Compiler.Semantics": "[1.0.0-preview.1, )",
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )"
         }
       },

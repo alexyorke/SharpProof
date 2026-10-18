@@ -20,6 +20,9 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  repository-quality:
+    uses: ./.github/workflows/quality.yml
+
   canonical-main:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -205,7 +208,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-package, canonical-gates, self-application]
+    needs: [canonical-main, canonical-package, canonical-gates, self-application, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -214,7 +217,12 @@ jobs:
           SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
+          SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
         run: |
+          if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
+            echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
+            exit 1
+          fi
           if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
             echo "Canonical jobs (Gates includes formatting), or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1

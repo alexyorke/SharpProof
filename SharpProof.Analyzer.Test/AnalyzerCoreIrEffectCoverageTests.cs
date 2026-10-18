@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Effects;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -30,7 +30,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(analysis.Gap, Is.Null);
         Assert.That(analysis.Sites.Single().Kind, Is.EqualTo(AdvisoryEffectSiteKind.Write));
         Assert.That(analysis.Sites.Single().Region, Is.EqualTo(region));
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
+        var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         var contract = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, TestContext.CurrentContext.CancellationToken)
             .Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.EffectContract));
         var violation = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
@@ -71,7 +71,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(call.Effects, Is.EqualTo(flags));
         Assert.That(call.Location.SourceSpan, Is.EqualTo(invocation.Span));
         Assert.That(call.Location.SourceTree, Is.SameAs(invocation.SyntaxTree));
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
+        var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         var claims = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, TestContext.CurrentContext.CancellationToken);
         var permission = claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.AllowedCapabilities));
         var violation = AdvisoryEffectClaims.FindViolation(permission.Kind, permission.Constraint, analysis.Sites, compilation);

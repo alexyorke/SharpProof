@@ -33,7 +33,7 @@ internal sealed partial class SharpProofAnalyzerEngine
 
     private void InitializeCompilation(CompilationStartAnalysisContext context)
     {
-        var configuration = AnalyzerConfiguration.FromOptions(context.Options);
+        var configuration = CompilerConfiguration.FromOptions(context.Options);
         var configurationDiagnostics = GetConfigurationDiagnostics(
             context.Compilation,
             context.Options,
@@ -656,65 +656,14 @@ internal sealed partial class SharpProofAnalyzerEngine
     internal static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
         Compilation compilation,
         AnalyzerOptions analyzerOptions,
-        AnalyzerConfiguration configuration,
+        CompilerConfiguration configuration,
         CancellationToken cancellationToken)
     {
-        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        analyzerOptions = ArgumentNullGuard.NotNull(analyzerOptions, nameof(analyzerOptions));
-        configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-        foreach (var invalidValue in configuration.InvalidConfigurationValues)
-        {
-            diagnostics.Add(
-                CreateInvalidConfigurationDiagnostic(invalidValue));
-        }
-        // A failed options provider cannot be queried again safely. Other
-        // global configuration errors are independent from tree-local values,
-        // so continue collecting those values instead of hiding them behind
-        // the first global diagnostic.
-        var optionsProviderFailed = configuration.InvalidConfigurationValues
-            .Any(static invalidValue => string.Equals(
-                invalidValue.Key,
-                "AnalyzerConfigOptionsProvider",
-                StringComparison.Ordinal));
-        if (optionsProviderFailed)
-        {
-            return diagnostics.ToImmutable();
-        }
-
-        try
-        {
-            foreach (var tree in compilation.SyntaxTrees)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var options = analyzerOptions.AnalyzerConfigOptionsProvider
-                    .GetOptions(tree);
-                var invalidValues =
-                    AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
-                        options,
-                        analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
-                foreach (var invalidValue in invalidValues)
-                {
-                    diagnostics.Add(
-                        CreateInvalidConfigurationDiagnostic(
-                            invalidValue,
-                            Location.Create(tree, new TextSpan(0, 0))));
-                }
-            }
-        }
-        catch (AggregateException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is not OperationCanceledException)
-        {
-            diagnostics.Add(
-                CreateInvalidConfigurationDiagnostic(
-                    AnalyzerConfiguration.ProviderFailure(exception)));
-        }
-
-        return diagnostics.ToImmutable();
+        analyzerOptions = RepositoryParameterGuard.NotNull(analyzerOptions, nameof(analyzerOptions));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
+        return [.. CompilerConfigurationValidation.GetIssues(compilation, analyzerOptions, configuration, cancellationToken)
+            .Select(static issue => issue is null ? throw new ArgumentNullException(nameof(issue)) : CreateInvalidConfigurationDiagnostic(issue.Value, issue.Location))];
     }
 
     private static Action<CompilationAnalysisContext>
@@ -735,7 +684,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     }
 
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
-        InvalidAnalyzerConfigurationValue invalidValue,
+        InvalidCompilerConfigurationValue invalidValue,
         Location? location = null)
     {
         invalidValue = RepositoryParameterGuard.ValidateInitialized(invalidValue, invalidValue.Key is null || invalidValue.Value is null || invalidValue.Reason is null, nameof(invalidValue), "Value must be initialized.");

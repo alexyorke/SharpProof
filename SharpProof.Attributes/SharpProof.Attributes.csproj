@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsPackable>true</IsPackable> 
+    <EnablePackageValidation>true</EnablePackageValidation>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>SharpProof.Attributes</PackageId>
     <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
@@ -11,7 +12,7 @@
     <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
     <None Include="..\README.md">
       <Pack>True</Pack>

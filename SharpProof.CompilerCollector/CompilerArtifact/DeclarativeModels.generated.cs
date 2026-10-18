@@ -26,7 +26,7 @@ internal sealed record CompilerPotentialCallOwner(
     SemanticModel SemanticModel,
     IMethodBodyOperation BodyOperation,
     string CallableId,
-    ImmutableArray<SharpProof.Analyzer.PotentialRequiresCallSite> Calls,
+    ImmutableArray<SharpProof.Compiler.Semantics.PotentialRequiresCallSite> Calls,
     bool DiscoveryComplete);
 
 internal sealed record CompilerPotentialCallGap(int TreeOrdinal, int Start, int Length, string Reason,

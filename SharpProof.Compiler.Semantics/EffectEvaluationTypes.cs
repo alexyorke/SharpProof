@@ -1,4 +1,4 @@
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal enum EffectEvaluationContractKind
 {
