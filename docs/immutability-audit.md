@@ -2229,3 +2229,15 @@ The two direct fixture consumers can freeze builder labels/IDs, constraint vecto
 callback checks; native IR/runtime invocation argument adapters remain. Their read-only
 prime and callable-target vectors can be immutable. Preserve before/after resource
 accounting and rejection assertions. Status: open before edits.
+## Solver core and Horn state construction inventory
+
+IMM-M045: Coordinator traced PassiveCallableSolver's five local hash sets and Horn
+state map. Use builders with Ordinal core labels/default operation/ordinal comparers,
+strict AddUnique for the former state dictionary, and frozen Horn state/clauses.
+HornInvariantSearch only queries the state map with TryGetValue; no map ordering escapes.
+
+Call-precondition aggregate cores/assumptions are explicitly sorted before publication.
+Houdini's successful union currently publishes HashSet insertion order, so preserve
+first occurrence with array sidecars alongside builder membership sets. Keep candidate
+removal, proof/witness priorities and cancellation/resource checks unchanged. Status:
+open before edits.
