@@ -2202,3 +2202,17 @@ Expose an immutable Counts snapshot from the test session and read it directly. 
 lock control needs separate snapshots before and after its second RunCase; preserve
 pre-control refutation scalars and post-control proven count. Keep the private builder
 and the session's intended mutable counting behavior. Status: open before edits.
+## Candidate admission and invariant construction inventory
+
+IMM-M043: Coordinator traced PassiveCallableCandidate validation sets/maps and
+LoopInvariantCandidates construction. Use hash/map/array builders with existing default
+comparers, strict capture for prior ToDictionary calls and immutable State result
+vectors. Instruction admission needs an ordered array sidecar filled during strict
+capture to retain instruction enumeration and exception sequencing in writers/reads/
+reserved-marker validation. Preserve canonical parameter distinctness and marker checks.
+
+Invariant conditions/lengths retain append order; variable and constant sets are sorted
+before output. Freeze entering membership and substitution maps before use; preserve
+copy overwrites/null conflict markers, cancellation checks and maximum candidate order.
+State's three direct consumers (Generate, PassiveCallableSolver, checksum evidence)
+only use enumeration/Length/projection and accept immutable vectors. Status: open before edits.
