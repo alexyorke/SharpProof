@@ -2038,3 +2038,18 @@ and field counts, and publication grace/expected milliseconds to typed constants
 Keep actual caller-owned exception arrays and captured/mutated variables unchanged.
 The lexical audit does not establish exhaustive CFG coverage; other candidates remain
 open. Status: open before edits.
+## Specification validation and generated input construction inventory
+
+IMM-M033: Coordinator traced ApiSpecTable's validatedTerms through the only internal
+Validate/ValidateAndCompile callers, recursive ValidationContext and expansion memo.
+Use immutable dictionary builders with DeclarationReferenceComparer.Instance, preserve
+recursive lookup-before-add, strict memo Add and validated-node index overwrite, then
+freeze once into ApiSpecTemplate. This is owned compiler construction, not an alias
+or mutable SUT contract. Update internal sink parameters together.
+
+WellSortedIrGenerator.CreateCase fills an optional sequence buffer and environment;
+use array/map builders and freeze before Factory/GeneratedIrCase publication. Preserve
+all random draws even when sequence values are not referenced, null/empty semantics,
+value identity and traversal order. CollectVariables visited/output sets are local
+construction guards and can use builders; its DFS stack remains immutable. Status:
+open before edits.
