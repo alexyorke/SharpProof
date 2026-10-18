@@ -77,15 +77,7 @@ public sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task CorpusSwapRetainsConcreteArrayReceiverAcrossItsGenericHelper()
     {
-        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            TestRepository.FindRoot(), "SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
-        var method = document.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
-        var file = document.RootElement.GetProperty("files").EnumerateArray().Single(item =>
-            item.GetProperty("sourceId").GetString() == method.GetProperty("sourceId").GetString() &&
-            item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var declaration = string.Join("\n", file.GetProperty("content").GetString()!.Split('\n')
-            .Skip(method.GetProperty("startLine").GetInt32() - 1)
-            .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
+        var declaration = await CorpusSwapDeclaration();
         using var project = WorkerTests.TestProject.Create(
             "using System.Collections.Generic; public static class C { " +
             "public static int Target(int[] values, int first, int second, int read) { C.Swap<int>(values, first, second); return values[read]; } " +
@@ -165,6 +157,52 @@ public sealed partial class NativeSpecifiedCallTests
         }
         finally
         { load.Unload(); }
+    }
+
+    [TestCase("bool", true)]
+    [TestCase("char", true)]
+    [TestCase("sbyte", true)]
+    [TestCase("byte", true)]
+    [TestCase("short", true)]
+    [TestCase("ushort", true)]
+    [TestCase("int", true)]
+    [TestCase("uint", true)]
+    [TestCase("long", true)]
+    [TestCase("ulong", true)]
+    [TestCase("bool", false)]
+    [TestCase("char", false)]
+    [TestCase("sbyte", false)]
+    [TestCase("byte", false)]
+    [TestCase("short", false)]
+    [TestCase("ushort", false)]
+    [TestCase("int", false)]
+    [TestCase("uint", false)]
+    [TestCase("long", false)]
+    [TestCase("ulong", false)]
+    public async Task CorpusArraySwapProvesItsFullContentsPostcondition(string elementType, bool correct)
+    {
+        ArgumentNullException.ThrowIfNull(elementType);
+        var declaration = (await CorpusSwapDeclaration()).Replace("IList<T>", "System.Collections.Generic.IList<T>", StringComparison.Ordinal);
+        var expected = correct ? "(read == first ? Contract.Old(values[second]) : read == second ? Contract.Old(values[first]) : Contract.Old(values[read]))" :
+            "Contract.Old(values[read])";
+        var body = "Contract.Requires(values != null && first >= 0 && first < values.Length && second >= 0 && second < values.Length && read >= 0 && read < values.Length); " +
+            "Contract.Ensures(Contract.Result<" + elementType + ">() == " + expected + "); " +
+            "Swap<" + elementType + ">(values, first, second); return values[read];";
+        await CheckInterfaceArrayContract(elementType + "[] values, int first, int second, int read", body,
+            correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted, result: elementType, members: declaration);
+    }
+    private static async Task<string> CorpusSwapDeclaration()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
+            TestRepository.FindRoot(), "SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
+        var method = document.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
+        var file = document.RootElement.GetProperty("files").EnumerateArray().Single(item =>
+            item.GetProperty("sourceId").GetString() == method.GetProperty("sourceId").GetString() &&
+            item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
+        var declaration = string.Join("\n", file.GetProperty("content").GetString()!.Split('\n')
+            .Skip(method.GetProperty("startLine").GetInt32() - 1)
+            .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
+        return declaration;
     }
 
 }
