@@ -21,7 +21,7 @@ language lowering is missing.
 
 The source-use universe is all 200 selected original OSS targets, 28 original
 synthetic targets and 10 sample files: 641 resolved sites, zero unresolved sites,
-115 API/access/status rows. Every one is listed below, including partial models
+114 API/access/status rows. Every one is listed below, including partial models
 that still have gaps. Dependency-only methods, metamorphic duplicates, repository
 implementation code, dynamic/reflection calls and unexecuted workloads do not
 contribute to this ranking. The CI JSON has source hashes and exact locations;
@@ -42,7 +42,7 @@ access kind and value domains satisfy the production guard.
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance remains supported. |
-| D: Dictionary | Fresh integer-key empty state is independent of value type; contents support scalar/reference values; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
+| D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key membership and scalar/reference contents remain separate; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Count/getter/Add have partial effects; constructors, stores, range operations and count/content relationships remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
@@ -99,11 +99,11 @@ those files use `TVertex/int`, `int/TVertex`, `T/int`, `T/long`, nested graph/tr
 types, and `uint/BigInteger`; these need type, value-storage and comparer/callback
 models beyond the verified integer-key state and supported scalar/reference values. All ranked dictionary index reads,
 Add/ContainsKey calls and the index write still show unmodeled dispatch. Four parameterless
-corpus constructions now have partial empty-state support; four generic-key constructions
-still have an unsupported key domain. Missing/duplicate-key paths retain opaque fallback
+corpus constructions gained empty-state support first; the four generic-key constructions
+now also have partial construction/Count support. Generic-key content operations remain open. Missing/duplicate-key paths retain opaque fallback
 and have explicit Unknown controls; their original proof probes remain preserved
 under `artifacts/api-coverage/open-gap-probes/`. Incoming or escaped references,
-custom comparers, reference/unbound key types, capacities and constructor overloads,
+custom comparers, reference/unbound-key operations, capacities and constructor overloads,
 views, removal/clear, and precise growth/exception behavior remain actionable gaps.
 
 ## Verified reference dictionary values
@@ -139,7 +139,8 @@ assembly checksums and catalog digest are unchanged. The usage ranking still has
 all 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one write awaiting
 actual receiver/domain evidence. At the reference-value snapshot, all eight parameterless
 corpus constructions lacked supported domains; the empty-state extension below closes
-the value-domain gap for four of them. The four generic-key constructions remain open.
+the value-domain gap for four of them. The generic-key construction extension below
+covers the paired four; their content/comparer operations remain open.
 
 This closes reference-value storage/identity within the owned integer-key slice.
 Reference or unsupported keys, unconstrained generic/structure values, arrays of
@@ -181,16 +182,49 @@ BellmanFordShortestPaths line 134, BipartiteColoring line 102,
 BreadthFirstShortestPaths line 90 and DijkstraShortestPaths line 93, in the pinned
 `Algorithms/Graphs` sources embedded in the corpus manifest. Each constructs
 `Dictionary<int, TVertex>` (or `Dictionary<int, T>`), whose value parameter has only
-an IComparable constraint. The paired four generic-key dictionaries remain
-unsupported. All 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one
+an IComparable constraint. At that snapshot the paired four generic-key constructions
+remained unsupported; the following extension covers their construction and Count. All 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one
 write still need receiver/content or comparer evidence. Constructor support does
 not prove the surrounding graph algorithms or every operation on their fields.
 
-The ranked universe is still 641 sites with zero unresolved sites, now in 115
-API/access/status rows. The complete declaration universe and all 43 partial facet
+That intermediate ranking had 641 sites with zero unresolved sites in 115
+API/access/status rows; the following construction extension combines the two constructor rows. The complete declaration universe and all 43 partial facet
 registrations stay unchanged. Constructor, Count and ContainsKey evidence now also
 executes the generic-value empty-state probe; Add/indexer evidence retains its
 scalar/reference scope. No SDK, reference assembly, catalog or inventory pin changed.
+
+## Verified default construction and Count for generic keys
+
+Parameterless framework dictionary construction and owned Count no longer require
+primitive keys. On normal constructor return the result is fresh and has zero
+Count, regardless of key or value type. For a non-primitive or open key type,
+default-comparer initialization remains an opaque operation with allocation,
+exception and arbitrary existing-state effects. Fresh dictionary state is
+established only after its normal continuation, preserving those effects without
+inventing access to the unpublished result.
+
+Native controls prove empty Count for unconstrained, comparable-constrained,
+class-constrained and string keys. CLR probes verify construction without invoking
+the key's constructor, static initializer, virtual equality or hashing methods.
+CLR/IR normal-state comparisons cover string, object and Guid keys. These IR
+comparisons explicitly consume approximation for initialization; they provide no
+concrete native replay authority. A wrong Count claim remains Unknown when the
+initializer cannot be replayed concretely. Unrelated heap facts and zero Count
+after an opaque mutation are not preserved.
+
+This moves the paired four generic-key corpus constructors into partial support:
+BellmanFordShortestPaths line 133, BipartiteColoring line 101,
+BreadthFirstShortestPaths line 89 and DijkstraShortestPaths line 92. All eight
+parameterless corpus constructions now have partial construction support. The
+ranking has 114 API/access/status rows at the same 641 sites, with zero unresolved
+sites. Constructor and Count gain executed construction-state evidence; inventory
+counts and SDK/reference/catalog pins remain unchanged.
+
+This does not model generic/reference-key hashing, equality, null-key behavior or
+membership/content operations. The 40 index reads, 22 Add calls, 22 ContainsKey
+calls and one index write still need actual receiver/comparer/content evidence.
+Incoming or escaped receivers, explicit comparer/capacity constructors, precise
+initialization faults and replay, growth, removal and views remain open.
 
 ## Cross-cutting gaps previously identified
 
@@ -330,8 +364,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | unmodeled | S |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | unmodeled | S |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | unmodeled | C |
-| M:System.Collections.Generic.Dictionary`2.#ctor | call | 4 | partially-modeled | D |
-| M:System.Collections.Generic.Dictionary`2.#ctor | call | 4 | unmodeled-domain | D |
+| M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | partially-modeled | D |
 | M:System.Action`1.Invoke(`0) | call | 7 | unmodeled | F |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | unmodeled | T |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | partially-modeled | T |
@@ -435,7 +468,7 @@ These 43 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Byte.CompareTo(System.Byte) | intrinsic=integer-comparison |
 | M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | intrinsic=default-integer-comparer-only |
-| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state |
+| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
@@ -462,7 +495,7 @@ These 43 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
-| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state |
+| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface |

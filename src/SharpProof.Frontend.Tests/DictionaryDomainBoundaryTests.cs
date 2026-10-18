@@ -60,7 +60,7 @@ public sealed class DictionaryDomainBoundaryTests
             "var data = new System.Collections.Generic.Dictionary<int, int>(); " + body + " return data.Count;");
         context.TrackDefaultDictionaries(graph);
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(expected));
+        Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(expected));
     }
 
     [TestCase("publish(data[17]);", true)]
@@ -81,7 +81,7 @@ public sealed class DictionaryDomainBoundaryTests
             "var data = new System.Collections.Generic.Dictionary<int, object>(); data[17] = null; " + body + " return data.Count;");
         context.TrackDefaultDictionaries(graph);
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(expected));
+        Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(expected));
     }
 
     [TestCase("int", "T", "", true, false)]
@@ -93,6 +93,7 @@ public sealed class DictionaryDomainBoundaryTests
     [TestCase("int", "T", "where T : class, System.IDisposable", true, true)]
     [TestCase("int", "T", "where T : System.Exception", true, true)]
     [TestCase("string", "object", "", false, false)]
+    [TestCase("T", "int", "where T : System.IComparable<T>", false, false)]
     [TestCase("int", "decimal", "", true, false)]
     [TestCase("int", "object[][]", "", true, false)]
     [TestCase("int", "object[]", "", true, true)]
@@ -114,12 +115,12 @@ public sealed class DictionaryDomainBoundaryTests
         var contains = type.GetMembers("ContainsKey").OfType<IMethodSymbol>().Single();
         var add = type.GetMembers("Add").OfType<IMethodSymbol>().Single();
         var indexer = type.GetMembers().OfType<IPropertySymbol>().Single(property => property is null ? throw new ArgumentNullException(nameof(property)) : property.IsIndexer);
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(constructor), Is.EqualTo(emptyState));
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(count.GetMethod!), Is.EqualTo(emptyState));
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(contains), Is.EqualTo(emptyState));
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(add), Is.EqualTo(contents));
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(indexer.GetMethod!), Is.EqualTo(contents));
-        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(indexer.SetMethod!), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(constructor), Is.True);
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(count.GetMethod!), Is.True);
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(contains), Is.EqualTo(emptyState));
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(add), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(indexer.GetMethod!), Is.EqualTo(contents));
+        Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(indexer.SetMethod!), Is.EqualTo(contents));
     }
 
     [TestCase("new System.Collections.Generic.Dictionary<int, decimal>()", true, true)]
@@ -131,10 +132,10 @@ public sealed class DictionaryDomainBoundaryTests
         ArgumentNullException.ThrowIfNull(expression);
         var (model, syntax, graph, context) = Prepare("", "var data = " + expression + "; return data.Count;");
         var creation = syntax.DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
-        Assert.That(CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(model.GetOperation(creation)!), Is.EqualTo(syntaxEmpty));
+        Assert.That(CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(model.GetOperation(creation)!), Is.EqualTo(syntaxEmpty));
         context.TrackDefaultDictionaries(graph);
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(trackedDefaultComparer));
+        Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(trackedDefaultComparer));
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)
