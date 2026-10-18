@@ -2118,3 +2118,17 @@ comparison can edit an owned builder and freeze per evaluation. Native input arr
 remain mutation/identity subjects. CompilerElisionContinuationPlannerTests' local
 continuation set can use a hash builder and frozen snapshot before assertion/readout.
 Status: open before edits.
+## Release manifest and evidence construction inventory
+
+IMM-M039: Coordinator read both release exporters. Package manifest TSV rows and ZIP
+name membership can use immutable builders. Inventory needs an OrdinalIgnoreCase map
+builder plus insertion-order sidecar and final ordered JSON adapter; preserve lower-case
+IDs, duplicate rejection and final TSV newline.
+
+Release evidence packages/files/relationships/checksums can use scoped array builders,
+freezing at serialization. Archive IDs retain case-insensitive overwrite behavior;
+entry IDs retain Ordinal lookup/reuse semantics. Extracted licenses need a case-insensitive
+map builder plus first-insertion order sidecar, retaining later value overwrites and
+final ordered value output. Keep ordered JSON records as serializer adapters; preserve
+all package/component/file/relationship/checksum order and exact hashing inputs.
+Status: open before edits.
