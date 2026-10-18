@@ -45,6 +45,21 @@ public sealed partial class DotnetApiInventoryTests
                         genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true));
             }
 
+            if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
+            {
+                var arrays = row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal);
+                var nonnegative = row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal);
+                var empty = row.Id is "M:System.Collections.Generic.List`1.#ctor" or "P:System.Collections.Generic.List`1.Count" or "P:System.Collections.Generic.ICollection`1.Count";
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "compiled owned List construction, Count, Add and scalar/reference content state through concrete/interface aliases versus runtime; optional initialization/growth and bounds faults retained; ListStateOracleTests checks typed boundaries and faults; existing array and nonnegative probes retained",
+                    () => CheckListStateIntrinsic(compilation, false) && CheckListStateIntrinsic(compilation, false, referenceValues: true) &&
+                        (!empty || CheckListStateIntrinsic(compilation, false, opaqueValues: true)) &&
+                        (!arrays || CheckInterfaceArrayIntrinsic(compilation, row.Id, false)) && (!nonnegative || CheckCountInvariant(row.Id, false)),
+                    () => CheckListStateIntrinsic(compilation, true) || CheckListStateIntrinsic(compilation, true, referenceValues: true) ||
+                        empty && CheckListStateIntrinsic(compilation, true, opaqueValues: true) ||
+                        arrays && CheckInterfaceArrayIntrinsic(compilation, row.Id, true) || nonnegative && CheckCountInvariant(row.Id, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "empty, singleton and 65 entries; native lowering exercised by NativeSpecifiedCallTests.CountGettersProveNonnegativeResults", () => CheckCountInvariant(row.Id, false), () => CheckCountInvariant(row.Id, true));

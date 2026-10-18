@@ -248,6 +248,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
+        if (depth < 256 && ListBody(operation, block, depth) is { } list)
+        { return Capture(operation, list); }
         if (depth < 256 && DictionaryBody(operation, block, depth) is { } dictionary)
         { return Capture(operation, dictionary); }
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
