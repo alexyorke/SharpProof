@@ -6,11 +6,12 @@ cifs
 csharp
 definedness
 disjointness
+extensionless
 getpid
 glibcxx
+katex
 libc
 linq
-katex
 lowerer
 multitargeted
 nameof
@@ -27,6 +28,7 @@ ntfs
 nullness
 parameterless
 postconditions
+redirections
 reparsing
 replayable
 retarget
@@ -36,6 +38,7 @@ roslyn
 sarif
 satisfiability
 sharpproof
+shfmt
 signedness
 slnx
 spcf
