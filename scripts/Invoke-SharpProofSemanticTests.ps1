@@ -24,7 +24,13 @@ param(
 
     [string]$CoverageResultsDirectory = '',
 
-    [switch]$AttributesCollectedSeparately
+    [switch]$AttributesCollectedSeparately,
+
+    # Coverage CI spreads the semantic coverage tasks across runners. Gates
+    # holds every slot, the two Worker remainder shards dominate the rest, and
+    # Projects holds every other task. All keeps the single-runner task set.
+    [ValidateSet('All', 'Gates', 'Worker', 'Projects')]
+    [string]$CoverageTaskGroup = 'All'
 )
 
 Set-StrictMode -Version Latest
@@ -97,6 +103,9 @@ $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
     throw 'Separate Attributes collection requires coverage collection.'
 }
+if ($CoverageTaskGroup -ne 'All' -and -not $coverageEnabled) {
+    throw 'Coverage task groups require coverage collection.'
+}
 if ($coverageEnabled) {
     # The corpus verifier starts its own worker pool and must run in a separate
     # task that reserves every slot. Attributes has its own collector stage.
@@ -168,6 +177,7 @@ $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 $timingStem = 'semantic-tests-' + $Configuration.ToLowerInvariant()
 $timingSuffix =
     $(if ($ArchitectureOnly) { '-architecture-only' } else { '' }) +
+    $(if ($CoverageTaskGroup -ne 'All') { '-' + $CoverageTaskGroup.ToLowerInvariant() } else { '' }) +
     $(if ($coverageEnabled) { '-coverage' } else { '' })
 $canonicalTimingOutput = Join-Path $timingDirectory (
     $timingStem + $timingSuffix + '.json')
@@ -358,29 +368,22 @@ if (-not $ArchitectureOnly) {
             DefaultEstimatedMilliseconds = 10000L
         }
     }
-    if ($coverageEnabled -and $parallelism -ge 4) {
-        $workerTaskDescriptors += @(
-            [pscustomobject]@{
-                Name = 'worker-remainder-heavy'
-                Filter = $workerRemainderHeavyTaskFilter
-                Slots = 2
-                DefaultEstimatedMilliseconds = 160000L
-            },
-            [pscustomobject]@{
-                Name = 'worker-remainder-other'
-                Filter = $workerRemainderOtherTaskFilter
-                Slots = 2
-                DefaultEstimatedMilliseconds = 160000L
-            })
-    }
-    else {
-        $workerTaskDescriptors += [pscustomobject]@{
-            Name = 'worker-remainder'
-            Filter = $workerRemainderTaskFilter
+    # The remainder is the longest Worker task in every mode (about five
+    # minutes uninstrumented on a four-CPU runner), so it always runs as two
+    # complementary halves that the scheduler can overlap.
+    $workerTaskDescriptors += @(
+        [pscustomobject]@{
+            Name = 'worker-remainder-heavy'
+            Filter = $workerRemainderHeavyTaskFilter
             Slots = [Math]::Min($parallelism, 2)
-            DefaultEstimatedMilliseconds = 20000L
-        }
-    }
+            DefaultEstimatedMilliseconds = 160000L
+        },
+        [pscustomobject]@{
+            Name = 'worker-remainder-other'
+            Filter = $workerRemainderOtherTaskFilter
+            Slots = [Math]::Min($parallelism, 2)
+            DefaultEstimatedMilliseconds = 160000L
+        })
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
         $tasks.Add([pscustomobject]@{
             Name = $descriptor.Name
@@ -408,6 +411,23 @@ if ($architectureShardingEnabled) {
         Slots = 1
         DefaultEstimatedMilliseconds = 10000L
     })
+}
+if ($CoverageTaskGroup -ne 'All') {
+    $gatesTaskNames = @('semantic-gates')
+    $workerTaskNames = @(
+        'worker-remainder-heavy',
+        'worker-remainder-other',
+        'worker-fixed-checksum')
+    $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
+            switch ($CoverageTaskGroup) {
+                'Gates' { $_.Name -cin $gatesTaskNames }
+                'Worker' { $_.Name -cin $workerTaskNames }
+                'Projects' { $_.Name -cnotin ($gatesTaskNames + $workerTaskNames) }
+            }
+        })
+    if ($tasks.Count -eq 0) {
+        throw "Coverage task group '$CoverageTaskGroup' selected no tasks."
+    }
 }
 foreach ($task in $tasks) {
     $task | Add-Member -NotePropertyName EstimatedMilliseconds `
@@ -605,6 +625,7 @@ finally {
             fast = [bool]$Fast
             architectureOnly = [bool]$ArchitectureOnly
             semanticCohort = $SemanticCohort
+            coverageTaskGroup = $CoverageTaskGroup
             parallelism = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
             tasks = @($timings | Sort-Object name)

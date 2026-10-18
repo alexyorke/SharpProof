@@ -77,6 +77,12 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   container-verifier:
     name: Canonical Linux analyzer and verifier consumers
     needs: package
@@ -93,6 +99,12 @@ jobs:
           docker compose run --rm tooling package-consumers
           -Configuration Release
           -PackageSource nupkgs
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
   native-linux-verifier:
     name: Plug-and-play native Linux verifier (${{ matrix.architecture }})

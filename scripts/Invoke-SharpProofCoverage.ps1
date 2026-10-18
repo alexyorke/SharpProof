@@ -10,11 +10,13 @@ param(
     [Parameter()]
     [string]$TestFilter = '',
 
-    # 'all' runs every phase (default). 'semantic' and 'package' run one
-    # independent half of the default collection so CI can place each half on
-    # its own runner. Shard runs leave the coverage gate to a separate job.
+    # 'all' runs every phase (default). Each other phase runs one independent
+    # part of the default collection so CI can place each part on its own
+    # runner: the semantic tasks are split into Gates, Worker remainder, and
+    # every other project, plus the package tests. Shard runs leave the
+    # coverage gate to a separate job.
     [Parameter()]
-    [ValidateSet('all', 'semantic', 'package')]
+    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all'
 )
 
@@ -151,8 +153,14 @@ if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     $broadFilter = "($broadFilter)&($TestFilter)"
 }
 if ([string]::IsNullOrWhiteSpace($TestFilter)) {
-    if ($CoveragePhase -in @('all', 'semantic')) {
+    if ($CoveragePhase -ne 'package') {
         $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
+        $coverageTaskGroup = switch ($CoveragePhase) {
+            'semantic-gates' { 'Gates' }
+            'semantic-worker' { 'Worker' }
+            'semantic-projects' { 'Projects' }
+            default { 'All' }
+        }
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
             -Configuration Release `
             -NoBuild `
@@ -160,6 +168,7 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
             -TestFilter $broadFilter `
             -CoverageSettings $managedSettings `
             -CoverageResultsDirectory $semanticResults `
+            -CoverageTaskGroup $coverageTaskGroup `
             -AttributesCollectedSeparately
         if ($LASTEXITCODE -ne 0) {
             throw (
@@ -205,8 +214,8 @@ else {
 # assembly.
 $coverageAttributesTimer = [Diagnostics.Stopwatch]::StartNew()
 try {
-    # The isolated run belongs to the semantic half (or to 'all').
-    if ($CoveragePhase -in @('all', 'semantic')) {
+    # The isolated run belongs to the semantic projects shard (or to 'all').
+    if ($CoveragePhase -in @('all', 'semantic-projects')) {
         $attributesSettings = New-CoverageSettings `
             -Name 'attributes' `
             -ModulePath '.*SharpProof\.Attributes\.dll$'
@@ -241,51 +250,55 @@ finally {
 # testhost. The broad suites exclude Coverage-tagged tests, and this private
 # output prevents static instrumentation from changing another collector's
 # already-built binaries.
-$fuzzConsoleSettings = New-CoverageSettings `
-    -Name 'fuzz-console-cancellation' `
-    -ModulePath '.*SharpProof\.Fuzz\.dll$'
-$fuzzConsoleOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
-    'sharpproof-fuzz-console-' + [Guid]::NewGuid().ToString('N'))
-$fuzzConsoleResults = Join-Path $resolvedResultsDirectory 'fuzz-console-cancellation'
-$fuzzConsoleOriginalIsolation = [Environment]::GetEnvironmentVariable(
-    'SHARPPROOF_FUZZ_CONSOLE_ISOLATED')
-$fuzzConsoleClock = [Diagnostics.Stopwatch]::StartNew()
-try {
-    $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
-        -SourceDirectory (Join-Path $repositoryRoot (
-            'SharpProof.Fuzz.Test/bin/Release/net10.0')) `
-        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net10.0')
-    [Environment]::SetEnvironmentVariable(
-        'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
-    & $dotnetWrapper `
-        -TimeoutSeconds $TimeoutSeconds `
-        test (Join-Path $repositoryRoot 'SharpProof.Fuzz.Test/SharpProof.Fuzz.Test.csproj') `
-        -c Release `
-        --no-build `
-        --no-restore `
-        "-p:OutDir=$fuzzConsoleOutput/" `
-        --filter 'FullyQualifiedName~FuzzConsoleCancellationTests|FullyQualifiedName~FuzzDefaultCliCoverageTests' `
-        --settings $fuzzConsoleSettings `
-        --collect 'Code Coverage;Format=Cobertura' `
-        --logger 'trx;LogFilePrefix=fuzz-console-cancellation' `
-        --results-directory $fuzzConsoleResults
-    if ($LASTEXITCODE -ne 0) {
-        throw "Isolated Fuzz console coverage failed with exit code $LASTEXITCODE."
+# Merged reports keep maximum hits, so one shard collecting this run is
+# enough; it belongs to the semantic projects shard (or to 'all').
+if ($CoveragePhase -in @('all', 'semantic-projects')) {
+    $fuzzConsoleSettings = New-CoverageSettings `
+        -Name 'fuzz-console-cancellation' `
+        -ModulePath '.*SharpProof\.Fuzz\.dll$'
+    $fuzzConsoleOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
+        'sharpproof-fuzz-console-' + [Guid]::NewGuid().ToString('N'))
+    $fuzzConsoleResults = Join-Path $resolvedResultsDirectory 'fuzz-console-cancellation'
+    $fuzzConsoleOriginalIsolation = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_FUZZ_CONSOLE_ISOLATED')
+    $fuzzConsoleClock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
+            -SourceDirectory (Join-Path $repositoryRoot (
+                'SharpProof.Fuzz.Test/bin/Release/net10.0')) `
+            -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net10.0')
+        [Environment]::SetEnvironmentVariable(
+            'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
+        & $dotnetWrapper `
+            -TimeoutSeconds $TimeoutSeconds `
+            test (Join-Path $repositoryRoot 'SharpProof.Fuzz.Test/SharpProof.Fuzz.Test.csproj') `
+            -c Release `
+            --no-build `
+            --no-restore `
+            "-p:OutDir=$fuzzConsoleOutput/" `
+            --filter 'FullyQualifiedName~FuzzConsoleCancellationTests|FullyQualifiedName~FuzzDefaultCliCoverageTests' `
+            --settings $fuzzConsoleSettings `
+            --collect 'Code Coverage;Format=Cobertura' `
+            --logger 'trx;LogFilePrefix=fuzz-console-cancellation' `
+            --results-directory $fuzzConsoleResults
+        if ($LASTEXITCODE -ne 0) {
+            throw "Isolated Fuzz console coverage failed with exit code $LASTEXITCODE."
+        }
     }
-}
-finally {
-    $fuzzConsoleClock.Stop()
-    [Environment]::SetEnvironmentVariable(
-        'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $fuzzConsoleOriginalIsolation)
-    [pscustomobject]@{
-        # Retain the legacy label and filename; this timing covers both fixtures.
-        fixture = 'FuzzConsoleCancellationTests'
-        fixtures = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
-        elapsedMilliseconds = [long]$fuzzConsoleClock.Elapsed.TotalMilliseconds
-    } | ConvertTo-Json | Set-Content `
-        -LiteralPath (Join-Path $resolvedResultsDirectory 'fuzz-console-timing.json') `
-        -Encoding utf8NoBOM
-    Remove-SharpProofOwnedDirectory -Directory $fuzzConsoleOutputRoot
+    finally {
+        $fuzzConsoleClock.Stop()
+        [Environment]::SetEnvironmentVariable(
+            'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $fuzzConsoleOriginalIsolation)
+        [pscustomobject]@{
+            # Retain the legacy label and filename; this timing covers both fixtures.
+            fixture = 'FuzzConsoleCancellationTests'
+            fixtures = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
+            elapsedMilliseconds = [long]$fuzzConsoleClock.Elapsed.TotalMilliseconds
+        } | ConvertTo-Json | Set-Content `
+            -LiteralPath (Join-Path $resolvedResultsDirectory 'fuzz-console-timing.json') `
+            -Encoding utf8NoBOM
+        Remove-SharpProofOwnedDirectory -Directory $fuzzConsoleOutputRoot
+    }
 }
 
 # The container entrypoint builds each task in a disposable clone while the

@@ -10,23 +10,41 @@ inputs:
 runs:
   using: composite
   steps:
+    # Temporary diagnostics: sample runner CPU and memory for the whole job.
+    # The job's final runner-telemetry report step stops it and summarizes.
+    - name: Start runner telemetry
+      uses: ./.github/actions/runner-telemetry
+      with:
+        mode: start
     - name: Download exact NuGet artifacts
       if: inputs.download-packages == 'true'
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
         path: nupkgs
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+    # Restore image layers from the GitHub Actions cache instead of pulling the
+    # five pinned base images from MCR in every job; those pulls occasionally
+    # took 15 minutes per job. Only default-branch runs write the cache, so
+    # pull requests share one entry instead of each branch storing its own
+    # multi-gigabyte copy.
     - name: Build the pinned Linux amd64 toolchain
-      shell: bash
-      run: |
-        set -euo pipefail
-        docker buildx build \
-          --platform linux/amd64 \
-          --file eng/container/Dockerfile \
-          --target toolchain \
-          --load \
-          --tag "${COMPOSE_PROJECT_NAME}-tooling:local" \
-          --build-arg USER_UID=1000 \
-          --build-arg USER_GID=1000 \
-          --progress plain \
-          .
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      env:
+        BUILDKIT_PROGRESS: plain
+        # Skip the per-job build-record artifact; the step log has the build.
+        DOCKER_BUILD_RECORD_UPLOAD: "false"
+      with:
+        context: .
+        file: eng/container/Dockerfile
+        target: toolchain
+        platforms: linux/amd64
+        load: true
+        provenance: false
+        tags: ${{ env.COMPOSE_PROJECT_NAME }}-tooling:local
+        build-args: |
+          USER_UID=1000
+          USER_GID=1000
+        cache-from: type=gha,scope=sharpproof-tooling
+        cache-to: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && 'type=gha,scope=sharpproof-tooling,mode=min,ignore-error=true' || '' }}

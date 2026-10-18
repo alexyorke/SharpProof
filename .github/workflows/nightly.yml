@@ -35,3 +35,9 @@ jobs:
           path: artifacts
           if-no-files-found: error
           retention-days: 30
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report

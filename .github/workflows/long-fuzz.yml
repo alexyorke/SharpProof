@@ -164,3 +164,10 @@ jobs:
           fi
           echo "$errors error finding(s)."
           test "$errors" -eq 0
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+          name: ${{ github.job }}-${{ matrix.shard }}

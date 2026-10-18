@@ -199,7 +199,7 @@ param(
 
     [string]$TestResultsDirectory = '',
 
-    [ValidateSet('all', 'semantic', 'package')]
+    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,

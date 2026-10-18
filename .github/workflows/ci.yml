@@ -71,6 +71,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   canonical-main:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -96,6 +102,12 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
   canonical-gates:
     if: github.event_name != 'schedule'
@@ -124,6 +136,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   self-application:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -138,6 +156,12 @@ jobs:
 
       - name: Apply SharpProof to every tracked project
         run: docker compose run --rm tooling self-apply -Configuration Release
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
@@ -190,6 +214,12 @@ jobs:
           path: artifacts/canonical-cohorts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
   exact-sha-security:
     uses: ./.github/workflows/security-reusable.yml
