@@ -130,6 +130,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 problems.Add(("AnalyzerDiagnostic-" + diagnostic.Id, LongFuzzHit.Error, diagnostic.ToString()));
             }
         }
+        WorkerModelValue[] reportedModel = [];
         WorkerClaimOutcome? outcome = null;
         var reason = "";
         if (File.Exists(manifestPath))
@@ -154,6 +155,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
                 if (claims.Length == 1)
                 {
+                    reportedModel = claims[0].Model;
                     outcome = claims[0].Outcome;
                     reason = claims[0].Reason.ToString();
                     count("outcome:" + outcome + (outcome == WorkerClaimOutcome.Unknown ? ":" + reason : ""));
@@ -181,6 +183,18 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
         }
 
+        var exactReproduced = false;
+        if (outcome == WorkerClaimOutcome.Refuted)
+        {
+            var replay = ExactCounterexampleReplay.Run(source, mode, reportedModel);
+            exactReproduced = replay.Status == ExactReplayStatus.Reproduced;
+            count("exact-replay:" + replay.Status);
+            if (replay.Status is ExactReplayStatus.Mismatch or ExactReplayStatus.InvalidModel or ExactReplayStatus.HarnessError)
+            {
+                problems.Add(("ExactCounterexample" + replay.Status, LongFuzzHit.Error, replay.Detail));
+            }
+        }
+
         var runtime = "";
         if (outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted)
         {
@@ -194,7 +208,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             {
                 problems.Add(("FalseProven", LongFuzzHit.Error, observation.Violation));
             }
-            else if (outcome == WorkerClaimOutcome.Refuted && observation.Violation == null)
+            else if (outcome == WorkerClaimOutcome.Refuted && observation.Violation == null && !exactReproduced)
             {
                 count("refuted-not-observed");
                 problems.Add(("RefutedNotObserved", LongFuzzHit.Warning,
@@ -218,6 +232,21 @@ public sealed class AnalyzerPipelineLongFuzzTests
             "public static int State { get { return s_state; } set { s_state = value; StateWrites++; } }";
 
         internal static Observation Run(string source, string mode)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(mode);
+            return RunCore(source, mode, null);
+        }
+
+        internal static Observation RunExact(string source, string mode, ExactReplayInput exactInput)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(mode);
+            ArgumentNullException.ThrowIfNull(exactInput);
+            return RunCore(source, mode, exactInput);
+        }
+
+        private static Observation RunCore(string source, string mode, ExactReplayInput? exactInput)
         {
             System.ArgumentNullException.ThrowIfNull(mode);
             System.ArgumentNullException.ThrowIfNull(source);
@@ -257,7 +286,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     .Distinct().Order().ToArray();
                 var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToArray();
                 var arrayLengths = SourceArrayLengths(tree, model).Distinct().Order().ToArray();
-                return Execute(type, mode, trackWrites, sourceIntegers, stringLengths, arrayLengths);
+                return Execute(type, mode, trackWrites, sourceIntegers, stringLengths, arrayLengths, exactInput);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -530,7 +559,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return model.GetConstantValue(expression) is { HasValue: true, Value: int value } && value == 0;
         }
 
-        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
+        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths, int[] arrayLengths, ExactReplayInput? exactInput)
         {
             System.ArgumentNullException.ThrowIfNull(arrayLengths, nameof(arrayLengths));
             System.ArgumentNullException.ThrowIfNull(sourceIntegers, nameof(sourceIntegers));
@@ -561,7 +590,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 other.SetValue(null, 0);
             }
             var inputs = 0;
-            foreach (var (x, y, a, s) in Inputs(sourceIntegers, stringLengths, arrayLengths))
+            IEnumerable<(int X, int Y, int[]? Array, string? Text)> candidates = exactInput is { } exact
+                ? [(exact.X, exact.Y, null, exact.Text)]
+                : Inputs(sourceIntegers, stringLengths, arrayLengths);
+            foreach (var (x, y, a, s) in candidates)
             {
                 Reset();
                 if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
