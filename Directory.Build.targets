@@ -47,6 +47,10 @@
   </Target>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+  <!-- Arcade defaults its binaries to Microsoft copyright; this repository owns its metadata. -->
+  <PropertyGroup>
+    <Copyright>$(SharpProofCopyright)</Copyright>
+  </PropertyGroup>
   <!-- Arcade supplies Microsoft signing defaults during its target import.
        Restore the published contract identity and full signature afterward. -->
   <PropertyGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Attributes'">

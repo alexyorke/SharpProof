@@ -173,6 +173,7 @@ public enum SharpProofEffect : long
 <Project>
   <PropertyGroup>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
+    <SharpProofCopyright>Copyright (c) $(SharpProofPublisher)</SharpProofCopyright>
     <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>

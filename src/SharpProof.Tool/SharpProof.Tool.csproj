@@ -14,13 +14,13 @@
     <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
     <Authors>$(SharpProofPublisher)</Authors>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)../../eng/branding/icon.png</PackageIconFullPath>
     <PackageTags>SharpProof;formal-verification;smt;z3;contracts;diagnostics;dotnet-tool</PackageTags>
     <Copyright>Copyright (c) $(SharpProofPublisher)</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
     <None Update="README.md" Pack="true" PackagePath="/" />
-    <None Include="../../eng/branding/icon.png" Pack="true" PackagePath="/" />
     <InternalsVisibleTo Include="SharpProof.Tool.Test" />
   </ItemGroup>
 </Project>

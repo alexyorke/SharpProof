@@ -30,6 +30,8 @@
     <SignAssembly>false</SignAssembly>
     <Company>$(SharpProofPublisher)</Company>
     <Authors>$(SharpProofPublisher)</Authors>
+    <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon />
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
