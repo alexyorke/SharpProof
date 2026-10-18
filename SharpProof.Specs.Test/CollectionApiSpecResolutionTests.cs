@@ -5,6 +5,7 @@ using SharpProof.Attributes;
 using SharpProof.Specs;
 
 namespace SharpProof.Specs.Test;
+
 [TestFixture]
 public sealed class CollectionApiSpecResolutionTests
 {

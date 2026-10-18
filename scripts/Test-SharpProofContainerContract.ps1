@@ -116,6 +116,10 @@ function Assert-DockerfileAuthority {
             Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
         },
         [pscustomobject]@{
+            Argument = 'DOTNET_API_INVENTORY_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
+        },
+        [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
         })
@@ -173,6 +177,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+        'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
