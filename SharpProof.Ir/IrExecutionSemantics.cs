@@ -114,18 +114,18 @@ public sealed class IrHavocRequest(
 
 public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocValueProvider)
 {
-    internal ImmutableHashSet<IrVarId> SnapshotVariables { get; set; } = [];
+    internal ImmutableHashSet<IrVarId> SnapshotVariables { get; init; } = [];
     // Only a trusted replay host may replace an approximation with an observed framework value.
-    internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; set; }
+    internal Func<IrHavocRequest, IrValue?>? ConcreteHavocValueProvider { get; init; }
 
-    public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; set; }
-    public Action<IrAllocationInstruction>? AllocationObserver { get; set; }
-    public Action<IrWriteInstruction>? WriteObserver { get; set; }
-    public Action<IrLockInstruction>? LockObserver { get; set; }
-    public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; set; }
-    public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; set; }
-    internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; set; }
-    public Action<IrLockInstruction, bool>? LockPrefixObserver { get; set; }
+    public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; init; }
+    public Action<IrAllocationInstruction>? AllocationObserver { get; init; }
+    public Action<IrWriteInstruction>? WriteObserver { get; init; }
+    public Action<IrLockInstruction>? LockObserver { get; init; }
+    public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; init; }
+    public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; init; }
+    internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; init; }
+    public Action<IrLockInstruction, bool>? LockPrefixObserver { get; init; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));

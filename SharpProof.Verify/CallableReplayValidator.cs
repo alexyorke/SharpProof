@@ -49,24 +49,24 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
+            var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                initial = initial.SetItem(binding.Key, GetRequiredValue(model, binding.Value));
+                initialBuffer[binding.Key] = GetRequiredValue(model, binding.Value);
             }
+            var initial = initialBuffer.ToImmutable();
             var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
                 request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
-                }));
-            if (factory.Semantics == IrExecutionSemantics.Total)
+                }))
             {
-                replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet();
-                replayOptions.ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider;
-            }
+                SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(),
+                ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider
+            };
             var execution = new IrProgramInterpreter(factory).Execute(
                 program, initial, context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)

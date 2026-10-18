@@ -104,8 +104,8 @@ internal sealed partial class BvEncoder
     {
         if (content.Length == 0)
         { return (SeqExpr)owner.Own(context.MkEmptySeq(_textSort!)); }
-        var units = content.Select(unit => (SeqExpr)owner.Own(context.MkUnit(owner.Own(context.MkBV(unit, 16))))).ToArray();
-        return units.Length == 1 ? units[0] : (SeqExpr)owner.Own(context.MkConcat(units));
+        var units = content.Select(unit => (SeqExpr)owner.Own(context.MkUnit(owner.Own(context.MkBV(unit, 16))))).ToImmutableArray();
+        return units.Length == 1 ? units[0] : (SeqExpr)owner.Own(context.MkConcat(units.ToArray()));
     }
 
     // The model's content for a string, or null when no query read content.
@@ -119,7 +119,7 @@ internal sealed partial class BvEncoder
         if (_text == null)
         { return null; }
         using var evaluated = model.Evaluate(owner.Own(context.MkApp(_text, value)), true);
-        var units = ImmutableList<char>.Empty;
+        var units = ImmutableArray.CreateBuilder<char>();
         void Append(Expr sequence)
         {
             meter.Consume();
@@ -128,7 +128,7 @@ internal sealed partial class BvEncoder
                 case Z3_decl_kind.Z3_OP_SEQ_EMPTY:
                     return;
                 case Z3_decl_kind.Z3_OP_SEQ_UNIT when sequence.Args[0] is BitVecNum unit:
-                    units = units.Add((char)unit.UInt);
+                    units.Add((char)unit.UInt);
                     return;
                 case Z3_decl_kind.Z3_OP_SEQ_CONCAT:
                     foreach (var part in sequence.Args)
@@ -139,7 +139,7 @@ internal sealed partial class BvEncoder
             }
         }
         Append(evaluated);
-        return string.Concat(units);
+        return string.Concat(units.ToImmutable());
     }
 
     private void DisposeStrings()

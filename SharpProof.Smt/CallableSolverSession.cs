@@ -154,7 +154,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         core = RepositoryParameterGuard.NotNull(core, nameof(core));
         goal = RepositoryParameterGuard.NotNull(goal, nameof(goal));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        var indices = ImmutableHashSet<int>.Empty;
+        var indices = ImmutableHashSet.CreateBuilder<int>();
         try
         {
             foreach (var expression in core)
@@ -169,13 +169,13 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     }
                     if (active.TryGetValue(name, out var index))
                     {
-                        indices = indices.Add(index);
+                        indices.Add(index);
                         continue;
                     }
                 }
                 return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
-            return BackendCheckResult.Unsatisfiable(indices.OrderBy(static index => index));
+            return BackendCheckResult.Unsatisfiable(indices.ToImmutable().OrderBy(static index => index));
         }
         finally
         {

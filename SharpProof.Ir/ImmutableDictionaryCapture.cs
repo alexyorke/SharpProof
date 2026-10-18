@@ -17,6 +17,20 @@ internal static class ImmutableDictionaryCapture
         return map.Add(key, value);
     }
 
+    internal static void AddUnique<TKey, TValue>(
+        this ImmutableDictionary<TKey, TValue>.Builder map,
+        TKey key,
+        TValue value /* SPINT001: all values valid - builders support null values when TValue permits them */)
+        where TKey : notnull
+    {
+        map = RepositoryParameterGuard.NotNull(map, nameof(map));
+        if (map.ContainsKey(key))
+        {
+            throw new ArgumentException("An item with the same key has already been added. Key: " + key);
+        }
+        map.Add(key, value);
+    }
+
     internal static ImmutableDictionary<TKey, TValue> Create<TSource, TKey, TValue>(
         IEnumerable<TSource> source,
         Func<TSource, TKey> keySelector,

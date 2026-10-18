@@ -8,7 +8,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         // The matched provider admits static methods; Roslyn binds one argument per parameter.
-        var arguments = new IrTerm[body.Method.Parameters.Length];
+        var arguments = ImmutableArray.CreateBuilder<IrTerm>(body.Method.Parameters.Length);
+        arguments.Count = body.Method.Parameters.Length;
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
@@ -29,14 +30,14 @@ internal sealed partial class RoslynTotalProgramLowerer
         var region = _regionGraph == null ? null : _regionSource.EnclosingRegion;
         var filter = region == null ? null : EnclosingRegionFilter(region);
         var anchor = _context.Site(invocation);
-        return ExpandIl(body, arguments, block, anchor,
+        return ExpandIl(body, arguments.ToImmutable(), block, anchor,
             (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ContinueSourceException(region, filter, kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target))), sourceBoundary: true);
     }
 
-    private TotalBodyValue ExpandIl(TotalIlBody body, IrTerm[] arguments, IrBlockId caller, OperationId anchor,
+    private TotalBodyValue ExpandIl(TotalIlBody body, ImmutableArray<IrTerm> arguments, IrBlockId caller, OperationId anchor,
         Func<IrExceptionKind, OperationId, IrBlockId> exceptionTarget, bool sourceBoundary = false)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(anchor.IsDefault, nameof(anchor));
         RepositoryParameterGuard.ThrowIfInvalid(caller.IsDefault, nameof(caller));
         exceptionTarget = RepositoryParameterGuard.NotNull(exceptionTarget, nameof(exceptionTarget));
@@ -72,23 +73,27 @@ internal sealed partial class RoslynTotalProgramLowerer
                 _builder.Assign(entry, anchor, parameter.PreState, factory.Variable(parameter.Entry));
             }
             var locals = body.Locals.Select(type => _context.Temporary(type == SpecialType.System_Object ? factory.ObjectType :
-                type == SpecialType.System_String ? factory.StringType : (CSharpOperationSemantics.MapType(factory, type) ?? throw new RegionIncompleteException()))).ToArray();
+                type == SpecialType.System_String ? factory.StringType : (CSharpOperationSemantics.MapType(factory, type) ?? throw new RegionIncompleteException()))).ToImmutableArray();
             foreach (var local in locals)
             {
                 var type = factory.GetVariableInfo(local).Type;
                 _builder.Assign(entry, anchor, local, CSharpOperationSemantics.DefaultValue(factory, type));
             }
-            var blocks = new IrBlockId[shapes.Length];
-            var storage = new IrVarId[shapes.Length][];
+            var blockBuffer = ImmutableArray.CreateBuilder<IrBlockId>(shapes.Length);
+            blockBuffer.Count = shapes.Length;
+            var storageBuffer = ImmutableArray.CreateBuilder<ImmutableArray<IrVarId>>(shapes.Length);
+            storageBuffer.Count = shapes.Length;
             for (var index = 0; index < shapes.Length; index++)
             {
                 if (shapes[index] is not { } shape)
                 { continue; }
                 if (!_calls.Spend(shape.Length + 1))
                 { throw new RegionIncompleteException(); }
-                blocks[index] = _builder.CreateBlock("il:" + body.Instructions[index].Offset.ToString(CultureInfo.InvariantCulture));
-                storage[index] = [.. shape.Select(value => ((!value.IsValid) ? throw new System.ArgumentException("Value must be initialized.", nameof(value)) : (_context.Temporary(value.StorageType(factory)))))];
+                blockBuffer[index] = _builder.CreateBlock("il:" + body.Instructions[index].Offset.ToString(CultureInfo.InvariantCulture));
+                storageBuffer[index] = [.. shape.Select(value => ((!value.IsValid) ? throw new System.ArgumentException("Value must be initialized.", nameof(value)) : (_context.Temporary(value.StorageType(factory)))))];
             }
+            var blocks = blockBuffer.ToImmutable();
+            var storage = storageBuffer.ToImmutable();
             _builder.Goto(caller, anchor, entry);
             _builder.Goto(entry, anchor, blocks[0]);
             for (var index = 0; index < shapes.Length; index++)
@@ -101,8 +106,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ":" + instruction.Offset.ToString("X4", CultureInfo.InvariantCulture) + ":" + body.ImageSha256,
                     factory.GetOperationInfo(anchor).SourceSpan);
                 var block = blocks[index];
-                var stack = storage[index].Select((variable, slot) => ((slot < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(slot)) : (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (shapes[index]!.Value[slot].IsNullReference
-                    ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable))))).ToList();
+                var stack = ImmutableArray.CreateBuilder<IrTerm>();
+                stack.AddRange(storage[index].Select((variable, slot) => ((slot < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(slot)) : (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (shapes[index]!.Value[slot].IsNullReference
+                    ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable))))));
                 IrTerm Pop()
                 { var value = stack[stack.Count - 1]; stack.RemoveAt(stack.Count - 1); return value; }
                 IrBlockId Edge(int target)
@@ -188,10 +194,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                         break;
                     case "Call":
                         var dependency = _calls.PrepareIl(instruction.Method ?? throw new System.IO.InvalidDataException("IL call without a method.")) ?? throw new RegionIncompleteException();
-                        var values = new IrTerm[dependency.Method.Parameters.Length];
-                        for (var parameter = values.Length - 1; parameter >= 0; parameter--)
+                        var values = ImmutableArray.CreateBuilder<IrTerm>(dependency.Method.Parameters.Length);
+                        values.Count = dependency.Method.Parameters.Length;
+                        for (var parameter = values.Count - 1; parameter >= 0; parameter--)
                         { values[parameter] = IlStore(factory, Pop(), frame.Type(dependency.Method.Parameters[parameter].Type)); }
-                        var called = ExpandIl(dependency, values, block, site, exceptionTarget);
+                        var called = ExpandIl(dependency, values.ToImmutable(), block, site, exceptionTarget);
                         block = called.Continuation;
                         if (!dependency.Method.ReturnsVoid)
                         { stack.Add(IlLoad(factory, called.Value)); }
@@ -325,12 +332,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         return CSharpOperationSemantics.DivideOrRemainder(factory, operation, left, right);
     }
 
-    private void RecordMetadataPreconditions(TotalLoweringContext frame, IrTerm[] arguments, IrBlockId block, OperationId site)
+    private void RecordMetadataPreconditions(TotalLoweringContext frame, ImmutableArray<IrTerm> arguments, IrBlockId block, OperationId site)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
-        var replacements = frame.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+        var replacements = ImmutableDictionaryCapture.Create(frame.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
             parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
         for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)
         {

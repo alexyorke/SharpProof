@@ -19,9 +19,9 @@ internal static class CompilerReachableSourceCollector
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
             .ToImmutableDictionary(item => item.tree, item => item.ordinal);
         var pending = ImmutableQueue<IMethodSymbol>.Empty;
-        var bodies = ImmutableDictionary.Create<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
-        var methods = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var roots = ImmutableList<CompilerSourceRootArtifact>.Empty;
+        var bodies = ImmutableDictionary.CreateBuilder<string, CompilerSourceBodyArtifact>(StringComparer.Ordinal);
+        var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var roots = ImmutableArray.CreateBuilder<CompilerSourceRootArtifact>();
         var complete = true;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         foreach (var target in targets.OrderBy(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal))
@@ -30,7 +30,7 @@ internal static class CompilerReachableSourceCollector
             if (body != null)
             {
                 body = UpdateRegisteredBody(body with { MethodIdentity = target.Entry.CallableId });
-                roots = roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId });
+                roots.Add(new() { CallableId = target.Entry.CallableId, BodyId = body.BodyId });
             }
             else
             { complete = false; }
@@ -50,7 +50,7 @@ internal static class CompilerReachableSourceCollector
             });
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree);
             var operation = model.GetOperation(syntax, cancellationToken);
-            var calls = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+            var calls = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
             body = UpdateRegisteredBody(body with { CallsComplete = operation != null });
             if (operation == null)
             { complete = false; }
@@ -87,14 +87,14 @@ internal static class CompilerReachableSourceCollector
                             if (destination == null)
                             { body = UpdateRegisteredBody(body with { CallsComplete = false }); complete = false; }
                             else
-                            { calls = calls.Add(destination.BodyId); }
+                            { calls.Add(destination.BodyId); }
                         }
                     }
                     foreach (var child in current.ChildOperations)
                     { stack = stack.Push(child); }
                 }
             }
-            body = UpdateRegisteredBody(body with { Callees = [.. calls.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)] });
+            body = UpdateRegisteredBody(body with { Callees = [.. calls.ToImmutable().OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)] });
             // Calls stay as shadow boundaries rather than expanding bodies.
             if (syntax is MethodDeclarationSyntax declaration && method.IsStatic && !method.IsGenericMethod &&
                 !method.ContainingType.IsGenericType &&
@@ -144,7 +144,7 @@ internal static class CompilerReachableSourceCollector
         }
         // The compiler CFG can omit statically unreachable calls. Retain only
         // bodies connected by the final IR edges (or an incomplete boundary).
-        var retained = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var retained = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var reachable = ImmutableStack<string>.Empty;
         foreach (var root in roots)
         { reachable = reachable.Push(root.BodyId); }
@@ -155,22 +155,23 @@ internal static class CompilerReachableSourceCollector
             reachable = reachable.Pop();
             if (retained.Contains(id))
             { continue; }
-            retained = retained.Add(id);
+            retained.Add(id);
             foreach (var callee in bodies[id].Callees)
             { reachable = reachable.Push(callee); }
         }
         foreach (var id in bodies.Keys.Where(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!retained.Contains(id))).ToImmutableArray())
-        { bodies = bodies.Remove(id); }
+        { bodies.Remove(id); }
+        var frozenBodies = bodies.ToImmutable();
         return new()
         {
             CollectionComplete = complete,
-            Roots = [.. roots.OrderBy(root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root.CallableId), StringComparer.Ordinal)],
-            Bodies = [.. bodies.Values.OrderBy(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId), StringComparer.Ordinal)],
-            Documents = [.. bodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().OrderBy(ordinal => ordinal)
+            Roots = [.. roots.ToImmutable().OrderBy(root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root.CallableId), StringComparer.Ordinal)],
+            Bodies = [.. frozenBodies.Values.OrderBy(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId), StringComparer.Ordinal)],
+            Documents = [.. frozenBodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().OrderBy(ordinal => ordinal)
                 .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (new CompilerSourceDocumentArtifact
                 {
                     SourceTreeOrdinal = ordinal, Path = capturedTrees[ordinal].Path,
-                    MaximumBodyEnd = bodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == ordinal))
+                    MaximumBodyEnd = frozenBodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == ordinal))
                         .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length))
                 })))]
         };
@@ -182,7 +183,7 @@ internal static class CompilerReachableSourceCollector
             {
                 throw new InvalidOperationException("A collected body must be registered before publication.");
             }
-            bodies = bodies.SetItem(body.BodyId, body);
+            bodies[body.BodyId] = body;
             return body;
         }
 
@@ -204,7 +205,7 @@ internal static class CompilerReachableSourceCollector
             { return existing; }
             if (bodies.Count >= CompilerArtifactLimits.MaximumInstructions || methods.Contains(method))
             { return null; }
-            methods = methods.Add(method);
+            methods.Add(method);
             var body = new CompilerSourceBodyArtifact
             {
                 BodyId = id,
@@ -232,7 +233,9 @@ internal static class CompilerReachableSourceCollector
                     CompilerReachableSourceValidator.TypeKey(signatureFactory, mapper.GetTypeId(method.ReturnType))
                 };
             }
-            bodies = bodies.AddUnique(id, body);
+            if (bodies.ContainsKey(id))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + id); }
+            bodies.Add(id, body);
             pending = pending.Enqueue(method);
             return body;
         }
@@ -245,15 +248,15 @@ internal static class CompilerReachableSourceCollector
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
             var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
-            var pending = ImmutableList<DeconstructionInfo>.Empty;
-            pending = pending.Add(model.GetDeconstructionInfo(syntax));
+            var pending = ImmutableArray.CreateBuilder<DeconstructionInfo>();
+            pending.Add(model.GetDeconstructionInfo(syntax));
             while (pending.Count != 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (--remaining < 0)
                 { return true; }
                 var info = pending[pending.Count - 1];
-                pending = pending.RemoveAt(pending.Count - 1);
+                pending.RemoveAt(pending.Count - 1);
                 if (IsUncollectedMethod(info.Method, compilation) ||
                     IsUncollectedMethod(info.Conversion?.MethodSymbol, compilation))
                 { return true; }
@@ -262,7 +265,7 @@ internal static class CompilerReachableSourceCollector
                 if (info.Nested.Length > remaining - pending.Count)
                 { return true; }
                 foreach (var nested in info.Nested)
-                { pending = pending.Add(nested); }
+                { pending.Add(nested); }
             }
         }
         if (operation is IRecursivePatternOperation { DeconstructSymbol: not null and not IMethodSymbol })

@@ -252,15 +252,16 @@ internal static class SmtNativeUtilities
         RepositoryParameterGuard.ThrowIfInvalid(elements.IsDefault, nameof(elements));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        var result = elements.ToBuilder();
         foreach (var entry in observed)
         {
             if (entry.Key < 0 || entry.Key >= elements.Length)
             { throw new UnsupportedIrEncodingException(); }
             var value = entry.Value.Type == elementType ? entry.Value
                 : factory.CreateIntegerValueFromBits(elementType, entry.Value.IntegerBits);
-            elements = elements.SetItem(entry.Key, value);
+            result[entry.Key] = value;
         }
-        return elements;
+        return result.ToImmutable();
     }
 
     // This explicitly in-place API retains partial writes on failure, as tested

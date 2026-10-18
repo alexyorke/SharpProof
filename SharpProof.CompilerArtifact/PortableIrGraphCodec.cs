@@ -167,33 +167,33 @@ internal static partial class PortableIrGraphCodec
         externalVariableIndices = RepositoryParameterGuard.NotNull(externalVariableIndices, nameof(externalVariableIndices));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var previous = -1;
-        var externalVariables = ImmutableList<IrVarId>.Empty;
+        var externalVariables = ImmutableArray.CreateBuilder<IrVarId>();
         foreach (var index in externalVariableIndices)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Require(
-                index >= 0 && index < decoded.Variables.Count && index > previous,
+                index >= 0 && index < decoded.Variables.Length && index > previous,
                 "Portable IR external variable metadata is not canonical.");
             previous = index;
-            externalVariables = externalVariables.Add(decoded.Variables[index]);
+            externalVariables.Add(decoded.Variables[index]);
         }
 
         previous = -1;
-        var externalOperations = ImmutableList<OperationId>.Empty;
+        var externalOperations = ImmutableArray.CreateBuilder<OperationId>();
         foreach (var index in externalOperationIndices)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Require(index >= 0 && index < decoded.Operations.Count && index > previous,
+            Require(index >= 0 && index < decoded.Operations.Length && index > previous,
                 "Portable IR external operation metadata is not canonical.");
             previous = index;
-            externalOperations = externalOperations.Add(decoded.Operations[index]);
+            externalOperations.Add(decoded.Operations[index]);
         }
         var canonical = EncodeGraph(
             decoded.Factory,
             decoded.Program,
             decoded.Roots,
-            externalVariables,
-            externalOperations,
+            externalVariables.ToImmutable(),
+            externalOperations.ToImmutable(),
             cancellationToken).Graph;
         canonical = canonical with
         {
@@ -397,23 +397,31 @@ internal static partial class PortableIrGraphCodec
     private static ImmutableDictionary<T, int> Dense<T>(IEnumerable<T> values) where T : notnull
     {
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
-        var result = ImmutableDictionary<T, int>.Empty;
+        var result = ImmutableDictionary.CreateBuilder<T, int>();
         foreach (var value in values)
         {
-            result = result.AddUnique(value, result.Count);
+            if (result.ContainsKey(value))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + value); }
+            result.Add(value, result.Count);
         }
 
-        return result;
+        return result.ToImmutable();
     }
 
     private sealed class EncodingTable<TSource, TRow>(
         Func<TSource, int, TRow> encode) where TSource : notnull
     {
-        private ImmutableDictionary<TSource, int> _indices = encode is null ? throw new System.ArgumentNullException(nameof(encode)) : ImmutableDictionary<TSource, int>.Empty;
-        private ImmutableList<TRow> _rows = [];
+        private readonly ImmutableDictionary<TSource, int>.Builder _indices = encode is null ? throw new System.ArgumentNullException(nameof(encode)) : ImmutableDictionary.CreateBuilder<TSource, int>();
+        private readonly ImmutableArray<TRow>.Builder _rows = ImmutableArray.CreateBuilder<TRow>();
 
-        internal ImmutableDictionary<TSource, int> Indices => _indices;
-        internal ImmutableArray<TRow> Rows => [.. _rows];
+        internal ImmutableDictionary<TSource, int> Indices => _indices.ToImmutable();
+        internal ImmutableArray<TRow> Rows => _rows.ToImmutable();
+
+        internal bool TryGetValue(TSource source, out int index)
+        {
+            source = RepositoryParameterGuard.NotNull(source, nameof(source));
+            return _indices.TryGetValue(source, out index);
+        }
 
         internal int Add(TSource source)
         {
@@ -423,10 +431,10 @@ internal static partial class PortableIrGraphCodec
             }
 
             var index = _rows.Count;
-            _indices = _indices.AddUnique(source, index);
-            _rows = _rows.Add(default!);
+            _indices.Add(source, index);
+            _rows.Add(default!);
             var row = encode(source, index);
-            _rows = _rows.SetItem(index, row);
+            _rows[index] = row;
             return index;
         }
     }
@@ -435,9 +443,9 @@ internal static partial class PortableIrGraphCodec
     {
         private readonly IrFactory _factory;
         private readonly IrProgram? _program;
-        private readonly IReadOnlyList<IrTerm> _roots;
-        private readonly IReadOnlyList<IrVarId> _extraVariables;
-        private readonly IReadOnlyList<OperationId> _extraOperations;
+        private readonly ImmutableArray<IrTerm> _roots;
+        private readonly ImmutableArray<IrVarId> _extraVariables;
+        private readonly ImmutableArray<OperationId> _extraOperations;
         private readonly CancellationToken _cancellationToken;
         private readonly EncodingTable<IrTypeId, PortableIrType> _types;
         private readonly EncodingTable<IrIdentityId, int> _identities;
@@ -614,7 +622,7 @@ internal static partial class PortableIrGraphCodec
         private int TypeIndex(IrTypeId id)
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            if (_types.Indices.TryGetValue(id, out var existing))
+            if (_types.TryGetValue(id, out var existing))
             {
                 return existing;
             }
@@ -660,7 +668,7 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             _factory.EnsureTerm(term, nameof(term));
-            if (_terms.Indices.TryGetValue(term.Id, out var existing))
+            if (_terms.TryGetValue(term.Id, out var existing))
             {
                 return existing;
             }

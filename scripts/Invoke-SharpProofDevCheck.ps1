@@ -72,7 +72,7 @@ if ([string]$restoreCommand.configuration -cne $Configuration -or
     throw 'Developer-check phase configurations do not match the requested configuration.'
 }
 $packageProductBuild = $packageProductBuildCommands.Count -eq 1
-$timings = [Collections.Generic.List[object]]::new()
+$timings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
 Invoke-SharpProofTimedPhase -Name 'restore' -Timings $timings -Action {
@@ -137,7 +137,7 @@ $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     command                  = 'check'
     configuration            = $Configuration
     totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-    phases                   = @($timings)
+    phases                   = @($timings.ToImmutable())
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
 Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force

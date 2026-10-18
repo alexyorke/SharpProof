@@ -1,7 +1,31 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 New-Variable -Scope Script -Name SharpProofSolutionTestTimeoutFallbackSeconds -Option ReadOnly -Value 1800
-$script:SharpProofAcceptanceContractCache = @{}
+$script:SharpProofAcceptanceContractCache = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase)
+
+function ConvertTo-SharpProofImmutableContractValue {
+    param([AllowNull()][object]$Value)
+
+    if ($Value -is [Collections.IDictionary]) {
+        $items = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase).ToBuilder()
+        foreach ($entry in $Value.GetEnumerator()) {
+            $key = [string]$entry.Key
+            if ($items.ContainsKey($key)) {
+                throw "Acceptance contract keys must be unique ignoring case: '$key'."
+            }
+            $items.Add($key, (ConvertTo-SharpProofImmutableContractValue -Value $entry.Value))
+        }
+        return , $items.ToImmutable()
+    }
+    if ($Value -is [array]) {
+        $items = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        foreach ($item in $Value) {
+            $items.Add((ConvertTo-SharpProofImmutableContractValue -Value $item))
+        }
+        return , $items.ToImmutable()
+    }
+    return , $Value
+}
 
 function Get-SharpProofAcceptanceContract {
     param(
@@ -12,12 +36,11 @@ function Get-SharpProofAcceptanceContract {
     $path = [IO.Path]::GetFullPath((Join-Path `
                 $RepositoryRoot 'eng/acceptance/contract.json'))
     if (-not $script:SharpProofAcceptanceContractCache.ContainsKey($path)) {
-        $script:SharpProofAcceptanceContractCache[$path] = Get-Content `
-            -LiteralPath $path `
-            -Raw |
-            ConvertFrom-Json
+        $contract = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -AsHashtable
+        $snapshot = ConvertTo-SharpProofImmutableContractValue -Value $contract
+        $script:SharpProofAcceptanceContractCache = $script:SharpProofAcceptanceContractCache.SetItem($path, $snapshot)
     }
-    return $script:SharpProofAcceptanceContractCache[$path]
+    return , $script:SharpProofAcceptanceContractCache[$path]
 }
 
 function Assert-SharpProofContainer {
@@ -372,7 +395,8 @@ function Invoke-SharpProofTimedPhase {
         [scriptblock]$Action,
 
         [Parameter(Mandatory = $true)]
-        [Collections.IList]$Timings,
+        [AllowEmptyCollection()]
+        [Collections.Generic.IList[object]]$Timings,
 
         [switch]$RecordOnFailure
     )
@@ -463,7 +487,7 @@ function Get-SharpProofCpuBudget {
     $contract = Get-SharpProofAcceptanceContract `
         -RepositoryRoot $RepositoryRoot
     if (-not [string]::IsNullOrWhiteSpace($DivisorProperty)) {
-        $divisor = [int]$contract.automation.$DivisorProperty
+        $divisor = [int]$contract['automation'][$DivisorProperty]
         if ($divisor -lt 1) {
             throw $InvalidMessage
         }
@@ -471,7 +495,7 @@ function Get-SharpProofCpuBudget {
             1, [Math]::Floor($visibleProcessors / $divisor))
     }
 
-    $percent = [int]$contract.automation.$PercentProperty
+    $percent = [int]$contract['automation'][$PercentProperty]
     if ($percent -lt 1 -or $percent -gt 100) {
         throw $InvalidMessage
     }
@@ -481,7 +505,7 @@ function Get-SharpProofCpuBudget {
 
 function ConvertTo-SharpProofImmutablePolicy {
     param([Parameter(Mandatory = $true)][hashtable]$Values)
-    $result = [System.Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase)
+    $result = [System.Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase).ToBuilder()
     foreach ($entry in $Values.GetEnumerator()) {
         $immutableValue = if ($entry.Value -is [hashtable]) {
             ConvertTo-SharpProofImmutablePolicy -Values $entry.Value
@@ -490,9 +514,9 @@ function ConvertTo-SharpProofImmutablePolicy {
             , ([System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$entry.Value))
         }
         else { $entry.Value }
-        $result = $result.Add([string]$entry.Key, $immutableValue)
+        $result.Add([string]$entry.Key, $immutableValue)
     }
-    return , $result
+    return , $result.ToImmutable()
 }
 
 New-Variable -Scope Script -Name SharpProofParallelismPolicies -Option Constant -Value (
@@ -609,16 +633,24 @@ function Resolve-SharpProofSolutionTestTimeoutSeconds {
         if (Test-Path -LiteralPath $contractPath -PathType Leaf) {
             $contract = Get-SharpProofAcceptanceContract `
                 -RepositoryRoot $RepositoryRoot
-            $automation = $contract.PSObject.Properties['automation']
-            $solutionTestWall = if ($null -eq $automation) {
-                $null
+            $automation = $null
+            $timeoutValue = $null
+            $hasTimeout = if ($contract.TryGetValue('automation', [ref]$automation)) {
+                if ($automation -is [Collections.Immutable.ImmutableDictionary[string, object]]) {
+                    $automation.TryGetValue('solutionTestWallSeconds', [ref]$timeoutValue)
+                }
+                else {
+                    $property = $automation.PSObject.Properties['solutionTestWallSeconds']
+                    if ($null -ne $property) {
+                        $timeoutValue = $property.Value
+                        $true
+                    }
+                    else { $false }
+                }
             }
-            else {
-                $automation.Value.PSObject.Properties[
-                'solutionTestWallSeconds']
-            }
-            if ($null -ne $solutionTestWall) {
-                $TimeoutSeconds = [int]$solutionTestWall.Value
+            else { $false }
+            if ($hasTimeout) {
+                $TimeoutSeconds = [int]$timeoutValue
             }
             else {
                 $TimeoutSeconds = $script:SharpProofSolutionTestTimeoutFallbackSeconds
@@ -790,12 +822,13 @@ function Invoke-SharpProofParallelDotnetBuilds {
         1,
         [Math]::Floor($Parallelism / $Builds.Count))
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-    $running = [Collections.Generic.List[object]]::new()
+    $running = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
     $compilerServerScope = [Guid]::NewGuid().ToString('N')
     try {
         foreach ($build in $Builds) {
             $name = [string]$build.Name
-            $arguments = @($build.Arguments)
+            $arguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            $arguments.AddRange([string[]]@($build.Arguments))
             if ([string]::IsNullOrWhiteSpace($name) -or
                 $arguments.Count -lt 2 -or
                 [string]$arguments[0] -cne 'build') {
@@ -803,13 +836,13 @@ function Invoke-SharpProofParallelDotnetBuilds {
             }
             $sharedCompilationId =
             "sharpproof-parallel-$compilerServerScope-$name"
-            $arguments += @(
-                "/m:$lanesPerBuild",
-                '/nodeReuse:false',
-                '-p:UseSharedCompilation=true',
-                "-p:SharedCompilationId=$sharedCompilationId")
-            $effectiveArguments = @(
-                Add-SharpProofStaticGraphArgument -Arguments $arguments)
+            $arguments.AddRange([string[]]@(
+                    "/m:$lanesPerBuild",
+                    '/nodeReuse:false',
+                    '-p:UseSharedCompilation=true',
+                    "-p:SharedCompilationId=$sharedCompilationId"))
+            $effectiveArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    Add-SharpProofStaticGraphArgument -Arguments $arguments.ToImmutable()))
             $startInfo = New-SharpProofParallelProcessStartInfo `
                 -FileName 'dotnet' `
                 -WorkingDirectory $RepositoryRoot `
@@ -833,7 +866,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 })
         }
 
-        foreach ($active in $running) {
+        foreach ($active in $running.ToImmutable()) {
             $remaining = $deadline - [DateTime]::UtcNow
             if ($remaining -le [TimeSpan]::Zero -or
                 -not $active.Process.WaitForExit(
@@ -842,8 +875,8 @@ function Invoke-SharpProofParallelDotnetBuilds {
             }
         }
 
-        $failures = [Collections.Generic.List[string]]::new()
-        foreach ($active in $running) {
+        $failures = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        foreach ($active in $running.ToImmutable()) {
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
             $exitCode = $active.Process.ExitCode
@@ -871,13 +904,13 @@ function Invoke-SharpProofParallelDotnetBuilds {
         if ($failures.Count -ne 0) {
             throw "Parallel builds failed:`n$($failures -join "`n")"
         }
-        foreach ($active in $running) {
+        foreach ($active in $running.ToImmutable()) {
             Stop-SharpProofCompilerServer `
                 -SharedCompilationId $active.SharedCompilationId
         }
     }
     finally {
-        foreach ($active in $running) {
+        foreach ($active in $running.ToImmutable()) {
             Stop-SharpProofParallelProcess -Process $active.Process
         }
     }
@@ -911,7 +944,7 @@ function Invoke-SharpProofParallelDotnetTests {
 
     Assert-SharpProofContainer `
         'Parallel tests require the canonical Linux container.'
-    $pending = [Collections.Generic.List[object]]::new()
+    $pending = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
     foreach ($test in $Tests) {
         $name = [string]$test.Name
         $slots = if ($test.PSObject.Properties.Name -contains 'Slots') {
@@ -935,9 +968,9 @@ function Invoke-SharpProofParallelDotnetTests {
             })
     }
 
-    $running = [Collections.Generic.List[object]]::new()
-    $completed = [Collections.Generic.List[object]]::new()
-    $failures = [Collections.Generic.List[string]]::new()
+    $running = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
+    $completed = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $failures = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $activeSlots = 0
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     try {
@@ -1001,9 +1034,9 @@ function Invoke-SharpProofParallelDotnetTests {
                     throw "Parallel $Label tests exceeded $TimeoutSeconds seconds."
                 }
             }
-            $finished = @($running | Where-Object {
-                    $_.ExitTask.IsCompleted
-                })
+            $finished = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($running.ToImmutable() | Where-Object {
+                        $_.ExitTask.IsCompleted
+                    }))
             foreach ($active in $finished) {
                 $active.Process.WaitForExit()
                 $stdout = $active.StandardOutput.GetAwaiter().GetResult()
@@ -1045,14 +1078,14 @@ function Invoke-SharpProofParallelDotnetTests {
         }
     }
     finally {
-        foreach ($active in @($running)) {
+        foreach ($active in $running.ToImmutable()) {
             Stop-SharpProofParallelProcess -Process $active.Process
         }
     }
 
     return [pscustomobject]@{
-        Completed = @($completed)
-        Failures  = @($failures)
+        Completed = $completed.ToImmutable()
+        Failures  = $failures.ToImmutable()
     }
 }
 
@@ -1231,7 +1264,7 @@ function Resolve-SharpProofCoverageLineCredits {
     )
 
     $permitted = $false
-    $credits = [Collections.Generic.HashSet[int]]::new()
+    $credits = [Collections.Immutable.ImmutableHashSet[int]]::Empty.ToBuilder()
     foreach ($range in $Ranges) {
         if ($Number -ge $range.startLine -and
             $Number -le $range.endLine) {
@@ -1248,7 +1281,7 @@ function Resolve-SharpProofCoverageLineCredits {
     }
     # An empty array is a permitted line with no creditable start, not a miss.
     # Keep all overlapping starts; a single nearest range loses valid credit.
-    return , ([int[]]@($credits))
+    return , ([int[]]@($credits.ToImmutable()))
 }
 
 function New-SharpProofIsolatedTestOutput {

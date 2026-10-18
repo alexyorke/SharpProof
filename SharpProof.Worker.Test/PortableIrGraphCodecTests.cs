@@ -116,12 +116,12 @@ public sealed class PortableIrGraphCodecTests
                     .Distinct(),
                 Is.EquivalentTo(Enum.GetValues<IrLocationKind>()));
             Assert.That(decoded.Program, Is.Not.Null);
-            Assert.That(decoded.Roots, Has.Count.EqualTo(fixture.Roots.Length));
-            Assert.That(decoded.Variables, Has.Count.EqualTo(encoded.Graph.Variables.Length));
+            Assert.That(decoded.Roots, Has.Length.EqualTo(fixture.Roots.Length));
+            Assert.That(decoded.Variables, Has.Length.EqualTo(encoded.Graph.Variables.Length));
             Assert.That(decoded.Program!.Blocks, Has.Length.EqualTo(encoded.Graph.Blocks.Length));
             Assert.That(
                 decoded.Instructions,
-                Has.Count.EqualTo(
+                Has.Length.EqualTo(
                     encoded.Graph.Blocks.Sum(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length))));
             AssertGraphJsonEqual(encoded.Graph, encodedAgain.Graph);
         }
@@ -148,7 +148,7 @@ public sealed class PortableIrGraphCodecTests
                 .Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation))
                 .Distinct()
                 .Count(),
-            Is.EqualTo(decoded.Instructions.Count));
+            Is.EqualTo(decoded.Instructions.Length));
     }
 
     [Test]
@@ -176,7 +176,7 @@ public sealed class PortableIrGraphCodecTests
         {
             Assert.That(
                 decoded.Variables,
-                Has.Count.EqualTo(encoded.Graph.Variables.Length));
+                Has.Length.EqualTo(encoded.Graph.Variables.Length));
             AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
         }
     }

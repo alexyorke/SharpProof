@@ -247,6 +247,7 @@ internal static class SmtEncodingDepth
         maximumDepths = RepositoryParameterGuard.NotNull(maximumDepths, nameof(maximumDepths));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
+        var depths = maximumDepths.ToBuilder();
         var pending = ImmutableStack<(IrTerm Term, int Depth)>.Empty;
         var children = ImmutableStack<IrTerm>.Empty;
         pending = pending.Push((root, 1));
@@ -260,11 +261,11 @@ internal static class SmtEncodingDepth
             {
                 throw new UnsupportedIrEncodingException();
             }
-            if (maximumDepths.TryGetValue(term.Id, out var previous) && previous >= depth)
+            if (depths.TryGetValue(term.Id, out var previous) && previous >= depth)
             {
                 continue;
             }
-            maximumDepths = maximumDepths.SetItem(term.Id, depth);
+            depths[term.Id] = depth;
             children = ImmutableStack<IrTerm>.Empty;
             children = IrTraversal.PushChildren(term, children);
             while (!children.IsEmpty)
@@ -273,6 +274,6 @@ internal static class SmtEncodingDepth
                 children = children.Pop();
             }
         }
-        return maximumDepths;
+        return depths.ToImmutable();
     }
 }

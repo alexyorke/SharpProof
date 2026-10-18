@@ -46,17 +46,17 @@ public static class HornInvariantSearch
         internal ImmutableDictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
         {
             clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-            var proposals = ImmutableDictionary<IrMemberId, IrTerm>.Empty;
+            var proposals = ImmutableDictionary.CreateBuilder<IrMemberId, IrTerm>();
             _error = context.MkFuncDecl("error", [], context.BoolSort);
-            var rules = ImmutableList<BoolExpr>.Empty;
+            var rules = ImmutableArray.CreateBuilder<BoolExpr>();
             foreach (var clause in clauses)
             {
                 var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToImmutableList();
                 foreach (var (guards, head) in Heads(encoder.EncodeBoolean(clause.Goal.Predicate, _meter)))
-                { rules = rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
+                { rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
             }
             if (encoder.ReferenceFacts.Count != 0 || encoder.Relations!.Count == 0)
-            { return proposals; }
+            { return proposals.ToImmutable(); }
             using var fixedpoint = context.MkFixedpoint();
             using var parameters = context.MkParams();
             parameters.Add("engine", "spacer");
@@ -67,7 +67,7 @@ public static class HornInvariantSearch
             foreach (var relation in _relationOrder)
             { fixedpoint.RegisterRelation(relation); }
             fixedpoint.RegisterRelation(_error);
-            foreach (var converted in rules)
+            foreach (var converted in rules.ToImmutable())
             {
                 var rule = Ackermann(converted);
                 var (constants, constantOrder) = CollectIntegerConstants(rule,
@@ -75,7 +75,7 @@ public static class HornInvariantSearch
                 fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constantOrder.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : constants[name])], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
-            { return proposals; }
+            { return proposals.ToImmutable(); }
             foreach (var relation in encoder.RelationDeclarations)
             {
                 if (!_relations.TryGetValue(relation.Value.Name.ToString(), out var integer))
@@ -91,9 +91,9 @@ public static class HornInvariantSearch
                 { _names = _names.SetItem(arguments[ordinal].FuncDecl.Name.ToString(), state[ordinal]); }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
                 if (Translate(Own(cover.SubstituteVars(arguments))) is { } invariant && invariant.Type == factory.BooleanType)
-                { proposals = proposals.SetItem(relation.Key, invariant); }
+                { proposals[relation.Key] = invariant; }
             }
-            return proposals;
+            return proposals.ToImmutable();
         }
 
         // A rule whose uninterpreted applications became unknowns also
@@ -102,8 +102,8 @@ public static class HornInvariantSearch
         {
             var (constants, _) = CollectIntegerConstants(rule,
                 ImmutableDictionary.Create<string, Expr>(StringComparer.Ordinal), ImmutableList<string>.Empty);
-            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToArray();
-            var congruence = ImmutableList<BoolExpr>.Empty;
+            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToImmutableArray();
+            var congruence = ImmutableArray.CreateBuilder<BoolExpr>();
             // A bitvector unknown keeps its signed range.
             foreach (var name in applied)
             {
@@ -111,8 +111,8 @@ public static class HornInvariantSearch
                 {
                     var bound = System.Numerics.BigInteger.One << (int)(width - 1);
                     var value = (ArithExpr)constants[name];
-                    congruence = congruence.Add(Own(context.MkLe(Own(context.MkInt((-bound).ToString(CultureInfo.InvariantCulture))), value)));
-                    congruence = congruence.Add(Own(context.MkLt(value, Own(context.MkInt(bound.ToString(CultureInfo.InvariantCulture))))));
+                    congruence.Add(Own(context.MkLe(Own(context.MkInt((-bound).ToString(CultureInfo.InvariantCulture))), value)));
+                    congruence.Add(Own(context.MkLt(value, Own(context.MkInt(bound.ToString(CultureInfo.InvariantCulture))))));
                 }
             }
             for (var left = 0; left < applied.Length; left++)
@@ -123,7 +123,7 @@ public static class HornInvariantSearch
                     var (other, otherArguments, _) = _applied[applied[right]];
                     if (function != other || arguments.Length != otherArguments.Length)
                     { continue; }
-                    congruence = congruence.Add(Own(context.MkImplies(
+                    congruence.Add(Own(context.MkImplies(
                         Own(context.MkAnd([.. arguments.Select((argument, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkEq(argument, otherArguments[ordinal]))))))])),
                         Own(context.MkEq(constants[applied[left]], constants[applied[right]])))));
                 }
@@ -305,7 +305,7 @@ public static class HornInvariantSearch
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
                 var guards = goal.Args.Where(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (!ContainsRelation(argument)))
-                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToArray();
+                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToImmutableArray();
                 return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToImmutableArray(), head.Head))];
             }
             throw new UnsupportedIrEncodingException();

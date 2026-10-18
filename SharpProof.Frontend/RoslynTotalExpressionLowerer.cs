@@ -18,26 +18,26 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private readonly IrFactory _factory = context.Factory;
     private readonly IrProgramBuilder? _builder = builder;
     private readonly IrBlockId _exceptionalExit = exceptionalExit;
-    internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; set; }
-    internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; set; }
-    internal Action? Spend { get; set; }
-    internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; set; }
+    internal Func<IInvocationOperation, TotalParameterState, GuardedExpression?>? Intrinsic { get; init; }
+    internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; init; }
+    internal Action? Spend { get; init; }
+    internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; init; }
 
-    internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; set; }
-    internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; set; }
-    internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; set; }
+    internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
+    internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
+    internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
 
     // Shadow skeletons record call edges only; they never take opaque calls.
-    internal bool AllowOpaqueCalls { get; set; }
-    internal bool ShadowCallSkeleton { get; set; }
+    internal bool AllowOpaqueCalls { get; init; }
+    internal bool ShadowCallSkeleton { get; init; }
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
-    internal bool ApproximateElementReads { get; set; }
-    internal bool PinElementReads { get; set; }
+    internal bool ApproximateElementReads { get; init; }
+    internal bool PinElementReads { get; init; }
 
     // An API specification narrows what an opaque call may do.
-    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
+    internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; init; }
 
     // `this` (or `base`) of a reference-type instance member is never null.
     internal bool IsImplicitThis(IOperation? instance)

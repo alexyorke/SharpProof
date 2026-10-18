@@ -112,7 +112,7 @@ public sealed partial class TotalLoweringContext
 
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
-    internal bool CaptureShadowCallAncestry { get; set; }
+    internal bool CaptureShadowCallAncestry { get; init; }
     internal object Origin { get; } = new();
     internal bool AllowObjectWidening { get; set; }
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)

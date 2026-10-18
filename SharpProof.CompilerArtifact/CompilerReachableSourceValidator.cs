@@ -55,7 +55,7 @@ internal static class CompilerReachableSourceValidator
             {
                 var decoded = PortableIrGraphCodec.Decode(body.Graph, externalVariableIndices: null, cancellationToken: cancellationToken);
                 Require(decoded.Factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null &&
-                    decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Count <= 4096);
+                    decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Length <= 4096);
                 graphs.Add(body.BodyId, decoded);
                 foreach (var operation in body.Graph.Operations)
                 {
@@ -90,7 +90,7 @@ internal static class CompilerReachableSourceValidator
                 foreach (var row in body.SourceCalls)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    Require(row != null && row.InstructionIndex >= 0 && row.InstructionIndex < graph.Instructions.Count &&
+                    Require(row != null && row.InstructionIndex >= 0 && row.InstructionIndex < graph.Instructions.Length &&
                         seen.Add(row.InstructionIndex) && row.CalleeBodyId != null && bodies.ContainsKey(row.CalleeBodyId));
                     Require(graph.Instructions[row!.InstructionIndex] is IrCallInstruction);
                     var call = (IrCallInstruction)graph.Instructions[row.InstructionIndex];

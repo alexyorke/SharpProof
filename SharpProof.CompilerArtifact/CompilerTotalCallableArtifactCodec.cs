@@ -219,7 +219,7 @@ internal static class CompilerTotalCallableArtifactCodec
         var factory = decoded.Factory;
         Require(factory.Semantics == IrExecutionSemantics.Total &&
             (entryOnly ? decoded.Program == null && artifact.Result == -1 : decoded.Program != null) &&
-            decoded.Roots.Count == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
+            decoded.Roots.Length == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
             "The Total graph has an invalid mode or root closure.");
         foreach (var term in artifact.Graph.Terms)
         {
@@ -256,7 +256,7 @@ internal static class CompilerTotalCallableArtifactCodec
         var identities = ImmutableHashSet<IrVarId>.Empty;
         IrVarId Variable(int index, string name)
         {
-            Require(index >= 0 && index < decoded.Variables.Count, "A Total canonical role has an invalid index.");
+            Require(index >= 0 && index < decoded.Variables.Length, "A Total canonical role has an invalid index.");
             var variable = decoded.Variables[index];
             var info = factory.GetVariableInfo(variable);
             Require(!identities.Contains(variable) && factory.GetString(info.Name) == name && Scalar(factory, info.Type),
@@ -314,7 +314,7 @@ internal static class CompilerTotalCallableArtifactCodec
             Require(!entryOnly || row.Kind == CompilerContractKind.Requires, "An entry payload can contain only Requires clauses.");
             Require(row.Kind is CompilerContractKind.Requires or CompilerContractKind.Ensures or CompilerContractKind.Assume &&
                 row.ValueRoot == ordinal * 2 && row.SafeRoot == ordinal * 2 + 1 &&
-                row.Operation >= 0 && row.Operation < decoded.Operations.Count, "A Total clause has an invalid root or site binding.");
+                row.Operation >= 0 && row.Operation < decoded.Operations.Length, "A Total clause has an invalid root or site binding.");
             var value = decoded.Roots[row.ValueRoot];
             var safe = decoded.Roots[row.SafeRoot];
             Require(value.Type == factory.BooleanType && safe.Type == factory.BooleanType &&
@@ -399,11 +399,11 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             cancellationToken.ThrowIfCancellationRequested();
             var row = artifact.CallPreconditions[ordinal];
-            Require(row.InstructionIndex > previous && row.InstructionIndex < decoded.Instructions.Count &&
+            Require(row.InstructionIndex > previous && row.InstructionIndex < decoded.Instructions.Length &&
                 decoded.Instructions[row.InstructionIndex] is IrAssignInstruction &&
                 !string.IsNullOrWhiteSpace(row.CalleeIdentity) && row.CalleeIdentity.Length <= 4096 &&
                 row.ClauseOrdinal >= 0 && row.ClauseOrdinal < CompilerArtifactLimits.MaximumInstructions &&
-                row.ClauseSite >= 0 && row.ClauseSite < decoded.Operations.Count &&
+                row.ClauseSite >= 0 && row.ClauseSite < decoded.Operations.Length &&
                 row.ValueRoot == artifact.Clauses.Length * 2 + ordinal * 2 && row.SafeRoot == row.ValueRoot + 1,
                 "A Total call precondition has an invalid instruction, clause, or root binding.");
             previous = row.InstructionIndex;

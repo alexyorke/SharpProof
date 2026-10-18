@@ -118,20 +118,20 @@ internal sealed class PassiveCallableVcPlan
         { return null; }
         var marker = _candidate.CallPreconditions[ordinal].Marker;
         OperationId? witness = null;
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
         {
-            initial[parameter.Entry] = inputs[parameter.Entry];
-            initial[parameter.Current] = inputs[parameter.Entry];
+            initialBuffer[parameter.Entry] = inputs[parameter.Entry];
+            initialBuffer[parameter.Current] = inputs[parameter.Entry];
         }
-        var options = ReplayOptions(initial: initial);
-        options.AssignmentObserver = (assignment, value, approximation) =>
+        var initial = initialBuffer.ToImmutable();
+        var options = ReplayOptions(initial: initial, assignmentObserver: (assignment, value, approximation) =>
         {
             System.ArgumentNullException.ThrowIfNull(assignment);
             System.ArgumentNullException.ThrowIfNull(value);
             if (assignment.Id == marker && !value.Boolean && !approximation)
             { witness ??= assignment.Operation; }
-        };
+        });
         new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, options, cancellationToken);
         return witness;
@@ -280,33 +280,34 @@ internal sealed class PassiveCallableVcPlan
         return ReplayWithOptions(inputs, initial =>
         {
             System.ArgumentNullException.ThrowIfNull(initial);
-            var options = ReplayOptions(initial: initial, lockPrefixObserver: lockObserver);
-            options.NonFreshWritePrefixObserver = writeObserver;
-            return options;
+            return ReplayOptions(initial: initial, lockPrefixObserver: lockObserver, nonFreshWritePrefixObserver: writeObserver);
         }, cancellationToken);
     }
 
     private IrProgramExecutionResult ReplayWithOptions(ImmutableDictionary<IrVarId, IrValue> inputs,
-        Func<Dictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
+        Func<ImmutableDictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(createOptions);
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in _candidate.Parameters)
         {
-            initial[parameter.Entry] = inputs[parameter.Entry];
-            initial[parameter.Current] = inputs[parameter.Entry];
+            initialBuffer[parameter.Entry] = inputs[parameter.Entry];
+            initialBuffer[parameter.Current] = inputs[parameter.Entry];
         }
+        var initial = initialBuffer.ToImmutable();
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, createOptions(initial), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
-        Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null,
+        Action<IrLockInstruction>? lockObserver = null, ImmutableDictionary<IrVarId, IrValue>? initial = null,
         Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
-        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null,
+        Action<IrAssignInstruction, IrValue, bool>? assignmentObserver = null,
+        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null)
     {
         return new(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
@@ -324,7 +325,9 @@ internal sealed class PassiveCallableVcPlan
             LockObserver = lockObserver,
             AllocationPrefixObserver = allocationPrefixObserver,
             WritePrefixObserver = writePrefixObserver,
-            LockPrefixObserver = lockPrefixObserver
+            LockPrefixObserver = lockPrefixObserver,
+            AssignmentObserver = assignmentObserver,
+            NonFreshWritePrefixObserver = nonFreshWritePrefixObserver
         };
     }
 

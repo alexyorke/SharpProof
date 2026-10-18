@@ -289,23 +289,23 @@ internal sealed class DecodedPortableIrGraph(
 {
     internal IrFactory Factory { get; } = factory;
     internal IrProgram? Program { get; } = program;
-    internal IReadOnlyList<IrTerm> Roots { get; } = roots;
-    internal IReadOnlyList<IrVarId> Variables { get; } = variables;
-    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
-    internal IReadOnlyList<OperationId> Operations { get; } = operations;
+    internal ImmutableArray<IrTerm> Roots { get; } = roots;
+    internal ImmutableArray<IrVarId> Variables { get; } = variables;
+    internal ImmutableArray<IrInstruction> Instructions { get; } = instructions;
+    internal ImmutableArray<OperationId> Operations { get; } = operations;
 }
 
 internal sealed class EncodedPortableIrGraph(
     PortableIrGraph graph,
-    IReadOnlyDictionary<IrVarId, int> variableIndices,
-    IReadOnlyDictionary<IrInstructionId, int> instructionIndices,
-    IReadOnlyDictionary<OperationId, int> operationIndices
+    ImmutableDictionary<IrVarId, int> variableIndices,
+    ImmutableDictionary<IrInstructionId, int> instructionIndices,
+    ImmutableDictionary<OperationId, int> operationIndices
 )
 {
     internal PortableIrGraph Graph { get; } = graph;
-    internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices.ToImmutableDictionary();
-    internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices.ToImmutableDictionary();
-    internal IReadOnlyDictionary<OperationId, int> OperationIndices { get; } = operationIndices.ToImmutableDictionary();
+    internal ImmutableDictionary<IrVarId, int> VariableIndices { get; } = variableIndices.ToImmutableDictionary();
+    internal ImmutableDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices.ToImmutableDictionary();
+    internal ImmutableDictionary<OperationId, int> OperationIndices { get; } = operationIndices.ToImmutableDictionary();
 }
 
 internal static class PortableIrWireCatalog
@@ -547,9 +547,12 @@ internal static class PortableIrGraphCodecProjections
         Func<Exception> Invalid);
 
     private static readonly ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> TermProjections =
-        new Dictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>>
-        {
-            [IrTermKind.Boolean] = new(
+        CreateTermProjections();
+
+    private static ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> CreateTermProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>>();
+        result.Add(IrTermKind.Boolean, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Boolean],
                 static (term, context) =>
                 {
@@ -560,8 +563,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     RequirePayload(row.A is 0 or 1, context.Invalid);
                     return context.Factory.Boolean(row.A == 1);
-                }),
-            [IrTermKind.Integer] = new(
+                }));
+        result.Add(IrTermKind.Integer, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Integer],
                 static (term, context) =>
                 {
@@ -578,8 +581,8 @@ internal static class PortableIrGraphCodecProjections
                     }
                     RequirePayload(row.Number == 0, context.Invalid);
                     return context.Factory.IntegerBits(context.Type(row.Type), row.Bits);
-                }),
-            [IrTermKind.String] = new(
+                }));
+        result.Add(IrTermKind.String, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.String],
                 static (term, context) =>
                 {
@@ -590,8 +593,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     RequirePayload(row.Text != null, context.Invalid);
                     return context.Factory.String(row.Text!);
-                }),
-            [IrTermKind.Null] = new(
+                }));
+        result.Add(IrTermKind.Null, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Null],
                 static (term, context) =>
                 {
@@ -600,8 +603,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Null(context.Type(row.Type));
-                }),
-            [IrTermKind.EmptyArray] = new(
+                }));
+        result.Add(IrTermKind.EmptyArray, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.EmptyArray],
                 static (term, context) =>
                 {
@@ -610,8 +613,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.EmptyArray(context.Type(row.Type));
-                }),
-            [IrTermKind.Variable] = new(
+                }));
+        result.Add(IrTermKind.Variable, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Variable],
                 static (term, context) =>
                 {
@@ -621,8 +624,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Variable(context.Variable(row.A));
-                }),
-            [IrTermKind.Opaque] = new(
+                }));
+        result.Add(IrTermKind.Opaque, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque],
                 static (term, context) =>
                 {
@@ -649,8 +652,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Terms,
                         context.OpaquePurity,
                         context.Invalid);
-                }),
-            [IrTermKind.Unary] = new(
+                }));
+        result.Add(IrTermKind.Unary, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Unary],
                 static (term, context) =>
                 {
@@ -670,8 +673,8 @@ internal static class PortableIrGraphCodecProjections
                     return context.Factory.Unary(
                         context.UnaryOperator(row.A),
                         context.Term(row.B, context.Depth + 1));
-                }),
-            [IrTermKind.Binary] = new(
+                }));
+        result.Add(IrTermKind.Binary, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Binary],
                 static (term, context) =>
                 {
@@ -692,8 +695,8 @@ internal static class PortableIrGraphCodecProjections
                         context.BinaryOperator(row.A),
                         context.Term(row.B, context.Depth + 1),
                         context.Term(row.C, context.Depth + 1));
-                }),
-            [IrTermKind.Conditional] = new(
+                }));
+        result.Add(IrTermKind.Conditional, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Conditional],
                 static (term, context) =>
                 {
@@ -714,8 +717,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Term(row.A, context.Depth + 1),
                         context.Term(row.B, context.Depth + 1),
                         context.Term(row.C, context.Depth + 1));
-                }),
-            [IrTermKind.Cast] = new(
+                }));
+        result.Add(IrTermKind.Cast, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Cast],
                 static (term, context) =>
                 {
@@ -725,8 +728,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Cast(context.Type(row.Type), context.Term(row.A, context.Depth + 1));
-                }),
-            [IrTermKind.Length] = new(
+                }));
+        result.Add(IrTermKind.Length, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.Length],
                 static (term, context) =>
                 {
@@ -736,8 +739,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Factory.Length(context.Term(row.A, context.Depth + 1));
-                }),
-            [IrTermKind.SequenceAccess] = new(
+                }));
+        result.Add(IrTermKind.SequenceAccess, new(
                 PortableIrSlotCatalog.Terms[(int)IrTermKind.SequenceAccess],
                 static (term, context) =>
                 {
@@ -757,8 +760,9 @@ internal static class PortableIrGraphCodecProjections
                     return context.Factory.SequenceAccess(
                         context.Term(row.A, context.Depth + 1),
                         context.Term(row.B, context.Depth + 1));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping TermSlotMapping(IrTermKind kind)
     {
@@ -766,9 +770,12 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static readonly ImmutableDictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>> LocationProjections =
-        new Dictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>>
-        {
-            [IrLocationKind.Member] = new(
+        CreateLocationProjections();
+
+    private static ImmutableDictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>> CreateLocationProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>>();
+        result.Add(IrLocationKind.Member, new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Member],
                 static (location, context) =>
                 {
@@ -785,8 +792,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Member(row.A),
                         context.OptionalTerm(row.B),
                         context.Terms(row.Items.ToArray()));
-                }),
-            [IrLocationKind.Sequence] = new(
+                }));
+        result.Add(IrLocationKind.Sequence, new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Sequence],
                 static (location, context) =>
                 {
@@ -802,8 +809,9 @@ internal static class PortableIrGraphCodecProjections
                     return context.Builder.SequenceLocation(
                         context.Term(row.A),
                         context.Term(row.B));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping LocationSlotMapping(IrLocationKind kind)
     {
@@ -811,9 +819,12 @@ internal static class PortableIrGraphCodecProjections
     }
 
     private static readonly ImmutableDictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>> InstructionProjections =
-        new Dictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>>
-        {
-            [IrInstructionKind.Allocate] = new(
+        CreateInstructionProjections();
+
+    private static ImmutableDictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>> CreateInstructionProjections()
+    {
+        var result = ImmutableDictionary.CreateBuilder<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>>();
+        result.Add(IrInstructionKind.Allocate, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Allocate],
                 static (instruction, context) =>
                 {
@@ -824,8 +835,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items.ToArray()).ToImmutableArray());
-                }),
-            [IrInstructionKind.Lock] = new(
+                }));
+        result.Add(IrInstructionKind.Lock, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Lock],
                 static (instruction, context) =>
                 {
@@ -836,8 +847,8 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.Lock(context.Block, context.Operation(row.Operation), context.Term(row.A));
-                }),
-            [IrInstructionKind.Write] = new(
+                }));
+        result.Add(IrInstructionKind.Write, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Write],
                 static (instruction, context) =>
                 {
@@ -858,8 +869,8 @@ internal static class PortableIrGraphCodecProjections
                             ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items.ToArray())[0])
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
-                }),
-            [IrInstructionKind.Assign] = new(
+                }));
+        result.Add(IrInstructionKind.Assign, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assign],
                 static (instruction, context) =>
                 {
@@ -880,8 +891,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Variable(row.A),
                         context.Term(row.B));
-                }),
-            [IrInstructionKind.Load] = new(
+                }));
+        result.Add(IrInstructionKind.Load, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Load],
                 static (instruction, context) =>
                 {
@@ -902,8 +913,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Variable(row.A),
                         context.Location(row.Location));
-                }),
-            [IrInstructionKind.Store] = new(
+                }));
+        result.Add(IrInstructionKind.Store, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Store],
                 static (instruction, context) =>
                 {
@@ -924,8 +935,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.Location(row.Location),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Call] = new(
+                }));
+        result.Add(IrInstructionKind.Call, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call],
                 static (instruction, context) =>
                 {
@@ -948,8 +959,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Member(row.B),
                         context.OptionalTerm(row.C),
                         context.Terms(row.Items.ToArray()));
-                }),
-            [IrInstructionKind.Assume] = new(
+                }));
+        result.Add(IrInstructionKind.Assume, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assume],
                 static (instruction, context) =>
                 {
@@ -969,8 +980,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Assert] = new(
+                }));
+        result.Add(IrInstructionKind.Assert, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assert],
                 static (instruction, context) =>
                 {
@@ -990,8 +1001,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.Term(row.A));
-                }),
-            [IrInstructionKind.Havoc] = new(
+                }));
+        result.Add(IrInstructionKind.Havoc, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Havoc],
                 static (instruction, context) =>
                 {
@@ -1013,8 +1024,8 @@ internal static class PortableIrGraphCodecProjections
                         context.HavocKind(row.A),
                         row.Origin,
                         context.Variables(row.Items.ToArray()));
-                }),
-            [IrInstructionKind.Branch] = new(
+                }));
+        result.Add(IrInstructionKind.Branch, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Branch],
                 static (instruction, context) =>
                 {
@@ -1036,8 +1047,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Term(row.A),
                         context.BlockAt(row.B),
                         context.BlockAt(row.C));
-                }),
-            [IrInstructionKind.Goto] = new(
+                }));
+        result.Add(IrInstructionKind.Goto, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Goto],
                 static (instruction, context) =>
                 {
@@ -1057,8 +1068,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.BlockAt(row.A));
-                }),
-            [IrInstructionKind.Return] = new(
+                }));
+        result.Add(IrInstructionKind.Return, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Return],
                 static (instruction, context) =>
                 {
@@ -1078,8 +1089,8 @@ internal static class PortableIrGraphCodecProjections
                         context.Block,
                         context.Operation(row.Operation),
                         context.OptionalTerm(row.A));
-                }),
-            [IrInstructionKind.Throw] = new(
+                }));
+        result.Add(IrInstructionKind.Throw, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Throw],
                 static (instruction, context) =>
                 {
@@ -1091,8 +1102,8 @@ internal static class PortableIrGraphCodecProjections
                 {
                     return context.Builder.Throw(context.Block, context.Operation(row.Operation),
                         (IrExceptionKind)row.A, context.BlockAt(row.B));
-                }),
-            [IrInstructionKind.ExceptionalExit] = new(
+                }));
+        result.Add(IrInstructionKind.ExceptionalExit, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.ExceptionalExit],
                 static (instruction, context) =>
                 {
@@ -1102,8 +1113,9 @@ internal static class PortableIrGraphCodecProjections
                 static (row, context) =>
                 {
                     return context.Builder.ExceptionalExit(context.Block, context.Operation(row.Operation));
-                }),
-        }.ToImmutableDictionary();
+                }));
+        return result.ToImmutable();
+    }
 
     internal static PortableIrSlotMapping InstructionSlotMapping(IrInstructionKind kind)
     {

@@ -1434,3 +1434,70 @@ remaining production compiler/portable validation and construction state, replay
 configuration, helper input ownership, test fixture producers, and PowerShell
 orchestration. Syntax candidates still require individual classification; a
 permitted scoped builder is not counted as an unresolved mutability violation.
+
+## Replay, portable graph, solver, and orchestration checkpoint
+
+Portable graph encoding uses construction-owned dictionary/array builders while
+preserving recursive index reservation before row encoding and replacement after
+recursion. Hot index lookup reads the builder directly; only publication freezes
+the index maps. Decoded graph arrays and encoded index maps now expose immutable
+types. Three static projection catalogs use scoped builders for 30 unique entries.
+Reachable-source collection uses scoped builders for registered bodies, roots,
+admission sets and deconstruction work; published bodies freeze after reachability
+pruning. Existing FIFO/DFS worklists and strict duplicate behavior are preserved.
+
+Replay options and expression-lowerer configuration now use init-only properties.
+Their observers are installed at construction. The IR project links the existing
+IsExternalInit polyfill for its netstandard target. Evaluation snapshots variable
+maps, retaining existing immutable maps and known Dictionary comparers. Mutable
+heaps, object referents and observer side effects remain execution subjects. Two
+regressions prove that an observer cannot rewrite a captured environment and that
+a custom input dictionary comparer survives the snapshot. Those two mutable test
+maps are explicitly classified as subjects, not unresolved construction violations.
+
+Solver model maps, local depth state, unsat-core indices, proposals, rules, text
+units, bounds and congruence construction now prefer scoped builders. The shared
+AddUnique builder overload retains strict duplicate rejection. The immutable array
+overlay helper builds a detached result; the distinct explicitly in-place overlay
+API retains its original partial-write behavior. A review caught an over-broad
+edit to that API; it was removed before the successful solution-wide run.
+
+PowerShell orchestration uses scoped builders for build arguments, scheduler
+worklists/results, failure lists, coverage-credit sets and timing rows. Results
+freeze before publication. The acceptance cache stores a recursively immutable
+contract graph; all 621 original values match, including scalar types and array
+order. Timing accepts IList<object> with AllowEmptyCollection, supporting both
+existing List<object> inputs and immutable builders. Native process state remains
+a runtime adapter. Six malformed/optional automation timeout shapes match the
+prior outputs/errors, including array/scalar fallback and explicit-null rejection.
+
+Evidence:
+
+- The latest ordinary solution run passes all 19 projects: 11,603 passed, zero
+  failed, one existing platform skip. Performance, coverage and corpus categories
+  are excluded. Evidence: immutability-replay-il-smt-all-tests.log. Earlier targeted
+  compilation failures from the missing IR init polyfill and new guard sites were
+  corrected; their failed logs are not treated as successful checks.
+- Real native baseline/current scheduler fixtures pass completion ordering, slot
+  exclusion, failure retention, timeout cleanup and preparation-failure cleanup.
+  Two independent project builds and missing-project failures also pass for both
+  versions. Evidence: immutability-container-native-build-scheduler-check.log.
+- Cache/timing/coverage checks pass, including action output, record-on-failure,
+  detached timing snapshots and the int[] coverage boundary. Evidence:
+  immutability-container-cache-timing-check3.log. Six timeout output/error shapes
+  match: immutability-container-timeout-shapes-check2.log.
+- Canonical C# whitespace and PowerShell formatting pass. The literal checker
+  preserves 2,592 original raw/interpolated tokens across 540 changed C# files.
+  Inventory: 3,295 C# candidates across 1,811 files; 890 PowerShell candidates
+  across 58 scripts with zero parse failures. There are 3,050 C# and 744
+  PowerShell rows still open. Evidence: immutability-replay-il-smt-preservation.log,
+  immutability-container-final-residual-refresh.log.
+- Pushed e4b333b8e9e669bc73955c0c9fb58a3f7144c60e passes CodeQL C# and
+  Actions. Python extraction again processes no code and fails with exit 32,
+  run 39164861594/job 117785570316. This unrelated configuration gap remains open.
+
+Next work includes remaining compiler/portable validation collections, fuzz/replay
+outer-container ownership, local constant candidates, and the remaining script
+producers. A read-only literal-local review identified 16 provisional const-string
+candidates; main verification and numeric/computed-local review remain pending.
+Comprehensive completion is not claimed while these coverage gaps remain.

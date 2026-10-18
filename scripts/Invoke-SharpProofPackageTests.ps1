@@ -298,7 +298,7 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 }
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
-$phaseTimings = [Collections.Generic.List[object]]::new()
+$phaseTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $canonicalPackageFilter =
@@ -881,7 +881,7 @@ try {
         -Prepare $preparePackageTest `
         -Label 'Package test' `
         -Quiet:$Quiet
-    $shardTimings = [Collections.Generic.List[object]]::new()
+    $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject
     }
@@ -935,8 +935,8 @@ try {
         fast                     = [bool]$Fast
         parallelism              = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-        phases                   = @($phaseTimings)
-        shards                   = @($shardTimings | Sort-Object name)
+        phases                   = @($phaseTimings.ToImmutable())
+        shards                   = @($shardTimings.ToImmutable() | Sort-Object name)
         workerMethods            = $workerMethodTimings
         packageLayoutMethods     = $packageLayoutMethodTimings
         scheduler                = [ordered]@{
