@@ -263,6 +263,13 @@ keeps its separate nonnegative-only model. This ranking has 115 rows at the same
 probes; two declarations move from unmodeled to partial evidence. SDK, reference
 assembly and catalog pins are unchanged.
 
+Verification at integrated implementation head `38c3eb639` against master
+`e34429555`: 2,036 frontend tests, 958 selected worker tests, 29 inventory tests
+and seven ranking tests pass in the canonical container. Full CI covers all
+30,274 aggregate executable points and all 211 changed executable trusted-code
+lines (100%). The List probes select bounded normal initialization/growth choices;
+these coverage results do not upgrade approximate replay or close other contexts.
+
 Incoming/escaped List content state, arbitrary interfaces and subclasses,
 capacity/enumerable constructors, unbound or opaque value contents, compound
 updates, range/removal/sort operations, capacity/version/enumeration relationships,
