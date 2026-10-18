@@ -176,7 +176,7 @@ public sealed class ApiUsageRankingTests
             if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol) && symbol is IMethodSymbol)
             {
                 status = model.GetOperation(syntax) is IObjectCreationOperation creation
-                    ? CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(creation) ? "partially-modeled" : "unmodeled-domain"
+                    ? CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(creation) ? "partially-modeled" : "unmodeled-domain"
                     : knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch";
             }
 
@@ -397,15 +397,15 @@ public sealed class ApiUsageRankingTests
             foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
                 if (context.IsDefaultIntegerComparison(invocation) ||
-                    invocation.Instance != null && CSharpOperationSemantics.IsIntegerKeyDictionaryMember(invocation.TargetMethod) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultIntegerKeyDictionary(invocation.Instance))
+                    invocation.Instance != null && CSharpOperationSemantics.IsDefaultDictionaryStateMember(invocation.TargetMethod) &&
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null ||
-                    property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsIntegerKeyDictionaryMember(getter) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultIntegerKeyDictionary(property.Instance))
+                    property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter) &&
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance))
                 {
                     known.Add(property.Syntax.SpanStart);
                 }

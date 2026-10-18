@@ -12,13 +12,14 @@ internal static partial class CSharpOperationSemantics
             "P:System.Collections.Generic.Dictionary`2.Item(`0)";
     }
 
-    internal static bool IsIntegerKeyDictionaryMember(IMethodSymbol method)
+    internal static bool IsDefaultDictionaryStateMember(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return IsFrameworkCollectionMember(method) && !method.IsStatic &&
+        return IsDictionaryStateDeclaration(method.AssociatedSymbol ?? method) && !method.IsStatic &&
             method.ContainingType is { TypeArguments.Length: 2 } type &&
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
-            IsComparisonIntegerType(type.TypeArguments[0]) &&
+            (IsComparisonIntegerType(type.TypeArguments[0]) || method.MethodKind == MethodKind.Constructor ||
+                method.AssociatedSymbol is IPropertySymbol { Name: "Count" }) &&
             // Empty construction, Count and key membership do not inspect values.
             // Contents still require the supported scalar/reference value domain.
             (method.MethodKind == MethodKind.Constructor || method.Name == "ContainsKey" ||
@@ -27,11 +28,11 @@ internal static partial class CSharpOperationSemantics
                 type.TypeArguments[1] is ITypeParameterSymbol { IsReferenceType: true });
     }
 
-    internal static bool IsEmptyIntegerKeyDictionaryCreation(IOperation operation)
+    internal static bool IsEmptyDefaultDictionaryCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IObjectCreationOperation { Constructor: { Parameters.IsEmpty: true } constructor, Initializer: null } &&
-            IsIntegerKeyDictionaryMember(constructor);
+            IsDefaultDictionaryStateMember(constructor);
     }
 }
 
@@ -131,7 +132,7 @@ public sealed partial class TotalLoweringContext
                 // A framework indexer publishes its stored value, not its owner.
                 // A closure still captures the receiver used to perform that read.
                 if (!capturesReceiver && child is IPropertyReferenceOperation
-                    { Property: { IsIndexer: true, GetMethod: { } getter } } && CSharpOperationSemantics.IsIntegerKeyDictionaryMember(getter))
+                    { Property: { IsIndexer: true, GetMethod: { } getter } } && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter))
                 { continue; }
                 if (Symbol(child) is { } symbol && excluded.Add(symbol))
                 { escapedSymbols.Enqueue(symbol); }
@@ -157,14 +158,14 @@ public sealed partial class TotalLoweringContext
             { return symbol is ILocalSymbol && !excluded.Contains(symbol) && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1); }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
-            return CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(operation);
+            return CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
         }
     }
 
-    internal bool IsDefaultIntegerKeyDictionary(IOperation operation)
+    internal bool IsDefaultDictionary(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(operation) ||
+        return CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation) ||
             Symbol(operation) is { } symbol && _defaultDictionaries.Contains(symbol) ||
             operation is IFlowCaptureReferenceOperation capture && _defaultDictionaryCaptures.Contains(capture.Id);
     }
