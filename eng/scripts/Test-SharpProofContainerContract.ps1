@@ -319,6 +319,30 @@ function Assert-ComposeAuthority {
             '^    <<:' `
             '    <<: *sharpproof-common' `
             "Compose service '$ServiceName' authority"
+        if ($ServiceName -ceq 'lint') {
+            # The lint service may layer tools over the canonical image, but
+            # cannot select an unrelated base or override the platform.
+            Assert-SingleMatchingLine $serviceLines '^    image:' `
+                '    image: ${COMPOSE_PROJECT_NAME}-lint:local' 'Lint image'
+            Assert-SingleMatchingLine $serviceLines '^    build:' '    build:' 'Lint build'
+            Assert-SingleMatchingLine $serviceLines '^      context:' '      context: .' 'Lint context'
+            Assert-SingleMatchingLine $serviceLines '^      dockerfile:' `
+                '      dockerfile: eng/lint/Dockerfile' 'Lint Dockerfile'
+            Assert-SingleMatchingLine $serviceLines '^      additional_contexts:' `
+                '      additional_contexts:' 'Lint build contexts'
+            Assert-SingleMatchingLine $serviceLines '^        canonical_tooling:' `
+                '        canonical_tooling: service:tooling' 'Lint base'
+            if (@($serviceLines | Where-Object { $_ -cmatch '^    platform:' }).Count -ne 0) {
+                throw 'Lint must inherit the canonical platform.'
+            }
+            $lintLines = @(Get-Content (Join-Path $repositoryRoot 'eng/lint/Dockerfile'))
+            Assert-SingleMatchingLine $lintLines '^FROM .* AS lint$' `
+                'FROM canonical_tooling AS lint' 'Lint final stage'
+            if (@($lintLines | Where-Object { $_ -cmatch '^FROM ' })[-1] -cne 'FROM canonical_tooling AS lint') {
+                throw 'Lint must end in a stage derived from the canonical image.'
+            }
+            return
+        }
         if (@($serviceLines | Where-Object {
                     $_ -cmatch '^    (?:image|build|platform):'
                 }).Count -ne 0) {

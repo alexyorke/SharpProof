@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -89,7 +89,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint') -and
     -not $NoBuild -and -not $Fast) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -268,6 +268,9 @@ function Invoke-DependencyAudit {
 }
 
 switch ($Command) {
+    'lint' {
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofLint.ps1')
+    }
     'format-check' {
         Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
             'Repository script linting or formatting failed.' @{ VerifyNoChanges = $true }

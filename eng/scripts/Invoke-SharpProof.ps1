@@ -30,7 +30,16 @@ try {
         $arguments += @('--volume', "${commonDirectory}:/git-common:ro",
             '--volume', "${pointerPath}:/workspace/SharpProof/.git:ro")
     }
-    $arguments += @('tooling') + $ToolingArguments
+    $service = if ($ToolingArguments[0] -eq 'lint') { 'lint' } else { 'tooling' }
+    if ($service -eq 'lint') {
+        if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
+            $arguments += @('--env', 'GITHUB_TOKEN')
+        }
+        # Older Compose releases lose additional service contexts in run --build.
+        & docker compose --project-directory $repositoryRoot build lint
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    $arguments += @($service) + $ToolingArguments
     & docker @arguments
     $toolingExitCode = $LASTEXITCODE
 }

@@ -19,7 +19,7 @@ src/                            All repository-owned C# projects, including test
 src/samples/                    Package-backed examples and their solution
 eng/Build.props                 Arcade build graph
 eng/Versions.props              Component, dependency and tool versions
-eng/common/                     Unmodified upstream Arcade bootstrapper files
+eng/common/                     Unmodified upstream Arcade bootstrap scripts files
 eng/arcade-source.json           Upstream commit, file inventory and checksums
 eng/scripts/                    Repository command implementations and checks
 eng/SharpProofNUnit/             NUnit integration for Arcade's Test target
@@ -51,13 +51,13 @@ artifacts/toolset/
 
 Finite Docker tasks keep these build directories inside their private workspace.
 They export evidence and packages on completion, including failed runs, while
-compiler intermediates and restored toolsets remain private. Explicit consumer
+compiler intermediates and restored build tools remain private. Explicit consumer
 fixtures and coverage runs may choose an isolated temporary artifact root. The
 three published package IDs and preview version format remain unchanged.
 
 Arcade's custom test-runner extension retains the centrally pinned NUnit
 dependencies. Microsoft signing, Visual Studio insertion, localization, Helix
-and publishing features are not enabled. Shared bootstrapper files remain
+and publishing features are not enabled. Shared bootstrap scripts files remain
 unmodified; local builds require no Azure DevOps service or secret.
 
 Run commands from the repository root in the canonical Linux amd64 container:

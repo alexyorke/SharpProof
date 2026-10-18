@@ -1,0 +1,5 @@
+rules:
+  # actionlint 1.7.12 rejects the newer $/ syntax. Keep conventional local
+  # references until both validators support it; all other audits remain enabled.
+  self-repository:
+    disable: true

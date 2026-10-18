@@ -7,7 +7,7 @@ The repository follows the [Arcade SDK requirements at the pinned upstream commi
 | Requirement | Implementation |
 | --- | --- |
 | Output layout | Every owned project evaluates binary, intermediate and package outputs under `artifacts`. Private consumer fixtures retain their isolated overrides. |
-| Bootstrapper | All 151 files under `eng/common` match the pinned upstream tree. `eng/arcade-source.json` records Git blobs, SHA256 hashes and executable modes. These files are immutable. |
+| Shared scripts | All 151 files under `eng/common` match the pinned upstream tree. `eng/arcade-source.json` records Git blobs, SHA256 hashes and executable modes. These files are immutable. |
 | Engineering | `eng/Build.props` selects the source solution. Per-project restore supports `.slnx` with Arcade 9. Repository extensions live outside `eng/common`. |
 | Versions and feeds | Product and package dependency versions live in `eng/Versions.props`. Public engineering packages have explicit NuGet source mappings. |
 | Projects | All 57 owned C# projects are under `src`: 49 main-solution projects and eight package-backed samples. The additional upstream internal tools project stays in the required common tree. |

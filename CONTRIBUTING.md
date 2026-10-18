@@ -23,15 +23,25 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Run every repository quality and link check with one command, including image setup:
+
+```sh
+docker compose run --rm --build lint
+```
+
+Reports are saved under `artifacts/lint`; findings return a failing exit code.
+For host Git worktrees, use `pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`.
+See [quality gates](eng/lint/README.md) for the check scope.
+
 Apply the repository's `.editorconfig` formatting rules before submitting changes:
 
 ```text
-docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-CSharp.ps1'
-docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File scripts/Format-Scripts.ps1'
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File eng/scripts/Format-CSharp.ps1'
+docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File eng/scripts/Format-Scripts.ps1'
 docker compose run --rm tooling format-check
 ```
 
-For a Git worktree, use `pwsh -File scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
+For a Git worktree, use `pwsh -File eng/scripts/Invoke-SharpProof.ps1` in place of `docker compose run --rm tooling` so the container can read its Git metadata. The apply command writes to the checkout; `format-check` verifies a disposable snapshot with `--verify-no-changes`. Whitespace formatting covers every tracked C# file, including samples, templates, golden fixtures, script helpers, and checked-in generated sources. The main solution also runs the full `dotnet format` command, including configured warning-level style and analyzer fixes. PR builds and packaging/release fail when formatting drifts.
 
 `Format-Scripts.ps1` formats all tracked `.ps1`, `.psm1`, and `.psd1` files with PSScriptAnalyzer's formatter and checks parsing plus warning/error rules. It also runs ShellCheck and shfmt on every tracked `.sh`/`.bash` file and shell shebang script, including extensionless files. PowerShell uses four-space indentation; shell scripts use two spaces, indented case arms, and spaces after redirections. Check mode never rewrites sources. `format-check` includes these checks and regression tests proving that lint, syntax, and formatting failures are rejected.
 

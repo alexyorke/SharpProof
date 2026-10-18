@@ -20,6 +20,9 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  repository-quality:
+    uses: ./.github/workflows/quality.yml
+
   formatting:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -159,7 +162,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, formatting]
+    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, formatting, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -168,8 +171,13 @@ jobs:
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
           SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
+          SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
           SHARPPROOF_FORMATTING_RESULT: ${{ needs.formatting.result }}
         run: |
+          if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
+            echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
+            exit 1
+          fi
           if [[ "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
             echo "Repository formatting failed: $SHARPPROOF_FORMATTING_RESULT" >&2
             exit 1
