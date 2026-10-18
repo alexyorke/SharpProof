@@ -135,7 +135,7 @@ public sealed partial class NativeSpecifiedCallTests
     [Test]
     public async Task WrongAliasComparisonClaimCannotBeProven()
     {
-        await CheckComparisonContract("int", "var comparer = System.Collections.Generic.Comparer<int>.Default; return comparer.Compare(left, right);", WorkerClaimOutcome.Unknown, "42");
+        await CheckComparisonContract("int", "var comparer = System.Collections.Generic.Comparer<int>.Default; return comparer.Compare(left, right);", WorkerClaimOutcome.Refuted, "42");
     }
     [Test]
     public async Task AliasedDefaultGetterRetainsAllocationAndExceptionEffects()
