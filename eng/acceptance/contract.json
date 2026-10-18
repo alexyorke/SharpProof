@@ -665,7 +665,7 @@
           "SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
           "eng/ParameterGuard.cs",
-          "eng/configuration/SolverDefaults.cs",
+          "eng/shared/SolverDefaults.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",

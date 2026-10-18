@@ -14,7 +14,7 @@
     <ProjectReference Include="..\SharpProof.Verify\SharpProof.Verify.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\eng\configuration\SolverDefaults.cs"
+    <Compile Include="..\eng\shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
 </Project>

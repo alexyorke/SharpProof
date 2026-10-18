@@ -8,7 +8,7 @@
     "SharpProof.Host/HostEnvironmentVariables.cs",
     "SharpProof.Ir/AnalysisDefaults.cs",
     "Tools/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
-    "eng/configuration/SolverDefaults.cs",
+    "eng/shared/SolverDefaults.cs",
     "SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
     "SharpProof.Compiler.Semantics/GlobalUsings.cs",
     "SharpProof.CompilerCollector/CompilerSemanticUsings.cs",
