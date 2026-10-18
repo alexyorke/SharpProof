@@ -47,7 +47,19 @@ jobs:
     $shell = Write-Probe 'invalid.sh' "#!/bin/sh`necho `$word`n"
     Assert-NativeRejection 'ShellCheck' 'shellcheck' @('--format=gcc', $shell) 'SC2086'
     $markdown = Write-Probe 'invalid.md' "#Missing heading space`n"
-    Assert-NativeRejection 'markdownlint' 'markdownlint-cli2' @('--config', (Join-Path $repositoryRoot '.markdownlint-cli2.jsonc'), $markdown) 'MD018'
+    Assert-NativeRejection 'markdownlint' 'node' @((Join-Path $repositoryRoot 'eng/lint/markdownlint.mjs'), $markdown) 'MD018'
+    $validMarkdown = Write-Probe 'valid.md' @'
+# Math
+
+Inline $x$.
+
+$$
+x^2
+$$
+'@
+    [IO.File]::AppendAllText($validMarkdown, "`n")
+    $output = @(& node (Join-Path $repositoryRoot 'eng/lint/markdownlint.mjs') $validMarkdown 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Valid Markdown/math failed: $($output -join ' ')" }
     $spelling = Write-Probe 'spelling.md' "# Zzxqvspellmistakke`n"
     Assert-NativeRejection 'CSpell' 'cspell' @('lint', '--config', (Join-Path $repositoryRoot 'cspell.json'), '--no-progress', $spelling) 'Unknown word'
     $powershell = Write-Probe 'invalid.ps1' '$PID = 1'

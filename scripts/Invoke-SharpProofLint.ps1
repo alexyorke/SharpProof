@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'Compatibility')]
+    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'ToolDependencies', 'Compatibility', 'GateRegressions')]
     [string]$Category = 'All'
 )
 
@@ -61,8 +61,14 @@ Invoke-LintCheck 'Shell' {
     if ($paths.Count -eq 0) { throw 'No shell inputs found.' }
     Invoke-LintNative 'shellcheck' (@('--format=gcc') + $paths)
 }
-Invoke-LintCheck 'Markdown' { Invoke-LintNative 'markdownlint-cli2' @('--config', '.markdownlint-cli2.jsonc') }
+Invoke-LintCheck 'Markdown' { Invoke-LintNative 'node' @('eng/lint/markdownlint.mjs') }
 Invoke-LintCheck 'Spelling' { Invoke-LintNative 'cspell' @('lint', '--config', 'cspell.json', '--no-progress', '--no-cache') }
+Invoke-LintCheck 'ToolDependencies' {
+    Invoke-LintNative 'node' @(
+        '/usr/local/lib/node_modules/npm/bin/npm-cli.js', 'audit',
+        '--prefix', '/opt/sharpproof/lint', '--omit=dev', '--audit-level=low',
+        '--cache', (Join-Path ([IO.Path]::GetTempPath()) 'sharpproof-npm-cache'))
+}
 Invoke-LintCheck 'Compatibility' { & (Join-Path $PSScriptRoot 'Test-SharpProofPackageCompatibility.ps1') }
 Invoke-LintCheck 'GateRegressions' { & (Join-Path $PSScriptRoot 'Test-SharpProofLint.ps1') }
 

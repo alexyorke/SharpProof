@@ -9,6 +9,7 @@ disjointness
 getpid
 glibcxx
 libc
+katex
 lowerer
 multitargeted
 nameof

@@ -34,8 +34,9 @@ ApiCompat version are pinned in this directory.
 | zizmor | Offline audits of workflows, composite actions, and Dependabot; findings fail. |
 | PSScriptAnalyzer | All tracked and unignored PowerShell scripts/modules; every diagnostic from the selected correctness/security rules fails. |
 | ShellCheck | All tracked and unignored shell scripts; all reported findings fail. |
-| markdownlint-cli2 | Authored Markdown; enabled rule violations fail. |
+| markdownlint | Authored Markdown; enabled rule violations fail. |
 | CSpell | Authored Markdown prose; unknown words fail. |
+| Tool dependencies | Live npm audit of the pinned lint tools; low or higher vulnerabilities fail. |
 | ApiCompat | Public Attributes package against the pinned baseline; incompatible APIs fail. |
 | Gate regressions | Deliberately invalid fixtures must be rejected by each checker. |
 
@@ -49,6 +50,12 @@ in different sections, and documents without a leading title. Generated referenc
 build outputs, and imported third-party documentation are excluded from Markdown
 style and spelling checks. CSpell also excludes fenced/inline code and URLs; its
 dictionary contains reviewed project and compiler terminology.
+
+The Markdown runner uses the pinned markdownlint library and Git file inventory
+directly. This avoids markdownlint-cli2's unpatched globbing dependency while
+preserving the same lint rules. It checks authored Markdown and rejects empty input.
+The KaTeX override pins a patched transitive version used by math parsing; regression
+fixtures exercise inline and block math as well as Markdown error detection.
 
 One zizmor rule is disabled with an inline explanation in `zizmor.yml`:
 actionlint 1.7.12 rejects the newer self-repository syntax suggested by zizmor.
