@@ -717,7 +717,8 @@ internal sealed class PassiveCallableVcBuilder
             Spend(heap.Stores.Length);
             // A read through an Old snapshot sees the objects as the callable
             // entered, including direct owned body reads.
-            var entry = _factory.PureOpaque(field.Member, receiver);
+            var key = field.Arguments.IsEmpty ? null : rewritten(field.Arguments[0]);
+            var entry = key == null ? _factory.PureOpaque(field.Member, receiver) : _factory.PureOpaque(field.Member, receiver, key);
             // Entry heap values predate every allocation, including when the
             // body first reads them after allocating. Apply this to the entry
             // seed; ordered stores still allow a field to hold the new object.
@@ -757,7 +758,16 @@ internal sealed class PassiveCallableVcBuilder
                 }
                 if (store.Target.Type != receiver.Type || stored.Type != original.Type)
                 { consistent = false; continue; }
-                read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), stored, read);
+                var matches = Equal(receiver, store.Target);
+                if (store.Field != null && (key == null) != (store.Index == null))
+                { continue; }
+                if (store.Index is { } storedKey)
+                {
+                    if (key == null || key.Type != storedKey.Type)
+                    { consistent = false; continue; }
+                    matches = And(matches, Equal(key, storedKey));
+                }
+                read = _factory.Conditional(And(store.Reach, matches), stored, read);
             }
             return snapshot is IrBooleanTerm { Value: false } ? read : _factory.Conditional(snapshot, entry, read);
         }

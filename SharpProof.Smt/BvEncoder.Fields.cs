@@ -14,18 +14,25 @@ internal sealed partial class BvEncoder
         if (!_fields.TryGetValue(read.Member, out var field))
         {
             var type = factory.GetTypeInfo(read.Type);
-            if (IsReference(type))
-            { field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, ReferenceSort); }
+            using Sort? ownedSort = IsReference(type) ? null
+                : type.Kind == IrTypeKind.Boolean ? context.MkBoolSort()
+                : IsInteger(type) ? context.MkBitVecSort((uint)type.Width)
+                : throw new UnsupportedIrEncodingException();
+            var result = ownedSort ?? ReferenceSort;
+            if (read.Arguments.IsEmpty)
+            { field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, result); }
             else
             {
-                using Sort sort = type.Kind == IrTypeKind.Boolean ? context.MkBoolSort()
-                    : IsInteger(type) ? context.MkBitVecSort((uint)type.Width)
-                    : throw new UnsupportedIrEncodingException();
-                field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort, sort);
+                var key = factory.GetTypeInfo(read.Arguments[0].Type);
+                if (!IsInteger(key))
+                { throw new UnsupportedIrEncodingException(); }
+                using var keySort = context.MkBitVecSort((uint)key.Width);
+                field = context.MkFuncDecl("field" + read.Member.Value.ToString(CultureInfo.InvariantCulture), [ReferenceSort, keySort], result);
             }
             _fields.Add(read.Member, field);
         }
-        return owner.Own(context.MkApp(field, receiver));
+        return owner.Own(read.Arguments.IsEmpty ? context.MkApp(field, receiver)
+            : context.MkApp(field, receiver, Encode(read.Arguments[0], meter)));
     }
 
     // Fills an object of the model with every encoded field's entry value.
@@ -40,6 +47,10 @@ internal sealed partial class BvEncoder
         foreach (var field in _fields.ToArray())
         {
             meter.Consume();
+            // Entry keyed contents are not reconstructed from a finite sample.
+            // Replay must decline any witness that needs such an unknown cell.
+            if (!factory.GetMemberInfo(field.Key).ParameterTypes.IsEmpty)
+            { continue; }
             using var application = context.MkApp(field.Value, reference);
             using var value = model.Evaluate(application, true);
             if (decode(factory.GetMemberInfo(field.Key).ReturnType, value) is { } decoded)

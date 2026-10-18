@@ -171,6 +171,13 @@ public sealed class ApiUsageRankingTests
                 status = "unmodeled-dispatch";
             }
 
+            if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol) && symbol is IMethodSymbol)
+            {
+                status = model.GetOperation(syntax) is IObjectCreationOperation creation
+                    ? CSharpOperationSemantics.IsEmptyScalarDictionaryCreation(creation) ? "partially-modeled" : "unmodeled-domain"
+                    : knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch";
+            }
+
             if (model.GetOperation(syntax) is IPropertyReferenceOperation length && CSharpOperationSemantics.IsLength(length))
             { status = "partially-modeled"; }
             var access = "call";
@@ -187,6 +194,11 @@ public sealed class ApiUsageRankingTests
                 if (operation is IPropertyReferenceOperation property && CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property))
                 {
                     status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null && !knownIntrinsics.Contains(syntax.SpanStart) ? "unmodeled-dispatch" : access == "read-write" ? "unmodeled-access" : "partially-modeled";
+                }
+                else if (symbol is IPropertySymbol { IsIndexer: true } dictionary && CSharpOperationSemantics.IsDictionaryStateDeclaration(dictionary))
+                {
+                    status = !knownIntrinsics.Contains(syntax.SpanStart) ? "unmodeled-dispatch"
+                        : access == "read-write" ? "unmodeled-access" : "partially-modeled";
                 }
                 // Catalog property evidence resolves only the getter. The
                 // guarded array intrinsic above explicitly models simple stores.
@@ -335,6 +347,33 @@ public sealed class ApiUsageRankingTests
         Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(1));
         Assert.That(sites.Count(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : site.Status == "unmodeled"), Is.EqualTo(2));
     }
+    [Test]
+    public void UsageScanCreditsFreshDictionaryStateWithoutCreditingIncomingOrCustomComparers()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class DictionaryUsageProbe {
+                public static void Target(System.Collections.Generic.Dictionary<int, int> incoming,
+                    System.Collections.Generic.IEqualityComparer<int> comparer) {
+                    var fresh = new System.Collections.Generic.Dictionary<int, int>();
+                    fresh.Add(1, 23); _ = fresh[1]; fresh[1] = 29;
+                    incoming.Add(1, 23); _ = incoming[1];
+                    var custom = new System.Collections.Generic.Dictionary<int, int>(comparer);
+                    custom.Add(1, 23); _ = custom[1];
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var tree = compilation.SyntaxTrees.Single();
+        var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        Assert.That(calls, Has.Length.EqualTo(3));
+        Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
+            Is.EqualTo(new[] { true, false, false }));
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        Assert.That(indexers, Has.Length.EqualTo(4));
+        Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
+            Is.EqualTo(new[] { true, true, false, false }));
+    }
+
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
@@ -352,14 +391,19 @@ public sealed class ApiUsageRankingTests
             var context = new TotalLoweringContext(new SharpProof.Ir.IrFactory(SharpProof.Ir.IrExecutionSemantics.Total), method);
             context.TrackArrayReceivers(graph);
             context.TrackDefaultComparers(graph);
+            context.TrackDefaultDictionaries(graph);
             foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
-                if (context.IsDefaultIntegerComparison(invocation))
+                if (context.IsDefaultIntegerComparison(invocation) ||
+                    invocation.Instance != null && CSharpOperationSemantics.IsScalarDictionaryMember(invocation.TargetMethod) &&
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultScalarDictionary(invocation.Instance))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
-                if (context.ArrayCollectionReceiver(property) != null)
+                if (context.ArrayCollectionReceiver(property) != null ||
+                    property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsScalarDictionaryMember(getter) &&
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultScalarDictionary(property.Instance))
                 {
                     known.Add(property.Syntax.SpanStart);
                 }
