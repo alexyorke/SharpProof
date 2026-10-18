@@ -20,11 +20,19 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  repository-quality:
+    uses: ./.github/workflows/quality.yml
+
+  repository-links:
+    uses: ./.github/workflows/links.yml
+
   dotnet-api-inventory:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
@@ -77,6 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -103,6 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -130,6 +140,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -141,7 +152,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory]
+    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, repository-quality, repository-links]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -150,14 +161,17 @@ jobs:
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
           SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
+          SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
+          SHARPPROOF_LINKS_RESULT: ${{ needs.repository-links.result }}
         run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success ]]; then
-            echo "Canonical jobs, self-application, or API inventory failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success || "$SHARPPROOF_QUALITY_RESULT" != success || "$SHARPPROOF_LINKS_RESULT" != success ]]; then
+            echo "Required CI jobs failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT, $SHARPPROOF_QUALITY_RESULT, $SHARPPROOF_LINKS_RESULT" >&2
             exit 1
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages

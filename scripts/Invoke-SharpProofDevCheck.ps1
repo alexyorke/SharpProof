@@ -38,13 +38,13 @@ $plannedCommands = @($commandPlan.commands)
 function Get-RequiredPlanCommand {
     param([Parameter(Mandatory = $true)][string]$Id)
 
-    $matches = @($plannedCommands | Where-Object {
+    $planMatches = @($plannedCommands | Where-Object {
             [string]$_.id -ceq $Id
         })
-    if ($matches.Count -ne 1) {
+    if ($planMatches.Count -ne 1) {
         throw "Developer-check command plan must contain exactly one '$Id' row."
     }
-    return $matches[0]
+    return $planMatches[0]
 }
 
 $restoreCommand = Get-RequiredPlanCommand 'restore'

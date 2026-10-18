@@ -1,0 +1,10 @@
+{
+  "name": "sharpproof-repository-lint",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": ">=22.18.0" },
+  "dependencies": {
+    "markdownlint-cli2": "0.23.3",
+    "cspell": "10.4.0"
+  }
+}

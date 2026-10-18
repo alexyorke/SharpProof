@@ -1,0 +1,16 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD034": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "**/bin/**", "**/obj/**", "artifacts/**", "**/node_modules/**",
+    "docs/generated/**", "**/*.generated.md", "**/Corpus/third-party/**"
+  ]
+}

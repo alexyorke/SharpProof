@@ -59,8 +59,8 @@ function Assert-SingleMatchingLine {
         [Parameter(Mandatory = $true)][string]$Expected,
         [Parameter(Mandatory = $true)][string]$Name)
 
-    $matches = @($Lines | Where-Object { $_ -cmatch $Pattern })
-    if ($matches.Count -cne 1 -or $matches[0] -cne $Expected) {
+    $matchingLines = @($Lines | Where-Object { $_ -cmatch $Pattern })
+    if ($matchingLines.Count -cne 1 -or $matchingLines[0] -cne $Expected) {
         throw "$Name must occur exactly once as '$Expected'."
     }
 }
@@ -298,6 +298,28 @@ function Assert-ComposeAuthority {
             '^    <<:' `
             '    <<: *sharpproof-common' `
             "Compose service '$ServiceName' authority"
+        if ($ServiceName -ceq 'lint') {
+            # The lint service may layer tools over the canonical image, but
+            # cannot select an unrelated base or override the platform.
+            Assert-SingleMatchingLine $serviceLines '^    image:' `
+                '    image: ${COMPOSE_PROJECT_NAME}-lint:local' 'Lint image'
+            Assert-SingleMatchingLine $serviceLines '^    build:' '    build:' 'Lint build'
+            Assert-SingleMatchingLine $serviceLines '^      context:' '      context: .' 'Lint context'
+            Assert-SingleMatchingLine $serviceLines '^      dockerfile:' `
+                '      dockerfile: eng/lint/Dockerfile' 'Lint Dockerfile'
+            Assert-SingleMatchingLine $serviceLines '^        TOOLING_IMAGE:' `
+                '        TOOLING_IMAGE: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}' 'Lint base'
+            if (@($serviceLines | Where-Object { $_ -cmatch '^    platform:' }).Count -ne 0) {
+                throw 'Lint must inherit the canonical platform.'
+            }
+            $lintLines = @(Get-Content (Join-Path $repositoryRoot 'eng/lint/Dockerfile'))
+            Assert-SingleMatchingLine $lintLines '^FROM .* AS lint$' `
+                'FROM ${TOOLING_IMAGE} AS lint' 'Lint final stage'
+            if (@($lintLines | Where-Object { $_ -cmatch '^FROM ' })[-1] -cne 'FROM ${TOOLING_IMAGE} AS lint') {
+                throw 'Lint must end in a stage derived from the canonical image.'
+            }
+            return
+        }
         if (@($serviceLines | Where-Object {
                     $_ -cmatch '^    (?:image|build|platform):'
                 }).Count -ne 0) {

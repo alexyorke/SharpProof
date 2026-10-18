@@ -89,7 +89,6 @@ function Assert-SharpProofFuzzRunnerResult {
 
     $document = $null
     $bytes = $null
-    $json = $null
     try {
         $validation = Read-SharpProofBoundedJsonDocument -Path $Path `
             -ByteLimitMessage 'The fuzz runner result exceeds its byte limit.' `
@@ -97,7 +96,6 @@ function Assert-SharpProofFuzzRunnerResult {
             -GrowthMessage 'The fuzz runner result changed during validation.'
         $document = $validation.Document
         $bytes = $validation.Bytes
-        $json = $validation.Json
         $root = $document.RootElement
         if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Fuzz runner result must be a JSON object.'

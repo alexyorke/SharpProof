@@ -92,7 +92,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    quick|pr|security|pr-gates|test-changed|package-consumers|coverage|coverage-shard|coverage-gate)
+    lint|quick|pr|security|pr-gates|test-changed|package-consumers|coverage|coverage-shard|coverage-gate)
       return 0
       ;;
     *)

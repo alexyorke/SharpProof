@@ -82,14 +82,14 @@ try {
             elseif ($variant -eq 'verified') {
                 $references += '<PackageReference Include="SharpProof.Verifier" Version="' + $version + '" PrivateAssets="all" />'
             }
-            $profile = if ($variant -eq 'verified') { 'strict' } else { 'advisory' }
+            $consumerProfile = if ($variant -eq 'verified') { 'strict' } else { 'advisory' }
             $project = @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
     <NuGetAudit>false</NuGetAudit>
-    <SharpProofProfile>$profile</SharpProofProfile>
+    <SharpProofProfile>$consumerProfile</SharpProofProfile>
     <SharpProofVerifyResultFile>$resultFile</SharpProofVerifyResultFile>
     <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
   </PropertyGroup>

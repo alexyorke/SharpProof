@@ -1,8 +1,9 @@
 name: Repository link check
 
 on:
-  push:
-    branches: [master]
+  workflow_call:
+  schedule:
+    - cron: "37 9 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -14,6 +15,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check repository links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
@@ -26,6 +29,21 @@ jobs:
           jobSummary: true
           output: artifacts/links/report.md
           token: ${{ github.token }}
+
+      - name: Verify broken links cause failure
+        run: |
+          fixture_root=$(mktemp -d)
+          printf '# Target\n' > "$fixture_root/target.md"
+          printf '<h1 id="target">Target</h1>\n' > "$fixture_root/target.html"
+          printf '[valid](target.md#target)\n' > "$fixture_root/valid.md"
+          lychee --config lychee.toml --offline --root-dir "$fixture_root" "$fixture_root/valid.md"
+          for target in absent.md target.md#absent target.html#absent; do
+            printf '[broken](%s)\n' "$target" > "$fixture_root/broken.md"
+            if lychee --config lychee.toml --offline --root-dir "$fixture_root" "$fixture_root/broken.md"; then
+              echo "Broken link unexpectedly passed: $target" >&2
+              exit 1
+            fi
+          done
 
       - name: Upload link report
         if: always()

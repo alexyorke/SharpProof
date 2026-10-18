@@ -39,8 +39,9 @@ GitHub or alter the repository's branches.
 
 ## Link audit after merges
 
-[Repository link check](../.github/workflows/links.yml) runs after every push to
-`master` (including merges) and supports manual dispatch. It audits the whole
+[Repository link check](../.github/workflows/links.yml) is required by the main CI
+on pull requests and every push to `master` (including merges), and by release
+publication. It also runs weekly and supports manual dispatch. It audits the whole
 checkout, including hidden source directories, using [lychee](https://lychee.cli.rs/).
 [lychee.toml](../lychee.toml) lists the Markdown, HTML, CSS, reStructuredText, and
 plain-text formats scanned. Git metadata and ignored build outputs are excluded.
@@ -60,6 +61,9 @@ reports: it never fixes links, commits changes, or opens pull requests. Existing
 broken links, illustrative URLs, or sites blocking automated requests can cause
 failures and require human review. No domains or error status codes are silently
 allowlisted.
+
+See [repository quality gates](../eng/lint/README.md) for the required Markdown
+style, spelling, workflow, script, and package compatibility checks.
 
 ## Automatic update pull requests
 

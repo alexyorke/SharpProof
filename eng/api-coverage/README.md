@@ -154,7 +154,6 @@ and retain conservative results for abstract getters, comparator-driven dictiona
 lookups, invalid indexes, setters, and unmodeled collection-content relationships. These are
 partial API models, not collection-content or full heap models.
 
-
 ### Integer comparisons and Count result guarantees
 
 The frontend now models the exact -1/0/1 result of the typed
@@ -177,6 +176,7 @@ regression tests. The usage report splits rows by contextual support status:
 `unmodeled-dispatch` means the API declaration has a guarded intrinsic but this
 call does not meet its guards. Generic comparer calls in the original corpus
 therefore remain visible as gaps; this batch does not claim all 26 are covered.
+
 ### Array-backed IList and ICollection
 
 The frontend models `ICollection<T>.Count` and `IList<T>.Item` when the receiver is
@@ -236,6 +236,7 @@ arbitrary callers receive no implementation assumptions. Alias and smaller sourc
 helper postconditions also run through the worker. The full swap postcondition
 currently reaches the worker verification-condition construction budget; runtime
 model evidence does not turn that Unknown into a proof.
+
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |

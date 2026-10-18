@@ -7,7 +7,7 @@ $SharpProofPackageIds = @(
     'SharpProof.Verifier'
 ) | Sort-Object
 
-$SharpProofPackagePushOrder = @(
+$script:SharpProofPackagePushOrder = @(
     'SharpProof.Attributes',
     'SharpProof',
     'SharpProof.Verifier'

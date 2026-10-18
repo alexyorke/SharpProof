@@ -74,7 +74,7 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
             Add-Check 'framework' 'warning' 'This is an outer multi-target evaluation.' 'Repeat doctor with -TargetFramework for each target framework.'
         }
         $verifyEnabled = $configuration.SharpProofVerify.Trim().ToLowerInvariant() -eq 'true'
-        $profile = $configuration.SharpProofProfile.Trim().ToLowerInvariant()
+        $selectedProfile = $configuration.SharpProofProfile.Trim().ToLowerInvariant()
         $allowedValues = [ordered]@{
             SharpProofProfile = @('advisory', 'strict', 'off')
             SharpProofFeatures = @('effects', 'contracts', 'all')
@@ -88,13 +88,13 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
                 Add-Check $property 'error' "The evaluated $property value is invalid." "Use one of: $($allowedValues[$property] -join ', ')."
             }
         }
-        if ($profile -eq 'strict' -and -not $verifyEnabled) {
+        if ($selectedProfile -eq 'strict' -and -not $verifyEnabled) {
             Add-Check 'strict-profile' 'error' 'SharpProofProfile=strict requires SharpProofVerify=true.' 'Enable verification or select advisory for optional verification.'
         }
-        if (-not $profile) {
+        if (-not $selectedProfile) {
             Add-Check 'configuration' 'warning' 'SharpProof profile was not evaluated; package imports may be unavailable.' 'Restore the consumer, then repeat doctor. This check does not restore.'
         }
-        if (-not $verifyEnabled -or $profile -eq 'off') {
+        if (-not $verifyEnabled -or $selectedProfile -eq 'off') {
             Add-Check 'verification' 'warning' 'Build verification is disabled.' 'Set SharpProofVerify=true and select a supported profile when proof execution is intended.'
         }
         else {
