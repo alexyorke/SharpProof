@@ -2079,3 +2079,17 @@ array; BuildTaskTests assert this mutable contract at lines 204-210 and 223-226.
 Preserve that mutable subject and RunVerifier's writable argument adapter for now.
 Public MSBuild setter/ITaskItem[] contracts and process char buffers are required
 framework adapters. Status: open before edits.
+## Script formatter and coverage receipt construction inventory
+
+IMM-M036: Coordinator read Format-Scripts.ps1 and SharpProof.CoverageShardEvidence.ps1.
+Formatter Arcade lookup and collected PowerShell/shell paths/failures can use Ordinal
+map and array builders, freezing before lookup, traversal, native invocation/reporting.
+Preserve tracked Git order, strict duplicate rejection, first-60 failures and pinned
+vendor verification. Keep ProcessStartInfo.ArgumentList, text editing StringBuilder
+and writable read buffers as explicit native adapters. Native shell tools receive a
+string[] argument adapter from the frozen paths.
+
+Coverage observed-assembly membership and per-receipt definitions can use Ordinal
+hash/map builders, freezing before final membership and result checks respectively.
+Keep conflict-before-overwrite checks, same-value duplicate allowance, receipt order
+and required architecture assertions. Status: open before edits.
