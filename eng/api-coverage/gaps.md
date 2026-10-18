@@ -12,9 +12,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,635 declarations have no catalog/audited-intrinsic evidence, and 38 have partial
+55,634 declarations have no catalog/audited-intrinsic evidence, and 39 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,635 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,634 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -119,8 +119,14 @@ access kind and value domains satisfy the production guard.
   469 IR, 1,868 frontend and 56 verification tests pass, with two additional
   framework ownership controls rejecting source-defined lookalikes. Symbolic
   initialization, allocation, cache writes and faults remain conservative.
-  Object.ReferenceEquals API lowering remains open, with two preserved failing
-  probes; successful built-in reference equality does not close that API gap.
+  Commit `390ec0933` closes the two preserved Object.ReferenceEquals replay
+  probes and adds framework-only identity lowering for bodies and clauses.
+  Nulls, aliases, distinct objects, overridden equality and named-argument effects
+  have native controls and ten CLR/IR oracle cases. All 1,880 frontend tests and
+  27 inventory tests pass. The inventory gains one partial declaration, with a
+  passing semantic probe and wrong-claim rejection. Argument conversion, boxing,
+  allocation and fault models still determine which complete callers are supported;
+  this does not close arbitrary object behavior or every API facet.
 - Catalog and audited-intrinsic evidence gates require executed behavioral probes
   and wrong-claim controls for modeled requirements. They do not automatically map
   every repository test to every possible supported behavior. New facets need an
@@ -299,6 +305,7 @@ These 38 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Nullable`1.GetValueOrDefault | catalog=bcl.nullable.get-value-or-default;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Nullable`1.GetValueOrDefault(`0) | catalog=bcl.nullable.get-value-or-default.value;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Object.#ctor | catalog=bcl.object.ctor;effects=None;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
+| M:System.Object.ReferenceEquals(System.Object,System.Object) | intrinsic=object-reference-identity |
 | M:System.SByte.CompareTo(System.SByte) | intrinsic=integer-comparison |
 | M:System.String.Concat(System.String,System.String) | catalog=bcl.string.concat.string-string;effects=None;allocation=MayAllocate;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.String.Equals(System.String) | intrinsic=string-instance-equality |
