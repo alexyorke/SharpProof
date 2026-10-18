@@ -18,32 +18,24 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check repository links
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          lycheeVersion: v0.24.2
-          args: --config lychee.toml --root-dir '${{ github.workspace }}' .
-          fail: true
-          failIfEmpty: true
-          format: markdown
-          jobSummary: true
-          output: artifacts/links/report.md
-          token: ${{ github.token }}
-
-      - name: Verify broken links cause failure
+      - name: Require valid repository links and exercise rejection fixtures
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          fixture_root=$(mktemp -d)
-          printf '# Target\n' > "$fixture_root/target.md"
-          printf '<h1 id="target">Target</h1>\n' > "$fixture_root/target.html"
-          printf '[valid](target.md#target)\n' > "$fixture_root/valid.md"
-          lychee --config lychee.toml --offline --root-dir "$fixture_root" "$fixture_root/valid.md"
-          for target in absent.md target.md#absent target.html#absent; do
-            printf '[broken](%s)\n' "$target" > "$fixture_root/broken.md"
-            if lychee --config lychee.toml --offline --root-dir "$fixture_root" "$fixture_root/broken.md"; then
-              echo "Broken link unexpectedly passed: $target" >&2
-              exit 1
-            fi
-          done
+          mkdir -p artifacts/links
+          docker run --rm --platform linux/amd64 --env GITHUB_TOKEN \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/input,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/artifacts/links,target=/reports" \
+            --workdir /input --entrypoint /bin/sh \
+            lycheeverse/lychee:0.24.2@sha256:e2d19e57cf6ab037026f20b8e449a1f30d9d7f81eef4194763aab2eab20bd28d \
+            scripts/Test-SharpProofLinks.sh /reports/report.md
+
+      - name: Publish link summary
+        if: always()
+        run: |
+          if [[ -f artifacts/links/report.md ]]; then
+            cat artifacts/links/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload link report
         if: always()
