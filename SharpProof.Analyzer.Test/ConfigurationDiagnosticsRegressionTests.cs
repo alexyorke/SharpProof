@@ -12,6 +12,17 @@ namespace SharpProof.Analyzer.Test;
 public sealed class ConfigurationDiagnosticsRegressionTests
 {
     [Test]
+    public void ConfigurationIssueRejectsUninitializedValue()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(static () => _ = new CompilerConfigurationIssue(default, Location.None)));
+
+        Assert.That(exception?.ParamName, Is.EqualTo("value"));
+        Assert.That(exception?.Message,
+            Does.Contain("A configuration issue requires a key, value, and reason."));
+    }
+
+    [Test]
     public void GlobalOptionsRethrowsAggregateCancellation()
     {
         var provider = new AggregateCancellationOptionsProvider(
