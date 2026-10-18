@@ -12,7 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
-    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
@@ -228,6 +228,21 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
+    // Witness search may ignore later facts: a concretely replayed write is
+    // already observable before the rest of the method executes. This query
+    // cannot establish purity, even when the first write is unreachable.
+    internal VerificationQuery? FirstPurityPrefixQuery()
+    {
+        foreach (var write in _writes)
+        {
+            if (write.Region != IrWriteRegion.Local)
+            {
+                return new(Factory, _entry.AddRange(_body.Take(write.FactCount)), new Goal(Factory,
+                    Factory.Unary(IrUnaryOperator.Not, write.Reach), ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+            }
+        }
+        return null;
+    }
     internal VerificationQuery PurityQuery()
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
@@ -302,6 +317,7 @@ internal sealed class PassiveCallableVcPlan
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
         {
+            ConcreteHavocValueProvider = ReplayFrameworkValue,
             AllocationObserver = allocationObserver,
             SnapshotVariables = _candidate.Parameters.Select(parameter => parameter.Old).ToImmutableHashSet(),
             WriteObserver = writeObserver,
@@ -309,6 +325,52 @@ internal sealed class PassiveCallableVcPlan
             AllocationPrefixObserver = allocationPrefixObserver,
             WritePrefixObserver = writePrefixObserver,
             LockPrefixObserver = lockPrefixObserver
+        };
+    }
+
+    private IrValue? ReplayFrameworkValue(IrHavocRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal static IrValue? ObserveFrameworkValue(IrFactory factory, IrHavocRequest request, Func<string, object?> read)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(read);
+        if (request.Origin != IrHavocOrigin.Approximation ||
+            IrOpaqueCallSite.DefaultComparerReplayPrimitive(factory, request.Site) is not { } primitive)
+        { return null; }
+        var type = factory.GetVariableInfo(request.Variable).Type;
+        if (type != factory.BooleanType && factory.GetTypeInfo(type).Kind != IrTypeKind.Reference)
+        { return null; }
+        object? value;
+        try
+        { value = read(primitive); }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException)
+        { return null; }
+        if (value == null)
+        { return null; }
+        return type == factory.BooleanType ? factory.CreateBooleanValue(false) : factory.CreateReferenceValue(type, value);
+    }
+
+    internal static object ReadDefaultComparer(string primitive)
+    {
+        ArgumentNullException.ThrowIfNull(primitive);
+        // Fixed CoreLib getters only: never invoke a user type or callback.
+        return primitive switch
+        {
+            "System_SByte" => Comparer<sbyte>.Default,
+            "System_Byte" => Comparer<byte>.Default,
+            "System_Int16" => Comparer<short>.Default,
+            "System_UInt16" => Comparer<ushort>.Default,
+            "System_Char" => Comparer<char>.Default,
+            "System_Int32" => Comparer<int>.Default,
+            "System_UInt32" => Comparer<uint>.Default,
+            "System_Int64" => Comparer<long>.Default,
+            "System_UInt64" => Comparer<ulong>.Default,
+            _ => throw new ArgumentOutOfRangeException(nameof(primitive))
         };
     }
 

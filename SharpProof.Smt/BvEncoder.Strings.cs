@@ -41,27 +41,6 @@ internal sealed partial class BvEncoder
         return text;
     }
 
-    // Witness lengths are charged when decoded; bound each string model
-    // variable well below any decoding budget.
-    internal BoolExpr? ShortStringBound(VerificationQuery query, SmtQueryResourceMeter meter)
-    {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        query = RepositoryParameterGuard.NotNull(query, nameof(query));
-        var bounds = new List<BoolExpr>();
-        foreach (var variable in query.ModelVariables)
-        {
-            meter.Consume();
-            if (factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind == IrTypeKind.String)
-            {
-                bounds.Add(owner.Own(context.MkBVULE((BitVecExpr)EncodeLength(GetVariable(variable, meter), meter),
-                    owner.Own(context.MkBV(MaximumShortString, 32)))));
-            }
-        }
-        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));
-    }
-
-    private const int MaximumShortString = 64;
-
     private void EnsureText(SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));

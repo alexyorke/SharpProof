@@ -228,6 +228,17 @@ internal static partial class CSharpOperationSemantics
     }
 
     // The framework's static string.Equals(string, string): content equality.
+    internal static bool IsObjectReferenceEquals(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return method.IsStatic && method.Name == "ReferenceEquals" && method.Arity == 0 &&
+            method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+            method.ContainingType.SpecialType == SpecialType.System_Object && IsFrameworkCollectionMember(method) &&
+            method.Parameters.Length == 2 && method.Parameters.All(parameter => parameter is null ?
+                throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_Object);
+    }
+
     internal static bool IsStringEqualsCall(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));

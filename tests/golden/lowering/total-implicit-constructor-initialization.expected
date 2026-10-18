@@ -11,7 +11,7 @@ block: b2 cfg:1
   i4 op3 Havoc Variables/Approximation [v1:bool[width=0,signed=False]] source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
   i5 op4 Branch v1 ? b5 : b6 source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
 block: b3 cfg:2
-  i11 op0 Return void source=none
+  i12 op0 Return void source=none
 block: b4 exceptional:exit
   i0 op0 ExceptionalExit source=none
 block: b5 throw
@@ -19,8 +19,9 @@ block: b5 throw
 block: b6 normal
   i7 op5 Assign v2:bool[width=0,signed=False] = true source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
   i8 op6 Allocate t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb -> v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb[width=0,signed=False] source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
-  i9 op1 Assign v0:object[width=0,signed=False] = (("object"#t3)v3) source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
-  i10 op1 Return v0 source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
+  i9 op7 Call void member=m0 receiver=none args=[] source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
+  i10 op1 Assign v0:object[width=0,signed=False] = (("object"#t3)v3) source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
+  i11 op1 Return v0 source=total-implicit-constructor-initialization.cs:tokens["new","Bomb","(",")"]#1
 term: ir0 Boolean type=t0:bool width=0 signed=False value=true
 term: ir1 Variable type=t0:bool width=0 signed=False value=v1
 term: ir3 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb width=0 signed=False value=v3
