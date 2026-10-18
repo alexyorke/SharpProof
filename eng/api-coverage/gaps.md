@@ -61,11 +61,11 @@ access kind and value domains satisfy the production guard.
   native/portable fault kind and tested catch hierarchy, but narrowing ancillary
   callback effects requires culture/callback provenance. Invalid paths retain
   exception allocation, framework cache writes and capability uncertainty.
-- Scalar SZ-array aliases/captures/immutable source parameters are supported.
-  Unknown or mixed bindings, cycles, ref escapes, closure-captured mutable state,
-  custom derived interfaces, reference covariance, `as` conversions and compound
-  index assignments need their own sound models. Rebinding must preserve identity
-  snapshots; opaque writers must invalidate content knowledge.
+- Scalar SZ-array aliases/captures/immutable source parameters, compound index
+  assignments and pre/post updates are supported. Unknown or mixed bindings,
+  cycles, ref escapes, closure-captured mutable state, custom derived interfaces,
+  reference covariance and `as` conversions need their own sound models. Rebinding
+  must preserve identity snapshots; opaque writers must invalidate content knowledge.
 - Exact OSS0002 Swap<T> has 128 runtime/IR normal/fault cases. Its full SMT swap
   postcondition reaches verification-condition construction limits. Reducing that
   cost requires a measured verifier change; runtime agreement is not a proof.
