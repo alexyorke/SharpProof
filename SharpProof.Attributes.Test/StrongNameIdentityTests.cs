@@ -19,14 +19,20 @@ internal sealed class StrongNameIdentityTests
     {
         var assembly = typeof(Contract).Assembly;
         var identity = assembly.GetName();
-        using var stream = File.OpenRead(assembly.Location);
+        var image = ReadOriginalSignedAssembly();
+        using var stream = new MemoryStream(image, writable: false);
         using var pe = new PEReader(stream);
         var corHeader = pe.PEHeaders.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
+        var metadata = pe.GetMetadataReader();
+        var definition = metadata.GetAssemblyDefinition();
+        Assert.That(metadata.GetString(definition.Name), Is.EqualTo(identity.Name));
+        Assert.That(definition.Version, Is.EqualTo(identity.Version));
+        Assert.That(metadata.GetBlobBytes(definition.PublicKey), Is.EqualTo(identity.GetPublicKey()));
         Assert.That(identity.Flags.HasFlag(AssemblyNameFlags.PublicKey), Is.True);
         Assert.That(Convert.ToHexString(identity.GetPublicKeyToken()!), Is.EqualTo("75825C3E099F5FAC"));
         Assert.That(corHeader.Flags.HasFlag(CorFlags.StrongNameSigned), Is.True);
         Assert.That(corHeader.StrongNameSignatureDirectory.Size, Is.EqualTo(256));
-        Assert.That(VerifySignature(File.ReadAllBytes(assembly.Location)), Is.True,
+        Assert.That(VerifySignature(image), Is.True,
             "A public key token or public-sign flag alone is insufficient for .NET Framework consumers.");
     }
 
@@ -34,7 +40,7 @@ internal sealed class StrongNameIdentityTests
     [TestCase(true)]
     public void SignatureVerificationRejectsUnsignedOrModifiedPayload(bool modifyMethodBody)
     {
-        var image = File.ReadAllBytes(typeof(Contract).Assembly.Location);
+        var image = ReadOriginalSignedAssembly();
         using var pe = new PEReader(new MemoryStream(image, writable: false));
         var corHeader = pe.PEHeaders.CorHeader ?? throw new InvalidDataException("Missing CLR header.");
         if (modifyMethodBody)
@@ -56,6 +62,18 @@ internal sealed class StrongNameIdentityTests
                 corHeader.StrongNameSignatureDirectory.Size);
         }
         Assert.That(VerifySignature(image), Is.False);
+    }
+
+    private static byte[] ReadOriginalSignedAssembly()
+    {
+        // Coverage instrumentation changes the loaded DLL's signed payload. The
+        // resource contains the actual build output captured before instrumentation.
+        using var stream = typeof(StrongNameIdentityTests).Assembly.GetManifestResourceStream(
+            "SharpProof.Attributes.Test.OriginalSignedAttributes") ??
+            throw new InvalidDataException("The original signed Attributes build output was not embedded.");
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        return copy.ToArray();
     }
 
     private static bool VerifySignature(byte[] image)

@@ -4,8 +4,18 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
-    <None Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.xml"
-          Link="SharpProof.Attributes.xml"
-          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- Preserve the signed ProjectReference bytes before a coverage collector rewrites
+       the runnable assembly. ResolveReferences honors isolated coverage output paths. -->
+  <Target Name="EmbedOriginalSignedAttributes" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_OriginalAttributesReference Include="@(ReferenceCopyLocalPaths)"
+                                    Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'SharpProof.Attributes' and '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+      <EmbeddedResource Include="@(_OriginalAttributesReference)"
+                        LogicalName="SharpProof.Attributes.Test.OriginalSignedAttributes" />
+      <None Include="@(_OriginalAttributesReference->'%(RootDir)%(Directory)%(Filename).xml')"
+            Link="SharpProof.Attributes.xml"
+            CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>
