@@ -1,7 +1,7 @@
 # Repository layout
 
 SharpProof adopts the [Arcade SDK repository requirements](https://github.com/dotnet/arcade/blob/ca4c91e56da9ae88fc62578058d8aee531679dba/Documentation/ArcadeSdk.md).
-`global.json` pins .NET SDK `9.0.316` and Arcade `9.0.0-beta.26507.8`, the
+`global.json` pins .NET SDK `10.0.402` and Arcade `9.0.0-beta.26507.8`, the
 Arcade version used by Microsoft's .NET 9 release branch when this integration
 was prepared.
 

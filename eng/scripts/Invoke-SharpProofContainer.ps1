@@ -341,7 +341,8 @@ switch ($Command) {
                 Where-Object {
                     $relative = [IO.Path]::GetRelativePath(
                         $repositoryRoot, $_).Replace('\', '/')
-                    $relative -notlike 'src/samples/*'
+                    $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
+                    -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
                 }
         )
         if ($sourceProjects.Count -eq 0) {
