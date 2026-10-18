@@ -188,8 +188,8 @@ write still need receiver/content or comparer evidence. Constructor support does
 not prove the surrounding graph algorithms or every operation on their fields.
 
 That intermediate ranking had 641 sites with zero unresolved sites in 115
-API/access/status rows; the following construction extension combines the two constructor rows. The complete declaration universe and all 43 partial facet
-registrations stay unchanged. Constructor, Count and ContainsKey evidence now also
+API/access/status rows; the following construction extension combines the two constructor rows. At that stage, the complete declaration universe and all 43 partial facet
+registrations were unchanged. Constructor, Count and ContainsKey evidence now also
 executes the generic-value empty-state probe; Add/indexer evidence retains its
 scalar/reference scope. No SDK, reference assembly, catalog or inventory pin changed.
 
@@ -251,7 +251,7 @@ lists, bounds and receiver/index/RHS order. Wrong claims retain Unknown without
 concrete initialization/growth replay evidence. CLR/IR normal-state and bounds
 comparisons explicitly consume approximation and do not grant native replay
 authority. Unknown writers, publication, ref/closure escape, mixed incoming joins,
-cycles and subclass reimplementation do not acquire List content assumptions.
+cycles and subclasses that replace interface members do not acquire List content assumptions.
 
 All 11 parameterless corpus constructor sites gain partial construction support,
 including the two `SieveOfAtkin` collection initializers. Three of 13 explicit Add
