@@ -22,7 +22,10 @@
   "powershell": {
     "versionLine": "7.5",
     "image": "mcr.microsoft.com/powershell:7.5-ubuntu-24.04",
-    "imageDigest": "sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81"
+    "imageDigest": "sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81",
+    "version": "7.5.12",
+    "archiveUrl": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz",
+    "archiveSha256": "db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd"
   },
   "scriptTools": {
     "psscriptAnalyzer": {

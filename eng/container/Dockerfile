@@ -6,6 +6,13 @@ ARG DOTNET_TEST_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim
 ARG POWERSHELL_IMAGE=mcr.microsoft.com/powershell:7.5-ubuntu-24.04@sha256:042240d57ec9e47e511033b92625a8d95875ee5860af3015992c248b58a8be81
 
 FROM ${POWERSHELL_IMAGE} AS powershell
+# MCR's 7.5 aliases still contain 7.5.0. Replace them with the verified serviced release.
+ADD --checksum=sha256:db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz /tmp/powershell.tar.gz
+RUN rm -rf /opt/microsoft/powershell/7 \
+    && mkdir -p /opt/microsoft/powershell/7 \
+    && tar -xzf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7 \
+    && chmod +x /opt/microsoft/powershell/7/pwsh \
+    && rm /tmp/powershell.tar.gz
 FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime
 FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk
 FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
@@ -40,7 +47,7 @@ COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host
 RUN rm -rf /usr/share/powershell
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
 RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
-    && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; $PSVersionTable.PSVersion.ToString()'
+    && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; if ($PSVersionTable.PSVersion.ToString() -cne [string]$catalog.powershell.version) { throw "PowerShell does not match the serviced archive version." }; $PSVersionTable.PSVersion.ToString()'
 
 COPY eng/container/Install-ScriptTools.ps1 /opt/sharpproof/Install-ScriptTools.ps1
 RUN apt-get update -qq \
