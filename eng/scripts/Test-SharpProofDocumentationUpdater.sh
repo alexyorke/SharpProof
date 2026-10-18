@@ -71,7 +71,7 @@ case "$1 $2" in
   'workflow run')
     [[ "$(arg_value --ref "$@")" == codex/automation-docs-sync ]]
     case "$3" in
-      ci.yml|package-consumers.yml) [[ $# == 5 ]] ;;
+      ci.yml|package-consumers.yml|toolchain-security.yml) [[ $# == 5 ]] ;;
       coverage.yml) [[ $# == 7 && "$(arg_value -f "$@")" == "comparison_ref=$GITHUB_SHA" ]] ;;
       *) exit 92 ;;
     esac
@@ -139,7 +139,7 @@ run_updater() {
 assert_no_writes() { [[ ! -s "$case_root/state/writes" ]] || fail 'unexpected PR mutation or workflow dispatch'; }
 assert_publication() {
   local action=$1 expected
-  expected=$(printf '%s\ndispatch:ci.yml\ndispatch:coverage.yml\ndispatch:package-consumers.yml' "$action")
+  expected=$(printf '%s\ndispatch:ci.yml\ndispatch:coverage.yml\ndispatch:package-consumers.yml\ndispatch:toolchain-security.yml' "$action")
   equal "$(cat "$case_root/state/writes")" "$expected"
   equal "$(git --git-dir="$case_root/remote.git" show "$branch:docs/generated/source-reference.md")" 'new reference'
   equal "$(git --git-dir="$case_root/remote.git" show "$branch:guide.md")" 'authored guide'
