@@ -307,6 +307,12 @@ public sealed partial class TotalLoweringContext
         {
             _receiverElements[element] = array.ElementType;
             _types.TypeSpecializer = SpecializeReceiverElement;
+            // The array fact also determines a return of this same scalar T.
+            // Recreate result storage before binding contracts or lowering returns.
+            if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
+                Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
+            { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+
         }
         Parameters = [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
             ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(array)),

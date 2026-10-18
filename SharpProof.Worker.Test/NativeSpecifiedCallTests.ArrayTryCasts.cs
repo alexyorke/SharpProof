@@ -174,7 +174,6 @@ public sealed partial class NativeSpecifiedCallTests
             "Contract.Requires(values != null && index >= 0 && index < values.Length); " +
             "var list = values as System.Collections.Generic.IList<int>; list[index] = replacement; return values[index];", true, true, false);
     }
-    [TestCase("int[] values", "return Read<int>(values as System.Collections.Generic.IList<int>); static T Read<T>(System.Collections.Generic.IList<T> list) => list[0];")]
     [TestCase("object values", "return (values as System.Collections.Generic.IList<int>).Count;")]
     [TestCase("int[] values, System.Collections.Generic.IList<int> unknown, bool choose", "var list = choose ? values as System.Collections.Generic.IList<int> : unknown; return list.Count;")]
     [TestCase("string[] values", "return (values as System.Collections.Generic.IList<string>).Count;")]

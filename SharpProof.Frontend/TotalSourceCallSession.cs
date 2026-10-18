@@ -184,6 +184,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { throw new ArgumentNullException(nameof(arguments)); }
         frame = null;
         graph = null;
+        var scalarReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
+            (CSharpOperationSemantics.IsScalar(method.ReturnType) || method.ReturnType is ITypeParameterSymbol &&
+             caller.Factory.GetTypeInfo(caller.Type(method.ReturnType)).Kind is IrTypeKind.Boolean or IrTypeKind.Integer);
         if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor or
                 MethodKind.LocalFunction) ||
@@ -198,7 +201,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
                 parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (!CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type))).Any() ||
-            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) ||
+            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !scalarReturnSpecialization ||
             method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
@@ -299,6 +302,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDefaultComparerParameter(parameter); }
             }
         }
+        // A closed scalar signature alone grants no representation facts. The
+        // immutable array parameter must have specialized this exact return T.
+        if (scalarReturnSpecialization && frame.Factory.GetVariableInfo(frame.Result!.Value).Type != caller.Type(method.ReturnType))
+        { frame = null; return false; }
         if (instance != null)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))

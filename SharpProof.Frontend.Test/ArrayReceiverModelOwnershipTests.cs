@@ -187,4 +187,24 @@ public sealed class ArrayReceiverModelOwnershipTests
         var sameNameForeignRead = (IMethodSymbol)sameNameForeign.GetDeclaredSymbol(locals[0])!;
         Assert.That(factory.GetTypeInfo(frame.Type(sameNameForeignRead.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void GenericArrayReturnStorageRequiresTheMatchingImmutableArrayParameter(bool local)
+    {
+        const string helper = "static T Read<T>(System.Collections.Generic.IList<T> list) => list[0];";
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int[] values) { return Read<int>(values); " +
+            (local ? helper + " }" : " } " + helper) + " }");
+        var compilation = CSharpCompilation.Create("ArrayReturnOwner", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
+            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var invocation = (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
+        var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
+        Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
+        Assert.That(factory.GetVariableInfo(frame!.Result!.Value).Type, Is.EqualTo(factory.IntegerType));
+        Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame).IsExact, Is.True);
+    }
 }
