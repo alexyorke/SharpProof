@@ -17,10 +17,12 @@ public sealed partial class DotnetApiInventoryTests
         { Assert.That(CSharpOperationSemantics.IsDictionaryStateDeclaration(member), Is.False); }
     }
 
-    private static bool CheckDictionaryStateIntrinsic(CSharpCompilation references, bool wrongClaim, bool referenceValues = false, bool opaqueValues = false)
+    private static bool CheckDictionaryStateIntrinsic(CSharpCompilation references, bool wrongClaim, bool referenceValues = false, bool opaqueValues = false, bool genericKeys = false)
     {
         ArgumentNullException.ThrowIfNull(references);
-        var body = opaqueValues
+        var body = genericKeys
+            ? "var data = new System.Collections.Generic.Dictionary<T, int>(); var alias = data; return data.Count + alias.Count;"
+            : opaqueValues
             ? "var data = new System.Collections.Generic.Dictionary<int, T>(); var alias = data; return data.Count + alias.Count + (alias.ContainsKey(17) ? 100 : 0);"
             : referenceValues
             ? "var data = new System.Collections.Generic.Dictionary<int, object>(); var alias = data; var first = new object(); var second = new object(); " +
@@ -29,7 +31,7 @@ public sealed partial class DotnetApiInventoryTests
             : "var data = new System.Collections.Generic.Dictionary<int, int>(); var alias = data; " +
                 "alias.Add(1, 23); data[2] = 29; alias[1] = 31; " +
                 "return data.Count * 1000 + data[1] * 10 + data[2] + (data.ContainsKey(1) ? 1 : 0) + (data.ContainsKey(3) ? 100 : 0);";
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int " + (opaqueValues ? "Target<T>()" : "Target()") + " { " + body + " } }");
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int " + (opaqueValues || genericKeys ? "Target<T>()" : "Target()") + " { " + body + " } }");
         var compilation = references.AddSyntaxTrees(tree);
         if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
@@ -50,7 +52,13 @@ public sealed partial class DotnetApiInventoryTests
         });
         var result = new IrProgramInterpreter(factory).Execute(lowered.Program, null, 5000, normal);
         int actual;
-        if (opaqueValues)
+        if (genericKeys)
+        {
+            var data = new Dictionary<string, int>();
+            var alias = data;
+            actual = data.Count + alias.Count;
+        }
+        else if (opaqueValues)
         {
             var data = new Dictionary<int, decimal>();
             var alias = data;

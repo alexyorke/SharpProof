@@ -54,16 +54,26 @@ internal sealed partial class RoslynTotalExpressionLowerer
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }
-        if (CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(operation))
-        { return AllocateValue(operation, block); }
+        if (CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation))
+        {
+            var constructor = ((IObjectCreationOperation)operation).Constructor!;
+            if (!CSharpOperationSemantics.IsComparisonIntegerType(constructor.ContainingType.TypeArguments[0]))
+            {
+                // Default-comparer initialization may allocate, fault or affect
+                // arbitrary existing state. It cannot reach the unpublished result.
+                // Establish fresh logical state only after its normal continuation.
+                block = EmitOpaqueCall(operation, constructor, [], block, null, IrOpaqueCallEffects.All).Continuation;
+            }
+            return AllocateValue(operation, block);
+        }
         var assigned = (operation as ISimpleAssignmentOperation)?.Value;
         var access = operation is ISimpleAssignmentOperation assignment ? assignment.Target : operation;
         var invocation = access as IInvocationOperation;
         var property = access as IPropertyReferenceOperation;
         var method = invocation?.TargetMethod ?? (assigned == null ? property?.Property.GetMethod : property?.Property.SetMethod);
         var instance = invocation?.Instance ?? property?.Instance;
-        if (method == null || instance == null || !CSharpOperationSemantics.IsIntegerKeyDictionaryMember(method) ||
-            !_context.IsDefaultIntegerKeyDictionary(instance))
+        if (method == null || instance == null || !CSharpOperationSemantics.IsDefaultDictionaryStateMember(method) ||
+            !_context.IsDefaultDictionary(instance))
         { return null; }
         var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
         if (name is not ("Count" or "Item" or "Add" or "ContainsKey"))

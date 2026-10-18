@@ -111,7 +111,11 @@ internal static class DotnetApiInventory
         }
 
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
-        { evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state"); }
+        {
+            evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");
+            if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.#ctor" or "P:System.Collections.Generic.Dictionary`2.Count")
+            { evidence.Add("intrinsic=fresh-default-dictionary-construction-state"); }
+        }
 
         if (symbol is IMethodSymbol method)
         {

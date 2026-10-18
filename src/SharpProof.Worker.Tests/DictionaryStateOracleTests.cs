@@ -100,7 +100,23 @@ public sealed class DictionaryStateOracleTests
             "return data.Count + alias.Count + (alias.ContainsKey(17) ? 100 : 0);");
     }
 
+    [TestCase("string")]
+    [TestCase("object")]
+    [TestCase("System.Guid")]
+    public void NonIntegerKeyEmptyDictionaryCountAgreesWithCompiledClr(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        Compare("var data = new System.Collections.Generic.Dictionary<" + key + ", int>(); var alias = data; return data.Count + alias.Count;", true);
+    }
+
     private static void Compare(string body, params object?[] inputs)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(inputs);
+        Compare(body, false, inputs);
+    }
+
+    private static void Compare(string body, bool approximateInitialization, params object?[] inputs)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(inputs);
@@ -123,9 +139,15 @@ public sealed class DictionaryStateOracleTests
         {
             image.Position = 0;
             var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, inputs);
-            // The CLR invocation succeeded and warmed the exact framework paths
-            // before replay selects the no-initialization/no-fault alternative.
-            var options = new IrProgramReplayOptions(_ => null)
+            // Primitive operations use observed replay authority. Generic-key
+            // initialization selects a bounded normal model choice and must
+            // remain approximation-dependent, never trusted native replay.
+            var options = new IrProgramReplayOptions(request =>
+            {
+                ArgumentNullException.ThrowIfNull(request);
+                return approximateInitialization && factory.GetVariableInfo(request.Variable).Type == factory.BooleanType
+                    ? factory.CreateBooleanValue(false) : null;
+            })
             {
                 ConcreteHavocValueProvider = request => IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) != null &&
                     factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null
@@ -138,7 +160,7 @@ public sealed class DictionaryStateOracleTests
             }
             var result = new IrProgramInterpreter(factory).Execute(lowered.Program, arguments, 5000, options);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);
-            Assert.That(result.ConsumedApproximation, Is.False);
+            Assert.That(result.ConsumedApproximation, Is.EqualTo(approximateInitialization));
             Assert.That(result.ReturnValue!.Integer, Is.EqualTo(actual));
         }
         finally

@@ -279,8 +279,16 @@ native proof/refutation controls cover the new behavior. See the
 Empty-state support also applies to opaque structure and unconstrained generic
 value types, without invoking their value constructors. This covers four actual
 integer-key corpus constructions. Opaque value writes still invalidate empty-state
-facts; generic/reference keys and custom/incoming comparer state remain open. See
+facts; generic/reference-key operations and custom/incoming comparer state remain open. See
 [empty-state evidence and remaining gaps](gaps.md#verified-empty-dictionary-state-across-value-domains).
+
+Parameterless default construction and owned Count also support generic/reference
+keys. Nonprimitive-key comparer initialization retains arbitrary heap, allocation
+and fault effects before fresh zero-Count state is established. This covers the
+four paired generic-key corpus constructions; hashing, membership and contents for
+those keys still need models. Native refutation remains Unknown without concrete
+initialization replay. See the
+[generic-key construction evidence](gaps.md#verified-default-construction-and-count-for-generic-keys).
 
 ### Highest remaining priorities
 
