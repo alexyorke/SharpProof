@@ -62,8 +62,8 @@ internal sealed class CompilerConfiguration
             }
 
             return new(
-                ParseProfile(profileAliases.Found ? profileAliases.Value : "advisory"),
-                ParseFeatures(featuresAliases.Found ? featuresAliases.Value : "all"),
+                ParseProfile(profileAliases.Found ? profileAliases.Value : SharpProofConfigurationCatalog.DefaultProfile),
+                ParseFeatures(featuresAliases.Found ? featuresAliases.Value : SharpProofConfigurationCatalog.DefaultFeatures),
                 invalidConfigurationValues);
         }
         catch (AggregateException)
@@ -327,9 +327,9 @@ internal sealed class CompilerConfiguration
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return option == CompilerConfigurationOptionRegistry.Profile
-            ? Is(value, "advisory")
+            ? Is(value, SharpProofConfigurationCatalog.DefaultProfile)
             : option == CompilerConfigurationOptionRegistry.Features &&
-                Is(value, "all");
+                Is(value, SharpProofConfigurationCatalog.DefaultFeatures);
     }
 
     private static bool TryGet(
@@ -361,7 +361,7 @@ internal sealed class CompilerConfiguration
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return Is(value, SharpProofConfigurationCatalog.ProfileOff)
             ? SharpProofProfile.Off :
-        Is(value, "strict") ? SharpProofProfile.Strict :
+        Is(value, SharpProofConfigurationCatalog.ProfileStrict) ? SharpProofProfile.Strict :
         SharpProofProfile.Advisory;
     }
 

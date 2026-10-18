@@ -20,7 +20,7 @@ internal static class NativeSourceEmission
             if (!emitted.Success)
             {
                 throw new InvalidDataException(
-                    errorPrefix + string.Join("; ", emitted.Diagnostics.Take(5)));
+                    errorPrefix + string.Join("; ", emitted.Diagnostics.Take(CorpusExecutionDefaults.MaximumEmissionDiagnostics)));
             }
             image.Position = 0;
             return image;

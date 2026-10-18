@@ -20,7 +20,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Execute(program, initialValues, maximumSteps, cancellation.Token);
     }
 
@@ -52,7 +52,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         replayOptions = RepositoryParameterGuard.NotNull(replayOptions, nameof(replayOptions));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Execute(program, initialValues, maximumSteps, replayOptions, cancellation.Token);
     }
 
@@ -529,7 +529,9 @@ public sealed partial class IrWriteInstruction
             if (element.Status != IrEvaluationStatus.Value)
             { return IrProgramInterpreter.FromEvaluation(element, this, state.Values, state.Steps); }
             // The lowering guards the store, so an invalid one is not C#.
-            if (position != null)
+            if (this.Field is { } keyedField && position != null && target.Value!.Kind == IrValueKind.Reference)
+            { state.Values.Heap.StoreKeyedField(target.Value, keyedField, position.Value!, element.Value!); }
+            else if (position != null)
             {
                 if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
                 { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "An element store was not in bounds."); }

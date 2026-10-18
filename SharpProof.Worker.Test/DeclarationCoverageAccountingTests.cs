@@ -1,5 +1,10 @@
+using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 
 namespace SharpProof.Worker.Test;
@@ -9,6 +14,52 @@ namespace SharpProof.Worker.Test;
 public sealed class DeclarationCoverageAccountingTests
 {
     [Test]
+    public void ConstantsHaveNoExecutablePdbPointsWhileReadonlyInitializersDo()
+    {
+        const string source = """
+            public static class Subject
+            {
+                public const int Literal = 7;
+                public const int Alias = Literal;
+                public static readonly int RuntimeValue = 7;
+                public static int Read() => RuntimeValue;
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(SourceText.From(source, Encoding.UTF8));
+        var compilation = CSharpCompilation.Create("ConstantCoverageProbe",
+            [tree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        using var image = new MemoryStream();
+        using var symbols = new MemoryStream();
+        var emitted = compilation.Emit(image, symbols,
+            options: new EmitOptions(debugInformationFormat: DebugInformationFormat.PortablePdb));
+        Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
+        symbols.Position = 0;
+        using var provider = MetadataReaderProvider.FromPortablePdbStream(symbols);
+        var reader = provider.GetMetadataReader();
+        var executableLines = new HashSet<int>();
+        foreach (var handle in reader.MethodDebugInformation)
+        {
+            foreach (var point in reader.GetMethodDebugInformation(handle).GetSequencePoints())
+            {
+                if (!point.IsHidden)
+                {
+                    executableLines.Add(point.StartLine);
+                }
+            }
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(executableLines, Does.Not.Contain(3), "A literal constant has no runtime initializer.");
+            Assert.That(executableLines, Does.Not.Contain(4), "A constant alias is resolved at compile time.");
+            Assert.That(executableLines, Does.Contain(5), "Readonly field initialization must retain executable coverage.");
+            Assert.That(executableLines, Does.Contain(6), "Method execution must retain executable coverage.");
+        }
+    }
+
+    [Test]
     public async Task ClassifiesOnlyDeclarationTokensAndRetainsExecutableOrUnknownRows()
     {
         var cases = new (string Name, string Declaration, bool Omit)[]
@@ -17,7 +68,12 @@ public sealed class DeclarationCoverageAccountingTests
             ("abstract slot", "public abstract int M(int value);", true),
             ("uninitialized field", "private readonly int value;", true),
             ("initializer", "private int value = Compute();\n private static int Compute() => 1;", false),
-            ("constant initializer", "private const int Value = 1;", false),
+            ("constant initializer", "private const int Value = 1;", true),
+            ("constant alias", "private const int First = 1, Value = First + 1;", true),
+            ("constant expression", "private const int Value = (1 << 10) + 2;", true),
+            ("readonly literal initializer", "private static readonly int Value = 1;", false),
+            ("constant sharing runtime row", "private const int Value = 1; private int runtime = 2;", false),
+            ("local constant", "public int M() { const int value = 1; return value; }", false),
             ("expression body", "public int M() => 1;", false),
             ("inline body", "public int M() { return 1; }", false),
             ("auto accessor", "public int Value { get; set; }", false),

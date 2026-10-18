@@ -13,8 +13,9 @@ internal static class IrFieldSites
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        return term is IrOpaqueTerm { Purity: IrOpaquePurity.Pure, Receiver: not null, Arguments.IsEmpty: true } opaque &&
-            IsField(factory, opaque.Member);
+        return term is IrOpaqueTerm { Purity: IrOpaquePurity.Pure, Receiver: not null, Arguments.Length: <= 1 } opaque &&
+            IsField(factory, opaque.Member) &&
+            (opaque.Arguments.IsEmpty || factory.GetTypeInfo(opaque.Arguments[0].Type).Kind == IrTypeKind.Integer);
     }
 }
 
@@ -61,6 +62,7 @@ internal static class IrArrayStorage
 internal sealed class IrHeap
 {
     private readonly Dictionary<IrValue, Dictionary<int, IrValue>> _elements = new(IrValueIdentity.Instance);
+    private readonly Dictionary<object, Dictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>> _keyedFields = new(ObjectKey.Instance);
     private readonly HashSet<IrValue> _freshArrays = new(IrValueIdentity.Instance);
     private readonly HashSet<object> _freshObjects = new(ObjectKey.Instance);
     internal Dictionary<(object Identity, IrMemberId Field), IrValue> Fields { get; } = new(FieldKey.Instance);
@@ -72,6 +74,7 @@ internal sealed class IrHeap
         UnknownContents = true;
         _elements.Clear();
         Fields.Clear();
+        _keyedFields.Clear();
         _freshArrays.Clear();
         _freshObjects.Clear();
     }
@@ -118,10 +121,24 @@ internal sealed class IrHeap
         return false;
     }
 
-    internal bool TryReadField(IrFactory factory, IrValue owner, IrMemberId field, out IrValue value)
+    internal void StoreKeyedField(IrValue owner, IrMemberId field, IrValue key, IrValue value)
+    {
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        key = RepositoryParameterGuard.NotNull(key, nameof(key));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        if (!_keyedFields.TryGetValue(owner.Reference, out var cells))
+        { _keyedFields.Add(owner.Reference, cells = []); }
+        cells[(field, key.Type, key.IntegerBits)] = value;
+    }
+
+    internal bool TryReadField(IrFactory factory, IrValue owner, IrMemberId field, out IrValue value, IrValue? key = null)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        if (Fields.TryGetValue((owner.Reference, field), out value!))
+        if (key != null && _keyedFields.TryGetValue(owner.Reference, out var cells) &&
+            cells.TryGetValue((field, key.Type, key.IntegerBits), out value!))
+        { return true; }
+        if (key == null && Fields.TryGetValue((owner.Reference, field), out value!))
         { return true; }
         if (_freshObjects.Contains(owner.Reference))
         {
@@ -134,7 +151,7 @@ internal sealed class IrHeap
         }
         if (UnknownContents)
         { ConsumedApproximation = true; value = null!; return false; }
-        if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(field, out value!))
+        if (key == null && owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(field, out value!))
         { return true; }
         value = null!;
         return false;

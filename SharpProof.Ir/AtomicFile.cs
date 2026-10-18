@@ -29,7 +29,7 @@ internal static class AtomicFile
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException("The output path has no directory.");
         Directory.CreateDirectory(directory);
-        for (var attempt = 0; attempt < 8; attempt++)
+        for (var attempt = 0; attempt < MaxPublicationAttempts; attempt++)
         {
             var temporary = Path.Combine(
                 directory,

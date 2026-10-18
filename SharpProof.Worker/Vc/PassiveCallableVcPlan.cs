@@ -331,7 +331,53 @@ internal sealed class PassiveCallableVcPlan
     private IrValue? ReplayFrameworkValue(IrHavocRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+        return ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal static IrValue? ObserveDictionaryInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
+            IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) is not { } primitive)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        try
+        {
+            if (!observe(primitive))
+            { return null; }
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException)
+        { return null; }
+        return factory.CreateBooleanValue(false);
+    }
+
+    internal static bool WarmDefaultDictionary(string primitive)
+    {
+        ArgumentNullException.ThrowIfNull(primitive);
+        return primitive switch
+        {
+            "System_SByte" => ObserveDictionary<sbyte>(),
+            "System_Byte" => ObserveDictionary<byte>(),
+            "System_Int16" => ObserveDictionary<short>(),
+            "System_UInt16" => ObserveDictionary<ushort>(),
+            "System_Char" => ObserveDictionary<char>(),
+            "System_Int32" => ObserveDictionary<int>(),
+            "System_UInt32" => ObserveDictionary<uint>(),
+            "System_Int64" => ObserveDictionary<long>(),
+            "System_UInt64" => ObserveDictionary<ulong>(),
+            _ => throw new ArgumentOutOfRangeException(nameof(primitive))
+        };
+    }
+
+    private static bool ObserveDictionary<T>() where T : struct
+    {
+        // This helper is reached only through the fixed primitive switch above.
+        // Observe real CoreLib operations before certifying a warmed normal path.
+        var probe = new Dictionary<T, int>();
+        probe.Add(default, 1);
+        probe[default] = 2;
+        return probe.ContainsKey(default) && probe[default] == 2;
     }
 
     internal static IrValue? ObserveFrameworkValue(IrFactory factory, IrHavocRequest request, Func<string, object?> read)

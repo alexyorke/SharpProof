@@ -1,5 +1,7 @@
 # Consumer configuration
 
+Maintainers: see [configuration ownership](configuration-ownership.md) for runtime and automation setting authorities.
+
 The standard SDK-style consumer needs one `SharpProof` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 
 The implementation authority is [the consumer contract](../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
@@ -15,7 +17,7 @@ The implementation authority is [the consumer contract](../SharpProof.Package/bu
 | `SharpProofAssumptionPolicy` | `error` for strict; `allow` otherwise | `allow`, `warn`, `error`; governs declared user assumptions and trusted boundaries |
 | `SharpProofSpecificationPacks` | Unset | Semicolon-delimited embedded pack IDs; currently `dotnet.scalar` |
 
-`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, Core MSBuild, SDK 10.0.100+, and a host/filesystem in the [support matrix](preview-support.md): the canonical Linux amd64 container or native Windows, macOS, or glibc Linux on x64/ARM64. Design-time builds do not run the worker.
+`strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, SDK 10.0.100+, Core MSBuild or the supported Windows MSBuild 18+ task-host path, and a host/filesystem in the [support matrix](preview-support.md): the canonical Linux amd64 container or native Windows, macOS, or glibc Linux on x64/ARM64. Design-time builds do not run the worker.
 
 Feature selection does not mean that every method receives every possible proof. Effect annotations select effect obligations; postconditions and return contracts select normal-return obligations. A precondition describes an entry/call obligation and does not by itself assert a return relationship. Selected unsupported callables remain accountable through incomplete coverage and typed Unknown results. See [coverage and limits](coverage-and-limits.md) and [public API](public-api.md).
 
@@ -93,7 +95,7 @@ dotnet_diagnostic.SP0047.severity = warning
 
 Severity changes affect diagnostic reporting, while worker verification and assumption policies decide their respective build gates. `SharpProofSuppress` also changes reporting only. Portable generated-code filtering uses compiler generated-code classification, known generated filenames/headers, and supported generated-code attributes; portable silence does not establish worker coverage. Companion validation runs at compilation end after generators have added syntax. See [diagnostics](diagnostic-examples.md).
 
-Active package analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer), independently of the application's target framework. Full verification is unavailable in design-time builds and unsupported hosts; an IDE's portable diagnostics are not a native proof report.
+Explicit advisory-only package analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer), independently of the application's target framework. The standard strict configuration requires SDK 10.0.100+ and the .NET 10 runtime. Full verification is unavailable in design-time builds and unsupported hosts; an IDE's portable diagnostics are not a native proof report.
 
 ## Reserved and removed settings
 

@@ -25,5 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Tool" />
+    <Compile Include="..\eng\shared\SolverDefaults.cs"
+             Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
 </Project>

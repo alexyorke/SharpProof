@@ -244,7 +244,7 @@ internal sealed partial class PassiveLoopCutter
                 }
                 var target = write.IsFieldStore && write.Target is not null && write.Value is not null
                     ? IrSubstitution.Substitute(_candidate.Factory, write.Target, copies) : null;
-                if (target == null || !StableAddress(target))
+                if (target == null || write.Index != null || !StableAddress(target))
                 { cells = null; break; }
                 if (!cells!.Any(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (cell.Target.Id == target.Id && cell.Field == write.Field!.Value)))
                 { cells!.Add(new(target, write.Field!.Value, write)); }
@@ -353,11 +353,11 @@ internal sealed partial class PassiveLoopCutter
                     case IrCallInstruction call:
                         builder.Call(encoded, call.Operation, call.Target, call.Member, call.Receiver, [.. call.Arguments]);
                         break;
-                    case IrWriteInstruction { Target: { } stored, Index: { } index, Value: { } value } write:
+                    case IrWriteInstruction { Target: { } stored, Field: null, Index: { } index, Value: { } value } write:
                         builder.ElementStore(encoded, write.Operation, stored, index, value);
                         break;
                     case IrWriteInstruction { Target: { } receiver, Field: { } field, Value: { } value } write:
-                        builder.FieldStore(encoded, write.Operation, write.Region, receiver, field, value);
+                        builder.FieldStore(encoded, write.Operation, write.Region, receiver, field, value, write.Index);
                         break;
                     case IrWriteInstruction write:
                         builder.Write(encoded, write.Operation, write.Region);

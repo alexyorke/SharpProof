@@ -4,6 +4,8 @@ namespace SharpProof.Gates;
 
 internal static class GateProcess
 {
+    internal const int CleanupTimeoutSeconds = 5;
+
     internal static ProcessStartInfo CreateCaptured(
         string fileName,
         string workingDirectory)
@@ -41,7 +43,7 @@ internal static class GateProcess
             {
                 KillTree(process);
                 // Reap the killed process even when the caller canceled.
-                var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(GateProcess.CleanupTimeoutSeconds));
                 try
                 {
 #pragma warning disable SPINT003

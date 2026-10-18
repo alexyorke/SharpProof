@@ -47,6 +47,27 @@ internal static class IrOpaqueCallSite
         return IsDefaultComparerPrimitive(primitive) ? primitive : null;
     }
 
+    private const string DictionaryInitializationPrefix = "framework-scalar-dictionary-ready:";
+
+    internal static string DictionaryInitialization(string primitive)
+    {
+        primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
+        if (!IsDefaultComparerPrimitive(primitive))
+        { throw new ArgumentOutOfRangeException(nameof(primitive)); }
+        return DictionaryInitializationPrefix + primitive;
+    }
+
+    internal static string? DictionaryInitializationPrimitive(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        if (!description.StartsWith(DictionaryInitializationPrefix, StringComparison.Ordinal))
+        { return null; }
+        var primitive = description.Substring(DictionaryInitializationPrefix.Length);
+        return IsDefaultComparerPrimitive(primitive) ? primitive : null;
+    }
+
     private static bool IsDefaultComparerPrimitive(string primitive)
     {
         primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
