@@ -1711,3 +1711,18 @@ cause. No production cache or source change was made on that hypothesis.
 The original 17 const-string rows are implemented and covered by the semantic
 and package checks. The additional enum constant is recorded as IMM-M014.
 Additional test worklist and observation-return findings remain open.
+
+## Frontend traversal follow-up inventory
+
+IMM-M015: Twelve frontend test files retain 24 mutable traversal, observation,
+or membership construction sites (BulkFrontendCallsBothConstructorCaptureRegression,
+BulkFrontendCallsElidedConstructorCapture, BulkFrontendCallsConditionalFinallyMutationControls,
+BulkFrontendCoreElisionTerminal, GenericCatchSemanticAgreement, LocalLifetimeRegionWorkApiCoverage,
+OperationFreeRegionCycleApiCoverage, RequiresOnlyNestedInitializerContinuation,
+SourceFinallyNoTransferApiCoverage, TypedExceptionSearch, TypedRegionProgramLowering,
+and StackTypeCalculusCoverage tests). Coordinator inspected each traversal and consumer.
+Use immutable stacks for LIFO worklists, scoped array/hash-set builders for observations
+and visited membership, and freeze ordered observations before consumers. Preserve
+successor push order, reversed child order in exception tracing, iterator laziness,
+default comparers, and reference identity of CFG nodes. Region-ID maps and two
+reachability membership snapshots can be immutable. Status: open, recorded before edits.
