@@ -4,6 +4,7 @@ using SharpProof.Ir;
 using SharpProof.Testing;
 
 namespace SharpProof.Effects.Test;
+
 public sealed partial class DotnetApiInventoryTests
 {
     private static readonly string IntrinsicEvidenceTest = typeof(DotnetApiInventoryTests).FullName + "." + nameof(PinnedFrameworkApiSurfaceAndSupportEvidenceMatchReviewedBaseline);

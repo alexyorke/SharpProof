@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 
 namespace SharpProof.Testing;
+
 internal static class ApiTestEvidence
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

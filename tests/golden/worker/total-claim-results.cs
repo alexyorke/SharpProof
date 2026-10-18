@@ -34,7 +34,8 @@ public static class Subject
     {
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 0);
-        while (x < 6) x++;
+        while (x < 6)
+            x++;
         return x;
     }
 }

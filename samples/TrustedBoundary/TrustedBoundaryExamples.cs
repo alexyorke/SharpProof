@@ -3,12 +3,14 @@ using SharpProof.Attributes;
 
 namespace SharpProof.Samples.TrustedBoundary;
 
-public static class TrustedBoundaryExamples {
+public static class TrustedBoundaryExamples
+{
     [AllowedCapabilities(SharpProofCapability.NativeInterop)]
     public static int CurrentProcessId() =>
         NativeMethods.GetProcessId();
 
-    private static class NativeMethods {
+    private static class NativeMethods
+    {
         [DllImport("libc", EntryPoint = "getpid")]
         [SharpProofTrusted(
             "The signature and effect summary were reviewed against libc.")]
