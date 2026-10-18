@@ -49,8 +49,20 @@ public sealed class DictionaryInitializationReplayTests
         {
             ArgumentNullException.ThrowIfNull(primitive);
             invoked = true;
+            return true;
         }), Is.Null);
         Assert.That(invoked, Is.False);
+    }
+
+    [Test]
+    public void AnObservationThatDisagreesWithTheExpectedStateNeverCertifiesReplay()
+    {
+        var (factory, request) = Request("System_Int32", IrHavocOrigin.Approximation, wrongType: false);
+        Assert.That(PassiveCallableVcPlan.ObserveDictionaryInitialization(factory, request, primitive =>
+        {
+            ArgumentNullException.ThrowIfNull(primitive);
+            return false;
+        }), Is.Null);
     }
 
     [Test]

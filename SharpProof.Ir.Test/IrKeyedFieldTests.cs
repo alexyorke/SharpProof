@@ -69,6 +69,8 @@ public sealed class IrKeyedFieldTests
         Assert.Throws<ArgumentException>((Action)(() => builder.FieldStore(block, site, IrWriteRegion.Field, owner, keyed, factory.Integer(1))));
         Assert.Throws<ArgumentException>((Action)(() => builder.FieldStore(block, site, IrWriteRegion.Field, owner, plain, factory.Integer(1), factory.Integer(0))));
         Assert.Throws<ArgumentException>((Action)(() => builder.FieldStore(block, site, IrWriteRegion.Field, owner, keyed, factory.Integer(1), factory.Boolean(false))));
+        Assert.Throws<ArgumentException>((Action)(() => builder.FieldStore(block, site, IrWriteRegion.Field, owner, keyed, factory.Integer(1),
+            factory.Integer(factory.GetOrCreateIntegerType(64, true), 0))));
     }
 
     [Test]

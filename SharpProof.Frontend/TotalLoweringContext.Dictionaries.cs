@@ -44,6 +44,9 @@ public sealed partial class TotalLoweringContext
         var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
         var captures = new Dictionary<CaptureId, List<IOperation>>();
         var excluded = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        var excludedCaptures = new HashSet<CaptureId>();
+        var escapedSymbols = new Queue<ISymbol>();
+        var escapedCaptures = new Queue<CaptureId>();
         foreach (var operation in graph.OriginalOperation.DescendantsAndSelf().Concat(operations))
         {
             if (operation is ISimpleAssignmentOperation assignment && Symbol(assignment.Target) is { } target)
@@ -75,6 +78,30 @@ public sealed partial class TotalLoweringContext
                 !SymbolEqualityComparer.Default.Equals(local.Symbol, Target))
             { Exclude(operation); }
         }
+        // Escape is an identity property, not a property of one local spelling.
+        // Walk every definition backward once, including CFG captures and joins.
+        // The deduplicated queues also terminate on cyclic alias definitions.
+        while (escapedSymbols.Count != 0 || escapedCaptures.Count != 0)
+        {
+            if (escapedSymbols.Count != 0)
+            {
+                var symbol = escapedSymbols.Dequeue();
+                if (definitions.TryGetValue(symbol, out var values))
+                {
+                    foreach (var value in values)
+                    { Exclude(value); }
+                }
+            }
+            else
+            {
+                var capture = escapedCaptures.Dequeue();
+                if (captures.TryGetValue(capture, out var values))
+                {
+                    foreach (var value in values)
+                    { Exclude(value); }
+                }
+            }
+        }
         var remaining = 4096;
         foreach (var pair in definitions)
         {
@@ -83,7 +110,7 @@ public sealed partial class TotalLoweringContext
         }
         foreach (var pair in captures)
         {
-            if (All(pair.Value, 0))
+            if (!excludedCaptures.Contains(pair.Key) && All(pair.Value, 0))
             { _defaultDictionaryCaptures.Add(pair.Key); }
         }
 
@@ -92,8 +119,10 @@ public sealed partial class TotalLoweringContext
             operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             foreach (var child in operation.DescendantsAndSelf())
             {
-                if (Symbol(child) is { } symbol)
-                { excluded.Add(symbol); }
+                if (Symbol(child) is { } symbol && excluded.Add(symbol))
+                { escapedSymbols.Enqueue(symbol); }
+                if (child is IFlowCaptureReferenceOperation capture && excludedCaptures.Add(capture.Id))
+                { escapedCaptures.Enqueue(capture.Id); }
             }
         }
         bool All(List<IOperation> values, int depth)
@@ -110,7 +139,7 @@ public sealed partial class TotalLoweringContext
             { return Resolve(conversion.Operand, depth + 1); }
             if (Symbol(operation) is { } symbol)
             { return symbol is ILocalSymbol && !excluded.Contains(symbol) && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1); }
-            if (operation is IFlowCaptureReferenceOperation capture && captures.TryGetValue(capture.Id, out var captured))
+            if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
             return CSharpOperationSemantics.IsEmptyScalarDictionaryCreation(operation);
         }

@@ -763,9 +763,9 @@ internal sealed class PassiveCallableVcBuilder
                 { continue; }
                 if (store.Index is { } storedKey)
                 {
-                    if (key == null || key.Type != storedKey.Type)
-                    { consistent = false; continue; }
-                    matches = And(matches, Equal(key, storedKey));
+                    // Both reads and stores validate the same member signature.
+                    // The keyed/unkeyed mismatch was rejected above.
+                    matches = And(matches, Equal(key!, storedKey));
                 }
                 read = _factory.Conditional(And(store.Reach, matches), stored, read);
             }
