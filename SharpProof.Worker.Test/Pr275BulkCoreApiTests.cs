@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.CompilerArtifact;
 
 namespace SharpProof.Worker.Test;
@@ -490,7 +490,7 @@ public sealed class Pr275BulkCoreApiTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         return new AnalyzerSession(
             compilation,
-            AnalyzerConfiguration.AdvisoryAll,
+            CompilerConfiguration.AdvisoryAll,
             TestContext.CurrentContext.CancellationToken);
     }
 

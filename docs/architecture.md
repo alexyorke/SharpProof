@@ -13,6 +13,7 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Ir` | Owned types, values, instructions, blocks, source provenance, evaluation |
 | `SharpProof.Dataflow` | Analysis primitives over the modeled program |
 | `SharpProof.Effects` | Effect values, mappings, and conservative summaries |
+| `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
 | `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
 | `SharpProof.ContractForGenerator` | Generator loading hook; companion validation runs after generators in analysis |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
@@ -25,6 +26,10 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Package` / `SharpProof.Verifier` | Portable and verifier package assembly |
 
 The solution lists production and test projects in [SharpProof.slnx](../SharpProof.slnx). Package identity and implementation assembly visibility do not make these internal components supported consumer APIs.
+
+The analyzer and compiler collector both depend on `SharpProof.Compiler.Semantics`. The collector does not load analyzer policy or advisory execution. Semantic claim declarations contain no diagnostic descriptors; the analyzer projects them into diagnostics and the collector projects them into artifact evidence.
+
+The worker consumes compiler-neutral artifact and verification libraries. It does not reference or compile source owned by the compiler-facing projects. Shared guards, hashing helpers, and framework polyfills live under `eng/shared`; linked IR identifier aliases remain owned by `SharpProof.Ir`. Architecture tests inspect evaluated MSBuild items as well as the declared project graph, and compiled assembly tests check the collector runtime closure.
 
 ## Compiler boundary
 

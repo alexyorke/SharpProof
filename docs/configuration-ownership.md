@@ -9,7 +9,7 @@ effective defaults, limits, wire formats, and explicit caller overrides.
 
 | Configuration | Owner | Consumers |
 | --- | --- | --- |
-| Analyzer keys, MSBuild property names, profile/features tokens and defaults | [SharpProofConfigurationCatalog](../SharpProof.Contracts/SharpProofConfigurationCatalog.cs) | Analyzer option registry, parsing, package-default alias handling |
+| Analyzer keys, MSBuild property names, profile/features tokens and defaults | [SharpProofConfigurationCatalog](../SharpProof.Contracts/SharpProofConfigurationCatalog.cs) | Compiler-semantics option registry and parsing, analyzer policy adapter, package-default alias handling |
 | Solver query resource default | [SolverDefaults](../eng/configuration/SolverDefaults.cs) | Source-linked into SMT options and worker protocol; existing public constants remain available |
 | Worker budgets, request expression-depth ceiling, cache defaults, launcher publication deadline | [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) | Request validation, launcher, compiler collector and artifact admission |
 | Convenience-operation deadline | [AnalysisDefaults](../SharpProof.Ir/AnalysisDefaults.cs) | Analyzer, compiler capture, contract binding, frontend queries, IR interpretation; explicit caller-token overloads keep caller deadlines |

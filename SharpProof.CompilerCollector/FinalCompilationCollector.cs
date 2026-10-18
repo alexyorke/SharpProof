@@ -1,5 +1,5 @@
 #pragma warning disable RS1035 // This build-only analyzer emits the selected seal.
-namespace SharpProof.Analyzer;
+namespace SharpProof.CompilerCollector;
 
 // Compiler artifact emission is isolated from the live analyzer entry point.
 internal static class FinalCompilationCollector
@@ -12,7 +12,7 @@ internal static class FinalCompilationCollector
             "build_property.SharpProofSpecificationPacks",
         MaximumExpressionDepthOption =
             "build_property.SharpProofVerifyMaximumExpressionDepth";
-    internal static void Collect(CompilationAnalysisContext context, AnalyzerConfiguration configuration)
+    internal static void Collect(CompilationAnalysisContext context, CompilerConfiguration configuration)
     {
         try
         {
@@ -30,7 +30,7 @@ internal static class FinalCompilationCollector
                 return;
             }
 
-            if (!SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
+            if (!CompilerConfigurationValidation.GetIssues(
                     context.Compilation,
                     context.Options,
                     configuration,
@@ -74,7 +74,7 @@ internal static class FinalCompilationCollector
 #pragma warning restore CA1031
             exception = exception.GetBaseException();
             context.ReportDiagnostic(Diagnostic.Create(
-                GeneratedDiagnosticDescriptors.CompilerManifestFailureRule,
+                CompilerCollectorDiagnosticDescriptors.CompilerManifestFailureRule,
                 Location.None,
                 exception.GetType().Name + ": " + exception.Message));
         }
@@ -82,7 +82,7 @@ internal static class FinalCompilationCollector
 
     private static string Create(
         CompilationAnalysisContext context,
-        AnalyzerConfigOptions options, AnalyzerConfiguration configuration)
+        AnalyzerConfigOptions options, CompilerConfiguration configuration)
     {
         configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
         var compilation = context.Compilation as CSharpCompilation ??

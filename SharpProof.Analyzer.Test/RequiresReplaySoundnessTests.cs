@@ -1,7 +1,7 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Analyzer.Test;
 

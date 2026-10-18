@@ -10,4 +10,9 @@
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\eng\shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
+    <Compile Include="..\eng\shared\Polyfills\NotNullAttribute.cs" Link="Polyfills\NotNullAttribute.cs" />
+    <Compile Include="..\eng\shared\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />
+  </ItemGroup>
 </Project>

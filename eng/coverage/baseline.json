@@ -3,17 +3,20 @@
   "minimumAggregateLinePercent": 100,
   "minimumChangedTcbLinePercent": 100.0,
   "declarationOnlyTcbFiles": [
-    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
     "SharpProof.Contracts/SharpProofConfigurationCatalog.cs",
     "SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs",
     "SharpProof.Host/HostEnvironmentVariables.cs",
     "SharpProof.Ir/AnalysisDefaults.cs",
+    "Tools/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
+    "eng/configuration/SolverDefaults.cs",
+    "SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
+    "SharpProof.Compiler.Semantics/GlobalUsings.cs",
+    "SharpProof.CompilerCollector/CompilerSemanticUsings.cs",
+    "eng/shared/Polyfills/IsExternalInit.cs",
     "SharpProof.Smt/GlobalUsings.cs",
     "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
-    "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
-    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs",
-    "Tools/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
-    "eng/configuration/SolverDefaults.cs"
+    "eng/shared/Polyfills/NotNullAttribute.cs",
+    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
     "ConsoleLoggingAnalyzer": 100.0,
@@ -39,6 +42,7 @@
     "SharpProof.Specs": 100.0,
     "SharpProof.Verify": 100.0,
     "SharpProof.Worker": 100,
-    "SharpProof.Worker.Protocol": 100.0
+    "SharpProof.Worker.Protocol": 100.0,
+    "SharpProof.Compiler.Semantics": 100.0
   }
 }

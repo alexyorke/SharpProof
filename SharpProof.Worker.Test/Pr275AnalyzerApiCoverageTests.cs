@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Worker.Test;
 
@@ -70,7 +70,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
         var methodError = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation((IMethodSymbol)null!, default)));
         var optionsError = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = AnalyzerConfiguration.FromOptions((AnalyzerOptions)null!)));
+            _ = CompilerConfiguration.FromOptions((AnalyzerOptions)null!)));
         var symbolError = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = AnalyzerGeneratedCodePolicy.IsGenerated(null!, tree, Compilation, default)));
 
@@ -83,7 +83,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
     [Test]
     public void StandardSdkOptionsSelectTheDocumentedDefaultProfile()
     {
-        var configuration = AnalyzerConfiguration.FromOptions(new AnalyzerOptions([]));
+        var configuration = CompilerConfiguration.FromOptions(new AnalyzerOptions([]));
 
         Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Advisory));
         Assert.That(configuration.InvalidConfigurationValues, Is.Empty);

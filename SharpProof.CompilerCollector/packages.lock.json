@@ -135,13 +135,11 @@
           "System.Runtime.CompilerServices.Unsafe": "6.1.2"
         }
       },
-      "sharpproof.analyzer.core": {
+      "sharpproof.compiler.semantics": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "SharpProof.Contracts": "[1.0.0-preview.1, )",
-          "SharpProof.Effects": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
+          "SharpProof.Effects": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.compilerartifact": {

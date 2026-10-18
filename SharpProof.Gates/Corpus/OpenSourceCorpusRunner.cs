@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Gates.Corpus;
 
