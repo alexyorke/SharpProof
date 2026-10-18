@@ -142,9 +142,12 @@ public sealed class ProjectDagTests
             .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (ProjectFile(name)
                 .Descendants("PackageReference")
                 .Any(static reference =>
-                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string?)reference.Attribute("Include") == "Microsoft.Z3"))));
+                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string?)reference.Attribute("Include") == "Microsoft.Z3"))))
+            .ToArray();
 
         Assert.That(z3Consumers, Is.SubsetOf(Z3Consumers));
+        // Guard against the scan silently matching nothing.
+        Assert.That(z3Consumers, Does.Contain("SharpProof.Smt"));
     }
 
     [Test]
