@@ -722,7 +722,10 @@ internal sealed class PassiveCallableVcBuilder
             // Entry heap values predate every allocation, including when the
             // body first reads them after allocating. Apply this to the entry
             // seed; ordered stores still allow a field to hold the new object.
-            if (_factory.GetTypeInfo(entry.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
+            // Keyed entry cells have no replay reconstruction. Do not require
+            // witnesses to read those cells solely to justify freshness; retain
+            // an overapproximation until an ordered store supplies their value.
+            if (key == null && _factory.GetTypeInfo(entry.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
             {
                 foreach (var fresh in _freshReferences)
                 {
@@ -833,7 +836,8 @@ internal sealed class PassiveCallableVcBuilder
         {
             System.ArgumentNullException.ThrowIfNull(term);
             Spend();
-            if (entryFields && IrFieldSites.IsFieldRead(_factory, term) &&
+            // Only unkeyed entry fields have complete replay state evidence.
+            if (entryFields && IrFieldSites.IsFieldRead(_factory, term) && term is IrOpaqueTerm { Arguments.IsEmpty: true } &&
                 _factory.GetTypeInfo(term.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
             { _entryFieldReferences[term.Id] = term; }
             return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||

@@ -52,10 +52,49 @@ public sealed class DictionaryStateOracleTests
             "data.Add(4294967296L, false); return data.Count == 2 && data[1L] && !data[4294967296L] ? 1 : 0;");
     }
 
-    private static void Compare(string body)
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, object>(); var first = new object(); var second = new object(); data.Add(17, first); var before = data[17]; var alias = data; alias[17] = second; return data.Count == 1 && object.ReferenceEquals(before, first) && object.ReferenceEquals(data[17], second) && !object.ReferenceEquals(first, second) ? 1 : 0;")]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, string>(); var value = \"sample\"; data[17] = value; data[18] = null; return data.Count == 2 && object.ReferenceEquals(data[17], value) && data.ContainsKey(18) && data[18] == null && !data.ContainsKey(19) ? 1 : 0;")]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, int[]>(); var value = new int[1]; data[17] = value; value[0] = 23; return object.ReferenceEquals(data[17], value) && data[17][0] == 23 ? 1 : 0;")]
+    public void ReferenceDictionaryStateAgreesWithCompiledClr(string body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target() { " + body + " } }");
+        Compare(body);
+    }
+
+    [Test]
+    public void ReferenceDictionaryDoesNotInvokeValueEqualityCallbacks()
+    {
+        var first = new ObservedValueEquality();
+        var second = new ObservedValueEquality();
+        Compare("var data = new System.Collections.Generic.Dictionary<int, object>(); data.Add(17, value0); " +
+            "data[17] = value1; return data.Count == 1 && object.ReferenceEquals(data[17], value1) ? 1 : 0;", first, second);
+        Assert.That(first.Callbacks, Is.Zero);
+        Assert.That(second.Callbacks, Is.Zero);
+    }
+
+    private sealed class ObservedValueEquality
+    {
+        public int Callbacks { get; private set; }
+
+        public override bool Equals(object? obj)
+        {
+            Callbacks++;
+            return ReferenceEquals(this, obj);
+        }
+
+        public override int GetHashCode()
+        {
+            Callbacks++;
+            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
+        }
+    }
+
+    private static void Compare(string body, params object?[] inputs)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(inputs);
+        var parameters = string.Join(", ", Enumerable.Range(0, inputs.Length).Select(index => "object value" + index));
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(" + parameters + ") { " + body + " } }");
         var compilation = CSharpCompilation.Create("DictionaryStateOracle", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
         using var image = new MemoryStream();
@@ -72,7 +111,7 @@ public sealed class DictionaryStateOracleTests
         try
         {
             image.Position = 0;
-            var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, null);
+            var actual = runtime.LoadFromStream(image).GetType("Probe")!.GetMethod("Target")!.Invoke(null, inputs);
             // The CLR invocation succeeded and warmed the exact framework paths
             // before replay selects the no-initialization/no-fault alternative.
             var options = new IrProgramReplayOptions(_ => null)
@@ -80,7 +119,13 @@ public sealed class DictionaryStateOracleTests
                 ConcreteHavocValueProvider = request => IrOpaqueCallSite.DictionaryInitializationPrimitive(factory, request.Site) != null &&
                     factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null
             };
-            var result = new IrProgramInterpreter(factory).Execute(lowered.Program, null, 5000, options);
+            var arguments = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+            for (var index = 0; index < inputs.Length; index++)
+            {
+                arguments.Add(context.Parameters[index].Entry, inputs[index] is { } value
+                    ? factory.CreateReferenceValue(factory.ObjectType, value) : factory.CreateNullValue(factory.ObjectType));
+            }
+            var result = new IrProgramInterpreter(factory).Execute(lowered.Program, arguments, 5000, options);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);
             Assert.That(result.ConsumedApproximation, Is.False);
             Assert.That(result.ReturnValue!.Integer, Is.EqualTo(actual));

@@ -68,13 +68,14 @@ public sealed class FloatingPredicateBoundaryAuditTests
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
-    [Test]
-    public async Task ReferenceConstrainedGenericOperatorRetainsUnsupportedPolicy()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReferenceConstrainedGenericIdentityIsProvenAndWrongClaimIsRefuted(bool wrongClaim)
     {
-        var source = CreateSource("<T>(T value) where T : class", "", "Contract.Result<bool>()",
+        var source = CreateSource("<T>(T value) where T : class", "", wrongClaim ? "!Contract.Result<bool>()" : "Contract.Result<bool>()",
             "var copy = value; return value == copy;");
-        var claim = await ObserveAndVerifyAsync("generic-class-eq", source, [new object()]);
-        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        var claim = await ObserveAndVerifyAsync(wrongClaim ? "generic-class-eq-wrong-claim" : "generic-class-eq", source, [new object()]);
+        Assert.That(claim.Outcome, Is.EqualTo(wrongClaim ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven));
     }
 
     private static string CreateSource(string signature, string requires, string ensures, string body)

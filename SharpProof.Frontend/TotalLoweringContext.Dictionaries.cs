@@ -12,20 +12,22 @@ internal static partial class CSharpOperationSemantics
             "P:System.Collections.Generic.Dictionary`2.Item(`0)";
     }
 
-    internal static bool IsScalarDictionaryMember(IMethodSymbol method)
+    internal static bool IsIntegerKeyDictionaryMember(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return IsFrameworkCollectionMember(method) && !method.IsStatic &&
             method.ContainingType is { TypeArguments.Length: 2 } type &&
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
-            IsComparisonIntegerType(type.TypeArguments[0]) && IsScalar(type.TypeArguments[1]);
+            IsComparisonIntegerType(type.TypeArguments[0]) &&
+            (IsScalar(type.TypeArguments[1]) || IsReferenceDomain(type.TypeArguments[1]) ||
+                type.TypeArguments[1] is ITypeParameterSymbol { IsReferenceType: true });
     }
 
-    internal static bool IsEmptyScalarDictionaryCreation(IOperation operation)
+    internal static bool IsEmptyIntegerKeyDictionaryCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IObjectCreationOperation { Constructor: { Parameters.IsEmpty: true } constructor, Initializer: null } &&
-            IsScalarDictionaryMember(constructor);
+            IsIntegerKeyDictionaryMember(constructor);
     }
 }
 
@@ -76,7 +78,7 @@ public sealed partial class TotalLoweringContext
             { Exclude(deconstruction.Target); }
             if (operation is IAnonymousFunctionOperation || operation is ILocalFunctionOperation local &&
                 !SymbolEqualityComparer.Default.Equals(local.Symbol, Target))
-            { Exclude(operation); }
+            { Exclude(operation, capturesReceiver: true); }
         }
         // Escape is an identity property, not a property of one local spelling.
         // Walk every definition backward once, including CFG captures and joins.
@@ -114,15 +116,25 @@ public sealed partial class TotalLoweringContext
             { _defaultDictionaryCaptures.Add(pair.Key); }
         }
 
-        void Exclude(IOperation operation)
+        void Exclude(IOperation operation, bool capturesReceiver = false)
         {
             operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-            foreach (var child in operation.DescendantsAndSelf())
+            var pending = new Stack<IOperation>();
+            pending.Push(operation);
+            while (pending.Count != 0)
             {
+                var child = pending.Pop();
+                // A framework indexer publishes its stored value, not its owner.
+                // A closure still captures the receiver used to perform that read.
+                if (!capturesReceiver && child is IPropertyReferenceOperation
+                    { Property: { IsIndexer: true, GetMethod: { } getter } } && CSharpOperationSemantics.IsIntegerKeyDictionaryMember(getter))
+                { continue; }
                 if (Symbol(child) is { } symbol && excluded.Add(symbol))
                 { escapedSymbols.Enqueue(symbol); }
                 if (child is IFlowCaptureReferenceOperation capture && excludedCaptures.Add(capture.Id))
                 { escapedCaptures.Enqueue(capture.Id); }
+                foreach (var nested in child.ChildOperations)
+                { pending.Push(nested); }
             }
         }
         bool All(List<IOperation> values, int depth)
@@ -141,14 +153,14 @@ public sealed partial class TotalLoweringContext
             { return symbol is ILocalSymbol && !excluded.Contains(symbol) && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1); }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
-            return CSharpOperationSemantics.IsEmptyScalarDictionaryCreation(operation);
+            return CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(operation);
         }
     }
 
-    internal bool IsDefaultScalarDictionary(IOperation operation)
+    internal bool IsDefaultIntegerKeyDictionary(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return CSharpOperationSemantics.IsEmptyScalarDictionaryCreation(operation) ||
+        return CSharpOperationSemantics.IsEmptyIntegerKeyDictionaryCreation(operation) ||
             Symbol(operation) is { } symbol && _defaultDictionaries.Contains(symbol) ||
             operation is IFlowCaptureReferenceOperation capture && _defaultDictionaryCaptures.Contains(capture.Id);
     }
