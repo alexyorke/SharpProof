@@ -184,10 +184,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { throw new ArgumentNullException(nameof(arguments)); }
         frame = null;
         graph = null;
-        var scalarReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
-            (CSharpOperationSemantics.IsScalar(method.ReturnType) || method.ReturnType is ITypeParameterSymbol &&
-             caller.Factory.GetTypeInfo(caller.Type(method.ReturnType)).Kind is IrTypeKind.Boolean or IrTypeKind.Integer);
-        if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
+        if (!Spend(method.Parameters.Length + 1))
+        { return false; }
+        // Reference element specialization belongs to the supported List helper
+        // boundary. Other generic source calls retain their existing scalar domain.
+        var listElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type));
+        ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
+        { return listElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
+        var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
+            KnownSourceValue(method.ReturnType) != null;
+        if (!contractOnly && IsActive(method) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor or
                 MethodKind.LocalFunction) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
@@ -206,9 +213,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 return !CSharpOperationSemantics.SharesValueDomain(parameter.Type, declared) &&
                     (assigned && ordinal == method.Parameters.Length - 1 ||
                      declared is not IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol } &&
-                     (declared is not ITypeParameterSymbol || caller.KnownScalarType(parameter.Type) == null));
+                     (declared is not ITypeParameterSymbol || KnownSourceValue(parameter.Type) == null));
             }).Any() ||
-            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !scalarReturnSpecialization ||
+            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !valueReturnSpecialization ||
             method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
@@ -282,13 +289,13 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Reconcile parameter and
         // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
-        // A constructed symbol supplies exact scalar type arguments even when no
+        // A constructed symbol supplies exact scalar/reference type arguments even when no
         // value parameter mentions them. Preserve each declaration's own symbols.
         if (!Spend(method.TypeArguments.Length))
         { frame = null; return false; }
         for (var ordinal = 0; ordinal < method.TypeArguments.Length; ordinal++)
         {
-            if (caller.KnownScalarType(method.TypeArguments[ordinal]) is { } scalar)
+            if (KnownSourceValue(method.TypeArguments[ordinal]) is { } scalar)
             { frame.SpecializeTypeParameter(method.OriginalDefinition.TypeParameters[ordinal], scalar); }
         }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
@@ -297,7 +304,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             { frame = null; return false; }
             for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
             {
-                if (caller.KnownScalarType(owner.TypeArguments[ordinal]) is { } scalar)
+                if (KnownSourceValue(owner.TypeArguments[ordinal]) is { } scalar)
                 { frame.SpecializeTypeParameter(owner.OriginalDefinition.TypeParameters[ordinal], scalar); }
             }
         }
@@ -308,7 +315,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
              method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol }) &&
             caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
-            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToArray();
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) != null ||
+            TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -325,11 +333,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
             if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
             { frame.SpecializeNullableDefaultComparerParameter(parameter); }
-            if (parameter.Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) is { } scalar)
+            if (parameter.Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) is { } scalar)
             {
                 frame.SpecializeScalarParameter(parameter, scalar);
                 continue;
             }
+            if (TotalLoweringContext.IsListReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredList &&
+                declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
+                KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
+            { frame.SpecializeTypeParameter(element, actualElement); }
             if (parameter.Type is IArrayTypeSymbol { IsSZArray: true } || declarationOperations.Length != 0 &&
                 !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
@@ -341,6 +353,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeArrayParameter(parameter, array); }
                 if (caller.IsDefaultIntegerComparer(argument.Value))
                 { frame.SpecializeDefaultComparerParameter(parameter); }
+                if (TotalLoweringContext.IsListReceiverType(parameter.Type) && caller.IsExactList(argument.Value))
+                { frame.SpecializeListParameter(parameter); }
             }
         }
         if (instance != null)

@@ -17,19 +17,36 @@ public sealed class ListStateDomainBoundaryTests
     [TestCase("System.Collections.Generic.ICollection<int> alias = data;", true)]
     [TestCase("var alias = choose ? data : new System.Collections.Generic.List<int>();", true)]
     [TestCase("var alias = choose ? data : incoming;", false)]
-    [TestCase("var alias = data; publish(alias);", false)]
+    [TestCase("var alias = data; publish(alias);", true)]
     [TestCase("var alias = data; System.Action callback = () => publish(alias);", false)]
     [TestCase("var alias = data; ref var byref = ref alias;", false)]
     [TestCase("var alias = data; alias = alias;", false)]
-    [TestCase("var alias = data; publish(data);", false)]
-    public void OnlyFreshUnpublishedListAliasesEstablishInterfaceImplementation(string declarations, bool expected)
+    [TestCase("var alias = data; publish(data);", true)]
+    public void ExactListAliasesRequireProvenDefinitions(string declarations, bool expected)
     {
         ArgumentNullException.ThrowIfNull(declarations);
         var (model, syntax, graph, context) = Prepare("bool choose, System.Collections.Generic.IList<int> incoming, System.Action<System.Collections.Generic.IList<int>> publish",
             "var data = new System.Collections.Generic.List<int>(); " + declarations + " return alias.Count;");
         context.TrackFreshLists(graph);
         var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
+        Assert.That(context.IsExactList(property.Instance!), Is.EqualTo(expected));
+    }
+
+    [TestCase("var alias = data; publish(alias);", true)]
+    [TestCase("System.Collections.Generic.IList<int> alias = data; publish(data);", true)]
+    [TestCase("var alias = choose ? data : new System.Collections.Generic.List<int>();", true)]
+    [TestCase("var alias = choose ? data : incoming;", false)]
+    [TestCase("var alias = data; ref var storage = ref alias;", false)]
+    [TestCase("System.Collections.Generic.IList<int> alias = data; System.Action change = () => alias = incoming;", false)]
+    [TestCase("var alias = data; alias = alias;", false)]
+    public void ExactListIdentitySurvivesPublicationButNotUnprovenBindings(string declarations, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        var (model, syntax, graph, context) = Prepare("bool choose, System.Collections.Generic.IList<int> incoming, System.Action<System.Collections.Generic.IList<int>> publish",
+            "var data = new System.Collections.Generic.List<int>(); " + declarations + " return alias.Count;");
+        context.TrackFreshLists(graph);
+        var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsExactList(property.Instance!), Is.EqualTo(expected));
     }
 
     [TestCase("new System.Collections.Generic.List<int>()", true)]
@@ -41,7 +58,7 @@ public sealed class ListStateDomainBoundaryTests
             "System.Collections.Generic.IList<int> alias = null; return (alias = " + value + ").Count;");
         context.TrackFreshLists(graph);
         var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsFreshList(property.Instance!), Is.EqualTo(expected));
+        Assert.That(context.IsExactList(property.Instance!), Is.EqualTo(expected));
     }
 
     [TestCase("int", true)]
@@ -114,7 +131,7 @@ public sealed class ListStateDomainBoundaryTests
     }
 
     [Test]
-    public void PublishedAssignmentExpressionsDoNotEstablishOwnedReceivers()
+    public void PublishedAssignmentResultRetainsItsAllocatedImplementation()
     {
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static System.Collections.Generic.List<int> Published; public static int Target() { return (Published = new System.Collections.Generic.List<int>()).Count; } }");
         var compilation = CSharpCompilation.Create("ListPublication", [tree], TestMetadataReferences.Platform,
@@ -124,16 +141,17 @@ public sealed class ListStateDomainBoundaryTests
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
         context.TrackFreshLists(ControlFlowGraph.Create(syntax, model)!);
         var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsFreshList(property.Instance!), Is.False);
+        Assert.That(context.IsExactList(property.Instance!), Is.True);
     }
 
     [TestCase("data.Count", 255)]
     [TestCase("Get().Count", 0)]
     [TestCase("data[Index()]", 0)]
+    [TestCase("Static", 0)]
     public void ListClausesDeclineUnsupportedReceiversIndexesAndDepth(string expression, int depth)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.List<int> data) { return " + expression + "; } static System.Collections.Generic.List<int> Get() => null; static int Index() => 0; }");
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.List<int> data) { return " + expression + "; } static System.Collections.Generic.List<int> Get() => null; static int Index() => 0; static int Static => 0; }");
         var compilation = CSharpCompilation.Create("ListClauseBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
