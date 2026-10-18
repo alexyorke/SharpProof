@@ -2241,3 +2241,13 @@ Houdini's successful union currently publishes HashSet insertion order, so prese
 first occurrence with array sidecars alongside builder membership sets. Keep candidate
 removal, proof/witness priorities and cancellation/resource checks unchanged. Status:
 open before edits.
+## Layout validator construction inventory
+
+IMM-M046: Coordinator read Test-SharpProofRepositoryLayout.ps1. Its failure/record/
+evaluation and explicit-package-import mapping lists can use array builders, freezing
+before mapping filters and final ordered report serialization. Covered-project and
+unique-project-name membership can use Ordinal/OrdinalIgnoreCase hash builders;
+freeze covered projects after solution discovery and preserve Add's duplicate result
+for names. Keep source traversal, failure first-20 order, static import controls,
+project evaluation order, pinned common validation and JSON report schema unchanged.
+The report's ordered records remain serialization adapters. Status: open before edits.
