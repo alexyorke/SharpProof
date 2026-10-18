@@ -202,7 +202,7 @@ if [[ "${command_name}" == tool-consumer ]]; then
     previous_argument="${argument}"
   done
   case "${package_source}" in
-    artifacts/tool-packages|artifacts/tool-packages/|./artifacts/tool-packages|./artifacts/tool-packages/)
+    artifacts/tool-packages | artifacts/tool-packages/ | ./artifacts/tool-packages | ./artifacts/tool-packages/)
       mkdir -p "${task_root}/artifacts/tool-packages"
       for package_input in "${repo_root}"/artifacts/tool-packages/*.nupkg \
         "${repo_root}"/artifacts/tool-packages/packages.tsv \

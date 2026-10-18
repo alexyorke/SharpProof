@@ -473,7 +473,7 @@ if ($null -eq $z3Package) {
 $versions = [xml](Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/Versions.props') -Raw)
 Assert-Exact $versions.Project.PropertyGroup.MicrosoftZ3Version $catalog.z3.version 'Microsoft.Z3 version'
 Assert-Exact `
-    ($packageProjects.projects -join '|') `
+($packageProjects.projects -join '|') `
     'src/SharpProof.Attributes/SharpProof.Attributes.csproj|src/SharpProof.Verifier/SharpProof.Verifier.csproj|src/SharpProof.Package/SharpProof.Package.csproj' `
     'Package projects in dependency order'
 Assert-Exact `
