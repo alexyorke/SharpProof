@@ -656,14 +656,14 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        return MentionsCore(expression, parameter, model, new HashSet<ISymbol>(SymbolEqualityComparer.Default), cancellationToken);
+        return MentionsCore(expression, parameter, model, ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), cancellationToken);
     }
 
     private static bool MentionsCore(
         SyntaxNode expression,
         IParameterSymbol parameter,
         SemanticModel model,
-        HashSet<ISymbol> visited,
+        ImmutableHashSet<ISymbol>.Builder visited,
         CancellationToken cancellationToken)
     {
         foreach (var identifier in expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())

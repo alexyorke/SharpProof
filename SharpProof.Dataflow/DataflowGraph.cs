@@ -63,7 +63,7 @@ public sealed class DataflowGraph<T>
             Blocks.Length,
             nameof(entryBlockId));
 
-        var distinctEdges = ImmutableHashSet<DataflowEdge>.Empty;
+        var distinctEdges = ImmutableHashSet.CreateBuilder<DataflowEdge>();
         foreach (var edge in edges)
         {
             if (edge.SourceId >= Blocks.Length || edge.TargetId >= Blocks.Length)
@@ -71,7 +71,7 @@ public sealed class DataflowGraph<T>
                 throw new ArgumentException("An edge references a block outside the graph.", nameof(edges));
             }
 
-            distinctEdges = distinctEdges.Add(edge);
+            distinctEdges.Add(edge);
         }
         Edges = [.. distinctEdges.OrderBy(static edge => edge.SourceId).ThenBy(static edge => edge.TargetId)];
         EntryBlockId = entryBlockId;

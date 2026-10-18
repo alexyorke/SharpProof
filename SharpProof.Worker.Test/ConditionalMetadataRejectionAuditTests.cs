@@ -216,7 +216,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         var reader = pe.GetMetadataReader();
         var handle = (MethodDefinitionHandle)MetadataTokens.Handle(logToken);
         var log = reader.GetMethodDefinition(handle);
-        var rows = ImmutableList<AttributeRow>.Empty;
+        var rows = ImmutableArray.CreateBuilder<AttributeRow>();
         foreach (var attributeHandle in log.GetCustomAttributes())
         {
             var attribute = reader.GetCustomAttribute(attributeHandle);
@@ -296,7 +296,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
                     valueError = exception.GetType().FullName;
                 }
             }
-            rows = rows.Add(new(MetadataTokens.GetRowNumber(attributeHandle), MetadataTokens.GetToken(attribute.Parent),
+            rows.Add(new(MetadataTokens.GetRowNumber(attributeHandle), MetadataTokens.GetToken(attribute.Parent),
                 constructorKind, constructorToken, constructorName, ownerKind, ownerToken, ownerName, ownerNamespace,
                 visibility, scopeKind, ownerNested, signature, attribute.Value.IsNil, MetadataTokens.GetHeapOffset(attribute.Value),
                 Convert.ToHexStringLower(rawValue), symbol, constructorError, valueError));
@@ -305,7 +305,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         return new(Hash(bytes), bytes.Length, reader.GetGuid(reader.GetModuleDefinition().Mvid),
             reader.GetString(reader.GetAssemblyDefinition().Name), logToken, reader.GetString(log.Name),
             Convert.ToHexStringLower(reader.GetBlobBytes(log.Signature)),
-            Convert.ToHexStringLower(pe.GetMethodBody(log.RelativeVirtualAddress).GetILBytes()!), tables, rows.ToImmutableArray());
+            Convert.ToHexStringLower(pe.GetMethodBody(log.RelativeVirtualAddress).GetILBytes()!), tables, rows.ToImmutable());
     }
 
     private static async Task QualifyImage(string directory, byte[] bytes, int logToken, string scenario, bool mutated)
@@ -710,7 +710,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = ImmutableList<IlInstruction>.Empty;
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -737,11 +737,11 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 token = BitConverter.ToInt32(il, offset);
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
-            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
     }
 
     private static PeObservation DescribePe(byte[] bytes)

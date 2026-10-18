@@ -20,9 +20,9 @@ internal static class IrBlockOrder
         spend = RepositoryParameterGuard.NotNull(spend, nameof(spend));
 
         var blockCapacity = program.Blocks.Length;
-        var states = Enumerable.Repeat((byte)0, blockCapacity).ToImmutableList();
+        var states = Enumerable.Repeat((byte)0, blockCapacity).ToImmutableArray().ToBuilder();
         var pending = ImmutableStack<(IrBlockId Block, bool Exit)>.Empty;
-        var result = ImmutableList<IrBlockId>.Empty;
+        var result = ImmutableArray.CreateBuilder<IrBlockId>();
         pending = pending.Push((program.Entry, false));
         while (!pending.IsEmpty)
         {
@@ -36,8 +36,8 @@ internal static class IrBlockOrder
             pending = pending.Pop();
             if (frame.Exit)
             {
-                states = states.SetItem(frame.Block.Value, 2);
-                result = result.Add(frame.Block);
+                states[frame.Block.Value] = 2;
+                result.Add(frame.Block);
 
                 continue;
             }
@@ -55,7 +55,7 @@ internal static class IrBlockOrder
                 return default;
             }
 
-            states = states.SetItem(frame.Block.Value, 1);
+            states[frame.Block.Value] = 1;
             pending = pending.Push((frame.Block, true));
             pending = block.Terminator switch
             {
@@ -67,7 +67,7 @@ internal static class IrBlockOrder
         }
 
         failure = IrAcyclicOrderFailure.None;
-        return result.Reverse().ToImmutableArray();
+        return result.ToImmutable().Reverse().ToImmutableArray();
     }
 
 }

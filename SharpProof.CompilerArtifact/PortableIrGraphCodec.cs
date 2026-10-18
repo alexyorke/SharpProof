@@ -977,14 +977,14 @@ internal static partial class PortableIrGraphCodec
             Func<TRow, TResult> decode) where TRow : class
         {
             decode = RepositoryParameterGuard.NotNull(decode, nameof(decode));
-            var result = ImmutableList<TResult>.Empty;
+            var result = ImmutableArray.CreateBuilder<TResult>();
             for (var index = 0; index < rows.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
-                result = result.Add(decode(Required(rows[index], $"{kind} row")));
+                result.Add(decode(Required(rows[index], $"{kind} row")));
             }
 
-            return result.ToImmutableArray();
+            return result.ToImmutable();
         }
 
         private OperationId DecodeOperation(PortableIrOperation row)

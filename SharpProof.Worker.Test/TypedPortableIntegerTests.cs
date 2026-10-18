@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
@@ -14,8 +15,8 @@ public sealed class TypedPortableIntegerTests
     public void RoundTripPreservesWidthSignednessBitsAndOperators()
     {
         var factory = new IrFactory();
-        var roots = new List<IrTerm>();
-        var values = new Dictionary<IrVarId, IrValue>();
+        var roots = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         foreach (var width in new[] { 8, 16, 32, 64 })
         {
             foreach (var isSigned in new[] { false, true })
@@ -23,18 +24,18 @@ public sealed class TypedPortableIntegerTests
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
                 var variable = factory.CreateVariable($"input{width}{isSigned}", type);
-                values.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
-                roots.Add(factory.IntegerBits(type, mask));
-                roots.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
+                values = values.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
+                roots = roots.Add(factory.IntegerBits(type, mask));
+                roots = roots.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                roots = roots.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                roots = roots.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
             }
         }
         var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var json = JsonSerializer.Serialize(encoded.Graph, WorkerProtocolJson.SharedOptions);
         var decoded = PortableIrGraphCodec.Decode(JsonSerializer.Deserialize<PortableIrGraph>(
             json, WorkerProtocolJson.SharedOptions)!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var decodedValues = encoded.VariableIndices.ToDictionary(
+        var decodedValues = encoded.VariableIndices.ToImmutableDictionary(
             pair => decoded.Variables[pair.Value],
             pair => decoded.Factory.CreateIntegerValueFromBits(
                 decoded.Factory.GetVariableInfo(decoded.Variables[pair.Value]).Type,

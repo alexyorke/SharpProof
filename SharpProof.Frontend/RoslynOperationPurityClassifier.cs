@@ -4,8 +4,8 @@ namespace SharpProof.Frontend;
 // Each lowering scope owns its reference-identity and depth-sensitive cache.
 internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> isKnownPure, int maximumDepth)
 {
-    private readonly Dictionary<IOperation, Dictionary<int, bool>> _purityResults =
-        (isKnownPure is null ? throw new System.ArgumentNullException(nameof(isKnownPure)) : new(ReferenceComparer<IOperation>.Instance));
+    private ImmutableDictionary<IOperation, ImmutableDictionary<int, bool>> _purityResults =
+        (isKnownPure is null ? throw new System.ArgumentNullException(nameof(isKnownPure)) : ImmutableDictionary.Create<IOperation, ImmutableDictionary<int, bool>>(ReferenceComparer<IOperation>.Instance));
 
     internal bool IsDemonstrablyPure(IOperation operation, int depth)
     {
@@ -15,11 +15,10 @@ internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> 
             return false;
         }
 
-        var purityResults = _purityResults;
-        if (!purityResults.TryGetValue(operation, out var depths))
+        if (!_purityResults.TryGetValue(operation, out var depths))
         {
-            depths = [];
-            purityResults.Add(operation, depths);
+            depths = ImmutableDictionary<int, bool>.Empty;
+            _purityResults = _purityResults.AddUnique(operation, depths);
         }
         if (depths.TryGetValue(depth, out var cached))
         {
@@ -27,7 +26,7 @@ internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> 
         }
 
         var result = IsDemonstrablyPureCore(operation, depth);
-        depths.Add(depth, result);
+        _purityResults = _purityResults.SetItem(operation, _purityResults[operation].AddUnique(depth, result));
         return result;
     }
 

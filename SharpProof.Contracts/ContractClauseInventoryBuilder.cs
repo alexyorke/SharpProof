@@ -446,17 +446,17 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         CancellationToken cancellationToken)
     {
         callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
-        var bodies = ImmutableList<SyntaxNode>.Empty;
+        var bodies = ImmutableArray.CreateBuilder<SyntaxNode>();
         foreach (var reference in callable.DeclaringSyntaxReferences)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (GetBody(reference.GetSyntax(cancellationToken)) is { } body)
             {
-                bodies = bodies.Add(body);
+                bodies.Add(body);
             }
         }
 
-        return bodies.ToImmutableArray();
+        return bodies.ToImmutable();
     }
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)

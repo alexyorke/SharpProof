@@ -39,16 +39,11 @@ public sealed class IrOperandFailureTests
         var entry = builder.CreateBlock();
         var store = builder.ElementStore(entry, factory.CreateOperation(), factory.Variable(array), factory.Variable(index), factory.Variable(value));
         builder.Return(entry, factory.CreateOperation());
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [array] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(0)]),
-            [index] = factory.CreateIntegerValue(0),
-            [value] = factory.CreateIntegerValue(5)
-        };
+        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(0)])).SetItem(index, factory.CreateIntegerValue(0)).SetItem(value, factory.CreateIntegerValue(5));
         var program = builder.Build();
         var interpreter = new IrProgramInterpreter(factory);
         Assert.That(interpreter.Execute(program, inputs).Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-        inputs.Remove(new[] { array, index, value }[missingOperand]);
+        inputs = inputs.Remove(System.Collections.Immutable.ImmutableArray.Create(array, index, value)[missingOperand]);
         var writes = 0;
         var result = interpreter.Execute(program, inputs, maximumSteps: 10000, replayOptions: new IrProgramReplayOptions(_ => null)
         { WriteObserver = _ => writes++ });

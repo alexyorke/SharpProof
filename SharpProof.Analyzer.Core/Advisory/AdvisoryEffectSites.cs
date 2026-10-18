@@ -62,7 +62,7 @@ internal static class AdvisoryEffectSites
         var escapes = Escaping(program);
         var factory = program.Factory;
         var sequenceReaders = IrSequenceReads.Readers(program);
-        var sites = ImmutableList<AdvisoryEffectSite>.Empty;
+        var sites = ImmutableArray.CreateBuilder<AdvisoryEffectSite>();
         foreach (var block in program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (reachable.Contains(block.Id))))
         {
             foreach (var instruction in block.Instructions)
@@ -70,28 +70,28 @@ internal static class AdvisoryEffectSites
                 cancellationToken.ThrowIfCancellationRequested();
                 var location = locate(instruction.Operation) ?? fallback;
                 if (sequenceReaders.Contains(instruction.Id))
-                { sites = sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
+                { sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
                 switch (instruction)
                 {
                     case IrAllocationInstruction:
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Allocation, location));
+                        sites.Add(new(AdvisoryEffectSiteKind.Allocation, location));
                         break;
                     case IrWriteInstruction write:
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Write, location)
+                        sites.Add(new(AdvisoryEffectSiteKind.Write, location)
                         { Region = IrWriteSites.IsObservable(factory, write) ? write.Region : IrWriteRegion.Local });
                         break;
                     case IrLockInstruction:
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Lock, location));
+                        sites.Add(new(AdvisoryEffectSiteKind.Lock, location));
                         break;
                     case IrCallInstruction { Receiver: null, Target: null } call:
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Call, location) { Effects = IrOpaqueCallSite.Effects(factory, call.Operation) });
+                        sites.Add(new(AdvisoryEffectSiteKind.Call, location) { Effects = IrOpaqueCallSite.Effects(factory, call.Operation) });
                         break;
                     case IrHavocInstruction { Origin: IrHavocOrigin.Approximation } havoc when ReadsState(factory, havoc.Operation):
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Read, location)
+                        sites.Add(new(AdvisoryEffectSiteKind.Read, location)
                         { Static = Describe(factory, havoc.Operation).StartsWith("StaticFieldReference@", StringComparison.Ordinal) });
                         break;
                     case IrThrowInstruction thrown:
-                        sites = sites.Add(new(AdvisoryEffectSiteKind.Throw, location)
+                        sites.Add(new(AdvisoryEffectSiteKind.Throw, location)
                         {
                             Exception = thrown.ExceptionKind,
                             Escapes = escapes.Contains(thrown.Target),
@@ -101,7 +101,7 @@ internal static class AdvisoryEffectSites
                 }
             }
         }
-        return new(sites.ToImmutableArray(), null);
+        return new(sites.ToImmutable(), null);
     }
 
     private static AdvisoryEffectAnalysis Gap(string reason)

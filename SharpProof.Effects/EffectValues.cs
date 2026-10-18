@@ -133,10 +133,10 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
     {
         types = ArgumentNullGuard.NotNull(types, nameof(types));
 
-        var distinct = ImmutableHashSet.Create<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var distinct = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         foreach (var type in types)
         {
-            distinct = distinct.Add(type ?? throw new ArgumentException(
+            distinct.Add(type ?? throw new ArgumentException(
                 "Exception type sets cannot contain null.", nameof(types)));
         }
 

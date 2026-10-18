@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -56,7 +57,7 @@ public sealed class Pr275BindingAndCaptureRequiredInputTests
         var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values;
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
-        var partialTrees = trees.Take(trees.Length - 1).ToArray();
+        var partialTrees = trees.Take(trees.Count - 1).ToImmutableArray();
 
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             CompilerReachableSourceCollector.Collect(compilation, targets, partialTrees, packs, default)));

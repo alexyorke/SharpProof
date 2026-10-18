@@ -162,14 +162,14 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         }
     }
 
-    private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static TotalIlBody Resolve(MetadataTestSubject subject, CompilerReferenceSnapshot[] references)
+    private static TotalIlBody Resolve(MetadataTestSubject subject, IReadOnlyList<CompilerReferenceSnapshot> references)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(subject);
@@ -195,7 +195,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
+    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot> references)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -204,7 +204,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
     }
 
-    private static void AssertRejected(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
+    private static void AssertRejected(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot> references)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -233,11 +233,11 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         var artifact = CompilerTotalCallableArtifactCodec.Encode(prepared)!;
         var decoded = CompilerDecodedShadowBody.Decode(prepared.CallableId, artifact, TestContext.CurrentContext.CancellationToken, references).Body;
         var factory = decoded.Program.Factory;
-        var arguments = new Dictionary<IrVarId, IrValue>();
+        var arguments = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         for (var index = 0; index < inputs.Length; index++)
         {
             var entry = decoded.Parameters[index].Entry;
-            arguments.Add(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, inputs[index]));
+            arguments = arguments.Add(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, inputs[index]));
         }
         var observed = new List<bool>();
         var marker = decoded.CallPreconditions.Single().Instruction;

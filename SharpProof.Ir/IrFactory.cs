@@ -273,13 +273,22 @@ public sealed class IrFactory
         }
     }
 
-    public IrMemberId GetOrCreateMember(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
+    public IrMemberId GetOrCreateMember(IrIdentityId identity /* SPINT001: all values valid - GetOrCreateMemberSnapshot validates the identity scope under the factory gate */, IrTypeId declaringType, string name /* SPINT001: all values valid - GetOrCreateMemberSnapshot validates names after parameter types to preserve guard ordering */, IrTypeId returnType, bool isStatic,
         params IrTypeId[] parameterTypes)
     {
         RepositoryParameterGuard.ThrowIfInvalid(declaringType.IsDefault, nameof(declaringType));
         RepositoryParameterGuard.ThrowIfInvalid(returnType.IsDefault, nameof(returnType));
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
-        var parameters = ImmutableArray.CreateRange(parameterTypes);
+        return GetOrCreateMemberSnapshot(identity, declaringType, name, returnType, isStatic, ImmutableArray.CreateRange(parameterTypes));
+    }
+
+    internal IrMemberId GetOrCreateMemberSnapshot(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
+        ImmutableArray<IrTypeId> parameterTypes)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(declaringType.IsDefault, nameof(declaringType));
+        RepositoryParameterGuard.ThrowIfInvalid(returnType.IsDefault, nameof(returnType));
+        RepositoryParameterGuard.RequireInitialized(parameterTypes.IsDefault, nameof(parameterTypes), "Array must be initialized.");
+        var parameters = parameterTypes;
         var parameterIds = ImmutableArray.CreateRange(
             parameters.Select(static parameter => parameter.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(parameter)) : (parameter.Value)));
         ValidateName(name, nameof(name));
@@ -431,7 +440,7 @@ public sealed class IrFactory
             elementType = info.ElementType.Value;
         }
 
-        var values = ImmutableList<IrValue>.Empty;
+        var values = ImmutableArray.CreateBuilder<IrValue>();
         foreach (var value in elements)
         {
             if (value == null || value.Type != elementType)
@@ -441,13 +450,13 @@ public sealed class IrFactory
                     nameof(elements));
             }
 
-            values = values.Add(value);
+            values.Add(value);
         }
 
         return new IrValue(
             type,
             IrValueKind.Sequence,
-            values.ToImmutableArray());
+            values.ToImmutable());
     }
 
     public IrBooleanTerm Boolean(bool value)

@@ -706,7 +706,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = ImmutableList<IlInstruction>.Empty;
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -736,11 +736,11 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 resolved = member.ToString();
                 resolvedMvid = member.Module.ModuleVersionId;
             }
-            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)),
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)),
                 token, resolved, resolvedMvid));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
     }
 
     private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)

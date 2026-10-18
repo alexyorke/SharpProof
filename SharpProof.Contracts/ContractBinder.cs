@@ -270,11 +270,11 @@ public sealed partial class ContractBinder
         {
             return ContractBindingResult.Fail(substituted.Failure);
         }
-        var clauses = substituted.Clauses.ToImmutableList();
+        var clauses = substituted.Clauses.ToBuilder();
         void AppendClause(BoundContractClause clause)
         {
             clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
-            clauses = clauses.Add(clause);
+            clauses.Add(clause);
         }
 
         var attributeFailure = BindClosedAttributes(
@@ -285,7 +285,7 @@ public sealed partial class ContractBinder
         }
 
         return ContractBindingResult.Success(new BoundMethodContracts(
-            target, source, clauses.ToImmutableArray(), canonical.ToBoundVariables(), usesCompanion));
+            target, source, clauses.ToImmutable(), canonical.ToBoundVariables(), usesCompanion));
     }
 
     private static bool HasRequiresPlacementErrors(

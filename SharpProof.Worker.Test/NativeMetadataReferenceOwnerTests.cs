@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
@@ -105,14 +106,14 @@ public sealed class NativeMetadataReferenceOwnerTests
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSignature"));
     }
 
-    private static CompilerReferenceSnapshot[] Capture(MetadataTestSubject subject)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(MetadataTestSubject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, CompilerReferenceSnapshot[] references, bool enabled)
+    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, IReadOnlyList<CompilerReferenceSnapshot> references, bool enabled)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(subject);
@@ -121,7 +122,7 @@ public sealed class NativeMetadataReferenceOwnerTests
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: enabled);
     }
 
-    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
+    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, IReadOnlyList<CompilerReferenceSnapshot> references)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(body);

@@ -1377,13 +1377,13 @@ public sealed class FrontendLoweringTests
             return interpreted;
         }
 
-        internal Dictionary<IrVarId, IrValue> CreateEnvironment(
+        internal ImmutableDictionary<IrVarId, IrValue> CreateEnvironment(
             FrontendLoweringResult lowering,
             params object?[] arguments)
         {
             System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
             System.ArgumentNullException.ThrowIfNull(lowering);
-            var values = new Dictionary<IrVarId, IrValue>();
+            var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
             foreach (var binding in lowering.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||
@@ -1401,7 +1401,7 @@ public sealed class FrontendLoweringTests
                         Factory.GetVariableInfo(binding.Variable).Type,
                         arguments[parameter.Ordinal]));
             }
-            return values;
+            return values.ToImmutable();
         }
 
         public void Dispose()

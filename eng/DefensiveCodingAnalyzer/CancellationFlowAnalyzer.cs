@@ -240,7 +240,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                 SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType) &&
                 argument.ArgumentKind != ArgumentKind.DefaultValue &&
                 FlowsFromAvailableToken(argument.Value, availableTokens, semanticModel,
-                    new HashSet<ISymbol>(SymbolEqualityComparer.Default), 0, cancellationToken));
+                    ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), 0, cancellationToken));
         }
 
         // The selected overload omitted cancellation entirely. Match only an
@@ -254,7 +254,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
 
     private static bool FlowsFromAvailableToken(IOperation value,
         ImmutableArray<IParameterSymbol> availableTokens, SemanticModel semanticModel,
-        HashSet<ISymbol> visited, int depth, CancellationToken cancellationToken)
+        ImmutableHashSet<ISymbol>.Builder visited, int depth, CancellationToken cancellationToken)
     {
         if (depth >= 16)
         {

@@ -35,7 +35,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
                 selectedOrdinal, trees[selectedOrdinal].GetText())
             : CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), Is.SameAs(captured));
-        Assert.That(captured, Has.Length.EqualTo(treeCount));
+        Assert.That(captured, Has.Count.EqualTo(treeCount));
         for (var ordinal = 0; ordinal < treeCount; ordinal++)
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, ordinal, out var length), Is.True);

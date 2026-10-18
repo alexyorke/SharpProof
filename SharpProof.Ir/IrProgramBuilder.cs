@@ -264,7 +264,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 "A program must contain at least one block.");
         }
 
-        var blocks = ImmutableArray<IrBasicBlock>.Empty;
+        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>();
         foreach (var block in _blocks)
         {
             if (block.Instructions.Count == 0 ||
@@ -274,14 +274,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     "Every program block must end in a control-flow terminator.");
             }
 
-            blocks = blocks.Add(block.Freeze());
+            blocks.Add(block.Freeze());
         }
         _built = true;
         return new IrProgram(
             _factory,
             _scope,
             _entry.Value,
-            blocks);
+            blocks.ToImmutable());
     }
 
     private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator

@@ -287,8 +287,8 @@ SOFTWARE.
             }
         }
 
-        var files = ImmutableList<OpenSourceCorpusFile>.Empty;
-        var candidates = ImmutableList<ImportCandidate>.Empty;
+        var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
+        var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
         var declarationHashes = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
@@ -308,7 +308,7 @@ SOFTWARE.
                             relativePath,
                             cancellationToken)
                         .ConfigureAwait(false)));
-            files = files.Add(
+            files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
                     relativePath,
@@ -340,7 +340,7 @@ SOFTWARE.
 
                 declarationHashes = declarationHashes.Add(hash);
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
-                candidates = candidates.Add(
+                candidates.Add(
                     new ImportCandidate(
                         relativePath,
                         lineSpan.StartLinePosition.Line + 1,
@@ -349,7 +349,7 @@ SOFTWARE.
                         method.Identifier.ValueText));
             }
         }
-        return (files.ToImmutableArray(), candidates.ToImmutableArray());
+        return (files.ToImmutable(), candidates.ToImmutable());
     }
 
     private static bool IsCandidate(MethodDeclarationSyntax method)

@@ -88,7 +88,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         Assert.That(preparation.Total, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(trees, Has.Length.EqualTo(1));
+            Assert.That(trees, Has.Count.EqualTo(1));
             Assert.That(references, Is.Not.Empty);
             Assert.That(preparation.Total!.Program.Factory.Semantics,
                 Is.EqualTo(IrExecutionSemantics.Total));

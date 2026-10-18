@@ -23,7 +23,7 @@ internal static class ClosedContractAttributeBinding
         createOperation = RepositoryParameterGuard.NotNull(createOperation, nameof(createOperation));
         getValue = RepositoryParameterGuard.NotNull(getValue, nameof(getValue));
         valueName = RepositoryParameterGuard.NotNull(valueName, nameof(valueName));
-        var clauses = ImmutableList<BoundClosedAttributeValue>.Empty;
+        var clauses = ImmutableArray.CreateBuilder<BoundClosedAttributeValue>();
         foreach (var attribute in attributes)
         {
             if (symbols.IsRejectedClosedContract(attribute))
@@ -57,7 +57,7 @@ internal static class ClosedContractAttributeBinding
                 }
                 var safeCondition = factory.Boolean(true);
                 var sourceOperation = createOperation(syntax);
-                clauses = clauses.Add(new(kind, condition, safeCondition, sourceOperation,
+                clauses.Add(new(kind, condition, safeCondition, sourceOperation,
                     FormatDiagnosticText(attribute, validation, valueName), syntax.GetReference()));
             }
             else
@@ -73,11 +73,11 @@ internal static class ClosedContractAttributeBinding
                 }
                 var diagnosticText = FormatDiagnosticText(attribute, validation, valueName);
                 var condition = validation.CreateLegacyPredicate(factory, value);
-                clauses = clauses.Add(new(kind, condition, null, createOperation(null), diagnosticText,
+                clauses.Add(new(kind, condition, null, createOperation(null), diagnosticText,
                     attribute.ApplicationSyntaxReference));
             }
         }
-        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
+        return new(clauses.ToImmutable(), ContractBindingFailure.None);
     }
 
     // Projects compiler-owned parameter annotations onto caller-owned IR values.
@@ -91,7 +91,7 @@ internal static class ClosedContractAttributeBinding
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         symbols = ArgumentNullGuard.NotNull(symbols, nameof(symbols));
         sites = ArgumentNullGuard.NotNull(sites, nameof(sites));
-        var clauses = ImmutableList<BoundTotalMetadataRequires>.Empty;
+        var clauses = ImmutableArray.CreateBuilder<BoundTotalMetadataRequires>();
         foreach (var site in sites)
         {
             var parameter = site.Parameter;
@@ -99,7 +99,7 @@ internal static class ClosedContractAttributeBinding
             var refKind = parameter.RefKind;
             var attributes = parameter.GetAttributes();
             cancellationToken.ThrowIfCancellationRequested();
-            var kinds = ImmutableHashSet<ClosedContractAttributeKind>.Empty;
+            var kinds = ImmutableHashSet.CreateBuilder<ClosedContractAttributeKind>();
             foreach (var attribute in attributes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -111,9 +111,8 @@ internal static class ClosedContractAttributeBinding
                 { continue; }
                 var constructor = attribute.AttributeConstructor;
                 var expectedArguments = validation.Kind == ClosedContractAttributeKind.InRange ? 2 : 0;
-                if (!validation.IsValid || kinds.Contains(validation.Kind))
+                if (!validation.IsValid || !kinds.Add(validation.Kind))
                 { return new([], ContractBindingFailure.InvalidClosedAttribute); }
-                kinds = kinds.Add(validation.Kind);
                 if (constructor == null ||
                     constructor.MethodKind != MethodKind.Constructor || constructor.IsStatic ||
                     !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attribute.AttributeClass) ||
@@ -127,10 +126,10 @@ internal static class ClosedContractAttributeBinding
                 var condition = validation.CreateTotalPredicate(factory, value, factory.GetTypeInfo(value.Type));
                 if (condition == null)
                 { return new([], ContractBindingFailure.UnsupportedExpression); }
-                clauses = clauses.Add(new(parameter.Ordinal, attribute, validation, condition, factory.Boolean(true)));
+                clauses.Add(new(parameter.Ordinal, attribute, validation, condition, factory.Boolean(true)));
             }
         }
-        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
+        return new(clauses.ToImmutable(), ContractBindingFailure.None);
     }
 
     internal static string FormatDiagnosticText(

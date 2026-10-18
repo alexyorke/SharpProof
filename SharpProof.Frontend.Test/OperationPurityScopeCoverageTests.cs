@@ -28,10 +28,9 @@ public sealed class OperationPurityScopeCoverageTests
         var pure = invocations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 1)"));
         var impure = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x++)"));
         var unknown = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.TargetMethod.Name == "Unknown"));
-        var calls = new List<string>();
+        var calls = ImmutableList<string>.Empty;
         var classifier = new RoslynOperationPurityClassifier(KnownPure, 256);
-        Assert.That(new[]
-        {
+        Assert.That(ImmutableArray.Create(
             classifier.IsDemonstrablyPure(pure, 0),
             classifier.IsDemonstrablyPure(pure, 0),
             classifier.IsDemonstrablyPure(impure, 0),
@@ -39,13 +38,13 @@ public sealed class OperationPurityScopeCoverageTests
             classifier.IsDemonstrablyPure(pure, 1),
             classifier.IsDemonstrablyPure(unknown, 0),
             classifier.IsDemonstrablyPure(pure, 256)
-        }, Is.EqualTo(ExpectedBatchResults));
+        ), Is.EqualTo(ExpectedBatchResults));
         Assert.That(calls, Is.EqualTo(ExpectedBatchCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
             System.ArgumentNullException.ThrowIfNull(method);
-            calls.Add(method.Name);
+            calls = calls.Add(method.Name);
             return method.Name == "Read";
         }
     }
@@ -75,7 +74,7 @@ public sealed class OperationPurityScopeCoverageTests
         var nested = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 2)"));
         FrontendLoweringResult? nestedResult = null;
         var reentered = false;
-        var calls = new List<string>();
+        var calls = ImmutableList<string>.Empty;
         RoslynOperationLowerer? lowerer = null;
         // Reenter while the first argument is being classified. The second
         // argument still needs the restored classifier from the outer scope.
@@ -96,7 +95,7 @@ public sealed class OperationPurityScopeCoverageTests
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
             System.ArgumentNullException.ThrowIfNull(method);
-            calls.Add(method.Name);
+            calls = calls.Add(method.Name);
             if (method.Name == "Read" && !reentered)
             {
                 reentered = true;
@@ -106,7 +105,7 @@ public sealed class OperationPurityScopeCoverageTests
         }
     }
 
-    private static IInvocationOperation[] Invocations(TypedProgramSubject subject)
+    private static ImmutableArray<IInvocationOperation> Invocations(TypedProgramSubject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
@@ -114,7 +113,7 @@ public sealed class OperationPurityScopeCoverageTests
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = subject.Compilation.GetSemanticModel(tree);
         return syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : ((IInvocationOperation)model.GetOperation(invocation)!)).ToArray();
+            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : ((IInvocationOperation)model.GetOperation(invocation)!)).ToImmutableArray();
     }
 
     private static void AssertOpaque(FrontendLoweringResult result, IrOpaquePurity purity)

@@ -77,7 +77,8 @@ public sealed partial class IrPrinter(IrFactory factory)
     private static string Quote(string value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        var fragments = ImmutableList<string>.Empty.Add("\"");
+        var fragments = ImmutableArray.CreateBuilder<string>();
+        fragments.Add("\"");
         foreach (var character in value)
         {
             var escape = character switch
@@ -91,21 +92,22 @@ public sealed partial class IrPrinter(IrFactory factory)
             };
             if (escape != null)
             {
-                fragments = fragments.Add(escape);
+                fragments.Add(escape);
                 continue;
             }
             if (character is < ' ' or > '~')
             {
-                fragments = fragments.Add("\\u" +
+                fragments.Add("\\u" +
                     ((int)character).ToString(
                         "X4",
                         CultureInfo.InvariantCulture));
             }
             else
             {
-                fragments = fragments.Add(character.ToString());
+                fragments.Add(character.ToString());
             }
         }
-        return string.Concat(fragments.Add("\""));
+        fragments.Add("\"");
+        return string.Concat(fragments.ToImmutable());
     }
 }

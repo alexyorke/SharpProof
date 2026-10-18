@@ -444,7 +444,7 @@ public sealed class GoldenWorkerTests
             var concrete = referenceInputs ? input == null ? factory.CreateNullValue(factory.GetVariableInfo(entry).Type) :
                 nominalInputs ? factory.CreateReferenceValue(factory.GetVariableInfo(entry).Type, input) : factory.CreateStringValue((string)input) : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)(int)input!);
             var execution = new IrProgramInterpreter(factory).Execute(original.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = concrete },
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, concrete),
                 10000, replay);
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);

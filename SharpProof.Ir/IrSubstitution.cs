@@ -124,10 +124,10 @@ public static class IrSubstitution
         }
 
         var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
-        var result = ImmutableList<IrTerm>.Empty;
+        var result = ImmutableArray.CreateBuilder<IrTerm>();
         foreach (var root in rootSnapshot)
         {
-            result = result.Add(Rewrite(
+            result.Add(Rewrite(
                 factory,
                 root,
                 replacementMap,
@@ -136,7 +136,7 @@ public static class IrSubstitution
                 out _, out memo));
         }
 
-        return result.ToImmutableArray();
+        return result.ToImmutable();
     }
 
     private static ImmutableDictionary<IrVarId, IrTerm> CreateReplacementMap(

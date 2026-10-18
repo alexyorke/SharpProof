@@ -87,7 +87,7 @@ internal static class CompilerManifestArtifactProducer
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables,
             ReachableSource = diagnosticArtifacts.Length == 0
-                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees.ToArray(), specificationPackAuthority, cancellationToken)
+                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
                 : null
         };
         return artifact;

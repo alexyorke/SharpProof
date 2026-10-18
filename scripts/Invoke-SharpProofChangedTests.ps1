@@ -33,11 +33,16 @@ $parallelism = Get-SharpProofSemanticTestParallelism `
 function Invoke-GitLines {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
-    $lines = @(& git -C $repositoryRoot @Arguments)
+    $lines = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($line in (& git -C $repositoryRoot @Arguments)) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            [void]$lines.Add($line)
+        }
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
-    return @($lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return $lines.ToImmutable()
 }
 
 function Invoke-GitPaths {
@@ -51,7 +56,7 @@ function Invoke-GitPaths {
     $start.RedirectStandardError = $true
     $start.StandardOutputEncoding = [Text.Encoding]::UTF8
     foreach ($argument in @('-C', $repositoryRoot) + $Arguments) {
-        $start.ArgumentList.Add($argument)
+        [void]$start.ArgumentList.Add($argument)
     }
     $process = [Diagnostics.Process]::Start($start)
     try {
@@ -62,7 +67,8 @@ function Invoke-GitPaths {
         if ($process.ExitCode -ne 0) {
             throw "git $($Arguments -join ' ') failed: $errorText"
         }
-        return $output.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+        return [Collections.Immutable.ImmutableArray]::CreateRange[string](
+            $output.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries))
     }
     finally {
         $process.Dispose()
@@ -85,30 +91,32 @@ if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
 }
 
 Invoke-GitLines @('rev-parse', '--verify', $ComparisonRef) | Out-Null
-$changedPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+$changedPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
 foreach ($path in Invoke-GitPaths @(
         'diff', '-z', '--no-renames', '--name-only', $ComparisonRef, '--')) {
-    $changedPaths = $changedPaths.Add($path.Replace('\', '/'))
+    [void]$changedPaths.Add($path.Replace('\', '/'))
 }
 foreach ($path in Invoke-GitPaths @(
         'ls-files', '-z', '--others', '--exclude-standard')) {
-    $changedPaths = $changedPaths.Add($path.Replace('\', '/'))
+    [void]$changedPaths.Add($path.Replace('\', '/'))
 }
+$changedPaths = $changedPaths.ToImmutable()
 if ($changedPaths.Count -eq 0) {
     Write-Host "No changes found relative to $ComparisonRef."
     return
 }
 
-$projectPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+$projectPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
 foreach ($projectPath in Invoke-GitPaths @('ls-files', '-z', '*.csproj')) {
-    $projectPaths = $projectPaths.Add($projectPath.Replace('\', '/'))
+    [void]$projectPaths.Add($projectPath.Replace('\', '/'))
 }
 foreach ($changedPath in $changedPaths) {
     if ($changedPath.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
-        $projectPaths = $projectPaths.Add($changedPath)
+        [void]$projectPaths.Add($changedPath)
     }
 }
-$projects = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal)
+$projectPaths = $projectPaths.ToImmutable()
+$projects = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder()
 $projectInventoryIncomplete = $false
 foreach ($relativePath in $projectPaths) {
     $relative = $relativePath.Replace('\', '/')
@@ -118,7 +126,7 @@ foreach ($relativePath in $projectPaths) {
         $projectInventoryIncomplete = $true
         continue
     }
-    $buildFiles = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+    $buildFiles = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
     $pendingImports = [Collections.Immutable.ImmutableStack[string]]::Empty
     $pendingImports = $pendingImports.Push($fullPath)
     # MSBuild searches upward independently for the nearest props and targets.
@@ -135,12 +143,12 @@ foreach ($relativePath in $projectPaths) {
             $searchDirectory = Split-Path -Parent $searchDirectory
         }
     }
-    $items = [Collections.Immutable.ImmutableList[object]]::Empty
+    $items = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
     while (-not $pendingImports.IsEmpty) {
         $buildFile = $pendingImports.Peek()
         $pendingImports = $pendingImports.Pop()
         if ($buildFiles.Contains($buildFile)) { continue }
-        $buildFiles = $buildFiles.Add($buildFile)
+        [void]$buildFiles.Add($buildFile)
         if (-not (Test-Path -LiteralPath $buildFile -PathType Leaf)) {
             $projectInventoryIncomplete = $true
             continue
@@ -160,7 +168,7 @@ foreach ($relativePath in $projectPaths) {
         }
         foreach ($item in $xml.SelectNodes(
                 "//*[local-name()='Compile' or local-name()='ProjectReference']")) {
-            $items = $items.Add($item)
+            [void]$items.Add($item)
         }
         foreach ($import in $xml.SelectNodes("//*[local-name()='Import']")) {
             $importPath = [string]$import.GetAttribute('Project')
@@ -174,6 +182,7 @@ foreach ($relativePath in $projectPaths) {
                     $importPath.Replace('\', '/'), (Split-Path -Parent $buildFile)))
         }
     }
+    $items = $items.ToImmutable()
     # Imported item paths are relative to the consuming project, whereas
     # nested Import paths are relative to the file containing the import.
     foreach ($item in $items) {
@@ -186,59 +195,60 @@ foreach ($relativePath in $projectPaths) {
             $projectInventoryIncomplete = $true
         }
     }
-    $references = @(
-        $items | Where-Object { $_.LocalName -eq 'ProjectReference' } |
-            ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
-            ForEach-Object { $_.Trim() } |
-            Where-Object {
-                -not [string]::IsNullOrWhiteSpace($_) -and
-                $_ -notmatch '[$@%]\(|%[0-9a-f]{2}|[*?]'
-            } |
-            ForEach-Object {
-                [IO.Path]::GetFullPath(
-                    $_.Replace('\', '/'), (Split-Path -Parent $fullPath))
-            })
-    $compiledFilePatterns = @(
-        $items | Where-Object { $_.LocalName -eq 'Compile' } |
-            ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
-            ForEach-Object { $_.Trim() } |
-            Where-Object {
-                -not [string]::IsNullOrWhiteSpace($_) -and
-                $_ -notmatch '[$@%]\(|%[0-9a-f]{2}'
-            } |
-            ForEach-Object {
-                [IO.Path]::GetFullPath(
-                    $_.Replace('\', '/'), (Split-Path -Parent $fullPath)).Replace('\', '/')
-            } |
-            ForEach-Object {
-                # Match the changed path itself, including deleted files.
-                # A recursive directory wildcard also matches zero directories;
-                # ordinary wildcards cannot cross directory separators.
-                $pattern = [regex]::Escape($_).
-                Replace('\*\*/', '(?:.*/)?').
-                Replace('\*\*', '.*').
-                Replace('\*', '[^/]*').
-                Replace('\?', '[^/]')
-                [regex]::new('\A' + $pattern + '\z',
-                    [Text.RegularExpressions.RegexOptions]::CultureInvariant)
-            })
-    $projects = $projects.SetItem($fullPath,
-        [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.
-        Add('FullPath', $fullPath).
-        Add('RelativePath', $relative).
-        Add('Directory', (Split-Path -Parent $fullPath)).
-        Add('References', [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]]$references)).
-        Add('CompiledFilePatterns', [Collections.Immutable.ImmutableList[object]]::Empty.AddRange([object[]]$compiledFilePatterns)).
-        Add('BuildFiles', $buildFiles))
+    $references = [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]](@(
+                $items | Where-Object { $_.LocalName -eq 'ProjectReference' } |
+                    ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
+                    ForEach-Object { $_.Trim() } |
+                    Where-Object {
+                        -not [string]::IsNullOrWhiteSpace($_) -and
+                        $_ -notmatch '[$@%]\(|%[0-9a-f]{2}|[*?]'
+                    } |
+                    ForEach-Object {
+                        [IO.Path]::GetFullPath(
+                            $_.Replace('\', '/'), (Split-Path -Parent $fullPath))
+                    })))
+    $compiledFilePatterns = [Collections.Immutable.ImmutableList[object]]::Empty.AddRange([object[]](@(
+                $items | Where-Object { $_.LocalName -eq 'Compile' } |
+                    ForEach-Object { ([string]$_.GetAttribute('Include')).Split(';') } |
+                    ForEach-Object { $_.Trim() } |
+                    Where-Object {
+                        -not [string]::IsNullOrWhiteSpace($_) -and
+                        $_ -notmatch '[$@%]\(|%[0-9a-f]{2}'
+                    } |
+                    ForEach-Object {
+                        [IO.Path]::GetFullPath(
+                            $_.Replace('\', '/'), (Split-Path -Parent $fullPath)).Replace('\', '/')
+                    } |
+                    ForEach-Object {
+                        # Match the changed path itself, including deleted files.
+                        # A recursive directory wildcard also matches zero directories;
+                        # ordinary wildcards cannot cross directory separators.
+                        $pattern = [regex]::Escape($_).
+                        Replace('\*\*/', '(?:.*/)?').
+                        Replace('\*\*', '.*').
+                        Replace('\*', '[^/]*').
+                        Replace('\?', '[^/]')
+                        [regex]::new('\A' + $pattern + '\z',
+                            [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+                    })))
+    $projects[$fullPath] =
+    [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.
+    Add('FullPath', $fullPath).
+    Add('RelativePath', $relative).
+    Add('Directory', (Split-Path -Parent $fullPath)).
+    Add('References', $references).
+    Add('CompiledFilePatterns', $compiledFilePatterns).
+    Add('BuildFiles', $buildFiles.ToImmutable())
 }
 
-$testProjects = @($projects.Values | Where-Object {
-        $_.RelativePath -match '(^|/)SharpProof\.[^/]+\.Test/' -or
-        $_.RelativePath -match '(^|/)SharpProof\.ArchitectureTest/'
-    })
+$projects = $projects.ToImmutable()
+$testProjects = [Collections.Immutable.ImmutableList[object]]::Empty.AddRange([object[]](@($projects.Values | Where-Object {
+                $_.RelativePath -match '(^|/)SharpProof\.[^/]+\.Test/' -or
+                $_.RelativePath -match '(^|/)SharpProof\.ArchitectureTest/'
+            })))
 $validationConsumersByPath = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase)
-$explicitValidationProjects = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
-$changedProjectPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+$explicitValidationProjects = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
+$changedProjectPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
 $globalImpact = $false
 $scriptOrDocumentationImpact = $false
 foreach ($changedPath in $changedPaths) {
@@ -247,7 +257,7 @@ foreach ($changedPath in $changedPaths) {
     if ($validationConsumersByPath.ContainsKey($changedPath)) {
         foreach ($relativeValidationProject in
             $validationConsumersByPath[$changedPath]) {
-            $explicitValidationProjects = $explicitValidationProjects.Add(
+            [void]$explicitValidationProjects.Add(
                 [IO.Path]::GetFullPath(
                     (Join-Path $repositoryRoot $relativeValidationProject)))
         }
@@ -284,35 +294,42 @@ foreach ($changedPath in $changedPaths) {
             @($project.CompiledFilePatterns | Where-Object {
                     $_.IsMatch($fullChangedPath.Replace('\', '/'))
                 }).Count -ne 0) {
-            $changedProjectPaths = $changedProjectPaths.Add($project.FullPath)
+            [void]$changedProjectPaths.Add($project.FullPath)
         }
     }
 }
 
-$selected = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+$explicitValidationProjects = $explicitValidationProjects.ToImmutable()
+$changedProjectPaths = $changedProjectPaths.ToImmutable()
+$selected = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
 if ($globalImpact) {
     foreach ($testProject in $testProjects) {
-        $selected = $selected.Add($testProject.FullPath)
+        [void]$selected.Add($testProject.FullPath)
     }
 }
 else {
-    $reverseReferences = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal)
+    $reverseReferences = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder()
     foreach ($project in $projects.Values) {
         if (-not $reverseReferences.ContainsKey($project.FullPath)) {
-            $reverseReferences = $reverseReferences.SetItem($project.FullPath, [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal))
+            $reverseReferences[$project.FullPath] = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
         }
         foreach ($reference in $project.References) {
             if (-not $reverseReferences.ContainsKey($reference)) {
-                $reverseReferences = $reverseReferences.SetItem($reference, [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal))
+                $reverseReferences[$reference] = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
             }
-            $reverseReferences = $reverseReferences.SetItem($reference, $reverseReferences[$reference].Add($project.FullPath))
+            [void]$reverseReferences[$reference].Add($project.FullPath)
         }
     }
-    $affectedProjects = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal)
+    $frozenReverseReferences = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder()
+    foreach ($entry in $reverseReferences.GetEnumerator()) {
+        $frozenReverseReferences[$entry.Key] = $entry.Value.ToImmutable()
+    }
+    $reverseReferences = $frozenReverseReferences.ToImmutable()
+    $affectedProjects = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
     $pending = [Collections.Immutable.ImmutableStack[string]]::Empty
     foreach ($changedProject in $changedProjectPaths) {
         if (-not $affectedProjects.Contains($changedProject)) {
-            $affectedProjects = $affectedProjects.Add($changedProject)
+            [void]$affectedProjects.Add($changedProject)
             $pending = $pending.Push($changedProject)
         }
     }
@@ -324,20 +341,21 @@ else {
         }
         foreach ($dependent in $reverseReferences[$candidate]) {
             if (-not $affectedProjects.Contains($dependent)) {
-                $affectedProjects = $affectedProjects.Add($dependent)
+                [void]$affectedProjects.Add($dependent)
                 $pending = $pending.Push($dependent)
             }
         }
     }
+    $affectedProjects = $affectedProjects.ToImmutable()
     foreach ($testProject in $testProjects) {
         if ($affectedProjects.Contains($testProject.FullPath)) {
-            $selected = $selected.Add($testProject.FullPath)
+            [void]$selected.Add($testProject.FullPath)
         }
     }
 }
 if ($projectInventoryIncomplete) {
     foreach ($testProject in $testProjects) {
-        $selected = $selected.Add($testProject.FullPath)
+        [void]$selected.Add($testProject.FullPath)
     }
 }
 
@@ -347,7 +365,7 @@ $packageProject = [IO.Path]::GetFullPath((Join-Path $repositoryRoot (
             'SharpProof.Package.Test/SharpProof.Package.Test.csproj')))
 if (($scriptOrDocumentationImpact -or $globalImpact) -and
     $projects.ContainsKey($architectureProject)) {
-    $selected = $selected.Add($architectureProject)
+    [void]$selected.Add($architectureProject)
 }
 if (@($changedPaths | Where-Object {
             $_.StartsWith('scripts/', [StringComparison]::Ordinal) -or
@@ -355,20 +373,20 @@ if (@($changedPaths | Where-Object {
             $_.StartsWith('SharpProof.Package/', [StringComparison]::Ordinal) -or
             $_.StartsWith('SharpProof.Verifier/', [StringComparison]::Ordinal)
         }).Count -gt 0 -and $projects.ContainsKey($packageProject)) {
-    $selected = $selected.Add($packageProject)
+    [void]$selected.Add($packageProject)
 }
 foreach ($validationProject in $explicitValidationProjects) {
     if ($projects.ContainsKey($validationProject)) {
-        $selected = $selected.Add($validationProject)
+        [void]$selected.Add($validationProject)
     }
 }
 if ($selected.Count -eq 0) {
     if ($projects.ContainsKey($architectureProject)) {
-        $selected = $selected.Add($architectureProject)
+        [void]$selected.Add($architectureProject)
     }
     else {
         foreach ($testProject in $testProjects) {
-            $selected = $selected.Add($testProject.FullPath)
+            [void]$selected.Add($testProject.FullPath)
         }
     }
 }
@@ -377,10 +395,11 @@ if ($selected.Count -eq 0) {
 }
 
 $runPackageTests = $selected.Contains($packageProject)
-$selected = $selected.Remove($packageProject)
-$selectedRelative = @($selected | ForEach-Object {
-        [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('/', '\')
-    } | Sort-Object)
+[void]$selected.Remove($packageProject)
+$selected = $selected.ToImmutable()
+$selectedRelative = [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]](@($selected | ForEach-Object {
+                [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('/', '\')
+            } | Sort-Object)))
 if ($PlanOnly) {
     Write-Host "Changed paths relative to ${ComparisonRef}: $($changedPaths.Count)"
     Write-Host "Selected test projects: $($selectedRelative.Count)"
@@ -405,7 +424,7 @@ if ($selectedRelative.Count -gt 0) {
         [pscustomobject]@{
             solution = [ordered]@{
                 path     = 'SharpProof.slnx'
-                projects = $selectedRelative
+                projects = @($selectedRelative)
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
@@ -430,15 +449,14 @@ if ($selectedRelative.Count -gt 0) {
             [IO.Path]::GetFileName($selectedRelative[0]) -ceq
             'SharpProof.ArchitectureTest.csproj'
             if (-not $NoBuild) {
-                $changedProjectBuildArguments = @(
-                    'build', $selectedRelative[0],
-                    '-c', $Configuration, '--no-restore')
+                $changedProjectBuildArguments = [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]](@(
+                            'build', $selectedRelative[0],
+                            '-c', $Configuration, '--no-restore'))).ToBuilder()
                 if ($Fast) {
-                    $changedProjectBuildArguments +=
-                    '-p:RunAnalyzersDuringBuild=false'
+                    [void]$changedProjectBuildArguments.Add('-p:RunAnalyzersDuringBuild=false')
                 }
                 Invoke-SharpProofRequiredDotnet `
-                    -Arguments $changedProjectBuildArguments `
+                    -Arguments @($changedProjectBuildArguments.ToImmutable()) `
                     -TimeoutSeconds $TimeoutSeconds `
                     -Quiet
             }
@@ -453,33 +471,33 @@ if ($selectedRelative.Count -gt 0) {
                 if ($LASTEXITCODE -ne 0) {
                     throw 'Changed architecture tests failed.'
                 }
-                $testArguments = @()
+                $testArguments = [Collections.Immutable.ImmutableList[string]]::Empty.ToBuilder()
             }
             else {
                 $assembly = Get-SharpProofTestAssemblyPath `
                     -ProjectPath $selectedRelative[0] `
                     -Configuration $Configuration
-                $testArguments = @('vstest', $assembly)
-                $testArguments += '/TestCaseFilter:' + $semanticFilter
+                $testArguments = [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]](@('vstest', $assembly))).ToBuilder()
+                [void]$testArguments.Add('/TestCaseFilter:' + $semanticFilter)
             }
         }
         else {
-            $testArguments = @(
-                'test', $filterPath,
-                '-c', $Configuration,
-                '--no-restore',
-                "/m:$parallelism",
-                '--filter', $semanticFilter)
+            $testArguments = [Collections.Immutable.ImmutableList[string]]::Empty.AddRange([string[]](@(
+                        'test', $filterPath,
+                        '-c', $Configuration,
+                        '--no-restore',
+                        "/m:$parallelism",
+                        '--filter', $semanticFilter))).ToBuilder()
             if ($Fast) {
-                $testArguments += '-p:RunAnalyzersDuringBuild=false'
+                [void]$testArguments.Add('-p:RunAnalyzersDuringBuild=false')
             }
             if ($NoBuild) {
-                $testArguments += '--no-build'
+                [void]$testArguments.Add('--no-build')
             }
         }
         if ($testArguments.Count -gt 0) {
             Invoke-SharpProofRequiredDotnet `
-                -Arguments $testArguments `
+                -Arguments @($testArguments.ToImmutable()) `
                 -TimeoutSeconds $TimeoutSeconds `
                 -Quiet
         }

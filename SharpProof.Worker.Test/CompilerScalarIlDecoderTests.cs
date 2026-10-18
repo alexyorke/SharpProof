@@ -54,7 +54,7 @@ public sealed class CompilerScalarIlDecoderTests
         Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
 
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(trees, Has.Length.EqualTo(compilation.SyntaxTrees.Length));
+        Assert.That(trees, Has.Count.EqualTo(compilation.SyntaxTrees.Length));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             trees, null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);

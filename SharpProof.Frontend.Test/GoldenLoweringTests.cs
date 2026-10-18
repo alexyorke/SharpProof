@@ -154,11 +154,8 @@ public sealed class GoldenLoweringTests
                     { observations.Add((assignment, value.Boolean, approximation)); }
                 }
             };
-            var inputs = new Dictionary<IrVarId, IrValue>
-            {
-                [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type,
-                    int.Parse(callInput[callInputPrefix.Length..], CultureInfo.InvariantCulture))
-            };
+            var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type,
+                    int.Parse(callInput[callInputPrefix.Length..], CultureInfo.InvariantCulture)));
             var execution = new IrProgramInterpreter(factory).Execute(result.Program, inputs,
                 RoslynTotalProgramLowerer.MaximumRegionSteps, replay, TestContext.CurrentContext.CancellationToken);
             output.AppendLine(CultureInfo.InvariantCulture, $"call-execution: {execution.Status} allocations={allocated}");

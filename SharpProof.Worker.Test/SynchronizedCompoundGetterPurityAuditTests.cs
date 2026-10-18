@@ -410,7 +410,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
     private static ImmutableArray<DecodedInstruction> ReadTargetIl(byte[] il)
     {
         System.ArgumentNullException.ThrowIfNull(il, nameof(il));
-        var result = ImmutableList<DecodedInstruction>.Empty;
+        var result = ImmutableArray.CreateBuilder<DecodedInstruction>();
         var offset = 0;
         while (offset < il.Length)
         {
@@ -434,9 +434,9 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             {
                 throw new InvalidOperationException("Unexpected Target opcode: " + opcode.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
             }
-            result = result.Add(new(start, opcode, token));
+            result.Add(new(start, opcode, token));
         }
-        return result.ToImmutableArray();
+        return result.ToImmutable();
     }
 
     private sealed record DecodedInstruction(int Offset, int Opcode, int? Token);

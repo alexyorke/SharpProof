@@ -674,11 +674,11 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             var irControlCount = 0;
             foreach (var inputs in controls)
             {
-                var initial = new Dictionary<IrVarId, IrValue>();
+                var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
                 for (var ordinal = 0; ordinal < inputs.Length; ordinal++)
                 {
                     var binding = candidate.Parameters[ordinal];
-                    initial.Add(binding.Entry, candidate.Factory.CreateIntegerValue(
+                    initial = initial.Add(binding.Entry, candidate.Factory.CreateIntegerValue(
                         candidate.Factory.GetVariableInfo(binding.Entry).Type, inputs[ordinal]));
                 }
                 // Public interpreter default10000, not an expanded limit or Worker replay4096 override.

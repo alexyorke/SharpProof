@@ -76,8 +76,7 @@ public sealed class IrRemainingLifecycleTests
         var program = builder.Build();
         var interpreter = new IrProgramInterpreter(factory);
         Assert.That(interpreter.Execute(program).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        var valid = interpreter.Execute(program, new Dictionary<IrVarId, IrValue>
-        { [array] = factory.CreateSequenceValue(factory.GetVariableInfo(array).Type, [factory.CreateIntegerValue(7)]) });
+        var valid = interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(array, factory.CreateSequenceValue(factory.GetVariableInfo(array).Type, [factory.CreateIntegerValue(7)])));
         Assert.That(valid.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(valid.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
     }
@@ -102,7 +101,7 @@ public sealed class IrRemainingLifecycleTests
         var program = conditionalBuilder.Build();
         var interpreter = new IrProgramInterpreter(factory);
         Assert.That(interpreter.Execute(program).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(interpreter.Execute(program, new Dictionary<IrVarId, IrValue> { [condition] = factory.CreateBooleanValue(true) }).Status,
+        Assert.That(interpreter.Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(condition, factory.CreateBooleanValue(true))).Status,
             Is.EqualTo(IrProgramExecutionStatus.Returned));
     }
     [Test]
@@ -129,22 +128,22 @@ public sealed class IrRemainingLifecycleTests
         var heap = new IrHeap();
         heap.Fields[(value.Reference, field)] = factory.CreateIntegerValue(7);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
-        var inputs = new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(true) };
-        var leaves = new List<IrTerm>();
+        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(true));
+        var leaves = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
         var first = factory.CreateVariable("first", factory.ObjectType);
-        inputs.Add(first, value);
-        leaves.Add(factory.Variable(first));
+        inputs = inputs.Add(first, value);
+        leaves = leaves.Add(factory.Variable(first));
         for (var index = 1; index < 2048; index++)
         {
             var owner = factory.CreateVariable("owner" + index, factory.ObjectType);
-            inputs.Add(owner, value);
-            leaves.Add(factory.Variable(owner));
+            inputs = inputs.Add(owner, value);
+            leaves = leaves.Add(factory.Variable(owner));
         }
         while (leaves.Count > 1)
         {
-            var next = new List<IrTerm>();
+            var next = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
             for (var index = 0; index < leaves.Count; index += 2)
-            { next.Add(factory.Conditional(factory.Variable(flag), leaves[index], leaves[index + 1])); }
+            { next = next.Add(factory.Conditional(factory.Variable(flag), leaves[index], leaves[index + 1])); }
             leaves = next;
         }
         var interpreter = new IrInterpreter(factory);

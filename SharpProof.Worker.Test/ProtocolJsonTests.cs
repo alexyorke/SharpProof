@@ -2383,10 +2383,10 @@ public sealed class ProtocolJsonTests
         if (size < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(size)); }
 
-        var callables = ImmutableList<WorkerCallableManifestEntry>.Empty;
-        var claims = ImmutableList<WorkerClaimManifestEntry>.Empty;
-        var callableResults = ImmutableList<WorkerCallableResult>.Empty;
-        var claimResults = ImmutableList<WorkerClaimResult>.Empty;
+        var callables = ImmutableArray.CreateBuilder<WorkerCallableManifestEntry>();
+        var claims = ImmutableArray.CreateBuilder<WorkerClaimManifestEntry>();
+        var callableResults = ImmutableArray.CreateBuilder<WorkerCallableResult>();
+        var claimResults = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         var idPrefix = new string('x', 32);
         var location = new WorkerSourceLocation
         {
@@ -2400,7 +2400,7 @@ public sealed class ProtocolJsonTests
             var suffix = index.ToString("D6", CultureInfo.InvariantCulture);
             var callableId = "M:" + idPrefix + suffix;
             var claimId = "claim:" + idPrefix + suffix;
-            callables = callables.Add(new WorkerCallableManifestEntry
+            callables.Add(new WorkerCallableManifestEntry
             {
                 CallableId = callableId,
                 SelectedFeatures = [WorkerSelectedFeature.Contracts],
@@ -2410,7 +2410,7 @@ public sealed class ProtocolJsonTests
                 Location = location,
                 ClaimIds = [claimId]
             });
-            claims = claims.Add(new WorkerClaimManifestEntry
+            claims.Add(new WorkerClaimManifestEntry
             {
                 ClaimId = claimId,
                 CallableId = callableId,
@@ -2418,13 +2418,13 @@ public sealed class ProtocolJsonTests
                 Evidence = WorkerClaimEvidence.DirectClause,
                 Location = location
             });
-            callableResults = callableResults.Add(new WorkerCallableResult
+            callableResults.Add(new WorkerCallableResult
             {
                 CallableId = callableId,
                 Coverage = WorkerCallableCoverage.Complete,
                 Reason = WorkerCallableCoverageReason.None
             });
-            claimResults = claimResults.Add(new WorkerClaimResult
+            claimResults.Add(new WorkerClaimResult
             {
                 ClaimId = claimId,
                 Outcome = WorkerClaimOutcome.Proven,
@@ -2434,8 +2434,8 @@ public sealed class ProtocolJsonTests
 
         var manifest = new WorkerClaimManifest
         {
-            Callables = callables.ToImmutableArray(),
-            Claims = claims.ToImmutableArray()
+            Callables = callables.ToImmutable(),
+            Claims = claims.ToImmutable()
         };
         manifest.Hash = WorkerProtocolJson.ComputeManifestHash(manifest);
         return new WorkerVerifyResponse
@@ -2444,8 +2444,8 @@ public sealed class ProtocolJsonTests
             Manifest = manifest,
             RunStatus = WorkerRunStatus.Complete,
             FailureReason = WorkerRunFailureReason.None,
-            CallableResults = callableResults.ToImmutableArray(),
-            ClaimResults = claimResults.ToImmutableArray(),
+            CallableResults = callableResults.ToImmutable(),
+            ClaimResults = claimResults.ToImmutable(),
             Summary = new WorkerVerificationSummary
             {
                 CacheStatus = WorkerCacheStatus.Miss,

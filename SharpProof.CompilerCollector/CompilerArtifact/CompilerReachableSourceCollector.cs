@@ -5,7 +5,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerReachableSourceCollector
 {
     internal static CompilerReachableSourceArtifact Collect(CSharpCompilation compilation,
-        IEnumerable<ManifestCallableTarget> targets, CompilerSyntaxTreeSnapshot[] trees,
+        IEnumerable<ManifestCallableTarget> targets, IReadOnlyList<CompilerSyntaxTreeSnapshot> trees,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
@@ -13,7 +13,8 @@ internal static class CompilerReachableSourceCollector
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(targets, nameof(targets));
         ArgumentNullGuard.NotNull(trees, nameof(trees));
-        if (trees.Length < compilation.SyntaxTrees.Length)
+        var capturedTrees = trees.ToImmutableArray();
+        if (capturedTrees.Length < compilation.SyntaxTrees.Length)
         { throw new ArgumentException("Snapshot array must cover every compilation syntax tree.", nameof(trees)); }
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
             .ToImmutableDictionary(item => item.tree, item => item.ordinal);
@@ -103,7 +104,7 @@ internal static class CompilerReachableSourceCollector
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
                 var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
-                    tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (trees[ordinals[tree]].Path));
+                    tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (capturedTrees[ordinals[tree]].Path));
                 var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
                     cancellationToken: cancellationToken);
                 if (binding.IsSuccess && operation != null)
@@ -168,7 +169,7 @@ internal static class CompilerReachableSourceCollector
             Documents = [.. bodies.Values.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().OrderBy(ordinal => ordinal)
                 .Select(ordinal => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (new CompilerSourceDocumentArtifact
                 {
-                    SourceTreeOrdinal = ordinal, Path = trees[ordinal].Path,
+                    SourceTreeOrdinal = ordinal, Path = capturedTrees[ordinal].Path,
                     MaximumBodyEnd = bodies.Values.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == ordinal))
                         .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length))
                 })))]

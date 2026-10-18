@@ -97,7 +97,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return new CaseResult("", "", "", []);
         }
         count("compiled");
-        var problems = ImmutableList<(string, string, string)>.Empty;
+        var problems = ImmutableArray.CreateBuilder<(string, string, string)>();
         using var temp = new TempDirectory("sharpproof-longfuzz-");
         var manifestPath = Path.Combine(temp.FullName, "manifest.json");
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -120,14 +120,14 @@ public sealed class AnalyzerPipelineLongFuzzTests
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         foreach (var exception in exceptions)
         {
-            problems = problems.Add(("AnalyzerException", LongFuzzHit.Error, exception));
+            problems.Add(("AnalyzerException", LongFuzzHit.Error, exception));
         }
         foreach (var diagnostic in diagnostics)
         {
             count("diag:" + diagnostic.Id);
             if (diagnostic.Id is "AD0001" or "SP0049" or "SP0025")
             {
-                problems = problems.Add(("AnalyzerDiagnostic-" + diagnostic.Id, LongFuzzHit.Error, diagnostic.ToString()));
+                problems.Add(("AnalyzerDiagnostic-" + diagnostic.Id, LongFuzzHit.Error, diagnostic.ToString()));
             }
         }
         WorkerClaimOutcome? outcome = null;
@@ -144,12 +144,12 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
                 if (response.Errors.Length > 0)
                 {
-                    problems = problems.Add(("WorkerErrors", LongFuzzHit.Error,
+                    problems.Add(("WorkerErrors", LongFuzzHit.Error,
                         string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message)))));
                 }
                 if (!WorkerProtocolJson.Validate(response).IsValid)
                 {
-                    problems = problems.Add(("WorkerResponseInvalid", LongFuzzHit.Error, "The worker response failed protocol validation."));
+                    problems.Add(("WorkerResponseInvalid", LongFuzzHit.Error, "The worker response failed protocol validation."));
                 }
                 var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
                     claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
@@ -166,7 +166,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                problems = problems.Add(("WorkerException", LongFuzzHit.Error, exception.ToString()));
+                problems.Add(("WorkerException", LongFuzzHit.Error, exception.ToString()));
             }
         }
         else
@@ -178,7 +178,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
         {
             foreach (var diagnostic in diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id is "SP0030" or "SP0013")))
             {
-                problems = problems.Add(("AnalyzerWorkerDisagree", LongFuzzHit.Error, diagnostic.ToString()));
+                problems.Add(("AnalyzerWorkerDisagree", LongFuzzHit.Error, diagnostic.ToString()));
             }
         }
 
@@ -189,20 +189,20 @@ public sealed class AnalyzerPipelineLongFuzzTests
             runtime = observation.Error ?? observation.Violation ?? "no violation on " + observation.Inputs + " inputs";
             if (observation.Error != null)
             {
-                problems = problems.Add(("RuntimeHarness", LongFuzzHit.Error, observation.Error));
+                problems.Add(("RuntimeHarness", LongFuzzHit.Error, observation.Error));
             }
             else if (outcome == WorkerClaimOutcome.Proven && observation.Violation != null)
             {
-                problems = problems.Add(("FalseProven", LongFuzzHit.Error, observation.Violation));
+                problems.Add(("FalseProven", LongFuzzHit.Error, observation.Violation));
             }
             else if (outcome == WorkerClaimOutcome.Refuted && observation.Violation == null)
             {
                 count("refuted-not-observed");
-                problems = problems.Add(("RefutedNotObserved", LongFuzzHit.Warning,
+                problems.Add(("RefutedNotObserved", LongFuzzHit.Warning,
                     "No tested input violates the claim the worker refuted (" + observation.Inputs + " inputs)."));
             }
         }
-        return new CaseResult(outcome?.ToString() ?? "None", reason, runtime, problems.ToImmutableArray());
+        return new CaseResult(outcome?.ToString() ?? "None", reason, runtime, problems.ToImmutable());
     }
 
     internal sealed record Observation(string? Violation, string? Error, int Inputs);

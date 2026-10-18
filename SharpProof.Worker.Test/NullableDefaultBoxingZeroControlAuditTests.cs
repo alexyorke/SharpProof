@@ -310,7 +310,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = ImmutableList<IlInstruction>.Empty;
+        var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -339,11 +339,11 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
                 OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
                 _ => null
             };
-            rows = rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
+            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutableArray());
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutable());
     }
     private sealed record MeasurementObservation(int Round, long SubjectBytes, bool SubjectNull,
         long BeforeBytes, bool BeforeNull, long AfterBytes, bool AfterNull, long IdentityBytes, bool IdentityNull);

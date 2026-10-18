@@ -30,15 +30,15 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
         finally { runtime.Unload(); }
 
         var captured = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(captured, Has.Length.EqualTo(2));
+        Assert.That(captured, Has.Count.EqualTo(2));
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
         var complete = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             captured, null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(complete.Callers, Has.Length.EqualTo(1));
         Assert.That(complete.Callers.Single().Body.CallPreconditions, Has.Length.EqualTo(1));
 
-        // Retain the original compiler capture record; only the argument array is incomplete.
-        var incomplete = captured[..1];
+        // Retain the original compiler capture record; only the argument snapshot is incomplete.
+        var incomplete = captured.GetRange(0, 1);
         Assert.That(incomplete[0], Is.SameAs(captured[0]));
         var rejected = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             incomplete, null, authority, TestContext.CurrentContext.CancellationToken);

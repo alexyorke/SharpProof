@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using SharpProof.Roslyn;
 
@@ -19,14 +18,12 @@ internal sealed class ContractApiIdentityResolver
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
-    private readonly ConcurrentDictionary<IAssemblySymbol, bool>
-        _compilationReferenceCache =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<string, AttributeResolution> _attributes =
-        new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<INamedTypeSymbol, string>
-        _knownAttributeMetadataNames =
-            new(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IAssemblySymbol, bool> _compilationReferenceCache =
+        ImmutableDictionary.Create<IAssemblySymbol, bool>(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<string, AttributeResolution> _attributes =
+        ImmutableDictionary.Create<string, AttributeResolution>(StringComparer.Ordinal);
+    private ImmutableDictionary<INamedTypeSymbol, string> _knownAttributeMetadataNames =
+        ImmutableDictionary.Create<INamedTypeSymbol, string>(SymbolEqualityComparer.Default);
     private readonly ContractApiMetadataNameMatcher _metadataNames = new();
 
     private ContractApiIdentityResolver(Compilation compilation)
@@ -95,7 +92,7 @@ internal sealed class ContractApiIdentityResolver
                 "Unknown SharpProof contract attribute.");
         }
 
-        return _attributes.GetOrAdd(
+        return ImmutableInterlocked.GetOrAdd(ref _attributes,
             metadataName,
             ResolveAttributeCore).Symbol;
     }
@@ -178,7 +175,7 @@ internal sealed class ContractApiIdentityResolver
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly is not null &&
-            _compilationReferenceCache.GetOrAdd(
+            ImmutableInterlocked.GetOrAdd(ref _compilationReferenceCache,
             assembly,
             candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (_compilation.References.Any(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference &&
@@ -241,7 +238,7 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol type,
         out string metadataName)
     {
-        if (_knownAttributeMetadataNames.TryGetValue(type, out metadataName!))
+        if (Volatile.Read(ref _knownAttributeMetadataNames).TryGetValue(type, out metadataName!))
         {
             return metadataName.Length != 0;
         }
@@ -251,13 +248,13 @@ internal sealed class ContractApiIdentityResolver
             if (_metadataNames.Matches(type, candidate))
             {
                 metadataName = candidate;
-                _knownAttributeMetadataNames.TryAdd(type, metadataName);
+                ImmutableInterlocked.TryAdd(ref _knownAttributeMetadataNames, type, metadataName);
                 return true;
             }
         }
 
         metadataName = string.Empty;
-        _knownAttributeMetadataNames.TryAdd(type, metadataName);
+        ImmutableInterlocked.TryAdd(ref _knownAttributeMetadataNames, type, metadataName);
         return false;
     }
 

@@ -24,7 +24,7 @@ internal static class CompilerCompilationCapture
             CancellationToken cancellationToken)
         {
             compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-            var seenPaths = new HashSet<string>(StringComparer.Ordinal);
+            var seenPaths = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
             Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
             {
                 tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
@@ -50,7 +50,7 @@ internal static class CompilerCompilationCapture
             })];
         }
 
-        internal CompilerSyntaxTreeSnapshot[] Trees { get; }
+        internal ImmutableList<CompilerSyntaxTreeSnapshot> Trees { get; }
     }
 
     private sealed class ResolverDirectiveCache
@@ -72,7 +72,7 @@ internal static class CompilerCompilationCapture
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, ResolverDirectiveCache>
         ResolverDirectiveCaches = new();
 
-    internal static CompilerSyntaxTreeSnapshot[] CaptureTrees(
+    internal static ImmutableList<CompilerSyntaxTreeSnapshot> CaptureTrees(
         CSharpCompilation compilation,
         CancellationToken cancellationToken,
         int capturedTreeOrdinal = -1,
@@ -95,7 +95,7 @@ internal static class CompilerCompilationCapture
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         if (SyntaxTreeCaches.TryGetValue(compilation, out var cache) &&
-            (uint)treeOrdinal < (uint)cache.Trees.Length)
+            (uint)treeOrdinal < (uint)cache.Trees.Count)
         {
             textLength = cache.Trees[treeOrdinal].TextLength;
             return true;
@@ -211,7 +211,7 @@ internal static class CompilerCompilationCapture
             References = CaptureReferences(
                 compilation.References,
                 ReferenceCaptureLimits.Default,
-                cancellationToken).ToImmutableArray(),
+                cancellationToken),
             AdditionalFiles = [.. additionalFiles.Select(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (CaptureAdditionalFile(
                 file, normalizedProject, cancellationToken))).OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Path), StringComparer.Ordinal)
                 .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Sha256), StringComparer.Ordinal)]
@@ -226,7 +226,7 @@ internal static class CompilerCompilationCapture
         var parse = tree.Options as CSharpParseOptions ??
             throw new InvalidDataException("A compiler syntax tree has no C# parse options.");
         var text = capturedText ?? tree.GetText(cancellationToken);
-        var characterOffsets = new Dictionary<int, int>();
+        var characterOffsets = ImmutableDictionary.CreateBuilder<int, int>();
         foreach (var mapping in tree.GetLineMappings(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -235,7 +235,7 @@ internal static class CompilerCompilationCapture
                 characterOffsets[mapping.Span.Start.Line] = characterOffset;
             }
         }
-        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select((line, lineIndex) =>
+        ImmutableArray<CompilerSourceLineMapEntry> lineMap = [.. text.Lines.Select((line, lineIndex) =>
         {
 RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine)), nameof(line), "Value must be initialized.");
 
@@ -267,7 +267,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             RoslynChecksum = HashEncoding.ToLowerHex(text.GetChecksum()),
             LineMapSha256 = CompilerReportingIdentity.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
-            LineMap = lineMap.ToImmutableArray(),
+            LineMap = lineMap,
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
@@ -289,7 +289,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
         tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
-    internal static CompilerReferenceSnapshot[] CaptureReferences(
+    internal static ImmutableArray<CompilerReferenceSnapshot> CaptureReferences(
         IEnumerable<MetadataReference> references,
         ReferenceCaptureLimits limits,
         CancellationToken cancellationToken)
@@ -300,13 +300,18 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             references,
             nameof(references));
         var budget = new ReferenceCaptureBudget(limits);
-        return [.. references.Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (CaptureReference(
-            reference,
-            budget,
-            cancellationToken)))];
+        var snapshots = ImmutableArray.CreateBuilder<CompilerReferenceSnapshot>();
+        foreach (var reference in references)
+        {
+            var captured = CaptureReference(
+                ArgumentNullGuard.NotNull(reference, nameof(reference)), budget, cancellationToken);
+            snapshots.Add(captured.Snapshot);
+            budget = captured.Budget;
+        }
+        return snapshots.ToImmutable();
     }
 
-    private static CompilerReferenceSnapshot CaptureReference(
+    private static (CompilerReferenceSnapshot Snapshot, ReferenceCaptureBudget Budget) CaptureReference(
         MetadataReference reference,
         ReferenceCaptureBudget budget,
         CancellationToken cancellationToken)
@@ -337,7 +342,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : ((
                 Module: module,
                 Name: ReadModuleName(module.GetMetadataReader()))))
-            .ToArray();
+            .ToImmutableArray();
         if (moduleEntries.Length > 1)
         {
             moduleEntries = [
@@ -347,8 +352,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                     StringComparer.Ordinal)
             ];
         }
-        var modules = ImmutableArray.CreateBuilder<CompilerReferenceModuleSnapshot>(
-            moduleEntries.Length);
+        var modules = ImmutableArray.CreateBuilder<CompilerReferenceModuleSnapshot>(moduleEntries.Length);
         string? identity = null;
         for (var index = 0; index < moduleEntries.Length; index++)
         {
@@ -365,7 +369,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 FileAccess.Read,
                 FileShare.Read);
             var sizeBytes = stream.Length;
-            budget.Consume(sizeBytes);
+            budget = budget.Consume(sizeBytes);
             using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
             if (!image.HasMetadata)
             {
@@ -396,7 +400,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 SizeBytes = sizeBytes
             });
         }
-        return new CompilerReferenceSnapshot
+        return (new CompilerReferenceSnapshot
         {
             Kind = reference.Properties.Kind.ToString(),
             EmbedInteropTypes = reference.Properties.EmbedInteropTypes,
@@ -406,15 +410,15 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
-            Modules = modules.ToImmutableArray()
-        };
+            Modules = modules.ToImmutable()
+        }, budget);
     }
 
-    private sealed class ReferenceCaptureBudget
+    private sealed record ReferenceCaptureBudget
     {
         private readonly ReferenceCaptureLimits _limits;
-        private long _closureBytes;
-        private int _moduleCount;
+        private long ClosureBytes { get; init; }
+        private int ModuleCount { get; init; }
 
         internal ReferenceCaptureBudget(ReferenceCaptureLimits limits)
         {
@@ -425,21 +429,20 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
 
         internal int MaximumModuleCount => _limits.MaximumModuleCount;
 
-        internal void Consume(long sizeBytes)
+        internal ReferenceCaptureBudget Consume(long sizeBytes)
         {
             if (sizeBytes <= 0 || sizeBytes > _limits.MaximumModuleBytes)
             {
                 throw new InvalidDataException(
                     "A compiler reference module exceeds the byte limit.");
             }
-            if (_moduleCount >= _limits.MaximumModuleCount ||
-                _closureBytes > _limits.MaximumClosureBytes - sizeBytes)
+            if (ModuleCount >= _limits.MaximumModuleCount ||
+                ClosureBytes > _limits.MaximumClosureBytes - sizeBytes)
             {
                 throw new InvalidDataException(
                     "The compiler reference closure exceeds its resource limit.");
             }
-            _moduleCount++;
-            _closureBytes += sizeBytes;
+            return this with { ModuleCount = ModuleCount + 1, ClosureBytes = ClosureBytes + sizeBytes };
         }
     }
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,

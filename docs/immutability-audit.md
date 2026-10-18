@@ -1322,3 +1322,60 @@ name and absent ActualValue. Evidence: artifacts/immutability-corpus-persistent-
 and artifacts/immutability-corpus-guard-build.log. The 2,345 affected fixture checks
 passed; their solution invocation failed only because of the now-corrected Gates
 compile-time guard diagnostics.
+
+## Updated construction preference
+
+The user clarified that immutable collection builders are preferred for local
+construction and accumulation, instead of repeated assignments such as
+items = items.Add(value). Scoped ImmutableArray, ImmutableList, ImmutableHashSet,
+and ImmutableDictionary builders satisfy this policy when their mutable state
+does not escape and completed results are frozen. Existing builder candidates
+must be reviewed for ownership and publication, rather than removed merely
+because the builder itself mutates. Shared concurrent caches continue to publish
+immutable snapshots through atomic updates. Earlier persistent accumulator
+conversions are being reviewed against this clarified preference.
+
+Construction and compiler follow-up checkpoint:
+
+- Scoped immutable builders now cover 39 additional accumulators in 28 files,
+  plus hand-reviewed contract, effect, IR, compiler-reference and fixture
+  producers. Only completed immutable values cross publication boundaries.
+  Main reviewed the restricted syntax transformation and all receiver/freeze
+  boundaries; an independent read-only review confirmed all 39 units.
+- Frontend symbol/purity caches preserve symbol/reference/ordinal comparers,
+  recursive memo entries, weak compilation ownership, and atomic concurrent
+  publication. CaptureTrees publishes a cached ImmutableList to preserve its
+  reference-identity contract. References and line maps publish ImmutableArray
+  snapshots; module/closure limits now propagate cumulative immutable budget
+  records across the entire reference closure.
+- Two malformed/operand test helpers now use immutable outer environments:
+  malformed runtime payloads and missing operands remain the actual subjects.
+  Another 22 fixture maps and their producer adapters were converted earlier
+  in this checkpoint. Construction helpers now prefer scoped builders.
+- The changed-test selector uses scoped builders for graph/input construction
+  and freezes nested graph values and argument lists before consumption.
+  Native ArgumentList remains a BCL adapter. Main traced every remaining
+  selector candidate; 18 native argument-routing scenarios match HEAD.
+  Explicit GetEnumerator is required when freezing PowerShell dictionary
+  builders. Evidence: immutability-selector-final-builder-arguments-check.log.
+- The latest full solution build passed with zero warnings/errors before the
+  final scoped-accumulator additions. The latest ordinary-suite invocation is
+  still completing. It exposed an over-applied fixture ToImmutable call on an
+  already immutable map; that call is corrected and all 640 Contracts tests
+  pass. The earlier full invocation exposed one stale Has.Length assertion on
+  the new ImmutableList capture cache; Has.Count is correct and all four
+  capture-coverage follow-up tests pass. Neither full invocation is reported
+  as a successful full-suite run.
+- Canonical C#/PowerShell formatting completed successfully. A batched Git
+  object check independently verified 2,592 original raw/interpolated literal
+  tokens across 523 changed C# files, including the final assertion correction.
+  Evidence: immutability-scoped-builders-batched-literals.log.
+- The refreshed inventories contain 3,336 C# syntax candidates across 1,810
+  non-vendored files and 907 PowerShell candidates across 58 scripts, with zero
+  script parse failures. Thirty-nine C# builder rows are explicitly verified;
+  the remaining open candidates still require individual review. Inventory
+  counts include permissible builders and native adapters.
+- On pushed commit 2622d8fe4, CodeQL C# and Actions pass. Python CodeQL fails
+  because extraction processed zero Python modules (GitHub job 117765993351).
+  This is recorded as a CI configuration limitation, not a passing check.
+  The comprehensive stopping condition remains open.

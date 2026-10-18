@@ -41,18 +41,15 @@ public sealed class Pr275ObjectFieldInputCoverageTests
         var fieldRead = factory.PureOpaque(field, factory.Variable(owner));
         var input = fieldType == factory.BooleanType ? factory.CreateIntegerValue(1) : factory.CreateBooleanValue(true);
         var state = new IrObjectState().WithField(field, input);
-        var variables = new Dictionary<IrVarId, IrValue>
-        {
-            [owner] = factory.CreateReferenceValue(factory.ObjectType, state)
-        };
+        var variables = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, factory.CreateReferenceValue(factory.ObjectType, state));
         var gate = factory.CreateVariable("gate", factory.BooleanType);
-        variables[gate] = factory.CreateBooleanValue(scenario is not ("or left" or "or right"));
+        variables = variables.SetItem(gate, factory.CreateBooleanValue(scenario is not ("or left" or "or right")));
         var gateTerm = factory.Variable(gate);
         IrTerm expression;
         if (scenario == "sequence index")
         {
             var array = factory.CreateVariable("array", sequenceType);
-            variables[array] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(3)]);
+            variables = variables.SetItem(array, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(3)]));
             expression = factory.SequenceAccess(factory.Variable(array), fieldRead);
         }
         else

@@ -181,11 +181,11 @@ public sealed class NativeMetadataShadowRequiresTests
             Is.EqualTo(JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(ordinary))));
     }
 
-    private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
+    private static ImmutableArray<CompilerReferenceSnapshot> Capture(CSharpCompilation compilation)
     { System.ArgumentNullException.ThrowIfNull(compilation, nameof(compilation)); return CompilerCompilationCapture.CaptureReferences(compilation.References, CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken); }
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation,
-        CompilerReferenceSnapshot[]? references, bool enabled)
+        IReadOnlyList<CompilerReferenceSnapshot>? references, bool enabled)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
@@ -193,7 +193,7 @@ public sealed class NativeMetadataShadowRequiresTests
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enabled);
     }
 
-    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
+    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, IReadOnlyList<CompilerReferenceSnapshot> references)
     {
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(body);

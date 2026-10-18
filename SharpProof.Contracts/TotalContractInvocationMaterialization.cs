@@ -67,7 +67,7 @@ internal static class TotalContractInvocationMaterialization
         var allowed = context.Inputs.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState))).ToImmutableHashSet();
         if (context.Result is { } resultVariable)
         { allowed = allowed.Add(resultVariable); }
-        var clauses = ImmutableList<BoundTotalContractClause>.Empty;
+        var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();
         foreach (var occurrence in candidates.Where(occurrence =>
             !requiresOnly || occurrence.Kind == BoundContractKind.Requires))
         {
@@ -89,11 +89,11 @@ internal static class TotalContractInvocationMaterialization
             }
             if (expression.Value.Type != factory.BooleanType)
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
-            clauses = clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), ContractInvocationMaterialization.FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
+            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), ContractInvocationMaterialization.FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
                 resolution.UsesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation,
                 invocation.Syntax.GetReference()));
         }
-        return new(clauses.ToImmutableArray(), ContractBindingFailure.None);
+        return new(clauses.ToImmutable(), ContractBindingFailure.None);
 
         static TotalContractInvocationMaterializationResult Fail(ContractBindingFailure failure)
         {

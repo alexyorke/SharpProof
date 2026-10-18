@@ -103,7 +103,7 @@ internal static class EffectContractDiagnostics
         var bodyless = method is { IsAbstract: true } or { IsExtern: true };
         var trusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid && declared.IsComplete;
         var throws = contract.Summary.Throws;
-        var evaluations = ImmutableList<EffectClaimEvaluation>.Empty;
+        var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>();
         Add(Select(attributes, session.Attributes.EnforcePure), EffectEvaluationContractKind.EnforcePure, EffectClaimConstraint.Empty,
             established: EffectContractMappings.IsObservablePure(contract.Summary));
         Add(Select(attributes, session.Attributes.ZeroAllocations), EffectEvaluationContractKind.ZeroAllocations, EffectClaimConstraint.Empty,
@@ -119,7 +119,7 @@ internal static class EffectContractDiagnostics
         Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
             new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
             contract.Kind != EffectContractResolutionKind.Invalid, true);
-        return evaluations.ToImmutableArray();
+        return evaluations.ToImmutable();
 
         void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
             bool valid = true, bool established = false)
@@ -132,7 +132,7 @@ internal static class EffectContractDiagnostics
                 established, false, valid, trusted, trusted, EffectEvaluationReason.EffectSummaryIncomplete);
             var (outcome, reason, certainty) = EffectEvaluationProducerTupleCatalog.Require(
                 projected.Outcome, projected.Reason, projected.Certainty);
-            evaluations = evaluations.Add(new EffectClaimEvaluation(kind, selected, outcome, reason, certainty,
+            evaluations.Add(new EffectClaimEvaluation(kind, selected, outcome, reason, certainty,
                 trusted ? "trusted-boundary" : "native", null, constraint, null, Location.None, []));
         }
     }
@@ -251,7 +251,7 @@ internal static class EffectContractDiagnostics
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        var types = ImmutableList<INamedTypeSymbol>.Empty;
+        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         var valid = true;
         foreach (var attribute in attributes)
         {
@@ -265,7 +265,7 @@ internal static class EffectContractDiagnostics
                     !type.IsUnboundGenericType &&
                     EffectTypeFacts.IsDerivedFrom(type, exceptionType)))
             {
-                types = types.AddRange(values.Select(static argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : ((INamedTypeSymbol)argument.Value!))));
+                types.AddRange(values.Select(static argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : ((INamedTypeSymbol)argument.Value!))));
                 continue;
             }
             ReportInvalidOnce(
@@ -274,7 +274,7 @@ internal static class EffectContractDiagnostics
                 fallbackLocation, session, reportDiagnostic);
             valid = false;
         }
-        return valid ? (types.ToImmutableArray(), true) : ([], false);
+        return valid ? (types.ToImmutable(), true) : ([], false);
     }
 
     private static void ReportInvalidOnce(

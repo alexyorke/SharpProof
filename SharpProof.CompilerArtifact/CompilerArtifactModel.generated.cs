@@ -95,7 +95,7 @@ internal sealed class CompilerDecodedShadowBody
     internal CompilerTotalCallablePreparation Body { get; }
 
     internal static CompilerDecodedShadowBody Decode(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         return new(CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(ownerId, artifact, cancellationToken, metadataReferences));
     }

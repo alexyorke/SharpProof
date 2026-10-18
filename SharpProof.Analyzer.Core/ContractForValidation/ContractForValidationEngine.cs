@@ -49,7 +49,7 @@ internal static class ContractForValidationEngine
                     compilation,
                     cancellationToken),
                 cancellationToken);
-        var accepted = ImmutableList<ResolvedCompanion>.Empty;
+        var accepted = ImmutableArray.CreateBuilder<ResolvedCompanion>();
         foreach (var companion in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -58,11 +58,11 @@ internal static class ContractForValidationEngine
                     relationships,
                     Report))
             {
-                accepted = accepted.Add(companion);
+                accepted.Add(companion);
             }
         }
 
-        companions = accepted.ToImmutableArray();
+        companions = accepted.ToImmutable();
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
@@ -188,7 +188,7 @@ internal static class ContractForValidationEngine
         contractFor = RepositoryParameterGuard.NotNull(contractFor, nameof(contractFor));
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
-        var result = ImmutableList<ResolvedCompanion>.Empty;
+        var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
         foreach (var companion in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -222,10 +222,10 @@ internal static class ContractForValidationEngine
                     attributeLocation, companion.Name));
                 continue;
             }
-            result = result.Add(new ResolvedCompanion(
+            result.Add(new ResolvedCompanion(
                 companion, target.Target, attributeLocation, target.IsOpen));
         }
-        return result.ToImmutableArray();
+        return result.ToImmutable();
     }
 
     private static Location GetAttributeLocation(

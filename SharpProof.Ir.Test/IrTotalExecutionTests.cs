@@ -141,8 +141,7 @@ public sealed class IrTotalExecutionTests
             var x = factory.CreateVariable("x", factory.StringType);
             var y = factory.CreateVariable("y", factory.StringType);
             var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.Variable(y));
-            var values = new Dictionary<IrVarId, IrValue>
-            { [x] = factory.CreateStringValue(first), [y] = factory.CreateStringValue(second) };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, factory.CreateStringValue(first)).SetItem(y, factory.CreateStringValue(second));
             var evaluated = new IrInterpreter(factory).Evaluate(equal, values);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
             Assert.That(evaluated.Value!.Boolean, Is.EqualTo(alias || semantics == IrExecutionSemantics.Legacy));
@@ -453,7 +452,7 @@ public sealed class IrTotalExecutionTests
         var initial = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = initial, [alias] = initial }, 100,
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, initial).SetItem(alias, initial), 100,
             (_, _, values) => values.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(values)) : (values.Single()),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -476,9 +475,9 @@ public sealed class IrTotalExecutionTests
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, argument);
         builder.Call(entry, factory.CreateOperation(), null, member, factory.Variable(owner), factory.Variable(argument));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         if (!missing)
-        { initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        { initial = initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
         var hostCalls = 0;
         IrValue? Host(IrCallInstruction call, IrValue? receiver, ImmutableArray<IrValue> arguments)
         { System.ArgumentNullException.ThrowIfNull(call, nameof(call)); if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } hostCalls++; return factory.CreateIntegerValue(0); }
@@ -513,12 +512,7 @@ public sealed class IrTotalExecutionTests
         builder.Call(entry, factory.CreateOperation(), target, member, factory.PureOpaque(field, factory.Variable(snapshot ? alias : holder)));
         builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
         var initialHolder = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, oldValue));
-        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), new Dictionary<IrVarId, IrValue>
-        {
-            [holder] = initialHolder,
-            [alias] = initialHolder,
-            [replacement] = newValue
-        }, 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(holder, initialHolder).SetItem(alias, initialHolder).SetItem(replacement, newValue), 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
             new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));

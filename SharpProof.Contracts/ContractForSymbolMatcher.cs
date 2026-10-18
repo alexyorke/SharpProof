@@ -260,7 +260,7 @@ internal static class ContractForSymbolMatcher
             return [];
         }
 
-        var result = ImmutableList<CompanionDescriptor>.Empty;
+        var result = ImmutableArray.CreateBuilder<CompanionDescriptor>();
         foreach (var type in ReferencedTypeSymbols.GetAllCached(
                      compilation,
                      contractFor.ContainingAssembly,
@@ -271,10 +271,10 @@ internal static class ContractForSymbolMatcher
                 attributes.First is { } attribute &&
                 TryGetTarget(attribute, out var target))
             {
-                result = result.Add(new CompanionDescriptor(type, target));
+                result.Add(new CompanionDescriptor(type, target));
             }
         }
-        return result.ToImmutableArray();
+        return result.ToImmutable();
     }
 
     internal static CompanionRelationshipInventory
@@ -335,7 +335,7 @@ internal static class ContractForSymbolMatcher
             }
         }
 
-        var accepted = ImmutableList<CompanionDescriptor>.Empty;
+        var accepted = ImmutableArray.CreateBuilder<CompanionDescriptor>();
         var selfTargeting = ImmutableHashSet.Create<INamedTypeSymbol>(comparer);
         var cyclic = ImmutableHashSet.Create<INamedTypeSymbol>(comparer);
         foreach (var relationship in relationships)
@@ -356,11 +356,11 @@ internal static class ContractForSymbolMatcher
             }
             else
             {
-                accepted = accepted.Add(relationship);
+                accepted.Add(relationship);
             }
         }
         return new CompanionRelationshipInventory(
-            accepted.ToImmutableArray(),
+            accepted.ToImmutable(),
             selfTargeting,
             cyclic);
     }

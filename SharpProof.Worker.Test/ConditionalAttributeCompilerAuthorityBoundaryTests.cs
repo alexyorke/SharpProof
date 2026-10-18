@@ -640,7 +640,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = ImmutableList<IlInstruction>.Empty;
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -667,11 +667,11 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 token = BitConverter.ToInt32(il, offset);
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
-            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutable());
     }
 
     private static PeObservation DescribePe(byte[] bytes)

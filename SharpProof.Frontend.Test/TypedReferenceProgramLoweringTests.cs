@@ -92,9 +92,9 @@ public sealed class TypedReferenceProgramLoweringTests
         var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
         var interpreter = new IrInterpreter(factory);
         var shared = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
-        var model = new Dictionary<IrVarId, IrValue> { [left] = shared, [right] = shared };
+        var model = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, shared).SetItem(right, shared);
         Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.True);
-        model[right] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]);
+        model = model.SetItem(right, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]));
         Assert.That(interpreter.Evaluate(equal, model).Value!.Boolean, Is.False);
         var nullLength = interpreter.Evaluate(factory.Length(factory.Null(sequenceType))).Value!;
         Assert.That(nullLength.IntegerWidth, Is.EqualTo(32));

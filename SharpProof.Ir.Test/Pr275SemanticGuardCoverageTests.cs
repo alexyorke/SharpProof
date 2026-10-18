@@ -18,11 +18,7 @@ public sealed class Pr275SemanticGuardCoverageTests
         var term = IrSemanticTerms.Guard(factory,
             factory.Variable(condition), factory.Variable(consequence));
         var result = new IrInterpreter(factory).Evaluate(term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [condition] = factory.CreateBooleanValue(conditionValue),
-                [consequence] = factory.CreateBooleanValue(consequenceValue)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(condition, factory.CreateBooleanValue(conditionValue)).SetItem(consequence, factory.CreateBooleanValue(consequenceValue)));
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Boolean, Is.EqualTo(expected));
@@ -65,7 +61,7 @@ public sealed class Pr275SemanticGuardCoverageTests
     {
         var factory = new IrFactory();
         var terms = new List<IrTerm>();
-        var values = new Dictionary<IrVarId, IrValue>();
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         var expectedConjunction = true;
         var expectedDisjunction = false;
         for (var index = 0; index < count; index++)
@@ -73,7 +69,7 @@ public sealed class Pr275SemanticGuardCoverageTests
             var variable = factory.CreateVariable("condition" + index, factory.BooleanType);
             var value = index == 0 ? firstValue : index % 2 == 0;
             terms.Add(factory.Variable(variable));
-            values.Add(variable, factory.CreateBooleanValue(value));
+            values = values.Add(variable, factory.CreateBooleanValue(value));
             expectedConjunction &= value;
             expectedDisjunction |= value;
         }

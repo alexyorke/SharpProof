@@ -248,19 +248,19 @@ public sealed class TypedFeatureLongFuzzTests
         {
             image.Position = 0;
             var method = context.LoadFromStream(image).GetType("C")!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = ImmutableList<ClrRun>.Empty;
+            var runs = ImmutableArray.CreateBuilder<ClrRun>();
             foreach (var input in inputs)
             {
                 try
                 {
-                    runs = runs.Add(new(input, (int)method.Invoke(null, [input])!, null));
+                    runs.Add(new(input, (int)method.Invoke(null, [input])!, null));
                 }
                 catch (TargetInvocationException exception)
                 {
-                    runs = runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
+                    runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
                 }
             }
-            return new(runs.ToImmutableArray(), null);
+            return new(runs.ToImmutable(), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

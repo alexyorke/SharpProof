@@ -5722,7 +5722,7 @@ public sealed partial class WorkerTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(count)); }
 
         var random = new Random(seed);
-        var result = ImmutableList<RuntimeContractCase>.Empty;
+        var result = ImmutableArray.CreateBuilder<RuntimeContractCase>();
         for (var index = 0; index < count; index++)
         {
             var boundary = random.Next(-50, 51);
@@ -5743,7 +5743,7 @@ public sealed partial class WorkerTests
                 System.Globalization.CultureInfo.InvariantCulture);
             var boundaryLiteral = boundary.ToString(
                 System.Globalization.CultureInfo.InvariantCulture) + "L";
-            result = result.Add((index % 8) switch
+            result.Add((index % 8) switch
             {
                 0 => new RuntimeContractCase(
                     name,
@@ -5811,7 +5811,7 @@ public sealed partial class WorkerTests
                     inputs)
             });
         }
-        return result.ToImmutableArray();
+        return result.ToImmutable();
     }
 
     private static string CreateRuntimeContractSource(

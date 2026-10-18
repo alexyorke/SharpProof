@@ -7,14 +7,12 @@ public sealed class RoslynOperationLowerer
     private readonly RoslynTypeMapper _types;
     private readonly Func<IMethodSymbol, bool> _isKnownPure;
     private readonly bool _allowCompilerConstants;
-    private readonly Dictionary<ISymbol, IrVarId> _variables =
-        new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
-        new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<CaptureId, IrVarId> _captures = [];
-    private readonly List<IrVarId> _captureOrder = [];
+    private ImmutableDictionary<ISymbol, IrVarId> _variables = ImmutableDictionary<ISymbol, IrVarId>.Empty.WithComparers(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<ITypeSymbol, IrVarId> _instances = ImmutableDictionary<ITypeSymbol, IrVarId>.Empty.WithComparers(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<CaptureId, IrVarId> _captures = ImmutableDictionary<CaptureId, IrVarId>.Empty;
+    private ImmutableList<IrVarId> _captureOrder = ImmutableList<IrVarId>.Empty;
     private readonly LoweringVisitor _visitor;
-    private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
+    private ImmutableDictionary<IOperation, LoweredExpression>? _currentLoweringResults;
     private RoslynOperationPurityClassifier? _currentPurityClassifier;
 
     public RoslynOperationLowerer(
@@ -82,8 +80,7 @@ public sealed class RoslynOperationLowerer
 
         var previousResults = _currentLoweringResults;
         var previousPurityClassifier = _currentPurityClassifier;
-        _currentLoweringResults = new(
-            ReferenceComparer<IOperation>.Instance);
+        _currentLoweringResults = ImmutableDictionary<IOperation, LoweredExpression>.Empty.WithComparers(ReferenceComparer<IOperation>.Instance);
         _currentPurityClassifier = new(_isKnownPure, MaximumLoweringDepth);
         try
         {
@@ -127,7 +124,7 @@ public sealed class RoslynOperationLowerer
         }
 
         var lowered = _visitor.Visit(operation, default);
-        results.Add(operation, lowered);
+        _currentLoweringResults = _currentLoweringResults!.AddUnique(operation, lowered);
         return lowered;
     }
 
@@ -151,7 +148,7 @@ public sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 symbol.Kind + ":" + symbol.MetadataName,
                 GetTypeId(type));
-            _variables.Add(symbol, variable);
+            _variables = _variables.AddUnique(symbol, variable);
         }
         return _factory.Variable(variable);
     }
@@ -166,8 +163,8 @@ public sealed class RoslynOperationLowerer
                 "capture:" +
                 _captureOrder.Count.ToString(CultureInfo.InvariantCulture),
                 GetTypeId(type));
-            _captures.Add(id, variable);
-            _captureOrder.Add(variable);
+            _captures = _captures.AddUnique(id, variable);
+            _captureOrder = _captureOrder.Add(variable);
         }
         return _factory.Variable(variable);
     }
@@ -254,7 +251,7 @@ public sealed class RoslynOperationLowerer
             variable = _factory.CreateVariable(
                 "instance:" + type.MetadataName,
                 GetTypeId(specializedType));
-            _instances.Add(type, variable);
+            _instances = _instances.AddUnique(type, variable);
         }
         return _factory.Variable(variable);
     }
@@ -269,7 +266,7 @@ public sealed class RoslynOperationLowerer
         var loweredReceiver = depthLimited || receiver == null
             ? null
             : LowerCore(receiver);
-        IrTerm[] loweredArguments = depthLimited
+        ImmutableArray<IrTerm> loweredArguments = depthLimited
             ? []
             : (arguments ?? operation.ChildOperations)
                 .Where(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!ReferenceEquals(child, receiver)))
@@ -285,7 +282,7 @@ public sealed class RoslynOperationLowerer
                 .OrderBy(static value => value.Ordinal)
                 .ThenBy(static value => value.Index)
                 .Select(static value => value.Term)
-                .ToArray();
+                .ToImmutableArray();
         var receiverTerm = loweredReceiver?.Term;
         var argumentTerms = loweredArguments;
         var resultType = GetTypeId(operation.Type);
@@ -301,17 +298,19 @@ public sealed class RoslynOperationLowerer
             CompilerIdentityBridge.CreateSymbolDisplay(symbol) +
             ":result=" +
             CompilerIdentityBridge.CreateTypeDisplay(operation.Type);
-        var parameterTypes = argumentTerms.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type)).ToArray();
-        var member = _factory.GetOrCreateMember(
+        var parameterTypes = argumentTerms.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type)).ToImmutableArray();
+        var member = _factory.GetOrCreateMemberSnapshot(
             identity, declaringType, displayName, resultType,
             receiverTerm == null, parameterTypes);
-        var term = isPure
-            ? _factory.PureOpaque(member, receiverTerm, argumentTerms)
-            : _factory.ImpureOpaque(
-                _factory.CreateOperation(
-                    operation.Kind + "@" +
-                    operation.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture)),
-                member, receiverTerm, argumentTerms);
+        var opaqueOperation = isPure
+            ? default
+            : _factory.CreateOperation(
+                operation.Kind + "@" +
+                operation.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture));
+        var term = _factory.RebuildOpaque(
+            member, receiverTerm, argumentTerms,
+            isPure ? IrOpaquePurity.Pure : IrOpaquePurity.Impure,
+            opaqueOperation);
         return new LoweredExpression(
             term, FrontendSubsetClassification.Abstain(abstention));
     }
@@ -689,7 +688,7 @@ public sealed class RoslynOperationLowerer
             var right = _owner.LowerCore(rightOperand);
             if (!left.Classification.IsExact || !right.Classification.IsExact)
             {
-                return OpaqueBinary(operation, FirstAbstention(left, right));
+                return OpaqueBinary(operation, FirstAbstention([left, right]));
             }
 
             IrBinaryOperator? mapped;
@@ -785,7 +784,7 @@ public sealed class RoslynOperationLowerer
                 !whenFalse.Classification.IsExact)
             {
                 return OpaqueConditional(operation,
-                    FirstAbstention(condition, whenTrue, whenFalse));
+                    FirstAbstention([condition, whenTrue, whenFalse]));
             }
 
             try
@@ -936,7 +935,7 @@ public sealed class RoslynOperationLowerer
             var index = _owner.LowerCore(operation.Indices[0]);
             if (!array.Classification.IsExact || !index.Classification.IsExact)
             {
-                return OpaqueElement(operation, FirstAbstention(array, index));
+                return OpaqueElement(operation, FirstAbstention([array, index]));
             }
 
             try
@@ -991,9 +990,9 @@ public sealed class RoslynOperationLowerer
         }
 
         private static FrontendAbstention FirstAbstention(
-            params LoweredExpression[] expressions)
+            ImmutableArray<LoweredExpression> expressions)
         {
-            expressions = RepositoryParameterGuard.NotNull(expressions, nameof(expressions));
+            RepositoryParameterGuard.RequireInitialized(expressions.IsDefault, nameof(expressions), "Value must be initialized.");
             return expressions
                 .First(static expression =>
                     expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (expression.Classification.Abstention != FrontendAbstention.None))

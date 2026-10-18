@@ -7,7 +7,7 @@ internal static class CompilerDisjointInputAnalysis
     internal static ImmutableArray<CompilerDisjointInputPair> Collect(IMethodSymbol method, CancellationToken cancellationToken)
     {
         // Only Roslyn's closed sealed class symbols certify impossible aliases.
-        var pairs = ImmutableList<CompilerDisjointInputPair>.Empty;
+        var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
         if (method.Parameters.Length > 128)
         { return []; }
         // Each pair consumes work in both directions, keeping its count below this limit.
@@ -38,11 +38,11 @@ internal static class CompilerDisjointInputAnalysis
                     !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
                     !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
                 {
-                    pairs = pairs.Add(new(left, right));
+                    pairs.Add(new(left, right));
                 }
             }
         }
-        return pairs.ToImmutableArray();
+        return pairs.ToImmutable();
     }
 
 }

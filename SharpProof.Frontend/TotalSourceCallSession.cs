@@ -22,10 +22,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
 {
     private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
-    private readonly Dictionary<IMethodSymbol, bool> _iterators = new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<INamedTypeSymbol, bool> _typeInitialization = new(SymbolEqualityComparer.Default);
+    private ImmutableHashSet<IMethodSymbol> _active = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default);
+    private ImmutableHashSet<string> _activeIl = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+    private ImmutableDictionary<IMethodSymbol, bool> _iterators = ImmutableDictionary.Create<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<INamedTypeSymbol, bool> _typeInitialization = ImmutableDictionary.Create<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool SourceInitializationEffectsComplete { get; private set; } = true;
     internal bool ConstructionLimitExceeded { get; private set; }
@@ -60,7 +60,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             invocation.Arguments.Length != method.Parameters.Length ||
             method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)))
         { return null; }
-        var ordinals = new HashSet<int>();
+        var ordinals = ImmutableHashSet.CreateBuilder<int>();
         foreach (var argument in invocation.Arguments)
         {
             if (argument.Parameter is not { } parameter ||
@@ -85,7 +85,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool Enter(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return Spend() && _active.Count < 256 && _active.Add(method);
+        if (!Spend() || _active.Count >= 256 || _active.Contains(method))
+        { return false; }
+        _active = _active.Add(method);
+        return true;
     }
 
     internal bool IsActive(IMethodSymbol method)
@@ -97,7 +100,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal void Leave(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        _active.Remove(method);
+        _active = _active.Remove(method);
     }
 
     internal TotalIlBody? PrepareIl(IMethodSymbol method)
@@ -111,11 +114,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool EnterIl(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return Spend() && _active.Count + _activeIl.Count < 256 && _activeIl.Add(IlKey(method));
+        if (!Spend() || _active.Count + _activeIl.Count >= 256)
+        { return false; }
+        var key = IlKey(method);
+        if (_activeIl.Contains(key))
+        { return false; }
+        _activeIl = _activeIl.Add(key);
+        return true;
     }
 
     internal void LeaveIl(IMethodSymbol method)
-    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); _activeIl.Remove(IlKey(method)); }
+    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); _activeIl = _activeIl.Remove(IlKey(method)); }
 
     internal static bool IsEmptyParamsArray(IArgumentOperation argument)
     {
@@ -137,7 +146,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             .OfType<IMethodSymbol>().Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
                 method.Arity == 1 && method.Parameters.IsEmpty &&
                 method.ReturnType is IArrayTypeSymbol { IsSZArray: true } returned &&
-                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0]))).ToArray();
+                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0]))).ToImmutableArray();
         if (emptyMethods.Length != 1 || !Spend(emptyMethods.Length))
         { return null; }
         var empty = emptyMethods[0].Construct(array.ElementType);
@@ -216,7 +225,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
         { return false; }
-        var ordinals = new HashSet<int>();
+        var ordinals = ImmutableHashSet.CreateBuilder<int>();
         foreach (var argument in arguments)
         {
             if (!Spend() || argument.Parameter is not { } parameter ||
@@ -270,9 +279,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { return false; }
                 iterator |= node is YieldStatementSyntax;
                 if (iterator && !contractOnly)
-                { _iterators[method.OriginalDefinition] = true; return false; }
+                { _iterators = _iterators.SetItem(method.OriginalDefinition, true); return false; }
             }
-            _iterators[method.OriginalDefinition] = iterator;
+            _iterators = _iterators.SetItem(method.OriginalDefinition, iterator);
         }
         if (contractOnly && !IsActive(method) && !iterator &&
             !(method.MethodKind == MethodKind.Constructor && !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)))
@@ -308,14 +317,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
              method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol }) &&
             caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
-            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToArray();
-        IOperation[] declarationOperations = [];
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToImmutableArray();
+        ImmutableArray<IOperation> declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
             try
             {
                 declarationOperations = CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree)
-                    .GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().ToArray() ?? [];
+                    .GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().ToImmutableArray() ?? [];
             }
             catch (ArgumentException)
             { frame = null; return false; }
@@ -414,11 +423,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // Neither does one that calls or takes a delegate to another local
     // function that does: that callee's captures are the caller's too.
     private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken,
-        HashSet<IMethodSymbol>? visited = null)
+        ImmutableHashSet<IMethodSymbol>.Builder? visited = null)
     {
         body = RepositoryParameterGuard.NotNull(body, nameof(body));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        visited ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method };
+        if (visited is null)
+        {
+            visited = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+            visited.Add(method);
+        }
         return body.Descendants().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
         {
             ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
@@ -430,7 +443,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }));
     }
 
-    private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, HashSet<IMethodSymbol> visited,
+    private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, ImmutableHashSet<IMethodSymbol>.Builder visited,
         CancellationToken cancellationToken)
     {
         body = RepositoryParameterGuard.NotNull(body, nameof(body));
@@ -450,7 +463,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return Spend() && eligible; }
         if (!TryCheckTypeInitialization(type, out eligible))
         { return false; }
-        _typeInitialization[type] = eligible;
+        _typeInitialization = _typeInitialization.SetItem(type, eligible);
         return eligible;
     }
 

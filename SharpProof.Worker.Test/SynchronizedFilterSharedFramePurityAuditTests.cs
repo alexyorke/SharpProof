@@ -246,7 +246,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         System.ArgumentNullException.ThrowIfNull(filter);
         System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = ImmutableList<IlInstruction>.Empty;
+        var rows = ImmutableArray.CreateBuilder<IlInstruction>();
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -285,12 +285,12 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             };
             var resolvesExactFilter = resolved != null && resolved.MetadataToken == filter.MetadataToken &&
                 resolved.Module.ModuleVersionId == filter.Module.ModuleVersionId && resolved.DeclaringType == filter.DeclaringType;
-            rows = rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
+            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
                 token, resolvesExactFilter));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutableArray());
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutable());
     }
 
     private static string Hash(byte[] value)

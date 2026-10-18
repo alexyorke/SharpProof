@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -24,7 +25,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
     public void DistinctCheckedLongArithmeticClausesPreserveBoundedMathematicalMeaning(int transformation, long value)
     {
         var (factory, contracts) = CreateContracts("long", "checked(value + 1L) > 0L");
-        var supplied = contracts.Variables.ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
+        var supplied = contracts.Variables.ToImmutableDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (factory.CreateIntegerValue(factory.GetVariableInfo(variable.Variable).Type,
                 variable.Role == BoundContractVariableRole.Result ? -value : value)));
         var rewritten = Transform(factory, contracts, supplied, transformation);
@@ -67,7 +68,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
             _ => value > 0
         };
         var (factory, contracts) = CreateContracts("int", condition);
-        var supplied = contracts.Variables.ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
+        var supplied = contracts.Variables.ToImmutableDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (factory.CreateIntegerValue(factory.GetVariableInfo(variable.Variable).Type,
                 variable.Role == BoundContractVariableRole.Result ? -value : value)));
         var rewritten = Transform(factory, contracts, supplied, transformation);
@@ -102,7 +103,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
             _ => "value == true"
         };
         var (factory, contracts) = CreateContracts("bool", condition);
-        var supplied = contracts.Variables.ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
+        var supplied = contracts.Variables.ToImmutableDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (factory.CreateBooleanValue(variable.Role == BoundContractVariableRole.Result || value)));
         var rewritten = Transform(factory, contracts, supplied, transformation);
         AssertSemanticsAndProvenance(factory, contracts, rewritten.Clauses, supplied,
@@ -124,7 +125,7 @@ public sealed class ContractClauseSubstitutionMatrixTests
         Assert.That(factory.GetVariableInfo(variable).Type,
             Is.EqualTo(typeName == "int" ? factory.IntegerType : factory.BooleanType));
         Assert.That(replacement.Type, Is.Not.EqualTo(factory.GetVariableInfo(variable).Type));
-        var substitutions = new Dictionary<IrVarId, IrTerm> { [variable] = replacement };
+        var substitutions = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement);
         Assert.Throws<ArgumentException>(new Action(() =>
             IrSubstitution.Substitute(factory, contracts.Clauses[0].Condition, substitutions)));
         var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToArray();
@@ -138,25 +139,25 @@ public sealed class ContractClauseSubstitutionMatrixTests
     public void NoOpAndGenuineEmptyClauseBatchesRemainSuccessful()
     {
         var (factory, contracts) = CreateContracts("int", "value > 0");
-        var rewritten = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, new Dictionary<IrVarId, IrTerm>());
+        var rewritten = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, ImmutableDictionary<IrVarId, IrTerm>.Empty);
         Assert.That(rewritten.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(rewritten.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)),
             Is.EqualTo(contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition))));
         var (emptyFactory, emptyContracts) = CreateContracts("int", condition: null);
         Assert.That(emptyContracts.Clauses, Is.Empty);
-        var empty = ContractClauseSubstitution.Substitute(emptyFactory, emptyContracts.Clauses, new Dictionary<IrVarId, IrTerm>());
+        var empty = ContractClauseSubstitution.Substitute(emptyFactory, emptyContracts.Clauses, ImmutableDictionary<IrVarId, IrTerm>.Empty);
         Assert.That(empty.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(empty.Clauses, Is.Empty);
     }
 
-    private static (System.Collections.Immutable.ImmutableArray<BoundContractClause> Clauses, Dictionary<IrVarId, IrValue> Values)
-        Transform(IrFactory factory, BoundMethodContracts contracts, Dictionary<IrVarId, IrValue> supplied, int transformation)
+    private static (System.Collections.Immutable.ImmutableArray<BoundContractClause> Clauses, ImmutableDictionary<IrVarId, IrValue> Values)
+        Transform(IrFactory factory, BoundMethodContracts contracts, ImmutableDictionary<IrVarId, IrValue> supplied, int transformation)
     {
         System.ArgumentNullException.ThrowIfNull(contracts);
         System.ArgumentNullException.ThrowIfNull(factory);
         System.ArgumentNullException.ThrowIfNull(supplied);
-        var substitutions = new Dictionary<IrVarId, IrTerm>();
-        var values = new Dictionary<IrVarId, IrValue>();
+        var substitutions = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var variable in contracts.Variables)
         {
             var original = variable.Variable;
@@ -178,17 +179,17 @@ public sealed class ContractClauseSubstitutionMatrixTests
                 values.Add(original, value);
             }
         }
-        var rewritten = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
+        var rewritten = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions.ToImmutable());
         Assert.That(rewritten.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(rewritten.Clauses, Has.Length.EqualTo(2));
         Assert.That(rewritten.Clauses.SelectMany(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrTermAnalysis.CollectVariables(clause.Condition))).Distinct(),
             Is.EquivalentTo(values.Keys));
-        return (rewritten.Clauses, values);
+        return (rewritten.Clauses, values.ToImmutable());
     }
 
     private static void AssertSemanticsAndProvenance(IrFactory factory, BoundMethodContracts original,
-        System.Collections.Immutable.ImmutableArray<BoundContractClause> rewritten, Dictionary<IrVarId, IrValue> originalValues,
-        Dictionary<IrVarId, IrValue> rewrittenValues, bool expectedRequires, bool expectedEnsures)
+        System.Collections.Immutable.ImmutableArray<BoundContractClause> rewritten, ImmutableDictionary<IrVarId, IrValue> originalValues,
+        ImmutableDictionary<IrVarId, IrValue> rewrittenValues, bool expectedRequires, bool expectedEnsures)
     {
 
         System.ArgumentNullException.ThrowIfNull(factory);

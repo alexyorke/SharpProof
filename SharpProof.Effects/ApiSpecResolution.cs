@@ -116,26 +116,26 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     private ResolvedApiSpecTable Build(Compilation compilation)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        var failures = ImmutableList<ApiSpecResolutionFailure>.Empty;
-        var resolved = ImmutableList<(ApiSpecTemplate Template, ISymbol Symbol)>.Empty;
-        var containingTypes = ImmutableDictionary.Create<string, ContainingTypeLookup>(StringComparer.Ordinal);
+        var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
+        var resolved = ImmutableArray.CreateBuilder<(ApiSpecTemplate Template, ISymbol Symbol)>();
+        var containingTypes = ImmutableDictionary.CreateBuilder<string, ContainingTypeLookup>(StringComparer.Ordinal);
         foreach (var template in _table.Templates)
         {
             var candidate = ResolveTemplate(
                 compilation,
                 template,
-                ref containingTypes);
+                containingTypes);
             if (candidate.Failure == null)
             {
-                resolved = resolved.Add((template, candidate.Symbol ?? throw new InvalidOperationException(
+                resolved.Add((template, candidate.Symbol ?? throw new InvalidOperationException(
                     "A resolved API spec template produced no symbol.")));
             }
             else
             {
-                failures = failures.Add(candidate.Failure);
+                failures.Add(candidate.Failure);
             }
         }
-        var specs = ImmutableDictionary.Create<ISymbol, ResolvedApiSpec>(SymbolEqualityComparer.Default);
+        var specs = ImmutableDictionary.CreateBuilder<ISymbol, ResolvedApiSpec>(SymbolEqualityComparer.Default);
         foreach (var group in resolved.GroupBy(
                      static candidate => candidate.Symbol, SymbolEqualityComparer.Default))
         {
@@ -145,28 +145,28 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             var first = candidates.Current;
             if (!candidates.MoveNext())
             {
-                specs = specs.Add(first.Symbol,
+                specs.Add(first.Symbol,
                     new ResolvedApiSpec(first.Template, first.Symbol));
                 continue;
             }
 
-            failures = failures.Add(Failure(first.Template,
+            failures.Add(Failure(first.Template,
                 ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
                 "Multiple spec rows resolved to the same original symbol."));
             do
             {
-                failures = failures.Add(Failure(candidates.Current.Template,
+                failures.Add(Failure(candidates.Current.Template,
                     ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
                     "Multiple spec rows resolved to the same original symbol."));
             }
             while (candidates.MoveNext());
         }
-        return new ResolvedApiSpecTable(specs, failures.ToImmutableArray());
+        return new ResolvedApiSpecTable(specs.ToImmutable(), failures.ToImmutable());
     }
     private static (ISymbol? Symbol, ApiSpecResolutionFailure? Failure) ResolveTemplate(
         Compilation compilation,
         ApiSpecTemplate template,
-        ref ImmutableDictionary<string, ContainingTypeLookup> containingTypes)
+        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         containingTypes = RepositoryParameterGuard.NotNull(containingTypes, nameof(containingTypes));
@@ -175,7 +175,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         var containingTypeLookup = ResolveContainingType(
             compilation,
             target.ContainingTypeMetadataName,
-            ref containingTypes);
+            containingTypes);
         var containingType = containingTypeLookup.Type;
         if (containingType == null)
         {
@@ -239,7 +239,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     private static ContainingTypeLookup ResolveContainingType(
         Compilation compilation,
         string metadataName,
-        ref ImmutableDictionary<string, ContainingTypeLookup> containingTypes)
+        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (containingTypes.TryGetValue(metadataName, out var lookup))
@@ -253,7 +253,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             containingType == null
                 ? compilation.GetTypesByMetadataName(metadataName)
                 : ImmutableArray<INamedTypeSymbol>.Empty);
-        containingTypes = containingTypes.Add(metadataName, lookup);
+        containingTypes.Add(metadataName, lookup);
         return lookup;
     }
 

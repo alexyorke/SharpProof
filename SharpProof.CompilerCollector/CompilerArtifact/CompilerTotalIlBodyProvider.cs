@@ -85,7 +85,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         if (_capturedReferences.IsDefault)
         {
             _capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken).ToImmutableArray();
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
         }
         var authority = _capturedReferences.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).FirstOrDefault(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path)));

@@ -9,6 +9,25 @@ namespace SharpProof.Frontend.Test;
 public sealed class ContractApiIdentityResolverTests
 {
     [Test]
+    public async Task ConcurrentResolutionRetainsOneCompilationOwnerAndAllAttributeResults()
+    {
+        var compilation = CreateConsumer(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.Contract).Assembly.Location));
+        var names = ContractApiMetadata.AttributeMetadataNames;
+        var results = (await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
+        {
+            var resolver = ContractApiIdentityResolver.ForCompilation(compilation);
+            return (Resolver: resolver, Symbols: names.Select(name =>
+                name is null ? throw new ArgumentNullException(nameof(name)) : resolver.ResolveAttribute(name)).ToImmutableArray());
+        }, TestContext.CurrentContext.CancellationToken)))).ToImmutableArray();
+        var owner = ContractApiIdentityResolver.ForCompilation(compilation);
+        var expected = names.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : owner.ResolveAttribute(name)).ToImmutableArray();
+        foreach (var result in results)
+        {
+            Assert.That(result.Resolver, Is.SameAs(owner));
+            Assert.That(result.Symbols, Is.EqualTo(expected));
+        }
+    }
+    [Test]
     public void ExactUnsignedPackagePayloadIsAccepted()
     {
         var assembly = typeof(SharpProof.Attributes.Contract).Assembly;

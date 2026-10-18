@@ -47,7 +47,7 @@ public sealed class IrResourceBoundTests
         Assert.That(fixture.Heap.ConsumedApproximation, Is.False);
     }
 
-    private static (IrInterpreter Interpreter, IrTerm Read, Dictionary<IrVarId, IrValue> Values,
+    private static (IrInterpreter Interpreter, IrTerm Read, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Values,
         IrHeap Heap, IrVarId First) BuildSnapshotSelectionFixture(int leafCount, bool chooseFirst)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -56,27 +56,24 @@ public sealed class IrResourceBoundTests
         var heap = new IrHeap();
         heap.StoreElement(sequence, 0, factory.CreateIntegerValue(7));
         var choice = factory.CreateVariable("choice", factory.BooleanType);
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [choice] = factory.CreateBooleanValue(chooseFirst)
-        };
-        var leaves = new List<IrTerm>(leafCount);
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(choice, factory.CreateBooleanValue(chooseFirst));
+        var leaves = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
         IrVarId first = default;
         for (var index = 0; index < leafCount; index++)
         {
             var variable = factory.CreateVariable("owner" + index, type);
             if (index == 0)
             { first = variable; }
-            values.Add(variable, sequence);
-            leaves.Add(factory.Variable(variable));
+            values = values.Add(variable, sequence);
+            leaves = leaves.Add(factory.Variable(variable));
         }
 
         while (leaves.Count > 1)
         {
-            var next = new List<IrTerm>(leaves.Count / 2);
+            var next = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
             for (var index = 0; index < leaves.Count; index += 2)
             {
-                next.Add(factory.Conditional(factory.Variable(choice), leaves[index], leaves[index + 1]));
+                next = next.Add(factory.Conditional(factory.Variable(choice), leaves[index], leaves[index + 1]));
             }
             leaves = next;
         }

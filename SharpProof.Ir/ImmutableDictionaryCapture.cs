@@ -27,7 +27,7 @@ internal static class ImmutableDictionaryCapture
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
         keySelector = RepositoryParameterGuard.NotNull(keySelector, nameof(keySelector));
         valueSelector = RepositoryParameterGuard.NotNull(valueSelector, nameof(valueSelector));
-        var result = ImmutableDictionary.Create<TKey, TValue>(comparer);
+        var result = ImmutableDictionary.CreateBuilder<TKey, TValue>(comparer);
         foreach (var item in source)
         {
             var key = keySelector(item);
@@ -36,8 +36,8 @@ internal static class ImmutableDictionaryCapture
             {
                 throw new ArgumentException("An item with the same key has already been added. Key: " + key);
             }
-            result = result.Add(key, value);
+            result.Add(key, value);
         }
-        return result;
+        return result.ToImmutable();
     }
 }

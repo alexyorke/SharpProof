@@ -139,7 +139,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     internal static CompilerTotalCallablePreparation DecodeShadowBodyCore(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
@@ -170,7 +170,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         ImmutableArray<WorkerAssumptionEvidence> assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
-        bool entryOnly, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
+        bool entryOnly, CancellationToken cancellationToken, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         RepositoryParameterGuard.RequireInitialized(assumptions.IsDefault, nameof(assumptions), "Array must be initialized.");
@@ -280,7 +280,7 @@ internal static class CompilerTotalCallableArtifactCodec
         Require(!artifact.HasReceiver || parameters.Count != 0 &&
             factory.GetTypeInfo(factory.GetVariableInfo(parameters[parameters.Count - 1].Entry).Type).Kind == IrTypeKind.Reference,
             "A receiver is a trailing reference parameter.");
-        var disjointInputs = ImmutableList<CompilerDisjointInputPair>.Empty;
+        var disjointInputs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
         CompilerDisjointInputPair? previousPair = null;
         foreach (var pair in artifact.DisjointInputs ?? [])
         {
@@ -294,7 +294,7 @@ internal static class CompilerTotalCallableArtifactCodec
             Require(leftType != rightType && leftType != factory.ObjectType && rightType != factory.ObjectType &&
                 factory.GetTypeInfo(leftType).Kind == IrTypeKind.Reference && factory.GetTypeInfo(rightType).Kind == IrTypeKind.Reference,
                 "Disjoint inputs require distinct nominal reference types.");
-            disjointInputs = disjointInputs.Add(pair);
+            disjointInputs.Add(pair);
             previousPair = pair;
         }
         IrVarId? result = artifact.Result == -1 ? null : Variable(artifact.Result, "result");
@@ -361,11 +361,11 @@ internal static class CompilerTotalCallableArtifactCodec
                 effectOwners.Contains(id))),
             "Validated effect claims must be canonical and owned by this callable.");
         var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities, metadataReferences, cancellationToken);
-        return new(factory, decoded.Program, parameters.ToImmutableArray(), result, clauses.ToImmutableArray(), exceptionConstraints, callPreconditions, disjointInputs.ToImmutableArray());
+        return new(factory, decoded.Program, parameters.ToImmutableArray(), result, clauses.ToImmutableArray(), exceptionConstraints, callPreconditions, disjointInputs.ToImmutable());
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
-        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, CompilerReferenceSnapshot[]? metadataReferences, CancellationToken cancellationToken)
+        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
     {
         if (artifact.CallPreconditions.Length == 0)
         {
@@ -374,7 +374,7 @@ internal static class CompilerTotalCallableArtifactCodec
                 "Every reserved call-precondition marker must own exactly one obligation row.");
             return [];
         }
-        var calls = ImmutableList<CompilerTotalCallPrecondition>.Empty;
+        var calls = ImmutableArray.CreateBuilder<CompilerTotalCallPrecondition>();
         var targets = ImmutableHashSet<IrVarId>.Empty;
         var reads = artifact.Graph.Terms.Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Variable))
             .Select(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (decoded.Variables[term.A])).ToImmutableHashSet();
@@ -432,12 +432,12 @@ internal static class CompilerTotalCallableArtifactCodec
                 string.Equals(factory.GetString(factory.GetVariableInfo(marker.Target).Name), name, StringComparison.Ordinal),
                 "A Total call precondition must match its independently owned marker identity.");
             targets = targets.Add(marker.Target);
-            calls = calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause));
+            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause));
         }
         Require(targets.SetEquals(decoded.Variables.Where(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (IrCallPreconditionMarker.IsReservedName(
             decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name))))),
             "Every reserved call-precondition marker must own exactly one obligation row.");
-        return calls.ToImmutableArray();
+        return calls.ToImmutable();
     }
 
 
@@ -529,7 +529,7 @@ internal static class CompilerTotalCallableArtifactCodec
         }
     }
 
-    private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, CompilerReferenceSnapshot[]? references)
+    private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, IReadOnlyList<CompilerReferenceSnapshot>? references)
     {
         origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         return references != null && references.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference != null && reference.Identity == origin.AssemblyIdentity &&
@@ -548,7 +548,7 @@ internal static class CompilerTotalCallableArtifactCodec
             "An exception constraint list has an invalid bound or mode.");
         var owned = ImmutableDictionaryCapture.Create(claims, claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : claim.ClaimId, claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim, StringComparer.Ordinal);
         var seen = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
-        var constraints = ImmutableList<CompilerTotalExceptionConstraint>.Empty;
+        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
         foreach (var row in rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -565,9 +565,9 @@ internal static class CompilerTotalCallableArtifactCodec
                 row.AllowedKinds.SequenceEqual(row.AllowedKinds.Distinct().OrderBy(kind => kind)) &&
                 (owner.EffectContractKind != WorkerEffectContractKind.DoesNotThrow || row.AllowedKinds.Length == 0),
                 "Allowed exception kinds must be canonical and agree with the effect contract.");
-            constraints = constraints.Add(new(row.ClaimId, [.. row.AllowedKinds]));
+            constraints.Add(new(row.ClaimId, [.. row.AllowedKinds]));
         }
-        return constraints.ToImmutableArray();
+        return constraints.ToImmutable();
     }
 
     private static bool Scalar(IrFactory factory, IrTypeId type)

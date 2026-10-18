@@ -14,7 +14,7 @@ internal static class CompilerClosedParameterCapture
         parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         attributes = [];
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var result = ImmutableList<TotalIlClosedAttribute>.Empty;
+        var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
         var sequences = ImmutableHashSet<int>.Empty;
         var remainingRows = 1024;
         foreach (var parameterHandle in parameters)
@@ -114,7 +114,7 @@ internal static class CompilerClosedParameterCapture
                 { return false; }
                 if (!TryReadClosedBlob(reader, attribute.Value, inRange, out var minimum, out var maximum))
                 { return false; }
-                result = result.Add(new(method.MetadataToken, parameter.SequenceNumber - 1, parameter.SequenceNumber,
+                result.Add(new(method.MetadataToken, parameter.SequenceNumber - 1, parameter.SequenceNumber,
                     MetadataTokens.GetToken(parameterHandle), MetadataTokens.GetToken(attributeHandle),
                     MetadataTokens.GetToken(attribute.Constructor), CompilerIdentityBridge.CreateSymbolDisplay(expected),
                     CompilerIdentityBridge.CreateSymbolDisplay(expectedConstructor),
@@ -127,7 +127,7 @@ internal static class CompilerClosedParameterCapture
         var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
         if (binding.Failure == ContractBindingFailure.ContractApiUnavailable && result.Count == 0)
         { return true; }
-        return binding.IsSuccess && CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses, result.ToImmutableArray(),
+        return binding.IsSuccess && CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses, result.ToImmutable(),
             cancellationToken, out attributes);
     }
 
