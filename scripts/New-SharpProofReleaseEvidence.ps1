@@ -11,7 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 & (Join-Path $PSScriptRoot 'Test-SharpProofThirdPartyInventory.ps1') -PackageSource $PackageSource -InventoryPath $InventoryPath
-$files = @(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object Extension -in @('.nupkg', '.snupkg') | Sort-Object Name -CaseSensitive)
+$files = @(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object Extension -In @('.nupkg', '.snupkg') | Sort-Object Name -CaseSensitive)
 if ($files.Count -ne 5) { throw 'Release evidence requires exactly three main and two symbol packages.' }
 $identitySet = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
 if (@($identitySet.RepositoryCommits).Count -ne 1 -or $identitySet.RepositoryCommits[0] -cne $RepositoryCommit) {
@@ -22,13 +22,13 @@ $inventoryDigest = (Get-FileHash -LiteralPath $InventoryPath -Algorithm SHA256).
 $created = $Timestamp.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
 $scope = 'Shipped package payload only: reviewed third-party components, archive hashes, and packaged binary hashes. Excludes SDK/build tools and dependencies not redistributed in these archives; no claim of a complete source/dependency SBOM.'
 $artifacts = @($identitySet.Identities | ForEach-Object {
-    if ($_.File.Name -cnotmatch '^[A-Za-z0-9_.+-]+\.(?:nupkg|snupkg)$') { throw 'Unsafe release package filename.' }
-    [ordered]@{
-        fileName = $_.File.Name; packageId = $_.Identity.Id; version = $_.Identity.Version
-        kind = $_.File.Extension.TrimStart('.'); bytes = $_.File.Length
-        sha256 = (Get-FileHash -LiteralPath $_.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
-})
+        if ($_.File.Name -cnotmatch '^[A-Za-z0-9_.+-]+\.(?:nupkg|snupkg)$') { throw 'Unsafe release package filename.' }
+        [ordered]@{
+            fileName = $_.File.Name; packageId = $_.Identity.Id; version = $_.Identity.Version
+            kind = $_.File.Extension.TrimStart('.'); bytes = $_.File.Length
+            sha256 = (Get-FileHash -LiteralPath $_.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    })
 $namespaceInput = $RepositoryCommit + $inventoryDigest + $created + (($artifacts | ForEach-Object sha256) -join '')
 $namespaceDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($namespaceInput))).ToLowerInvariant()
 $packages = [Collections.Generic.List[object]]::new()
@@ -40,11 +40,11 @@ for ($index = 0; $index -lt $artifacts.Count; $index++) {
     $artifact = $artifacts[$index]
     $id = "SPDXRef-Artifact-$index"
     $packages.Add([ordered]@{
-        SPDXID = $id; name = $artifact.fileName; versionInfo = $artifact.version
-        downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
-        licenseConcluded = 'NOASSERTION'; licenseDeclared = 'NOASSERTION'; copyrightText = 'NOASSERTION'
-        checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $artifact.sha256 })
-    })
+            SPDXID = $id; name = $artifact.fileName; versionInfo = $artifact.version
+            downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
+            licenseConcluded = 'NOASSERTION'; licenseDeclared = 'NOASSERTION'; copyrightText = 'NOASSERTION'
+            checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $artifact.sha256 })
+        })
     $relationships.Add([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $id })
     if ($artifact.kind -ceq 'nupkg') { $archiveIds[$artifact.packageId] = $id }
 }
@@ -59,11 +59,11 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
             $componentIndex++
             $license = [string]$component.license
             $packages.Add([ordered]@{
-                SPDXID = $componentId; name = [string]$component.id; versionInfo = [string]$component.version
-                downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
-                licenseConcluded = 'NOASSERTION'; licenseDeclared = $license; copyrightText = 'NOASSERTION'
-                sourceInfo = if ($component.Contains('source')) { [string]$component.source } else { 'Source and version as recorded in the reviewed third-party inventory.' }
-            })
+                    SPDXID = $componentId; name = [string]$component.id; versionInfo = [string]$component.version
+                    downloadLocation = 'NOASSERTION'; filesAnalyzed = $false
+                    licenseConcluded = 'NOASSERTION'; licenseDeclared = $license; copyrightText = 'NOASSERTION'
+                    sourceInfo = if ($component.Contains('source')) { [string]$component.source } else { 'Source and version as recorded in the reviewed third-party inventory.' }
+                })
             if ($license.StartsWith('LicenseRef-', [StringComparison]::Ordinal)) {
                 $extractedLicenses[$license] = [ordered]@{
                     licenseId = $license; name = 'Complete distributed third-party notice bundle'
@@ -79,10 +79,10 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
                     $entryId = "SPDXRef-File-$($binaryFiles.Count)"
                     $entryIds[$entryPath] = $entryId
                     $binaryFiles.Add([ordered]@{
-                        SPDXID = $entryId; fileName = "./$packageId/$entryPath"
-                        checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $digest })
-                        licenseConcluded = 'NOASSERTION'; copyrightText = 'NOASSERTION'
-                    })
+                            SPDXID = $entryId; fileName = "./$packageId/$entryPath"
+                            checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $digest })
+                            licenseConcluded = 'NOASSERTION'; copyrightText = 'NOASSERTION'
+                        })
                     $relationships.Add([ordered]@{ spdxElementId = $archiveIds[$packageId]; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryId })
                 }
                 $relationships.Add([ordered]@{ spdxElementId = $componentId; relationshipType = 'CONTAINS'; relatedSpdxElement = $entryIds[$entryPath] })
@@ -96,11 +96,11 @@ foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive))
 }
 $sbom = [ordered]@{
     spdxVersion = 'SPDX-2.3'; dataLicense = 'CC0-1.0'; SPDXID = 'SPDXRef-DOCUMENT'
-    name = "SharpProof $($identitySet.Version) shipped payload"
+    name              = "SharpProof $($identitySet.Version) shipped payload"
     documentNamespace = "https://github.com/alexyorke/SharpProof/sbom/$RepositoryCommit/$namespaceDigest"
-    creationInfo = [ordered]@{ created = $created; creators = @('Tool: SharpProof release evidence exporter') }
+    creationInfo      = [ordered]@{ created = $created; creators = @('Tool: SharpProof release evidence exporter') }
     comment = $scope; packages = @($packages.ToArray()); files = @($binaryFiles.ToArray())
-    relationships = @($relationships.ToArray())
+    relationships     = @($relationships.ToArray())
 }
 if ($extractedLicenses.Count -gt 0) { $sbom.hasExtractedLicensingInfos = @($extractedLicenses.Values) }
 [IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($OutputDirectory)) | Out-Null

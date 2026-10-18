@@ -39,4 +39,4 @@ function Get-SharpProofModuleVersionId {
 }
 
 Export-ModuleMember -Function Get-SharpProofModuleVersionId,
-    Get-SharpProofMetadataModuleVersionId
+Get-SharpProofMetadataModuleVersionId

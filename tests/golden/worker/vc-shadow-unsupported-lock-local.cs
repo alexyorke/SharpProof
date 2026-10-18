@@ -5,13 +5,15 @@ public static class Subject
     [AllowedCapabilities(SharpProofCapability.None)]
     public static void AEffectLock()
     {
-        lock (new object()) { }
+        lock (new object())
+        { }
         return;
     }
     public static void BContractLock()
     {
         Contract.Ensures(true);
-        lock (new object()) { }
+        lock (new object())
+        { }
         return;
     }
 }

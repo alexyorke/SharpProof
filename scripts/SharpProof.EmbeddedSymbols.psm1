@@ -10,9 +10,9 @@ function Get-SharpProofEmbeddedPdb {
         $pe = [Reflection.PortableExecutable.PEReader]::new($stream)
         try {
             $entries = @($pe.ReadDebugDirectory())
-            $embedded = @($entries | Where-Object Type -eq EmbeddedPortablePdb)
+            $embedded = @($entries | Where-Object Type -EQ EmbeddedPortablePdb)
             if ($embedded.Count -eq 0) { return $null }
-            if ($embedded.Count -ne 1 -or @($entries | Where-Object Type -eq CodeView).Count -ne 1) {
+            if ($embedded.Count -ne 1 -or @($entries | Where-Object Type -EQ CodeView).Count -ne 1) {
                 throw 'An embedded-symbol assembly must contain exactly one embedded PDB and one CodeView record.'
             }
             $entry = $embedded[0]
@@ -45,7 +45,7 @@ function Get-SharpProofEmbeddedPdb {
                         [Text.Encoding]::ASCII.GetString($bytes, 0, 4) -cne 'BSJB') {
                         throw 'Embedded PDB payload or declared size is invalid.'
                     }
-                    Write-Output -NoEnumerate $bytes
+                    Write-Output -NoEnumerate -InputObject $bytes
                 }
                 finally { $deflate.Dispose() }
             }

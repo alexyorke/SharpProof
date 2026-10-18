@@ -79,14 +79,14 @@ try {
             if ($variant -ne 'baseline') {
                 $references = '<PackageReference Include="SharpProof" Version="' + $version + '" />'
             }
-            $profile = if ($variant -eq 'verified') { 'strict' } else { 'advisory' }
+            $verificationProfile = if ($variant -eq 'verified') { 'strict' } else { 'advisory' }
             $project = @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
     <NuGetAudit>false</NuGetAudit>
-    <SharpProofProfile>$profile</SharpProofProfile>
+    <SharpProofProfile>$verificationProfile</SharpProofProfile>
     <SharpProofVerifyResultFile>$resultFile</SharpProofVerifyResultFile>
     <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
   </PropertyGroup>
@@ -134,23 +134,23 @@ try {
 finally {
     Set-Location $originalLocation
     $report = [ordered]@{
-        schemaVersion = 2
-        completed = $completed
-        measuredAtUtc = [DateTime]::UtcNow.ToString('O')
-        source = [ordered]@{
-            commit = $sourceCommit
+        schemaVersion            = 2
+        completed                = $completed
+        measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
+        source                   = [ordered]@{
+            commit            = $sourceCommit
             hasTrackedChanges = $trackedChanges.Count -gt 0
-            harnessSha256 = $harnessHash
+            harnessSha256     = $harnessHash
         }
-        packageVersion = [string]$identity.Version
+        packageVersion           = [string]$identity.Version
         packageRepositoryCommits = @($identity.RepositoryCommits)
-        sdk = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
-        platform = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
-        processorCount = [Environment]::ProcessorCount
-        iterations = $Iterations
-        scope = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
-        packages = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
-        measurements = @($measurements.ToArray())
+        sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
+        platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+        processorCount           = [Environment]::ProcessorCount
+        iterations               = $Iterations
+        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
+        packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
+        measurements             = @($measurements.ToArray())
     }
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM

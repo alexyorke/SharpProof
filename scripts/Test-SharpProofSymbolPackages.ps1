@@ -157,8 +157,12 @@ function Get-SharpProofSymbolPackageValidatorType {
     $validatorType = 'SharpProofSymbolPackageValidator' -as [type]
     if ($null -eq $validatorType) {
         $validatorType = @(
-            Add-Type -Path (Join-Path $PSScriptRoot 'SharpProof.SymbolPackageValidator.cs') -PassThru |
-                Where-Object Name -eq 'SharpProofSymbolPackageValidator'
+            Add-Type `
+                -Path (Join-Path `
+                    $PSScriptRoot `
+                    'SharpProof.SymbolPackageValidator.cs') `
+                -PassThru |
+                Where-Object Name -EQ 'SharpProofSymbolPackageValidator'
         )[0]
     }
     return $validatorType

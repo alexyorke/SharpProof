@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
-$files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -in @('.nupkg', '.snupkg'))
+$files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
 $identities = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $commit = (& git -C $repository rev-parse HEAD).Trim()

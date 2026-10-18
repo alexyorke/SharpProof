@@ -6,6 +6,18 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+[*.{ps1,psm1,psd1}]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
+tab_width = 2
+switch_case_indent = true
+space_redirects = true
+
 [*.cs]
 # Analyze public APIs even when their declaration files are missing.
 dotnet_public_api_analyzer.require_api_files = false

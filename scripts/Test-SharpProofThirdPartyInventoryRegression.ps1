@@ -30,10 +30,10 @@ function New-FixturePackage([string]$Id, [hashtable]$Files) {
 function New-FixtureInventory {
     return @{
         schemaVersion = 1
-        packages = @{
-            SharpProof = @()
+        packages      = @{
+            SharpProof              = @()
             'SharpProof.Attributes' = @()
-            'SharpProof.Verifier' = @(
+            'SharpProof.Verifier'   = @(
                 @{ id = 'Vendor'; version = '1'; license = 'MIT'; entries = @('tools/Vendor.dll') },
                 @{ id = 'StaticRuntime'; version = '2'; license = 'BSD-2-Clause'; linkage = 'static'; entries = @('tools/Vendor.dll') },
                 @{ id = 'Z3'; version = '4.12.2'; license = 'MIT'; entries = @('tools/native/win-x64/libz3.dll'); entrySha256 = @(@{ path = 'tools/native/win-x64/libz3.dll'; sha256 = $nativeDigest }) }

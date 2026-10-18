@@ -67,11 +67,11 @@ try {
     finally { $provider.Dispose(); $pdbStream.Dispose() }
     $hashOffset = -1
     for ($candidate = 0; $candidate -le $corruptSourcePdb.Length - $sourceHash.Length; $candidate++) {
-        $matches = $true
+        $sourceHashMatches = $true
         for ($index = 0; $index -lt $sourceHash.Length; $index++) {
-            if ($corruptSourcePdb[$candidate + $index] -ne $sourceHash[$index]) { $matches = $false; break }
+            if ($corruptSourcePdb[$candidate + $index] -ne $sourceHash[$index]) { $sourceHashMatches = $false; break }
         }
-        if ($matches) { $hashOffset = $candidate; break }
+        if ($sourceHashMatches) { $hashOffset = $candidate; break }
     }
     if ($hashOffset -lt 0) { throw 'The source-checksum negative-control fixture could not locate its document checksum.' }
     $corruptSourcePdb[$hashOffset] = $corruptSourcePdb[$hashOffset] -bxor 1
@@ -86,8 +86,8 @@ try {
         $embedded = $entries[$embeddedIndex]
         $debugRva = $pe.PEHeaders.PEHeader.DebugTableDirectory.RelativeVirtualAddress
         $section = @($pe.PEHeaders.SectionHeaders | Where-Object {
-            $debugRva -ge $_.VirtualAddress -and $debugRva -lt $_.VirtualAddress + [Math]::Max($_.VirtualSize, $_.SizeOfRawData)
-        })[0]
+                $debugRva -ge $_.VirtualAddress -and $debugRva -lt $_.VirtualAddress + [Math]::Max($_.VirtualSize, $_.SizeOfRawData)
+            })[0]
         $debugOffset = $section.PointerToRawData + $debugRva - $section.VirtualAddress
     }
     finally { $pe.Dispose(); $stream.Dispose() }

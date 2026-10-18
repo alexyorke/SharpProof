@@ -26,9 +26,9 @@ function Assert-WindowsPayloadPrerequisites([string]$Library, [string]$PayloadAr
         }
         $modules = [Collections.Generic.List[string]]::new()
         foreach ($descriptor in @(
-            @{ Directory = $reader.PEHeaders.PEHeader.ImportTableDirectory; Stride = 20; NameOffset = 12; Delay = $false },
-            @{ Directory = $reader.PEHeaders.PEHeader.DelayImportTableDirectory; Stride = 32; NameOffset = 4; Delay = $true }
-        )) {
+                @{ Directory = $reader.PEHeaders.PEHeader.ImportTableDirectory; Stride = 20; NameOffset = 12; Delay = $false },
+                @{ Directory = $reader.PEHeaders.PEHeader.DelayImportTableDirectory; Stride = 32; NameOffset = 4; Delay = $true }
+            )) {
             $directory = $descriptor.Directory
             if ($directory.RelativeVirtualAddress -eq 0) { continue }
             if ($directory.Size -lt $descriptor.Stride -or $directory.Size -gt 1048576) { throw 'Malformed or oversized PE import directory.' }

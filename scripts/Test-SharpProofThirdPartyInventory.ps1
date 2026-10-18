@@ -32,8 +32,8 @@ if (@($inventory.packages['SharpProof']).Count -ne 0) {
 $packages = @(Get-ChildItem -LiteralPath $PackageSource -File -Filter '*.nupkg')
 if ($packages.Count -ne 3) { throw 'Third-party validation requires exactly three nupkg files.' }
 $identities = @($packages | ForEach-Object {
-    Get-SharpProofPackageIdentity -Path $_.FullName -RequireSingleIdentity
-})
+        Get-SharpProofPackageIdentity -Path $_.FullName -RequireSingleIdentity
+    })
 $packageIds = @($identities.Id | Sort-Object -CaseSensitive)
 if (($packageIds -join '|') -cne ($expectedIds -join '|') -or
     @($identities.Version | Sort-Object -Unique -CaseSensitive).Count -ne 1) {

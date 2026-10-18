@@ -8,6 +8,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$reproductionTimeoutSeconds = $CommandTimeoutSeconds
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer 'Run independent reproducibility builds in the canonical Linux amd64 container.'
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::X64) { throw 'Reproducibility qualification requires Linux amd64.' }
@@ -29,12 +30,12 @@ $sdk = [string](Get-Content (Join-Path $repository 'global.json') -Raw | Convert
 $report = [ordered]@{
     schemaVersion = 1; sourceCommit = $commit; scope = $Scope; sdkVersion = $sdk
     configuration = 'Release'; continuousIntegrationBuild = $true
-    origin = 'https://github.com/alexyorke/SharpProof.git'
+    origin                 = 'https://github.com/alexyorke/SharpProof.git'
     toolchainCatalogSha256 = (Get-FileHash (Join-Path $repository 'eng/container/toolchain.json') -Algorithm SHA256).Hash.ToLowerInvariant()
     workspacePaths = $clones; managedPayloadsEqual = $false; managedPayloadCount = 0
     packageBytesEqual = $null; archiveComparisons = @(); payloadMismatches = @(); runs = @()
-    packageScope = 'SDK 10 archive container bytes are measured separately; managed payload equality does not imply ZIP equality.'
-    nativeInputs = @()
+    packageScope           = 'SDK 10 archive container bytes are measured separately; managed payload equality does not imply ZIP equality.'
+    nativeInputs           = @()
 }
 
 function Get-NativeInputReceipt {
@@ -45,8 +46,8 @@ function Get-NativeInputReceipt {
     return @(
         Get-ChildItem -LiteralPath $nativeRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
             [ordered]@{
-                path = [IO.Path]::GetRelativePath($nativeRoot, $_.FullName).Replace('\', '/')
-                bytes = $_.Length
+                path   = [IO.Path]::GetRelativePath($nativeRoot, $_.FullName).Replace('\', '/')
+                bytes  = $_.Length
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             }
         }
@@ -75,14 +76,14 @@ function Invoke-ReproCommand([string]$Executable, [string[]]$Arguments, [string]
         if (-not $process.Start()) { throw "Cannot start reproducibility phase $LogName." }
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
-        $timedOut = -not $process.WaitForExit($CommandTimeoutSeconds * 1000)
+        $timedOut = -not $process.WaitForExit($reproductionTimeoutSeconds * 1000)
         if ($timedOut) {
             $process.Kill($true)
             $process.WaitForExit()
         }
         $text = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         [IO.File]::WriteAllText((Join-Path $output "$LogName.log"), $text, [Text.UTF8Encoding]::new($false))
-        if ($timedOut) { throw "Reproducibility phase $LogName exceeded $CommandTimeoutSeconds seconds; inspect its local log." }
+        if ($timedOut) { throw "Reproducibility phase $LogName exceeded $reproductionTimeoutSeconds seconds; inspect its local log." }
         if ($process.ExitCode -ne 0) { throw "Reproducibility phase $LogName failed with exit code $($process.ExitCode); inspect its local log." }
         return $text
     }
@@ -100,13 +101,13 @@ function Get-RepresentativePayloads([string]$Clone) {
         }
     }
     if ($hashes.Count -eq 0) { throw 'The representative build produced no managed payload authority.' }
-    return ,$hashes
+    return , $hashes
 }
 
 function Get-PackedPayloads([string]$Clone) {
     $feed = Join-Path $Clone 'artifacts/container-packages'
     Import-Module (Join-Path $Clone 'scripts/SharpProof.PackageIdentity.psm1') -Force
-    $files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -in @('.nupkg', '.snupkg'))
+    $files = @(Get-ChildItem -LiteralPath $feed -File | Where-Object Extension -In @('.nupkg', '.snupkg'))
     $identity = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
     if ($identity.RepositoryCommits.Count -ne 1 -or $identity.RepositoryCommits[0] -cne $commit) { throw 'A reproduction package does not name the exact source commit.' }
     $hashes = [Collections.Generic.SortedDictionary[string, string]]::new([StringComparer]::Ordinal)
@@ -179,10 +180,10 @@ try {
     if ($Scope -eq 'Full') {
         $archiveKeys = @(@($runs[0].archives.Keys) + @($runs[1].archives.Keys) | Sort-Object -Unique)
         $comparisons = @($archiveKeys | ForEach-Object {
-            $firstHash = if ($runs[0].archives.ContainsKey($_)) { $runs[0].archives[$_] } else { $null }
-            $secondHash = if ($runs[1].archives.ContainsKey($_)) { $runs[1].archives[$_] } else { $null }
-            [ordered]@{ file = $_; firstSha256 = $firstHash; secondSha256 = $secondHash; equal = $firstHash -ceq $secondHash }
-        })
+                $firstHash = if ($runs[0].archives.ContainsKey($_)) { $runs[0].archives[$_] } else { $null }
+                $secondHash = if ($runs[1].archives.ContainsKey($_)) { $runs[1].archives[$_] } else { $null }
+                [ordered]@{ file = $_; firstSha256 = $firstHash; secondSha256 = $secondHash; equal = $firstHash -ceq $secondHash }
+            })
         $report.archiveComparisons = $comparisons
         $report.packageBytesEqual = @($comparisons | Where-Object { -not $_.equal }).Count -eq 0
     }

@@ -46,7 +46,7 @@ try {
     foreach ($id in @('SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'snupkg' }
     @{
         schemaVersion = 1
-        packages = @{
+        packages      = @{
             SharpProof = @(); 'SharpProof.Attributes' = @()
             'SharpProof.Verifier' = @(
                 @{ id = 'Vendor'; version = '1'; license = 'MIT'; entries = @('tools/Vendor.dll') },
@@ -69,7 +69,7 @@ try {
     $original = [IO.File]::ReadAllText($sbomPath)
     $sbom = $original | ConvertFrom-Json
     if ($sbom.spdxVersion -cne 'SPDX-2.3' -or $sbom.packages.Count -ne 8 -or $sbom.files.Count -ne 2 -or
-        @($sbom.relationships | Where-Object relationshipType -ceq 'STATIC_LINK').Count -ne 1) {
+        @($sbom.relationships | Where-Object relationshipType -CEQ 'STATIC_LINK').Count -ne 1) {
         throw 'The SBOM lost archive/component hashes or composite static-link relationships.'
     }
     $sbom.packages = @($sbom.packages | Select-Object -SkipLast 1)

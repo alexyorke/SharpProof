@@ -42,8 +42,8 @@ function Read-SharpProofBoundedJsonDocument {
     $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
     return [pscustomobject]@{
         Document = [Text.Json.JsonDocument]::Parse($json)
-        Bytes = $bytes
-        Json = $json
+        Bytes    = $bytes
+        Json     = $json
     }
 }
 
@@ -89,7 +89,6 @@ function Assert-SharpProofFuzzRunnerResult {
 
     $document = $null
     $bytes = $null
-    $json = $null
     try {
         $validation = Read-SharpProofBoundedJsonDocument -Path $Path `
             -ByteLimitMessage 'The fuzz runner result exceeds its byte limit.' `
@@ -97,7 +96,6 @@ function Assert-SharpProofFuzzRunnerResult {
             -GrowthMessage 'The fuzz runner result changed during validation.'
         $document = $validation.Document
         $bytes = $validation.Bytes
-        $json = $validation.Json
         $root = $document.RootElement
         if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'Fuzz runner result must be a JSON object.'
@@ -107,10 +105,10 @@ function Assert-SharpProofFuzzRunnerResult {
             -Description 'Fuzz runner result' `
             -RejectDuplicates `
             -Expected @(
-                'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
-                'Agreements', 'Abstentions', 'FrontendAgreements',
-                'SmtAgreements', 'PartialSmtAgreements', 'FrontendCoverage',
-                'TotalProgramCoverage', 'MetadataProgramCoverage', 'CoverageSatisfied', 'Failures', 'Passed')
+            'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
+            'Agreements', 'Abstentions', 'FrontendAgreements',
+            'SmtAgreements', 'PartialSmtAgreements', 'FrontendCoverage',
+            'TotalProgramCoverage', 'MetadataProgramCoverage', 'CoverageSatisfied', 'Failures', 'Passed')
 
         $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
         $cases = Get-ExactJsonInt32 $root 'Cases'
@@ -248,8 +246,8 @@ function Assert-SharpProofFuzzRunnerResult {
                 -Description 'Fuzz failure' `
                 -RejectDuplicates `
                 -Expected @(
-                    'Case', 'Seed', 'Oracle', 'Original', 'Minimized',
-                    'Detail', 'Term')
+                'Case', 'Seed', 'Oracle', 'Original', 'Minimized',
+                'Detail', 'Term')
             [void](Get-ExactJsonInt32 $failure 'Case')
             [void](Get-ExactJsonInt32 $failure 'Seed')
             foreach ($name in @(
@@ -265,21 +263,21 @@ function Assert-SharpProofFuzzRunnerResult {
             throw 'The fuzz runner did not produce a passing result.'
         }
         $result = [pscustomobject][ordered]@{
-            SchemaVersion = $schema
-            Cases = $cases
-            Seed = $seed
-            MaximumParallelism = $maximumParallelism
-            Agreements = $agreements
-            Abstentions = $abstentions
-            FrontendAgreements = $frontendAgreements
-            SmtAgreements = $smtAgreements
-            PartialSmtAgreements = $partialSmtAgreements
-            FrontendCoverage = [pscustomobject]$coverageValues
-            TotalProgramCoverage = [pscustomobject]$totalValues
+            SchemaVersion           = $schema
+            Cases                   = $cases
+            Seed                    = $seed
+            MaximumParallelism      = $maximumParallelism
+            Agreements              = $agreements
+            Abstentions             = $abstentions
+            FrontendAgreements      = $frontendAgreements
+            SmtAgreements           = $smtAgreements
+            PartialSmtAgreements    = $partialSmtAgreements
+            FrontendCoverage        = [pscustomobject]$coverageValues
+            TotalProgramCoverage    = [pscustomobject]$totalValues
             MetadataProgramCoverage = [pscustomobject]$metadataValues
-            CoverageSatisfied = $coverageSatisfied
-            Failures = [object[]]@()
-            Passed = $passed
+            CoverageSatisfied       = $coverageSatisfied
+            Failures                = [object[]]@()
+            Passed                  = $passed
         }
     }
     catch {

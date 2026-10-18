@@ -14,8 +14,8 @@ $sourceDirectory = Join-Path $probeRoot 'Project'
 $checks = 0
 try {
     foreach ($candidate in @(
-        '/_/Project/Source.cs', '\_\Project\Source.cs',
-        (Join-Path $sourceDirectory 'Source.cs'), 'Project/Source.cs')) {
+            '/_/Project/Source.cs', '\_\Project\Source.cs',
+            (Join-Path $sourceDirectory 'Source.cs'), 'Project/Source.cs')) {
         $resolved = Resolve-SharpProofSourceDocument -RepositoryRoot $probeRoot -DocumentPath $candidate
         if ($resolved -cne 'Project/Source.cs') {
             throw "Source document identity changed for '$candidate': '$resolved'."
@@ -28,11 +28,11 @@ try {
     $checks++
 
     foreach ($candidate in @(
-        '/_/', '/_/ ', '/_//Project/Source.cs', '/_/Project//Source.cs',
-        '/_/Project/./Source.cs', '/_/Project/../Project/Source.cs',
-        '/_/../Project/Source.cs', '/_/C:/Project/Source.cs',
-        '/__/Project/Source.cs', '/_other/Project/Source.cs',
-        '/foreign/Project/Source.cs', '/_/Project/Missing.cs')) {
+            '/_/', '/_/ ', '/_//Project/Source.cs', '/_/Project//Source.cs',
+            '/_/Project/./Source.cs', '/_/Project/../Project/Source.cs',
+            '/_/../Project/Source.cs', '/_/C:/Project/Source.cs',
+            '/__/Project/Source.cs', '/_other/Project/Source.cs',
+            '/foreign/Project/Source.cs', '/_/Project/Missing.cs')) {
         $rejected = $false
         try {
             Resolve-SharpProofSourceDocument -RepositoryRoot $probeRoot -DocumentPath $candidate | Out-Null

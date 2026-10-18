@@ -6,7 +6,8 @@ public static class Subject
     {
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return Callee(x); }
+        try
+        { return Callee(x); }
         catch (System.DivideByZeroException) when (++x > 0) { return 7; }
         catch (System.OverflowException) { return x; }
     }
@@ -14,14 +15,16 @@ public static class Subject
     {
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return Forward(x); }
+        try
+        { return Forward(x); }
         catch (System.DivideByZeroException) when (++x > 0) { return 7; }
         catch (System.OverflowException) { return x; }
     }
     private static int Forward(int value) { return Callee(value); }
     private static int Callee(int value)
     {
-        try { return 10 / value; }
+        try
+        { return 10 / value; }
         finally { value = checked((byte)(value + 256)); }
     }
 }

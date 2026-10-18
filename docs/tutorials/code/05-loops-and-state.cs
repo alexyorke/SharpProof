@@ -6,14 +6,16 @@ public static class Loops
         Contract.Requires(n >= 0);
         Contract.Ensures(Contract.Result<int>() == n);
         var i = 0;
-        while (i < n) i++;
+        while (i < n)
+            i++;
         return i;
     }
     [DoesNotThrow]
     public static int Sum([NotNull] int[] values)
     {
         var total = 0;
-        for (var i = 0; i < values.Length; i++) total += values[i];
+        for (var i = 0; i < values.Length; i++)
+            total += values[i];
         return total;
     }
 }

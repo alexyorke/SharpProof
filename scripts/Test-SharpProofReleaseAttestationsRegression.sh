@@ -10,7 +10,7 @@ printf fixture > "$fixture/provenance.json"
 printf fixture > "$fixture/sbom.json"
 printf fixture > "$fixture/evidence/sbom.spdx.json"
 printf fixture > "$fixture/evidence/release-manifest.json"
-cat > "$fixture/bin/gh" <<'MOCK'
+cat > "$fixture/bin/gh" << 'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "$CALL_LOG"
@@ -27,7 +27,7 @@ bash "$script_directory/Test-SharpProofReleaseAttestations.sh" "${arguments[@]}"
 [[ $(grep -c -- "--source-digest $commit --deny-self-hosted-runners" "$CALL_LOG") == 12 ]]
 [[ $(grep -c -- '--signer-workflow alexyorke/SharpProof/.github/workflows/package-consumers.yml' "$CALL_LOG") == 12 ]]
 if FAIL_SUBJECT="$fixture/packages/A.nupkg" bash "$script_directory/Test-SharpProofReleaseAttestations.sh" "${arguments[@]}"; then
-    echo 'Attestation verifier failure was ignored' >&2
-    exit 1
+  echo 'Attestation verifier failure was ignored' >&2
+  exit 1
 fi
 echo 'Attestation policy regressions passed: every archive/evidence subject, signer/repository/source policy, SPDX predicate and fail-closed CLI errors. No real signatures were generated or verified by this fixture.'

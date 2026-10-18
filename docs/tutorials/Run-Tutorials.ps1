@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1' -or
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64) {
+    [Runtime.InteropServices.Architecture]::X64) {
     throw 'Run tutorials in the canonical Linux amd64 container.'
 }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -147,12 +147,12 @@ dotnet_diagnostic.SP0047.severity = warning
             }
             Publish-Line "  run: $($result.runStatus); failure: $($result.failureReason)"
             $claimLines = foreach ($claim in $result.claimResults) {
-                $entry = @($result.manifest.claims | Where-Object claimId -eq $claim.claimId)[0]
+                $entry = @($result.manifest.claims | Where-Object claimId -EQ $claim.claimId)[0]
                 "  $($entry.callableId) | $($entry.kind)/$($entry.effectContractKind) | $($claim.outcome) | $($claim.reason) | $($claim.effectCertainty) | $($claim.vacuity)"
             }
             foreach ($line in @($claimLines | Sort-Object)) { Publish-Line $line }
             if ($id -in @('03-effects', '04-branching', '05-loops-and-state') -and
-                @($result.claimResults | Where-Object outcome -ne 'Proven').Count) {
+                @($result.claimResults | Where-Object outcome -NE 'Proven').Count) {
                 throw "$id did not prove all selected claims."
             }
             if ($id -eq '06-outcomes' -and
@@ -161,7 +161,7 @@ dotnet_diagnostic.SP0047.severity = warning
             }
             if ($id -eq '08-trusted-boundary' -and
                 ($result.claimResults[0].outcome -ne 'Proven' -or
-                 $result.claimResults[0].effectCertainty -ne 'TrustedCompleteBoundary')) {
+                $result.claimResults[0].effectCertainty -ne 'TrustedCompleteBoundary')) {
                 throw 'Trusted boundary evidence changed; review its declaration.'
             }
         }
