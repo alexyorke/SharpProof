@@ -151,6 +151,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         use = RepositoryParameterGuard.NotNull(use, nameof(use));
         for (var parent = use.Parent; parent != null; parent = parent.Parent)
         {
+            if (parent is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None })
+            { return true; }
             if (parent is IDeconstructionAssignmentOperation assignment && assignment.Target.DescendantsAndSelf().Contains(use))
             { return true; }
             if (parent is IAnonymousFunctionOperation lambda && !SymbolEqualityComparer.Default.Equals(lambda.Symbol, use.Parameter.ContainingSymbol) ||
@@ -182,6 +184,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { throw new ArgumentNullException(nameof(arguments)); }
         frame = null;
         graph = null;
+        var scalarReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
+            (CSharpOperationSemantics.IsScalar(method.ReturnType) || method.ReturnType is ITypeParameterSymbol &&
+             caller.Factory.GetTypeInfo(caller.Type(method.ReturnType)).Kind is IrTypeKind.Boolean or IrTypeKind.Integer);
         if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor or
                 MethodKind.LocalFunction) ||
@@ -195,8 +200,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (!CSharpOperationSemantics.SharesValueDomain(parameter.Type, method.OriginalDefinition.Parameters[ordinal].Type))).Any() ||
-            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) ||
+            {
+                parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+                var declared = method.OriginalDefinition.Parameters[ordinal].Type;
+                return !CSharpOperationSemantics.SharesValueDomain(parameter.Type, declared) &&
+                    (assigned && ordinal == method.Parameters.Length - 1 ||
+                     declared is not IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol } &&
+                     (declared is not ITypeParameterSymbol || caller.KnownScalarType(parameter.Type) == null));
+            }).Any() ||
+            !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !scalarReturnSpecialization ||
             method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
@@ -216,6 +228,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 argument.ArgumentKind == ArgumentKind.DefaultValue &&
                     (!parameter.HasExplicitDefaultValue || !argument.Value.ConstantValue.HasValue))
             { return false; }
+            if (method.OriginalDefinition.Parameters[parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol } &&
+                (parameter.Type is not IArrayTypeSymbol { IsSZArray: true } constructed ||
+                 caller.ConcreteArray(argument.Value) is not { } array || caller.Type(constructed.ElementType) != caller.Type(array.ElementType)))
+            { return false; }
+
         }
         var reference = method.DeclaringSyntaxReferences[0];
         var declaration = reference.GetSyntax(cancellationToken);
@@ -262,16 +279,38 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return false; }
         if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
-        // Source operations bind to declaration symbols. Closed outer types
-        // may share that body only when their intrinsic signature is unchanged.
+        // Source operations bind to declaration symbols. Reconcile parameter and
+        // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
-        // Specialize only immutable by-value parameters. Captured storage and
-        // ref/out escapes are excluded by scanning the complete declaration.
-        var arrayArguments = arguments.Where(argument =>
-            TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) &&
-            caller.ConcreteArray(argument.Value) != null).ToArray();
+        // A constructed symbol supplies exact scalar type arguments even when no
+        // value parameter mentions them. Preserve each declaration's own symbols.
+        if (!Spend(method.TypeArguments.Length))
+        { frame = null; return false; }
+        for (var ordinal = 0; ordinal < method.TypeArguments.Length; ordinal++)
+        {
+            if (caller.KnownScalarType(method.TypeArguments[ordinal]) is { } scalar)
+            { frame.SpecializeTypeParameter(method.OriginalDefinition.TypeParameters[ordinal], scalar); }
+        }
+        for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
+        {
+            if (!Spend(owner.TypeArguments.Length + 1))
+            { frame = null; return false; }
+            for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
+            {
+                if (caller.KnownScalarType(owner.TypeArguments[ordinal]) is { } scalar)
+                { frame.SpecializeTypeParameter(owner.OriginalDefinition.TypeParameters[ordinal], scalar); }
+            }
+        }
+        // Value and array parameters keep their representation through rebinding. Interface
+        // provenance requires immutable storage without captures or ref escapes.
+        var receiverArguments = arguments.Where(argument =>
+            (TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) ||
+             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol }) &&
+            caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
+            caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToArray();
         IOperation[] declarationOperations = [];
-        if (arrayArguments.Length != 0)
+        if (receiverArguments.Length != 0)
         {
             try
             {
@@ -281,16 +320,28 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             catch (ArgumentException)
             { frame = null; return false; }
         }
-        foreach (var argument in arrayArguments)
+        foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
-            if (declarationOperations.Length != 0 && caller.ConcreteArray(argument.Value) is { } array &&
+            if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
+            { frame.SpecializeNullableDefaultComparerParameter(parameter); }
+            if (parameter.Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) is { } scalar)
+            {
+                frame.SpecializeScalarParameter(parameter, scalar);
+                continue;
+            }
+            if (parameter.Type is IArrayTypeSymbol { IsSZArray: true } || declarationOperations.Length != 0 &&
                 !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
                     (use.Parent is IAssignmentOperation assignment && assignment.Target == use ||
                      use.Parent is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
                      IsCapturedParameterUse(use)))))
-            { frame.SpecializeArrayParameter(parameter, array); }
+            {
+                if (caller.ConcreteArray(argument.Value) is { } array)
+                { frame.SpecializeArrayParameter(parameter, array); }
+                if (caller.IsDefaultIntegerComparer(argument.Value))
+                { frame.SpecializeDefaultComparerParameter(parameter); }
+            }
         }
         if (instance != null)
         { frame.ModelReceiver(); }

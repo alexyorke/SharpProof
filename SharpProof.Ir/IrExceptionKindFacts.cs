@@ -11,6 +11,7 @@ internal static class IrExceptionKindFacts
             OverflowException => IrExceptionKind.Overflow,
             NullReferenceException => IrExceptionKind.NullReference,
             IndexOutOfRangeException => IrExceptionKind.IndexOutOfRange,
+            ArgumentOutOfRangeException when exception.GetType() == typeof(ArgumentOutOfRangeException) => IrExceptionKind.ArgumentOutOfRange,
             InvalidCastException => IrExceptionKind.InvalidCast,
             ArgumentException when exception.GetType() == typeof(ArgumentException) => IrExceptionKind.Argument,
             _ => null

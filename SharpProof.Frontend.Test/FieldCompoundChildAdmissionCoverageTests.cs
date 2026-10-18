@@ -8,31 +8,31 @@ namespace SharpProof.Frontend.Test;
 public sealed class FieldCompoundChildAdmissionCoverageTests
 {
     [TestCase(false, FrontendAbstention.ConversionMayChangeValue)]
-    [TestCase(true, FrontendAbstention.UnsupportedMutation)]
+    [TestCase(true, FrontendAbstention.None)]
     public void ActualFieldCompoundRetainsChildAdmissionAndTypedReplay(bool division, FrontendAbstention reason)
     {
         var members = division
             ? "int Target(int next) { var cell = new Cell(); cell.Value = 4; cell.Value /= next; return cell.Value; }"
             : "int Target(object next) { var cell = new Cell(); cell.Value = 1; cell.Value += (int)next; return cell.Value; }";
         const string cell = "public sealed class Cell { public int Value; }";
-        using var rejected = TypedProgramSubject.Create(members, cell);
+        using var subject = TypedProgramSubject.Create(members, cell);
         var expected = division ? 2 : 3;
-        Assert.That(rejected.Invoke([2]), Is.EqualTo(expected));
-        var tree = rejected.Compilation.SyntaxTrees.Single();
+        Assert.That(subject.Invoke([2]), Is.EqualTo(expected));
+        var tree = subject.Compilation.SyntaxTrees.Single();
         var assignment = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>()
             .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.OperatorToken.ValueText is "+=" or "/="));
-        var operation = rejected.Compilation.GetSemanticModel(tree).GetOperation(assignment)!;
-        var builder = new IrProgramBuilder(rejected.Factory);
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(assignment)!;
+        var builder = new IrProgramBuilder(subject.Factory);
         var entry = builder.CreateBlock("entry");
         var exceptionalExit = builder.CreateBlock("exceptional-exit");
         builder.SetEntry(entry);
-        var child = new RoslynTotalExpressionLowerer(rejected.Context, builder, exceptionalExit).LowerBodyValue(operation, entry);
-        Assert.That(child.Classification.IsExact, Is.False);
+        var child = new RoslynTotalExpressionLowerer(subject.Context, builder, exceptionalExit).LowerBodyValue(operation, entry);
+        Assert.That(child.Classification.IsExact, Is.EqualTo(division));
         Assert.That(child.Classification.Abstention, Is.EqualTo(reason));
-        var rejectedLowering = rejected.LowerSourceCalls(false, opaqueCalls: true);
-        Assert.That(rejectedLowering.IsExact, Is.False);
-        Assert.That(rejectedLowering.Classification.Abstention, Is.EqualTo(reason));
-        Assert.That(rejectedLowering.ConstructionLimitExceeded, Is.False);
+        var actualLowering = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(actualLowering.IsExact, Is.EqualTo(division));
+        Assert.That(actualLowering.Classification.Abstention, Is.EqualTo(reason));
+        Assert.That(actualLowering.ConstructionLimitExceeded, Is.False);
 
         var supportedMembers = division
             ? "int Target(int next) { var cell = new Cell(); cell.Value = 4; cell.Value -= next; return cell.Value; }"

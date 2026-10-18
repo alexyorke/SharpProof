@@ -91,7 +91,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             case IParenthesizedOperation parenthesized:
                 return LowerClause(parenthesized.Operand, state, depth + 1);
             case IInvocationOperation invocation:
-                return Intrinsic?.Invoke(invocation, state) ?? IntegerComparisonClause(invocation, state, depth) ?? StringEqualsClause(invocation, state, depth) ??
+                return Intrinsic?.Invoke(invocation, state) ?? ReferenceEqualsClause(invocation, state, depth) ?? IntegerComparisonClause(invocation, state, depth) ?? StringEqualsClause(invocation, state, depth) ??
                     Failed(operation, FrontendAbstention.UnsupportedInvocationShape);
             case IConditionalOperation { WhenFalse: { } whenFalse } conditional:
                 {
@@ -297,7 +297,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
-                IsImplicit: true, OperatorMethod: null, Type.SpecialType: SpecialType.System_Object,
+                IsTryCast: false, OperatorMethod: null, Conversion.IsImplicit: true, Type.SpecialType: SpecialType.System_Object,
                 Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.Array
             } widening &&
             widening.Conversion.IsReference)
@@ -375,6 +375,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
+        if (depth < 256 && operation is IInvocationOperation identity &&
+            ReferenceEqualsBody(identity, block, depth) is { } referenceEquality)
+        { return referenceEquality; }
         if (depth < 256 && operation is IInvocationOperation comparison &&
             IntegerComparisonBody(comparison, block, depth) is { } compared)
         { return compared; }
@@ -391,6 +394,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             { IsRef: false, Target: IPropertyReferenceOperation arrayTarget } arrayStore &&
             ArrayCollectionBody(arrayTarget, operation, arrayStore.Value, block, depth) is { } arrayStored)
         { return arrayStored; }
+        if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation arrayIncrement } &&
+            ArrayCollectionBody(arrayIncrement, operation, null, block, depth) is { } arrayIncremented)
+        { return arrayIncremented; }
+        if (depth < 256 && operation is ICompoundAssignmentOperation { Target: IPropertyReferenceOperation arrayCompound } &&
+            ArrayCollectionBody(arrayCompound, operation, null, block, depth) is { } arrayCompounded)
+        { return arrayCompounded; }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }
@@ -409,7 +418,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         { return read; }
         if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
-            CSharpOperationSemantics.IsOpaqueDomain(operation.Type))
+            CSharpOperationSemantics.IsOpaqueDomain(operation.Type) &&
+            !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null))
         {
             // Opaque constants and defaults have no effects; their values remain unknown.
             var constant = _context.Temporary(_context.Type(operation.Type));
@@ -872,6 +882,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
+        // Framework-only primitive Default getters can supply an observed replay
+        // value. Their symbolic exception, allocation and heap effects stay opaque.
+        var primitive = _context.KnownScalarType(CSharpOperationSemantics.DefaultComparerElement(operation));
+        if (CSharpOperationSemantics.IsComparisonIntegerType(primitive))
+        { site = _factory.CreateOperation(IrOpaqueCallSite.DefaultComparerReplay(primitive!.SpecialType.ToString()), _factory.GetOperationInfo(site).SourceSpan); }
         var member = OpaqueCallMember(method, values, resultType, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
@@ -936,7 +951,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
         }
         var completion = ApplyRule(creation, new TotalScalarRule(created.Value, faults, FrontendSubsetClassification.Exact), created.Continuation);
-        return deferAllocation ? AllocateValue(creation, completion.Continuation) : completion;
+        if (!deferAllocation)
+        { return completion; }
+        var deferred = AllocateValue(creation, completion.Continuation);
+        // Allocation establishes CLR zeroes before instance initialization. The
+        // opaque constructor already includes that initialization, so its result
+        // must not acquire default-field facts from this delayed allocation.
+        _builder.Call(deferred.Continuation, _context.OpaqueCallSite(creation, IrOpaqueCallEffects.Writes, display + ":initialized-state"), null, member, null, values);
+        return deferred;
     }
 
     private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
@@ -1005,11 +1027,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
             // A scalar element of a single-dimensional array is stored with its
             // value; other stores are effect sites only.
-            var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
+            var modeled = outside == null && (CSharpOperationSemantics.IsScalar(elementType) ||
+                _context.ConcreteArray(access.ArrayReference) is { } knownArray && CSharpOperationSemantics.IsScalar(knownArray.ElementType)) &&
                 _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
             if (stored is { } value)
             {
-                if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+                if (!modeled && CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
                 {
                     // A covariant array may reject the stored reference.
                     var mismatch = _context.Temporary(_factory.BooleanType);
@@ -1568,6 +1591,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         value = operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type) ? null : operation switch
         {
             ILiteralOperation literal => CSharpOperationSemantics.Literal(_factory, literal.Type!, literal.ConstantValue.Value),
+            IDefaultValueOperation when _context.KnownScalarType(operation.Type) is { } scalar =>
+                CSharpOperationSemantics.Literal(_factory, scalar, null),
             IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>
                 CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
             IParameterReferenceOperation parameter => _factory.Variable(_context.Variable(parameter.Parameter, state)),

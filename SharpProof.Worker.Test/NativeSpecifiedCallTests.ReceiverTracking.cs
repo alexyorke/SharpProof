@@ -74,22 +74,18 @@ public sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayEffects("[DoesNotThrow]", "object value",
             "return ((System.Collections.Generic.IList<int>)(int[])value).Count;", false, null, null);
     }
-    [Test]
-    public async Task CorpusSwapRetainsConcreteArrayReceiverAcrossItsGenericHelper()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CorpusSwapRetainsConcreteArrayReceiverAcrossItsGenericHelper(bool local)
     {
-        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            TestRepository.FindRoot(), "SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
-        var method = document.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
-        var file = document.RootElement.GetProperty("files").EnumerateArray().Single(item =>
-            item.GetProperty("sourceId").GetString() == method.GetProperty("sourceId").GetString() &&
-            item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
-        var declaration = string.Join("\n", file.GetProperty("content").GetString()!.Split('\n')
-            .Skip(method.GetProperty("startLine").GetInt32() - 1)
-            .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
+        var declaration = await CorpusSwapDeclaration();
+        if (local)
+        { declaration = declaration.Replace("public static void Swap<T>(this ", "static void Swap<T>(", StringComparison.Ordinal); }
         using var project = WorkerTests.TestProject.Create(
             "using System.Collections.Generic; public static class C { " +
-            "public static int Target(int[] values, int first, int second, int read) { C.Swap<int>(values, first, second); return values[read]; } " +
-            declaration + " }");
+            "public static int Target(int[] values, int first, int second, int read) { " +
+            (local ? "Swap<int>" : "C.Swap<int>") + "(values, first, second); return values[read]; " +
+            (local ? declaration : "") + " } " + (local ? "" : declaration) + " }");
         project.UseNetCoreReferencePack();
         var compilation = project.CreateCompilation();
         var tree = compilation.SyntaxTrees.Single();
@@ -156,7 +152,7 @@ public sealed partial class NativeSpecifiedCallTests
                             else
                             {
                                 Assert.That(replay.Exception!.Kind, Is.EqualTo(fault is NullReferenceException ? IrExceptionKind.NullReference :
-                                    fault is IndexOutOfRangeException ? IrExceptionKind.IndexOutOfRange : IrExceptionKind.Unknown));
+                                    fault is IndexOutOfRangeException ? IrExceptionKind.IndexOutOfRange : IrExceptionKind.ArgumentOutOfRange));
                             }
                         }
                     }
@@ -165,6 +161,74 @@ public sealed partial class NativeSpecifiedCallTests
         }
         finally
         { load.Unload(); }
+    }
+
+    [TestCase("bool", true, false)]
+    [TestCase("char", true, false)]
+    [TestCase("sbyte", true, false)]
+    [TestCase("byte", true, false)]
+    [TestCase("short", true, false)]
+    [TestCase("ushort", true, false)]
+    [TestCase("int", true, false)]
+    [TestCase("uint", true, false)]
+    [TestCase("long", true, false)]
+    [TestCase("ulong", true, false)]
+    [TestCase("bool", false, false)]
+    [TestCase("char", false, false)]
+    [TestCase("sbyte", false, false)]
+    [TestCase("byte", false, false)]
+    [TestCase("short", false, false)]
+    [TestCase("ushort", false, false)]
+    [TestCase("int", false, false)]
+    [TestCase("uint", false, false)]
+    [TestCase("long", false, false)]
+    [TestCase("ulong", false, false)]
+    [TestCase("bool", true, true)]
+    [TestCase("char", true, true)]
+    [TestCase("sbyte", true, true)]
+    [TestCase("byte", true, true)]
+    [TestCase("short", true, true)]
+    [TestCase("ushort", true, true)]
+    [TestCase("int", true, true)]
+    [TestCase("uint", true, true)]
+    [TestCase("long", true, true)]
+    [TestCase("ulong", true, true)]
+    [TestCase("bool", false, true)]
+    [TestCase("char", false, true)]
+    [TestCase("sbyte", false, true)]
+    [TestCase("byte", false, true)]
+    [TestCase("short", false, true)]
+    [TestCase("ushort", false, true)]
+    [TestCase("int", false, true)]
+    [TestCase("uint", false, true)]
+    [TestCase("long", false, true)]
+    [TestCase("ulong", false, true)]
+    public async Task CorpusArraySwapProvesItsFullContentsPostcondition(string elementType, bool correct, bool local)
+    {
+        ArgumentNullException.ThrowIfNull(elementType);
+        var declaration = (await CorpusSwapDeclaration()).Replace("IList<T>", "System.Collections.Generic.IList<T>", StringComparison.Ordinal);
+        var expected = correct ? "(read == first ? Contract.Old(values[second]) : read == second ? Contract.Old(values[first]) : Contract.Old(values[read]))" :
+            "Contract.Old(values[read])";
+        var body = "Contract.Requires(values != null && first >= 0 && first < values.Length && second >= 0 && second < values.Length && read >= 0 && read < values.Length); " +
+            "Contract.Ensures(Contract.Result<" + elementType + ">() == " + expected + "); " +
+            "Swap<" + elementType + ">(values, first, second); return values[read];";
+        if (local)
+        { body += declaration.Replace("public static void Swap<T>(this ", "static void Swap<T>(", StringComparison.Ordinal); }
+        await CheckInterfaceArrayContract(elementType + "[] values, int first, int second, int read", body,
+            correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted, result: elementType, members: local ? "" : declaration);
+    }
+    private static async Task<string> CorpusSwapDeclaration()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
+            TestRepository.FindRoot(), "SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
+        var method = document.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
+        var file = document.RootElement.GetProperty("files").EnumerateArray().Single(item =>
+            item.GetProperty("sourceId").GetString() == method.GetProperty("sourceId").GetString() &&
+            item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
+        var declaration = string.Join("\n", file.GetProperty("content").GetString()!.Split('\n')
+            .Skip(method.GetProperty("startLine").GetInt32() - 1)
+            .Take(method.GetProperty("endLine").GetInt32() - method.GetProperty("startLine").GetInt32() + 1));
+        return declaration;
     }
 
 }

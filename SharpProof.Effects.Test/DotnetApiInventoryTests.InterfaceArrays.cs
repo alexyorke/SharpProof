@@ -8,6 +8,47 @@ namespace SharpProof.Effects.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ArrayInterfaceBoundsResourceLookupCanInvokeUserCultureCode(bool throwFromCulture)
+    {
+        var saved = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = new BoundsProbeCulture();
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+            culture.Armed = true;
+            culture.ThrowFromName = throwFromCulture;
+            var exception = Assert.Catch((Action)(() => _ = ((System.Collections.Generic.IList<int>)Array.Empty<int>())[-1]));
+            Assert.That(exception, Is.TypeOf(throwFromCulture ? typeof(InvalidOperationException) : typeof(ArgumentOutOfRangeException)));
+            Assert.That(culture.Values[0], Is.EqualTo(37));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = saved;
+        }
+    }
+
+    private sealed class BoundsProbeCulture : System.Globalization.CultureInfo
+    {
+        public BoundsProbeCulture() : base("en-US") { }
+        public bool Armed;
+        public bool ThrowFromName;
+        public int[] Values { get; } = [17];
+        public override string Name
+        {
+            get
+            {
+                if (Armed)
+                {
+                    Values[0] = 37;
+                    if (ThrowFromName)
+                    { throw new InvalidOperationException("culture callback"); }
+                }
+                return base.Name;
+            }
+        }
+    }
     [Test]
     public void InterfaceArrayAdmissionRejectsDerivedInterfacesAliasesAndReferenceCovariance()
     {
@@ -20,6 +61,8 @@ public sealed partial class DotnetApiInventoryTests
                 public static int D(int[] values) => ((System.Collections.Generic.IList<int>)(object)values)[0];
                 public static int E(int[] values) => ((System.Collections.Generic.IList<int>)(values))[0];
                 public static int F(int[] values) => (values as System.Collections.Generic.IList<int>)[0];
+                public static int G(int[] values) => ((object)values as System.Collections.Generic.IList<uint>).Count;
+                public static int H(int[] values) => (values as System.Collections.Generic.ICollection<int>).Count;
             }
             """);
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
@@ -29,7 +72,7 @@ public sealed partial class DotnetApiInventoryTests
         foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
             var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(method.ExpressionBody!.Expression)!;
-            Assert.That(CSharpOperationSemantics.ArrayCollectionReceiver(property) != null, Is.EqualTo(method.Identifier.ValueText == "E"));
+            Assert.That(CSharpOperationSemantics.ArrayCollectionReceiver(property) != null, Is.EqualTo(method.Identifier.ValueText is "E" or "F" or "H"));
         }
     }
 
@@ -116,7 +159,7 @@ public sealed partial class DotnetApiInventoryTests
     [TestCase("System.Collections.Generic.IList<int> list = values; System.Action action = () => list = unknown; return list.Count;", false)]
     [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : unknown).Count;", false)]
     [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : (System.Collections.Generic.IList<int>)values).Count;", true)]
-    [TestCase("System.Collections.Generic.IList<int> list = values as System.Collections.Generic.IList<int>; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values as System.Collections.Generic.IList<int>; return list.Count;", true)]
     [TestCase("System.Collections.Generic.IList<long> list = (System.Collections.Generic.IList<long>)(System.Collections.Generic.IList<int>)values; return list.Count;", false)]
     public void ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(string body, bool expected)
     {
@@ -150,7 +193,7 @@ public sealed partial class DotnetApiInventoryTests
             "aliased-count"
         }
 
-        : ["read", "write", "aliased-read", "aliased-write"];
+        : ["read", "write", "aliased-read", "aliased-write", "caught-read", "caught-write", "wrong-catch", "post-increment", "pre-decrement", "compound-add", "compound-after-write", "checked-increment"];
         foreach (var action in actions)
         {
             var body = action switch
@@ -161,12 +204,22 @@ public sealed partial class DotnetApiInventoryTests
                 "aliased-count" => "System.Collections.Generic.IList<int> list = values; System.Collections.Generic.ICollection<int> collection = list; return collection.Count;",
                 "aliased-read" => "System.Collections.Generic.IList<int> list = values; return list[index];",
                 "aliased-write" => "System.Collections.Generic.IList<int> list = values; list[index] = replacement; return values[index];",
+                "caught-read" => "try { return ((System.Collections.Generic.IList<int>)values)[index]; } catch (System.ArgumentOutOfRangeException) { return 37; }",
+                "caught-write" => "try { ((System.Collections.Generic.IList<int>)values)[index] = replacement; return values[index]; } catch (System.ArgumentException) { return 37; }",
+                "post-increment" => "int before = ((System.Collections.Generic.IList<int>)values)[index]++; return unchecked(before * 31 + values[index]);",
+                "pre-decrement" => "int after = --((System.Collections.Generic.IList<int>)values)[index]; return unchecked(after * 31 + values[index]);",
+                "compound-add" => "return unchecked(((System.Collections.Generic.IList<int>)values)[index] += replacement);",
+                "compound-after-write" => "((System.Collections.Generic.IList<int>)values)[index] += (((System.Collections.Generic.IList<int>)values)[index] = replacement); return values[index];",
+                "checked-increment" => "return checked(++((System.Collections.Generic.IList<int>)values)[index]);",
+                "wrong-catch" => "try { return ((System.Collections.Generic.IList<int>)values)[index]; } catch (System.IndexOutOfRangeException) { return 37; }",
                 _ => "((System.Collections.Generic.IList<int>)values)[index] = replacement; return values[index];"
             };
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, int index, int replacement) { " + body + " } }");
             var compilation = references.AddSyntaxTrees(tree);
             if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
             {
+                if (!wrongClaim)
+                { throw new InvalidOperationException(action + ": compilation error"); }
                 return false;
             }
 
@@ -177,6 +230,8 @@ public sealed partial class DotnetApiInventoryTests
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
             if (!lowered.IsExact)
             {
+                if (!wrongClaim)
+                { throw new InvalidOperationException(action + ": " + lowered.Classification.Abstention); }
                 return false;
             }
 
@@ -207,6 +262,7 @@ public sealed partial class DotnetApiInventoryTests
                     var runtime = values?.ToArray();
                     int expected = 0;
                     Exception? fault = null;
+                    var handledBounds = false;
                     try
                     {
                         switch (action)
@@ -218,6 +274,39 @@ public sealed partial class DotnetApiInventoryTests
                             case "inherited-count":
                                 expected = ((IList<int>)runtime!).Count;
                                 break;
+                            case "caught-read":
+                                try
+                                { expected = ((IList<int>)runtime!)[index]; }
+                                catch (ArgumentOutOfRangeException) { expected = 37; handledBounds = true; }
+                                break;
+                            case "caught-write":
+                                try
+                                { ((IList<int>)runtime!)[index] = replacement; expected = runtime![index]; }
+                                catch (ArgumentException) { expected = 37; handledBounds = true; }
+                                break;
+                            case "post-increment":
+                                var before = ((IList<int>)runtime!)[index]++;
+                                expected = unchecked(before * 31 + runtime![index]);
+                                break;
+                            case "pre-decrement":
+                                var after = --((IList<int>)runtime!)[index];
+                                expected = unchecked(after * 31 + runtime![index]);
+                                break;
+                            case "compound-add":
+                                expected = unchecked(((IList<int>)runtime!)[index] += replacement);
+                                break;
+                            case "compound-after-write":
+                                ((IList<int>)runtime!)[index] += (((IList<int>)runtime!)[index] = replacement);
+                                expected = runtime[index];
+                                break;
+                            case "checked-increment":
+                                expected = checked(++((IList<int>)runtime!)[index]);
+                                break;
+                            case "wrong-catch":
+                                try
+                                { expected = ((IList<int>)runtime!)[index]; }
+                                catch (IndexOutOfRangeException) { expected = 37; }
+                                break;
                             case "aliased-read":
                             case "read":
                                 expected = ((IList<int>)runtime!)[index];
@@ -228,7 +317,7 @@ public sealed partial class DotnetApiInventoryTests
                                 break;
                         }
                     }
-                    catch (Exception exception) when (exception is NullReferenceException or ArgumentOutOfRangeException)
+                    catch (Exception exception) when (exception is NullReferenceException or ArgumentOutOfRangeException or OverflowException)
                     {
                         fault = exception;
                     }
@@ -237,8 +326,10 @@ public sealed partial class DotnetApiInventoryTests
                     var arrayType = factory.GetVariableInfo(parameters[0].Entry).Type;
                     var arrayValue = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType, values.Select(value => factory.CreateIntegerValue(value)));
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue> { [parameters[0].Entry] = arrayValue, [parameters[1].Entry] = factory.CreateIntegerValue(index), [parameters[2].Entry] = factory.CreateIntegerValue(replacement) }, 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
-                    if (replay.ConsumedApproximation && fault is not ArgumentOutOfRangeException)
+                    if (replay.ConsumedApproximation && !handledBounds && fault is not ArgumentOutOfRangeException)
                     {
+                        if (!wrongClaim)
+                        { throw new InvalidOperationException(action + ": unexpected approximation at " + index); }
                         return false;
                     }
 
@@ -246,16 +337,22 @@ public sealed partial class DotnetApiInventoryTests
                     {
                         if (values != null && !runtime!.SequenceEqual(values))
                         {
+                            if (!wrongClaim)
+                            { throw new InvalidOperationException(action + ": runtime fault changed array at " + index); }
                             return false;
                         }
 
-                        if (replay.Status != IrProgramExecutionStatus.Exception || replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : IrExceptionKind.Unknown))
+                        if (replay.Status != IrProgramExecutionStatus.Exception || replay.Exception?.Kind != (fault is NullReferenceException ? IrExceptionKind.NullReference : fault is OverflowException ? IrExceptionKind.Overflow : IrExceptionKind.ArgumentOutOfRange))
                         {
+                            if (!wrongClaim)
+                            { throw new InvalidOperationException(action + ": fault index=" + index + ", expected=" + fault.GetType().Name + ", status=" + replay.Status + ", actual=" + replay.Exception?.Kind); }
                             return false;
                         }
                     }
                     else if (replay.Status != IrProgramExecutionStatus.Returned || replay.ReturnValue?.Integer != expected + (wrongClaim ? 1L : 0L))
                     {
+                        if (!wrongClaim)
+                        { throw new InvalidOperationException(action + ": index=" + index + ", expected=" + expected + ", status=" + replay.Status + ", actual=" + replay.ReturnValue?.Integer); }
                         return false;
                     }
                 }
