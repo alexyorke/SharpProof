@@ -4,10 +4,15 @@
   "minimumChangedTcbLinePercent": 100.0,
   "declarationOnlyTcbFiles": [
     "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+    "SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs",
+    "SharpProof.Host/HostEnvironmentVariables.cs",
+    "SharpProof.Ir/AnalysisDefaults.cs",
     "SharpProof.Smt/GlobalUsings.cs",
     "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
     "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
-    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
+    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs",
+    "Tools/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
+    "eng/configuration/SolverDefaults.cs"
   ],
   "projects": {
     "ConsoleLoggingAnalyzer": 100.0,

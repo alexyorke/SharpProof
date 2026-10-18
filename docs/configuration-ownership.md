@@ -45,6 +45,12 @@ evaluate those defaults and compare them with runtime constants. Keep both the
 independent acceptance assertions and these parity checks when changing policy.
 No build-time code generator or runtime configuration-file dependency is added.
 
+New defaults sources must retain explicit ownership in the acceptance contract.
+Files containing only compile-time constants have no executable sequence points
+and are explicitly registered in the
+[declaration-only coverage baseline](../eng/coverage/baseline.json). Aggregate,
+changed-TCB, and project coverage floors remain at 100%.
+
 ## Repository audit coverage
 
 The initial inventory was the complete tracked tree at master
