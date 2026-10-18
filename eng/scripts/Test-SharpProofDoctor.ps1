@@ -48,7 +48,7 @@ try {
     $centralSource = $centralSource.Replace('</ItemGroup>', '<PackageReference Include="SharpProof.Unrelated" /></ItemGroup>')
     [IO.File]::WriteAllText($project, $centralSource)
     $assetsPath = Join-Path $fixture 'assets.fixture.json'
-    $assetsSource = '{"libraries":{"SharpProof/1.2.3":{"type":"package"},"src/SharpProof.Attributes/1.2.3":{"type":"package"},"src/SharpProof.Verifier/1.2.3":{"type":"package"},"SharpProof.Unrelated/7.0.0":{"type":"package"}},"packageFolders":{"do-not-emit-private-package-path":{}}}'
+    $assetsSource = '{"libraries":{"SharpProof/1.2.3":{"type":"package"},"SharpProof.Attributes/1.2.3":{"type":"package"},"SharpProof.Verifier/1.2.3":{"type":"package"},"SharpProof.Unrelated/7.0.0":{"type":"package"}},"packageFolders":{"do-not-emit-private-package-path":{}}}'
     [IO.File]::WriteAllText($assetsPath, $assetsSource)
     $json = & pwsh -NoLogo -NoProfile -File $doctor -Target $project -Format Json
     if ($LASTEXITCODE -ne 0) { throw 'Versionless centrally managed references should succeed.' }
@@ -57,7 +57,7 @@ try {
     if (@($report.packages | Where-Object { $_.version }).Count) { throw 'Expected versionless evaluated direct references.' }
     if (@($report.checks | Where-Object { $_.name -eq 'package-versions' }).Count) { throw 'Aligned resolved versions should not warn.' }
     if (($json | Out-String).Contains('do-not-emit-private-package-path')) { throw 'Doctor leaked unrelated assets metadata.' }
-    [IO.File]::WriteAllText($assetsPath, $assetsSource.Replace('src/SharpProof.Verifier/1.2.3', 'src/SharpProof.Verifier/1.2.4'))
+    [IO.File]::WriteAllText($assetsPath, $assetsSource.Replace('SharpProof.Verifier/1.2.3', 'SharpProof.Verifier/1.2.4'))
     $json = & pwsh -NoLogo -NoProfile -File $doctor -Target $project -Format Json
     if ($LASTEXITCODE -ne 0) { throw 'Resolved version mismatch should be a warning.' }
     $report = ($json | Out-String) | ConvertFrom-Json
