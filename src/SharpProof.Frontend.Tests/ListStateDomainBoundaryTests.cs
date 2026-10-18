@@ -12,6 +12,7 @@ namespace SharpProof.Frontend.Test;
 public sealed class ListStateDomainBoundaryTests
 {
     [TestCase("var alias = data;", true)]
+    [TestCase("var alias = data; alias = data = new System.Collections.Generic.List<int>();", true)]
     [TestCase("System.Collections.Generic.IList<int> alias = data;", true)]
     [TestCase("System.Collections.Generic.ICollection<int> alias = data;", true)]
     [TestCase("var alias = choose ? data : new System.Collections.Generic.List<int>();", true)]
@@ -96,6 +97,20 @@ public sealed class ListStateDomainBoundaryTests
         builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
         Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
             .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+    }
+
+    [Test]
+    public void PublishedAssignmentExpressionsDoNotEstablishOwnedReceivers()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static System.Collections.Generic.List<int> Published; public static int Target() { return (Published = new System.Collections.Generic.List<int>()).Count; } }");
+        var compilation = CSharpCompilation.Create("ListPublication", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        context.TrackFreshLists(ControlFlowGraph.Create(syntax, model)!);
+        var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsFreshList(property.Instance!), Is.False);
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)

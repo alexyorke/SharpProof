@@ -47,7 +47,8 @@ public sealed partial class TotalLoweringContext
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { operation = conversion.Operand; }
-            else if (operation is ISimpleAssignmentOperation { IsRef: false } assignment)
+            else if (operation is ISimpleAssignmentOperation { IsRef: false } assignment &&
+                Symbol(assignment.Target) is ILocalSymbol { RefKind: RefKind.None })
             { operation = assignment.Value; }
             else
             { break; }

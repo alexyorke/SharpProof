@@ -116,7 +116,8 @@ public sealed partial class TotalLoweringContext
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
                 (conversion.Conversion.IsIdentity || lists && conversion.Conversion.IsReference && conversion.Conversion.IsImplicit))
             { return Resolve(conversion.Operand, depth + 1); }
-            if (lists && operation is ISimpleAssignmentOperation { IsRef: false } assignment)
+            if (lists && operation is ISimpleAssignmentOperation { IsRef: false } assignment &&
+                Symbol(assignment.Target) is ILocalSymbol { RefKind: RefKind.None })
             { return Resolve(assignment.Value, depth + 1); }
             if (Symbol(operation) is { } symbol)
             { return symbol is ILocalSymbol && !excluded.Contains(symbol) && definitions.TryGetValue(symbol, out var values) && All(values, depth + 1); }
