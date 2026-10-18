@@ -1762,3 +1762,26 @@ Use comparer-preserving immutable builders, freeze before JSON/filter/text publi
 and retain required object[] process/scheduler adapters and ordered output records.
 These run in the canonical PowerShell runtime. The Windows PowerShell bootstrap
 eng/build.ps1 is a separate compatibility boundary. Status: open before edits.
+## Builder verification and next construction inventory
+
+IMM-M015 passed 268 focused frontend tests. IMM-M016/M017 passed all 640 ordinary
+Contracts tests. IMM-M018 passed 87 focused Worker tests with zero build warnings/errors;
+this compiles both updated LongFuzz harnesses, including nullable immutable results.
+The latest literal preservation check passes 2,724 tokens across 563 changed C# files.
+Evidence: immutability-frontend-traversal-tests.log,
+immutability-contract-scoped-builders-tests.log, immutability-worker-observation-tests.log,
+and immutability-master-literals.log. IMM-M015 through IMM-M018: implemented.
+
+IMM-M020: ContractForSymbolMatcher has scoped accumulation in BuildCompanionTargetIndex,
+ClassifyCompanionRelationships, GetTypeLayers, TypeParameterConstraintsMatch and
+UnmanagedCallingConventionTypesMatch. Coordinator traced consumers: preserve symbol
+comparers, per-bucket companion order, first-seen type order, FIFO cycle elimination,
+outermost-first type layers and first matching constraint removal. Use nested builders
+and freeze at returned inventories. Status: open before edits.
+
+IMM-M021: ForwardDataflowAnalysis.AnalyzeCore repeatedly replaces method-owned input,
+output and update-count vectors, changed-output lists and sorted scheduling sets.
+Use indexed array builders and sorted-set builders, snapshot each sorted pending batch
+before clearing, and freeze final results. FindReachableBlocks can use a sorted-set
+builder while retaining the DFS immutable stack. Preserve domain callback order,
+widening thresholds, cycle ordering and exception checks. Status: open before edits.
