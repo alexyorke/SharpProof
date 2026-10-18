@@ -1,7 +1,7 @@
 # .NET API gap backlog
 
 This is the committed work list for API support and its evidence. Baseline: latest
-master `dafb6d376f298de00df91f01f0cc0a8739a3c208`, followed by this branch's
+master `5d689ba7a`, followed by this branch's
 .NET 10 inventory and comparer-provenance work. Counts are static source sites,
 not runtime frequency. A passing test, a modeled effect, and a proved caller
 postcondition are separate claims.
@@ -43,7 +43,7 @@ access kind and value domains satisfy the production guard.
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance remains supported. |
 | D: Dictionary | 40 index reads, 22 Add, 22 ContainsKey, one index write and smaller constructor/view uses | Track key/value membership, aliasing and Count; model default versus custom comparers, GetHashCode/Equals callbacks, callback mutation/exceptions, missing/null/duplicate keys, allocation and mutation. Start with proven default-comparer scalar keys. Do not assume dictionary-typed parameters use default comparers. |
-| C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. This MR supports tracked Default integer aliases and immutable source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
+| C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. This MR supports tracked Default integer aliases and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Count/getter/Add have partial effects; constructors, stores, range operations and count/content relationships remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
@@ -96,9 +96,18 @@ access kind and value domains satisfy the production guard.
   queue/stack count/content relations and repeated getter consistency remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
   state. Proving a comparison result does not erase these effects. Parameters that
-  may be custom comparers, generic types without concrete evidence and mutable
-  helper parameters still need dispatch/provenance work. Null-coalescing comparer
-  selection in generic corpus sorts is a concrete next dataflow task.
+  may be custom comparers and generic types without concrete evidence still need
+  dispatch/provenance work. Commit `eb91e74aa` closes source-parameter normalization
+  for independently proven null/default inputs: `??`, `??=` and explicit null
+  branches retain an all-write domain invariant, including mutable parameters,
+  nested helpers, omitted optional arguments and all nine primitive integer types.
+  Null receivers fault after argument evaluation, and pure clauses retain their
+  non-null safety condition. All 57 new native cases pass, with 1,884 frontend
+  tests and five focused domain/entry/depth controls. Both array-interface and
+  comparer aliases now reject unknown parameter entry values even when a later
+  assignment has a known representation. Arbitrary incoming/custom comparers,
+  ref/closure escapes, unbound/non-scalar types and other collection implementations
+  remain open; normalization does not manufacture a default receiver for them.
   Closed scalar generic default comparers now resolve local-function type parameters
   through the same declaration-owned type resolver. Typed SByte/Byte/Int16/UInt16/Char
   CompareTo and proven default-comparer calls retain the exact promoted Int32
