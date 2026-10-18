@@ -13,7 +13,7 @@ public sealed class TypedCyclicRegionLoweringTests
     [TestCase("int Target(int x) { while (x < 3) { try { x++; } finally { x++; } } return x; }", 0, 4)]
     [TestCase("int Target(int x) { while (x < 3) { try { return x; } finally { x++; } } return x; }", 0, 0)]
     [TestCase("int Target(int x) { try { for (int i = 0; i < 2; i++) { try { x++; } finally { x++; } } } finally { x += 10; } return x; }", 0, 14)]
-    [TestCase("int Target(int x) { while (x < 0) { try { x = checked(x + 1); } catch (System.OverflowException) { x = 1; } finally { x++; } } return x; }", 1, 1)]
+    [TestCase("int Target(int x) { while (x < 0) { try { x = checked(x + 1); } catch (System.OverflowException) { x = 1; } finally { x++; } } return x; }", -1, 1)]
     public void CyclicRegionMatchesCompiledOracle(string members, int argument, int expected)
     {
         System.ArgumentNullException.ThrowIfNull(members);

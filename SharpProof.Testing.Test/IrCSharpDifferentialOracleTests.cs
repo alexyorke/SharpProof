@@ -53,7 +53,9 @@ public sealed class IrCSharpDifferentialOracleTests
             GC.WaitForPendingFinalizers();
         }
 
-        Assert.That(CountGeneratedOracleAssemblies(), Is.EqualTo(before));
+        // Earlier tests may leave unloaded-but-uncollected oracle assemblies that
+        // this collection also reclaims, so the count may only stay level or drop.
+        Assert.That(CountGeneratedOracleAssemblies(), Is.LessThanOrEqualTo(before));
     }
 
     [Test]
