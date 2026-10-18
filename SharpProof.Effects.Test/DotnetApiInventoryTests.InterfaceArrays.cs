@@ -5,6 +5,7 @@ using SharpProof.Ir;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Effects.Test;
+
 public sealed partial class DotnetApiInventoryTests
 {
     [Test]

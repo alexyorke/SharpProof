@@ -283,14 +283,14 @@ public sealed class IntervalDomainTests
         var joined = _domain.Join(
             _domain.Constant(long.MinValue),
             _domain.Constant(long.MaxValue));
-        var divisibleByThree = _domain.Create(null, null, 3, 1);
+        var congruentOneModThree = _domain.Create(null, null, 3, 1);
 
         Assert.That(
             joined.Modulus,
             Is.EqualTo(BigInteger.Parse(
                 "18446744073709551615",
                 CultureInfo.InvariantCulture)));
-        Assert.That(_domain.LessThanOrEqual(joined, divisibleByThree), Is.True);
+        Assert.That(_domain.LessThanOrEqual(joined, congruentOneModThree), Is.True);
     }
 
     [Test]
