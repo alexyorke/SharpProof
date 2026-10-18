@@ -110,6 +110,9 @@ internal static class DotnetApiInventory
             evidence.Add("intrinsic=scalar-array-backed-interface");
         }
 
+        if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
+        { evidence.Add("intrinsic=fresh-default-scalar-dictionary-state"); }
+
         if (symbol is IMethodSymbol method)
         {
             if (CSharpOperationSemantics.IsObjectReferenceEquals(method))
