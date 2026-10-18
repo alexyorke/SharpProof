@@ -415,7 +415,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         { return read; }
         if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
-            CSharpOperationSemantics.IsOpaqueDomain(operation.Type))
+            CSharpOperationSemantics.IsOpaqueDomain(operation.Type) &&
+            !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null))
         {
             // Opaque constants and defaults have no effects; their values remain unknown.
             var constant = _context.Temporary(_context.Type(operation.Type));
@@ -1582,6 +1583,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         value = operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type) ? null : operation switch
         {
             ILiteralOperation literal => CSharpOperationSemantics.Literal(_factory, literal.Type!, literal.ConstantValue.Value),
+            IDefaultValueOperation when _context.KnownScalarType(operation.Type) is { } scalar =>
+                CSharpOperationSemantics.Literal(_factory, scalar, null),
             IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>
                 CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
             IParameterReferenceOperation parameter => _factory.Variable(_context.Variable(parameter.Parameter, state)),

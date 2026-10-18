@@ -222,6 +222,16 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("ulong Target(ulong x) { return Add(x); } static ulong Add(ulong value, ulong step = 1) { return unchecked(value + step); }", ulong.MaxValue, 0UL)]
     [TestCase("bool Target(bool x) { return Flip(x); } static bool Flip(bool value) { return !value; }", true, false)]
     [TestCase("int Target(int x) { return Generic<int>(x); } static T Generic<T>(T value) => value;", int.MinValue, int.MinValue)]
+    [TestCase("bool Target(bool x) { return Reset<bool>(x); } static T Reset<T>(T value) => default(T);", true, false)]
+    [TestCase("char Target(char x) { return Reset<char>(x); } static T Reset<T>(T value) => default(T);", char.MaxValue, char.MinValue)]
+    [TestCase("sbyte Target(sbyte x) { return Reset<sbyte>(x); } static T Reset<T>(T value) => default(T);", sbyte.MinValue, (sbyte)0)]
+    [TestCase("byte Target(byte x) { return Reset<byte>(x); } static T Reset<T>(T value) => default(T);", byte.MaxValue, (byte)0)]
+    [TestCase("short Target(short x) { return Reset<short>(x); } static T Reset<T>(T value) => default(T);", short.MinValue, (short)0)]
+    [TestCase("ushort Target(ushort x) { return Reset<ushort>(x); } static T Reset<T>(T value) => default(T);", ushort.MaxValue, (ushort)0)]
+    [TestCase("int Target(int x) { return Reset<int>(x); } static T Reset<T>(T value) => default(T);", int.MinValue, 0)]
+    [TestCase("uint Target(uint x) { return Reset<uint>(x); } static T Reset<T>(T value) => default(T);", uint.MaxValue, 0u)]
+    [TestCase("long Target(long x) { return Reset<long>(x); } static T Reset<T>(T value) => default(T);", long.MinValue, 0L)]
+    [TestCase("ulong Target(ulong x) { return Reset<ulong>(x); } static T Reset<T>(T value) => default(T);", ulong.MaxValue, 0UL)]
     public void ScalarFramesPreserveWidthsAndDefaultConstants(string members, object input, object expected)
     {
         System.ArgumentNullException.ThrowIfNull(expected);
