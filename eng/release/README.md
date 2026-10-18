@@ -22,6 +22,30 @@ The three-package graph is internal to restore and publication: `SharpProof -> S
 
 Release qualification includes all six native OS/architecture combinations: Windows, macOS, and glibc Linux on x64/ARM64. Windows payloads link their C++ runtime statically and require no separate Visual C++ redistributable. Require the exact-artifact native ABI matrix to pass; compilation, import audits, and payload presence alone are insufficient. Native consumer builds require SDK 10.0.100+ and the .NET 10 runtime, with the host/filesystem and native runtime prerequisites in the [support matrix](../../docs/preview-support.md). Repository build/test/pack remains canonical-container-only. musl and other OS/CPU combinations are unsupported.
 
+## Debugging packages and packing
+
+All first-party assemblies use deterministic builds and portable PDBs with
+commit-specific Source Link. The two `.snupkg` files contain matching PDBs
+for every shipped SharpProof assembly. Every PDB also embeds its source files,
+including linked and generated source, so source inspection works offline once
+the symbols are available. Package qualification rejects missing embedded source.
+Release optimization remains enabled; optimized locals and stepping can differ
+from a Debug build.
+
+Publish the `.snupkg` files alongside the `.nupkg` files. In Visual Studio, enable
+Source Link support and the NuGet.org symbol server, and disable Just My Code to
+step into package code. For private feeds without a symbol server, extract the
+matching `.snupkg` and configure that directory as a local symbol source.
+
+`tooling pack` writes `build.binlog` and `pack.binlog` under
+`artifacts/pack-diagnostics`, separate from the package feed. These logs remain
+local. Binary logs exclude project import contents but can still contain paths
+and evaluated properties; review them before sharing.
+
+See the official [Source Link guidance](https://github.com/dotnet/sourcelink),
+[NuGet debugging guidance](https://learn.microsoft.com/en-us/dotnet/standard/library-guidance/nuget#symbol-packages),
+and [symbol package publishing instructions](https://learn.microsoft.com/en-us/nuget/create-packages/symbol-packages-snupkg).
+
 ## Security qualification
 
 See the [repository security runbook](../security/README.md) for exact-master test/coverage/image gates, immutable release tags, explicit publication approval, package SBOM/provenance verification, and image servicing. Tag only after all three exact-commit master push workflows have succeeded.
