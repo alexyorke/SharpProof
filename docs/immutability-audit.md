@@ -2268,3 +2268,13 @@ that subject init-only would remove the behavior under test. Preserve it under t
 user's mutable-SUT exception. The generated file is hand-maintained; no active generator
 needs regeneration. Null/default/empty wire-array distinctions remain unchanged.
 Status: verified exclusions from setter removal; no protocol code changes.
+## Frontend receiver, identity and modifier fixture inventory
+
+IMM-M048: Coordinator inspected ArrayReceiverModelOwnershipTests, NullableComparerDomainTests,
+ReferenceIdentityOracleTests, SourceCallImportBudgetSweepTests and ConditionalCustomModifierIdentityTests.
+Replace multi-entry input/modifier maps with scoped builders and frozen snapshots, retaining
+default IR-key equality and Ordinal modifier keys with index-overwrite semantics. Single-entry
+input maps may use direct immutable singleton construction without incremental reassignment.
+Freeze write observations after synchronous replay; retain the actual array/reference runtime
+subjects and IrValue identities. Method/local syntax vectors can be immutable; the PE image
+byte[] passed to MetadataReference.CreateFromImage remains its native adapter. Status: open before edits.
