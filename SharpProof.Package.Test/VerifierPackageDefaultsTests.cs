@@ -28,6 +28,18 @@ public sealed class VerifierPackageDefaultsTests
         s_packageCache.Dispose();
     }
 
+    [TestCase("SharpProof", "net461")]
+    [TestCase("SharpProof", "net462")]
+    [TestCase("SharpProof", "net472")]
+    [TestCase("SharpProof", "net48")]
+    [TestCase("SharpProof", "net481")]
+    [TestCase("SharpProof", "netstandard2.0")]
+    [TestCase("SharpProof", "netcoreapp2.0")]
+    [TestCase("SharpProof", "netcoreapp3.1")]
+    [TestCase("SharpProof", "net5.0")]
+    [TestCase("SharpProof", "net6.0")]
+    [TestCase("SharpProof", "net7.0")]
+    [TestCase("SharpProof", "net9.0")]
     [TestCase("SharpProof", "net8.0")]
     [TestCase("SharpProof", "net10.0")]
     [TestCase("SharpProof.Verifier", "net8.0")]
@@ -67,21 +79,27 @@ public sealed class VerifierPackageDefaultsTests
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")), Is.False);
     }
 
-    [TestCase("SharpProof")]
-    [TestCase("SharpProof.Verifier")]
-    public async Task OnePackageReferenceFailsTheBuildForARefutedClaimByDefault(string packageId)
+    [TestCase("SharpProof", "net461")]
+    [TestCase("SharpProof", "net472")]
+    [TestCase("SharpProof", "net481")]
+    [TestCase("SharpProof", "netstandard2.0")]
+    [TestCase("SharpProof", "netcoreapp2.0")]
+    [TestCase("SharpProof", "net10.0")]
+    [TestCase("SharpProof.Verifier", "net10.0")]
+    public async Task OnePackageReferenceFailsTheBuildForARefutedClaimByDefault(string packageId, string framework)
     {
         ArgumentNullException.ThrowIfNull(packageId);
+        ArgumentNullException.ThrowIfNull(framework);
         using var directory = new TempDirectory("sharpproof-verifier-refuted-");
-        await WriteConsumerAsync(directory.FullName, "net10.0", profile: null,
+        await WriteConsumerAsync(directory.FullName, framework, profile: null,
             Source.Replace("return value;", "return 0;", StringComparison.Ordinal), packageId);
         await RestoreAsync(directory.FullName);
         var build = await RunDotNetAsync(directory.FullName, "build", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo");
         Assert.That(build.ExitCode, Is.Not.Zero, build.CombinedOutput);
-        Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")),
+        Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", framework, "SharpProof", "result.json")),
             Is.True, build.CombinedOutput);
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")));
+            Path.Combine(directory.FullName, "obj", "Release", framework, "SharpProof", "result.json")));
         Assert.That(result.RootElement.GetProperty("claimResults")[0].GetProperty("outcome").GetString(), Is.EqualTo("Refuted"));
     }
 
@@ -161,8 +179,13 @@ public sealed class VerifierPackageDefaultsTests
             Assert.That(properties.GetProperty("SharpProofVerifyPolicy").GetString(), Is.EqualTo("require-proven"));
             Assert.That(properties.GetProperty("SharpProofAssumptionPolicy").GetString(), Is.EqualTo("error"));
         }
-        var references = document.RootElement.GetProperty("Items").GetProperty("PackageReference");
-        Assert.That(references.GetArrayLength(), Is.EqualTo(1));
+        // Older framework SDKs add their own implicit framework packages. Only
+        // user-authored references count toward the one-package contract.
+        var references = document.RootElement.GetProperty("Items").GetProperty("PackageReference").EnumerateArray()
+            .Where(static reference => !reference.TryGetProperty("IsImplicitlyDefined", out var implicitReference) ||
+                !string.Equals(implicitReference.GetString(), "true", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Assert.That(references, Has.Length.EqualTo(1));
         Assert.That(references[0].GetProperty("Identity").GetString(), Is.EqualTo(packageId));
     }
 

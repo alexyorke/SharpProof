@@ -1221,6 +1221,53 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
+    public async Task VerifierPackageRegistersCoreAndFullTaskHostsWithoutDuplicateEntrypoints()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var archive = await ZipFile.OpenReadAsync(
+            feed.GetPackagePath(PackagedProductFeed.VerifierPackageId), TestContext.CurrentContext.CancellationToken);
+        var targets = XDocument.Parse(ReadArchiveText(archive, "buildTransitive/SharpProof.Verifier.targets"));
+        var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
+        var registrations = root.Elements("UsingTask").ToArray();
+        Assert.That(registrations, Has.Length.EqualTo(8));
+        foreach (var taskName in new[]
+                 {
+                     "InvalidatePublishedResult", "RunVerifier",
+                     "ValidatePublishedVerificationResult", "ResetPublishedVerification"
+                 })
+        {
+            var coreRegistrations = 0;
+            var fullRegistrations = 0;
+            foreach (var registration in registrations)
+            {
+                if ((string?)registration.Attribute("TaskName") != "SharpProof.BuildTasks." + taskName)
+                {
+                    continue;
+                }
+                Assert.That((string?)registration.Attribute("AssemblyFile"), Is.EqualTo("$(_SharpProofBuildTasksPath)"));
+                var condition = (string?)registration.Attribute("Condition");
+                if (condition == "'$(MSBuildRuntimeType)' == 'Core'")
+                {
+                    Assert.That(registration.Attribute("Runtime"), Is.Null);
+                    Assert.That(registration.Attribute("TaskFactory"), Is.Null);
+                    coreRegistrations++;
+                }
+                else
+                {
+                    Assert.That(condition, Does.Contain("'$(MSBuildRuntimeType)' == 'Full'")
+                        .And.Contain("'$(UsingMicrosoftNETSdk)' == 'true'")
+                        .And.Contain("VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0')"));
+                    Assert.That((string?)registration.Attribute("Runtime"), Is.EqualTo("NET"));
+                    Assert.That((string?)registration.Attribute("TaskFactory"), Is.EqualTo("TaskHostFactory"));
+                    fullRegistrations++;
+                }
+            }
+            Assert.That(coreRegistrations, Is.EqualTo(1), taskName);
+            Assert.That(fullRegistrations, Is.EqualTo(1), taskName);
+        }
+    }
+
+    [Test]
     public async Task VerifierPackageAutoImportEvaluatesSdkRequirementAfterSdkInitialization()
     {
         TestRepository.RequireCanonicalContainer();

@@ -167,11 +167,47 @@ jobs:
           pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
           -PackageSource nupkgs -PackageId SharpProof -OsFamily windows
           -Architecture ${{ matrix.architecture }}
+      - name: Prove, refute, and execute a .NET Framework library consumer
+        if: matrix.family == 'windows'
+        run: >-
+          pwsh scripts/Test-SharpProofPlugAndPlayConsumer.ps1
+          -PackageSource nupkgs -PackageId SharpProof -OsFamily windows
+          -Architecture ${{ matrix.architecture }} -TargetFramework net48
       - name: Run native Windows proofs against the exact packed verifier
         if: matrix.family == 'windows'
         run: >-
           pwsh scripts/Test-SharpProofWindowsProofs.ps1
           -PackageSource nupkgs -Architecture ${{ matrix.architecture }}
+
+  visual-studio-consumers:
+    name: Visual Studio ${{ matrix.majorVersion }} package consumer
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            majorVersion: 17
+            sdkVersion: 9.0.300
+          - os: windows-2025-vs2026
+            majorVersion: 18
+            sdkVersion: 10.0.402
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          dotnet-version: ${{ matrix.sdkVersion }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-packages-${{ github.run_id }}-${{ github.sha }}
+          path: nupkgs
+      - name: Qualify Visual Studio MSBuild and compiler host against the packed packages
+        shell: pwsh
+        run: >-
+          ./scripts/Test-SharpProofVisualStudioConsumer.ps1
+          -PackageSource nupkgs -MajorVersion ${{ matrix.majorVersion }}
 
   native-windows-arm64-verifier:
     name: Native Windows ARM64 verifier
@@ -249,6 +285,7 @@ jobs:
       - native-linux-verifier
       - native-windows-arm64-verifier
       - portable-consumers
+      - visual-studio-consumers
       - macos-verifier
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'v1.0.0-preview.1' && 'nuget.private-preview' || 'nuget.org' }}

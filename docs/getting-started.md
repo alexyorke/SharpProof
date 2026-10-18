@@ -4,6 +4,8 @@ Run `dotnet add package SharpProof` in an SDK-style C# project using your config
 
 Full verification requires .NET SDK 10.0.100+ with the .NET 10 runtime and a host/filesystem in the [support matrix](preview-support.md). Application target frameworks are separate from the compiler/worker host. Repository build/test/pack commands always run in the canonical Linux amd64 container.
 
+Targeting an older application framework does not require running the verifier on an old OS or SDK. [Legacy compatibility](legacy-compatibility.md) covers SDK-style Framework 4.6.1+, Standard/Core and modern .NET targets, the Windows MSBuild 18+ task-host path, and the limits of Visual Studio and old-Windows qualification.
+
 ## First use in three steps
 
 1. Obtain the current packages from your configured feed; this checkout does not imply public NuGet availability. See [obtaining packages](#obtain-this-checkouts-packages).

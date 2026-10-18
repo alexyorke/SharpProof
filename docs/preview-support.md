@@ -7,16 +7,21 @@ This document defines the current verifier's qualified host/filesystem boundary.
 | Workflow | Qualified environment | Boundary/evidence |
 | --- | --- | --- |
 | Attributes API | netstandard2.0-compatible application targets | Application target is separate from compiler SDK |
+| Older application targets | SDK-style Framework 4.6.1/4.6.2/4.7.2/4.8/4.8.1, Standard 2.0, Core 2.0/3.1, .NET 5-10 | Actual default proof/refutation tests on a modern build host; see [legacy compatibility and qualification limits](legacy-compatibility.md) |
 | Explicit advisory-only analyzer consumers | Linux x64, Windows x64, macOS ARM64/x64; SDK 9.0.300+ / Roslyn 4.14+ | Separate portable consumer matrix in [package CI](../.github/workflows/package-consumers.yml); the default full verifier still requires SDK 10 |
 | Full verification | Canonical Linux amd64 container | Pinned .NET 10 SDK/runtime, payload, Docker resource isolation |
 | Full verification | Native Windows x64/ARM64, fixed local NTFS; SDK 10.0.100+ | .NET 10 runtime; architecture-matched solver with static C++ runtime; native package worker CI and restrictions below |
 | Full verification | Native macOS ARM64/x64; SDK 10.0.100+ | .NET 10 runtime; architecture-matched packaged solver; native package consumer CI |
 | Full verification | Native Linux x64/ARM64; SDK 10.0.100+ | .NET 10 runtime and supported distribution prerequisites; solver payload requires glibc 2.31+ on x64 or glibc 2.17+ on ARM64, plus compatible native runtime dependencies |
+| Visual Studio command-line build host | Windows full-framework MSBuild 18+ with .NET 10 SDK/runtime | Verifier tasks use the out-of-process .NET task host; actual MSBuild.exe proof/refutation/downstream/clean qualification is pending its exact-artifact CI jobs |
+| Older Visual Studio command-line build host | MSBuild 17.14 with SDK 9.0.300 and Roslyn 4.14 | Explicit advisory-only operation; default strict verification is not supported on this host |
 | Repository build/test/pack/acceptance | Canonical Linux amd64 container only | Includes repository PowerShell commands |
 | IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
-| musl Linux, other OS/architecture combinations, full-framework MSBuild verifier | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
+| musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
 
 The consumer matrix is maintained in [package CI](../.github/workflows/package-consumers.yml). Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
+
+[Legacy compatibility](legacy-compatibility.md) separates application targets and deployment operating systems from build hosts. SDK-style targets from Framework 4.6.1 through modern .NET have package proof/refutation checks on a modern host. Windows `net48` downstream execution checks CLR 4 on the current hosted image; it does not qualify original Framework installations or old Windows VMs. The MSBuild 18+ bridge and MSBuild 17.14 advisory-only matrix cover command-line hosts, with final exact-artifact CI qualification still required. Interactive IDE behavior, classic non-SDK projects, `packages.config`, and Visual Studio 2019 or older remain unqualified.
 
 The standard `SharpProof` reference automatically enables strict full verification on a supported host; no activation properties or separate API/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint. Package defaults cannot install a compatible compiler/IDE host, supply an unsupported OS ABI, or remove local filesystem requirements. An unavailable verifier must report a failure rather than silently treating portable diagnostics as full proof.
 
@@ -53,7 +58,8 @@ The package payload is unsigned. Exact package/assembly identity, payload eviden
 ## Unsupported hosts and workflows
 
 - Native Windows/Linux/macOS repository build/test/pack workflows outside the canonical container.
-- Full-framework MSBuild verifier execution or a separate IDE integration guarantee.
+- Default verification in full-framework MSBuild older than 18, or a separate interactive IDE integration guarantee. MSBuild 18+ uses the .NET task-host path described above and requires its own exact-artifact qualification.
+- Classic non-SDK projects, `packages.config`, Visual Studio 2019 or older, and local verifier execution on Windows XP/7/8/8.1. Modern-host builds targeting an older framework do not establish old-OS deployment execution.
 - musl Linux and native OS/architecture combinations beyond Windows, macOS, and glibc Linux on x64/ARM64.
 - UNC, NFS, CIFS/SMB, SSHFS, mapped-network, or cross-host publication.
 - Hostile concurrent mutation of the trusted host filesystem.

@@ -28,6 +28,8 @@ The standard setup requires .NET SDK 10.0.100 or newer and its .NET 10 runtime, 
 
 The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
 
+See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
+
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
 ## A minimal contract
