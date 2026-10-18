@@ -297,7 +297,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
-                IsImplicit: true, OperatorMethod: null, Type.SpecialType: SpecialType.System_Object,
+                IsTryCast: false, OperatorMethod: null, Conversion.IsImplicit: true, Type.SpecialType: SpecialType.System_Object,
                 Operand.Type.TypeKind: TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.Array
             } widening &&
             widening.Conversion.IsReference)
@@ -879,6 +879,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
+        // Framework-only primitive Default getters can supply an observed replay
+        // value. Their symbolic exception, allocation and heap effects stay opaque.
+        var primitive = _context.KnownScalarType(CSharpOperationSemantics.DefaultComparerElement(operation));
+        if (CSharpOperationSemantics.IsComparisonIntegerType(primitive))
+        { site = _factory.CreateOperation(IrOpaqueCallSite.DefaultComparerReplay(primitive!.SpecialType.ToString()), _factory.GetOperationInfo(site).SourceSpan); }
         var member = OpaqueCallMember(method, values, resultType, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];

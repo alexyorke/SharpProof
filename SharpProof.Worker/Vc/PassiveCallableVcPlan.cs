@@ -317,6 +317,7 @@ internal sealed class PassiveCallableVcPlan
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
         {
+            ConcreteHavocValueProvider = ReplayFrameworkValue,
             AllocationObserver = allocationObserver,
             SnapshotVariables = _candidate.Parameters.Select(parameter => parameter.Old).ToImmutableHashSet(),
             WriteObserver = writeObserver,
@@ -324,6 +325,52 @@ internal sealed class PassiveCallableVcPlan
             AllocationPrefixObserver = allocationPrefixObserver,
             WritePrefixObserver = writePrefixObserver,
             LockPrefixObserver = lockPrefixObserver
+        };
+    }
+
+    private IrValue? ReplayFrameworkValue(IrHavocRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal static IrValue? ObserveFrameworkValue(IrFactory factory, IrHavocRequest request, Func<string, object?> read)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(read);
+        if (request.Origin != IrHavocOrigin.Approximation ||
+            IrOpaqueCallSite.DefaultComparerReplayPrimitive(factory, request.Site) is not { } primitive)
+        { return null; }
+        var type = factory.GetVariableInfo(request.Variable).Type;
+        if (type != factory.BooleanType && factory.GetTypeInfo(type).Kind != IrTypeKind.Reference)
+        { return null; }
+        object? value;
+        try
+        { value = read(primitive); }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException)
+        { return null; }
+        if (value == null)
+        { return null; }
+        return type == factory.BooleanType ? factory.CreateBooleanValue(false) : factory.CreateReferenceValue(type, value);
+    }
+
+    internal static object ReadDefaultComparer(string primitive)
+    {
+        ArgumentNullException.ThrowIfNull(primitive);
+        // Fixed CoreLib getters only: never invoke a user type or callback.
+        return primitive switch
+        {
+            "System_SByte" => Comparer<sbyte>.Default,
+            "System_Byte" => Comparer<byte>.Default,
+            "System_Int16" => Comparer<short>.Default,
+            "System_UInt16" => Comparer<ushort>.Default,
+            "System_Char" => Comparer<char>.Default,
+            "System_Int32" => Comparer<int>.Default,
+            "System_UInt32" => Comparer<uint>.Default,
+            "System_Int64" => Comparer<long>.Default,
+            "System_UInt64" => Comparer<ulong>.Default,
+            _ => throw new ArgumentOutOfRangeException(nameof(primitive))
         };
     }
 
