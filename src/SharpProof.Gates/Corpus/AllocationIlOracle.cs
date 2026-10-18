@@ -19,7 +19,7 @@ internal static class AllocationIlOracle
         ArgumentNullException.ThrowIfNull(method);
         var body = method.GetMethodBody();
         var bytes = body?.GetILAsByteArray();
-        if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > 65536)
+        if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > CorpusExecutionDefaults.MaximumAllocationOracleBodyBytes)
         { return true; }
         var instructions = new Dictionary<int, (OpCode Op, int Next, int[] Targets)>();
         var cursor = 0;

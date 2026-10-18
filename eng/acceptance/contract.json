@@ -505,6 +505,7 @@
           "src/SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs",
           "src/SharpProof.Host/SharpProof.Host.csproj",
           "src/SharpProof.Host/ContainerContract.cs",
+          "src/SharpProof.Host/HostEnvironmentVariables.cs",
           "src/SharpProof.Host/LinuxHostContract.cs",
           "src/SharpProof.Host/MacOsHostContract.cs",
           "src/SharpProof.Host/ContainerNativeLibrary.cs",
@@ -594,6 +595,7 @@
           "src/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs",
           "src/SharpProof.Fuzz/FrontendFuzzing.cs",
           "src/SharpProof.Fuzz/FuzzOptions.cs",
+          "src/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
           "src/SharpProof.Fuzz/FuzzRunner.cs",
           "src/SharpProof.Fuzz/FuzzSourceCaseExecutor.cs",
           "src/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
@@ -601,14 +603,15 @@
           "src/SharpProof.Fuzz/TotalProgramFuzzing.cs",
           "src/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
           "src/SharpProof.Fuzz/packages.lock.json",
-          "eng/scripts/Assert-SharpProofFuzzRunnerResult.ps1",
-          "eng/scripts/SharpProof.FuzzEvidenceLifecycle.ps1"
+          "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
+          "scripts/SharpProof.FuzzEvidenceLifecycle.ps1"
         ]
       },
       {
         "name": "corpusEvidenceAuthority",
         "paths": [
           "src/SharpProof.Gates/Corpus/CorpusGate.cs",
+          "src/SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs",
           "src/SharpProof.Gates/Corpus/CorpusInputParsers.cs",
           "src/SharpProof.Gates/Corpus/CorpusObservationComparison.cs",
           "src/SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs"
@@ -664,6 +667,7 @@
           "src/SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
           "eng/ParameterGuard.cs",
+          "eng/shared/SolverDefaults.cs",
           "src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "src/SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
           "src/SharpProof.CompilerCollector/GlobalUsings.cs",
@@ -682,6 +686,7 @@
           "src/SharpProof.Frontend/GlobalUsings.cs",
           "src/SharpProof.Frontend/RoslynTypeMapper.cs",
           "src/SharpProof.Frontend/SyntaxSite.cs",
+          "src/SharpProof.Ir/AnalysisDefaults.cs",
           "src/SharpProof.Ir/AtomicFile.cs",
           "src/SharpProof.Ir/GlobalUsings.cs",
           "eng/shared/HashEncoding.cs",

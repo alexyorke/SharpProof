@@ -76,10 +76,10 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
             if (!concrete)
             { skipped = "NonConcreteInput"; continue; }
             var run = CreateInvocation(callable);
-            for (var repeat = 0; repeat < 3; repeat++)
+            for (var repeat = 0; repeat < CorpusExecutionDefaults.AllocationWarmupInvocations; repeat++)
             { Invoke(run, values); }
             var before = GC.GetAllocatedBytesForCurrentThread();
-            for (var repeat = 0; repeat < 32; repeat++)
+            for (var repeat = 0; repeat < CorpusExecutionDefaults.AllocationMeasuredInvocations; repeat++)
             { Invoke(run, values); }
             var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
             maximumBytes = Math.Max(maximumBytes, bytes);

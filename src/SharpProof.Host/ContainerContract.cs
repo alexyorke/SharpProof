@@ -68,7 +68,7 @@ public static class ContainerContract
     {
         RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
         if (!string.Equals(
-                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
+                Environment.GetEnvironmentVariable(HostEnvironmentVariables.Container),
                 "1",
                 StringComparison.Ordinal))
         {
@@ -77,7 +77,7 @@ public static class ContainerContract
         }
 
         var contractPath = Environment.GetEnvironmentVariable(
-            "SHARPPROOF_CONTAINER_CONTRACT");
+            HostEnvironmentVariables.ContainerContract);
         if (string.IsNullOrWhiteSpace(contractPath))
         {
             contractPath = DefaultContractPath;
@@ -190,7 +190,7 @@ public static class ContainerContract
 
     private static bool IsNativeLinuxHost()
     {
-        return OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER") != "1";
+        return OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable(HostEnvironmentVariables.Container) != "1";
     }
 
     internal static void RequireCanonicalPlatform(bool isLinux, Architecture architecture)
@@ -294,7 +294,7 @@ public static class ContainerContract
         ContainerContractInfo contract)
     {
         var nativeRoot = Environment.GetEnvironmentVariable(
-            "SHARPPROOF_NATIVE_ROOT");
+            HostEnvironmentVariables.NativeRoot);
         if (string.IsNullOrWhiteSpace(nativeRoot))
         {
             nativeRoot = "/opt/sharpproof/native";

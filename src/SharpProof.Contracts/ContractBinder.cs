@@ -62,7 +62,7 @@ public sealed partial class ContractBinder
             _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         _contractSources = contractSources ??
             (clauseInventory == null
                 ? EffectiveContractSourceResolver.ForCompilation(compilation, cancellation.Token)
@@ -76,7 +76,7 @@ public sealed partial class ContractBinder
         IOperation? implementationBody = null)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Bind(target, implementationBody, cancellation.Token);
     }
 
@@ -106,7 +106,7 @@ public sealed partial class ContractBinder
         IOperation? implementationBody = null)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return BindRequires(target, implementationBody, cancellation.Token);
     }
 
@@ -142,7 +142,7 @@ public sealed partial class ContractBinder
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return GetClauseInventory(target, cancellation.Token);
     }
 

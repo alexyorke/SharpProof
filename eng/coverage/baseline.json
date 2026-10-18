@@ -3,6 +3,12 @@
   "minimumAggregateLinePercent": 100,
   "minimumChangedTcbLinePercent": 100.0,
   "declarationOnlyTcbFiles": [
+    "src/SharpProof.Contracts/SharpProofConfigurationCatalog.cs",
+    "src/SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs",
+    "src/SharpProof.Host/HostEnvironmentVariables.cs",
+    "src/SharpProof.Ir/AnalysisDefaults.cs",
+    "src/SharpProof.Fuzz/FuzzExecutionDefaults.cs",
+    "eng/shared/SolverDefaults.cs",
     "src/SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
     "src/SharpProof.Compiler.Semantics/GlobalUsings.cs",
     "src/SharpProof.CompilerCollector/CompilerSemanticUsings.cs",

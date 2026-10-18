@@ -199,7 +199,7 @@ internal static class CompilerSourceCoordinates
     {
         location = RepositoryParameterGuard.NotNull(location, nameof(location));
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         var ordinal = FindUniqueTree(location, compilation, cancellation.Token);
         if (ordinal < 0)
         {

@@ -68,7 +68,7 @@ public sealed partial class ContractBinder
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
     {
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return BindTotalCore(context, implementationBody, requiresOnly: false, cancellation.Token);
     }
 
@@ -85,7 +85,7 @@ public sealed partial class ContractBinder
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
     {
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return BindTotalCore(context, implementationBody, requiresOnly: true, cancellation.Token);
     }
 

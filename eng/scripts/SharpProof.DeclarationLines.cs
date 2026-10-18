@@ -51,13 +51,18 @@ internal static class SharpProofDeclarationLines
                 // These regions have executable behavior or affect it without
                 // an ordinary sequence point. Never classify their tokens as
                 // declaration-only, even when they share a header's line.
-                // A parameter default is a compile-time constant. Unlike a field
-                // initializer, it has no runtime sequence point to cover.
+                // Parameter defaults and const field initializers are compile-time
+                // constants with no runtime sequence points. Ordinary field
+                // initializers (including readonly literal values) still execute.
                 if (node is BlockSyntax or ArrowExpressionClauseSyntax or
                     AccessorListSyntax or ConstructorInitializerSyntax or
                     PrimaryConstructorBaseTypeSyntax or AttributeListSyntax ||
                     node is EqualsValueClauseSyntax initializer &&
-                    initializer.Parent is not ParameterSyntax)
+                    initializer.Parent is not ParameterSyntax &&
+                    !(initializer.Parent is VariableDeclaratorSyntax
+                    {
+                        Parent: VariableDeclarationSyntax { Parent: FieldDeclarationSyntax field }
+                    } && field.Modifiers.Any(SyntaxKind.ConstKeyword)))
                     unsafeSpans.Add(node.Span);
             }
             var tokensByLine = new Dictionary<int, List<SyntaxToken>>();

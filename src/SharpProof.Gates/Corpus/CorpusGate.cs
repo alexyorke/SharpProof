@@ -391,8 +391,8 @@ internal static class CorpusGate
     {
         RepositoryParameterGuard.RequireInitialized(elapsed < System.TimeSpan.Zero, nameof(elapsed), "Value must be initialized.");
 
-        return elapsed > TimeSpan.FromMinutes(5)
-            ? [$"Corpus wall time {elapsed.TotalSeconds:F1}s exceeds the 300s budget."]
+        return elapsed > TimeSpan.FromSeconds(CorpusExecutionDefaults.MaximumWallTimeSeconds)
+            ? [$"Corpus wall time {elapsed.TotalSeconds:F1}s exceeds the {CorpusExecutionDefaults.MaximumWallTimeSeconds}s budget."]
             : [];
     }
 
