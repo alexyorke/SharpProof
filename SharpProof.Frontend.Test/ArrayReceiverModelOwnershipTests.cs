@@ -182,5 +182,9 @@ public sealed class ArrayReceiverModelOwnershipTests
         var foreign = compilation.WithAssemblyName("ForeignLocalElementOwner").GetSemanticModel(tree);
         var foreignRead = (IMethodSymbol)foreign.GetDeclaredSymbol(locals[0])!;
         Assert.That(factory.GetTypeInfo(frame.Type(foreignRead.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
+        var sameNameForeign = CSharpCompilation.Create(compilation.AssemblyName, [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)).GetSemanticModel(tree);
+        var sameNameForeignRead = (IMethodSymbol)sameNameForeign.GetDeclaredSymbol(locals[0])!;
+        Assert.That(factory.GetTypeInfo(frame.Type(sameNameForeignRead.TypeParameters[0])).Kind, Is.EqualTo(IrTypeKind.Reference));
     }
 }
