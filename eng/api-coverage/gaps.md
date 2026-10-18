@@ -61,11 +61,18 @@ access kind and value domains satisfy the production guard.
   native/portable fault kind and tested catch hierarchy, but narrowing ancillary
   callback effects requires culture/callback provenance. Invalid paths retain
   exception allocation, framework cache writes and capability uncertainty.
-- Scalar SZ-array aliases/captures/immutable source parameters, compound index
-  assignments and pre/post updates are supported. Unknown or mixed bindings,
-  cycles, ref escapes, closure-captured mutable state, custom derived interfaces,
-  reference covariance and `as` conversions need their own sound models. Rebinding
-  must preserve identity snapshots; opaque writers must invalidate content knowledge.
+- Scalar SZ-array aliases/captures/immutable source parameters, matching `as`
+  conversions to framework IList/ICollection receivers, compound index assignments
+  and pre/post updates are supported. Unknown or mixed bindings, cycles, ref
+  escapes, closure-captured mutable state, custom derived interfaces and reference
+  covariance need their own sound models. Rebinding must preserve identity
+  snapshots; opaque writers must invalidate content knowledge.
+- Generic helpers returning scalar T still need result representation specialization
+  from concrete array evidence. Generic local collection helpers also lose receiver
+  provenance: a Count-based branch retains opaque interface dispatch and cannot
+  establish a replayable normal witness, for both implicit and `as` conversions.
+  Tests keep these abstentions explicit; matching receiver conversions alone do
+  not establish full generic helper support.
 - Count >= 0 is weaker than a collection representation invariant. List/dictionary/
   queue/stack count/content relations and repeated getter consistency remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
