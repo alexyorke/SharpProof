@@ -1,1 +1,1 @@
-M:Subject.Target(System.Boolean)~System.Int32 Proven/None/None core=[] assumptions=[]
+M:Subject.Target(System.Boolean)~System.Int32 Proven/None/None core=[edge:10,edge:12,edge:16,edge:20,edge:4,edge:6,edge:8,phi:26,phi:27,reach:1,reach:11,reach:13,reach:17,reach:25,reach:5,reach:7,reach:9] assumptions=[]

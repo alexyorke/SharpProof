@@ -350,7 +350,8 @@ function Get-PortablePdbModule {
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
                 Get-RepositoryFilePath -RelativePath $relativePath `
                     -MissingMessage "Production inventory PDB source file is missing: '$relativePath'." | Out-Null
-                if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
+                Assert-SharpProofSourceDocumentCompileMembership `
+                    -RelativePath $relativePath -CompilePaths $CompilePaths
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
                 $documentState = $null
                 $pdbDocument = $pdb.GetDocument($documentHandle)
