@@ -131,8 +131,9 @@ public sealed class ContainerContractTests
         try
         {
             Environment.SetEnvironmentVariable("SHARPPROOF_CONTAINER", "0");
+            Assert.That(ContainerContract.ValidateRequired().Platform, Is.EqualTo("linux-x64"));
             Assert.Throws<PlatformNotSupportedException>(
-                (Action)(() => ContainerContract.ValidateRequired()));
+                (Action)(() => ContainerContract.ValidateCanonicalContainerRequired()));
 
             Environment.SetEnvironmentVariable("SHARPPROOF_CONTAINER", "1");
             Environment.SetEnvironmentVariable(

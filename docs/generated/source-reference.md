@@ -10,6 +10,7 @@ Conditions and expressions are preserved. See the authored guides for interpreta
 [Source](../../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props)
 
 ```xml
+<SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofVerifierPackagePresent)' == 'true'">strict</SharpProofProfile>
 <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
 <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
 <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
@@ -181,7 +182,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
+    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -205,7 +206,12 @@ param(
 
     [switch]$ReuseTestHarness,
 
-    [switch]$Fast
+    [switch]$Fast,
+
+    [ValidateSet('Text', 'Json')]
+    [string]$Format = 'Text',
+
+    [string]$TargetFramework = ''
 )
 ```
 

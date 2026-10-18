@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 6 digest recorded by the published Worker at 8e93a39.
-        // Internal representation changes must preserve this wire identity.
+        // Version 7 pins the reviewed concrete collection getter expansion.
+        // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("6"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("7"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "d461c0fb34f0dacc84a04ae483a82c0f047a25d62e5096a1f9627cc8700862b6"));
+                "a6030895a3357c77be237ccbb9f9c5f91bebfff3ef4397bede827d2fb0ec9bb2"));
         }
     }
 

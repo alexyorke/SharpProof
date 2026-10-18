@@ -1,20 +1,32 @@
 # SharpProof
 
-SharpProof checks C# contracts and effects. Its portable analyzer reports usage problems and conservative effect information; its optional build verifier proves selected claims with a bounded native Z3 worker.
+SharpProof checks C# contracts and effects. Add `SharpProof.Verifier` to an SDK-style project and build to run the portable analyzer and full verification automatically.
 
 **This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
 ## Packages
 
+The standard setup is one reference with no SharpProof configuration properties:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" />
+</ItemGroup>
+```
+
+It restores the contract API, analyzer, worker, and pinned native solver automatically and defaults to strict verification. Keep the standard reference without `PrivateAssets="all"` so application contract dependencies propagate. The internal dependency graph remains version-matched; no separate installation is needed.
+
 | Package | Purpose |
 | --- | --- |
 | `SharpProof.Attributes` | Application contract API and IntelliSense XML; targets netstandard2.0 |
 | `SharpProof` | Portable analyzer, companion validation hook, compiler collector, and build configuration |
-| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64 and macOS Z3 payloads |
+| `SharpProof.Verifier` | Standard complete entrypoint: transitive API/analyzer plus build tasks, worker and pinned native solver |
 
-Reference Attributes from application code. Keep analyzer and verifier references private. Full verification runs in the [canonical container](docs/container-development.md) or natively on macOS ARM64/x64; the portable analyzer does not load native Z3.
+Full verification runs on native Linux x64/ARM64, Windows x64, macOS ARM64/x64, and the canonical Linux container within the [host and filesystem support matrix](docs/preview-support.md). Linux requires a compatible glibc distribution and native runtime dependencies; Windows ARM64 and musl remain unsupported. Repository development commands run in the [canonical container](docs/container-development.md). `SharpProof` remains available as a deliberate portable-only alternative with advisory defaults and no native solver.
 
 Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This is a compiler-host requirement, separate from the application's target framework. The canonical image supplies the pinned SDK.
+
+Full verification additionally requires .NET SDK 10.0.100 or newer and its .NET 10 runtime. The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
 
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
@@ -36,7 +48,7 @@ public static class Calculator
 
 Contract clauses belong in a contiguous method prologue. They express static conditions and are normally removed by the C# compiler. Do not define `SHARPPROOF_CONTRACTS`: SharpProof has no runtime contract-checking mode.
 
-See [getting started](docs/getting-started.md) for package references, profiles, and verifier policy, and [public API](docs/public-api.md) for the full contract surface.
+Start with the [single-reference setup](docs/getting-started.md#first-use-in-three-steps) and [your first proof](docs/getting-started.md#your-first-proof). [Project templates](templates/README.md) generate the standard setup or an explicit portable-only alternative using this checkout's package version. Follow [incremental adoption](docs/adoption.md) for an existing repository and [upgrades](docs/upgrading.md) when changing versions. See [public API](docs/public-api.md) for the full contract surface.
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 

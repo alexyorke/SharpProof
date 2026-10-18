@@ -59,3 +59,17 @@ function Resolve-SharpProofSourceDocument {
     }
     throw "Source document is foreign or missing: '$DocumentPath'."
 }
+
+function Assert-SharpProofSourceDocumentCompileMembership {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [Collections.Generic.HashSet[string]]$CompilePaths
+    )
+
+    if (-not $CompilePaths.Contains($RelativePath)) {
+        throw "Production inventory PDB source is not an evaluated Compile item: '$RelativePath'."
+    }
+}

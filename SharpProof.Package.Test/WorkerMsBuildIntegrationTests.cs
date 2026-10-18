@@ -161,7 +161,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(build.Output, Does.Contain("error SP0025"), build.Output);
             Assert.That(
                 build.Output,
-                Does.Contain("must match the MSBuild SharpProofProfile"),
+                Does.Contain("configuration aliases disagree").And.Contain("strict / advisory"),
                 build.Output);
             Assert.That(File.Exists(project.RequestPath), Is.False);
             Assert.That(File.Exists(project.ResultPath), Is.False);
@@ -1909,7 +1909,29 @@ public sealed class WorkerMsBuildIntegrationTests
             stableManifest = project.VerifyOutputPath("net8.0", "blocked-parent-manifest.json");
             Directory.CreateDirectory(stableManifest);
         }
-        var engine = new BuildTaskTests.RecordingBuildEngine();
+        if (scenario == "success")
+        {
+            File.Delete(project.ResultPath);
+        }
+        var successMessages = 0;
+        var engine = new BuildTaskTests.RecordingBuildEngine
+        {
+            MessageObserver = message =>
+            {
+                System.ArgumentNullException.ThrowIfNull(message);
+                if (message.Message?.StartsWith("SharpProof evidence:", StringComparison.Ordinal) == true)
+                {
+                    // The message must follow promotion and binding validation;
+                    // the success fixture deliberately starts without a stable result.
+                    Assert.That(scenario, Is.EqualTo("success"));
+                    SharpProof.BuildTasks.ValidatePublishedVerificationResult.ValidateFiles(
+                        project.RequestPath, project.ResultPath, stableManifest, null, privateResult);
+                    Assert.That(message.Message, Is.EqualTo("SharpProof evidence: request=" + project.RequestPath +
+                        "; result=" + project.ResultPath + "; compiler manifest=" + stableManifest));
+                    successMessages++;
+                }
+            }
+        };
         using var task = new SharpProof.BuildTasks.RunVerifier
         {
             BuildEngine = engine,
@@ -1953,6 +1975,11 @@ public sealed class WorkerMsBuildIntegrationTests
             "publication-failure" => 3,
             _ => -1
         }), string.Join('\n', engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
+        Assert.That(successMessages, Is.EqualTo(scenario == "success" ? 1 : 0));
+        if (scenario is "success" or "publication-failure")
+        {
+            Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)), Has.Some.Contains("SharpProof staged evidence:"));
+        }
         if (scenario == "success")
         {
             var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(project.RequestPath))!;
@@ -3057,7 +3084,7 @@ public sealed class WorkerMsBuildIntegrationTests
             .Parent?.Name ?? throw new InvalidOperationException(
                 "The test build configuration was not found.");
         return Path.Combine(TestRepository.FindRoot(), "SharpProof.Worker",
-            "bin", configuration, "net9.0", "SharpProof.Worker.dll");
+            "bin", configuration, "net10.0", "SharpProof.Worker.dll");
     }
 
     private static void RequireContainerWorker()
@@ -3736,6 +3763,8 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofSharedDirectory>{template.CollectorDirectory}</_SharpProofSharedDirectory>
                     <_SharpProofTestCollectorDirectory>{template.CollectorDirectory}</_SharpProofTestCollectorDirectory>
                     <_SharpProofTestCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</_SharpProofTestCompilerCollectorPath>
+                    <!-- Worker-target fixtures opt into advisory; package-default tests cover zero-configuration installation. -->
+                    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{template.WorkerPath}</SharpProofWorkerPath>
@@ -3780,7 +3809,8 @@ public sealed class WorkerMsBuildIntegrationTests
                           BeforeTargets="CoreCompile"
                           Condition="'$(SharpProofRunAnalyzersForPackageTests)' != 'true'">
                     <ItemGroup>
-                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath)" />
+                      <!-- This fixture isolates worker targets; IDE enrollment is tested with the packed product. -->
+                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath);$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" />
                     </ItemGroup>
                   </Target>
                 </Project>
@@ -3811,10 +3841,10 @@ public sealed class WorkerMsBuildIntegrationTests
             var collectorDirectory = EscapePath(repository, "SharpProof.CompilerCollector", "bin", testConfiguration, "netstandard2.0");
             var targets = EscapePath(repository, "SharpProof.Package", "buildTransitive", "SharpProof.targets");
             var verifierTargets = EscapePath(repository, "SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets");
-            var worker = EscapePath(repository, "SharpProof.Worker", "bin", testConfiguration, "net9.0", "SharpProof.Worker.dll");
+            var worker = EscapePath(repository, "SharpProof.Worker", "bin", testConfiguration, "net10.0", "SharpProof.Worker.dll");
             var launcher = worker;
             var protocol = EscapePath(repository, "SharpProof.Worker.Protocol", "bin", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll");
-            var buildTasks = EscapePath(repository, "SharpProof.BuildTasks", "bin", testConfiguration, "net9.0", "SharpProof.BuildTasks.dll");
+            var buildTasks = EscapePath(repository, "SharpProof.BuildTasks", "bin", testConfiguration, "net10.0", "SharpProof.BuildTasks.dll");
             return new ProjectTemplate(
                 repository,
                 nativeZ3Path,

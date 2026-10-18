@@ -262,7 +262,7 @@ public sealed class LauncherArgumentTests
     [Test]
     [NonParallelizable]
     [Platform("Linux")]
-    public async Task MainLeavesRequestAndResultSentinelsWhenManifestIsMalformed()
+    public async Task MalformedManifestLeavesRequestAndResultSentinels()
     {
         using var temporary = new TempDirectory(
             "sharpproof-malformed-manifest-",
@@ -278,8 +278,9 @@ public sealed class LauncherArgumentTests
         await File.WriteAllTextAsync(result, resultSentinel);
         await File.WriteAllTextAsync(manifest, "{ malformed manifest");
 
-        var exitCode = await Program.Main(
-            ProjectionArguments(worker, request, result, manifest));
+        var exitCode = await Program.RunMain(
+            ProjectionArguments(worker, request, result, manifest), verify: null, validatePreflight: null,
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -290,13 +291,16 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
+    public void MaximumProjectTimeoutAndAllowedGraceUseLongPublicationTimeout()
     {
+        var graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
+        var expectedMilliseconds = (long)int.MaxValue +
+            graceMilliseconds +
+            PublicationLease.TimeoutMilliseconds;
+
         Assert.That(
-            (Action)(() => RunVerifier.ComputeProcessTimeout(
-                int.MaxValue,
-                WorkerLauncherDefaults.TerminationGraceMilliseconds)),
-            Throws.TypeOf<OverflowException>());
+            Program.GetPublicationTimeout(int.MaxValue, graceMilliseconds),
+            Is.EqualTo(TimeSpan.FromMilliseconds(expectedMilliseconds)));
     }
 
     [Test]
@@ -448,7 +452,7 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [Platform("Linux")]
-    public void WorkerResultFifoIsRejectedBeforeBlockingOpen()
+    public async Task WorkerResultFifoIsRejectedBeforeBlockingOpen()
     {
         using var temporary = new TempDirectory(
             "sharpproof-worker-result-fifo-",
@@ -464,7 +468,7 @@ public sealed class LauncherArgumentTests
                 ArgumentList = { path }
             })!)
         {
-            process.WaitForExit();
+            await process.WaitForExitAsync(TestContext.CurrentContext.CancellationToken);
             Assert.That(process.ExitCode, Is.Zero);
         }
 
@@ -476,44 +480,53 @@ public sealed class LauncherArgumentTests
             null,
             out _,
             out _));
-        var completed = Task.WhenAny(validation, Task.Delay(500))
-            .GetAwaiter()
-            .GetResult();
-        if (!ReferenceEquals(completed, validation))
+        var completedBeforeTimeout = false;
+        try
         {
-            using (var writer = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Write,
-                FileShare.ReadWrite))
+            try
             {
-                writer.WriteByte((byte)'{');
+                await validation.WaitAsync(TimeSpan.FromMilliseconds(500));
+                completedBeforeTimeout = true;
             }
-
-            var unblocked = Task.WhenAny(validation, Task.Delay(5000))
-                .GetAwaiter()
-                .GetResult();
-            Assert.That(unblocked, Is.SameAs(validation));
-            _ = validation.Exception;
+            catch (TimeoutException)
+            {
+                using (var writer = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
+                {
+                    writer.WriteByte((byte)'{');
+                }
+                // Release a regressed blocking FIFO read and verify its cleanup deadline.
+                await validation.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+        finally
+        {
+            // Always join the operation before disposing the directory it reads.
+            await validation;
         }
 
         Assert.That(
-            completed,
-            Is.SameAs(validation),
+            completedBeforeTimeout,
+            Is.True,
             "Worker-result validation must not wait for a FIFO writer.");
-        Assert.That(validation.GetAwaiter().GetResult(), Is.EqualTo(3));
+        Assert.That(await validation, Is.EqualTo(3));
     }
-
     [TestCase(1_000, 1_000)]
     [TestCase(1_000, 100)]
     [TestCase(1_000, 1)]
-    public void FinalTimeoutIncludesCleanupTime(
+    public void PublicationTimeoutIncludesCleanupTime(
         int projectMilliseconds, int graceMilliseconds)
     {
+        var expectedMilliseconds = (long)projectMilliseconds +
+            graceMilliseconds +
+            PublicationLease.TimeoutMilliseconds;
+
         Assert.That(
-            RunVerifier.ComputeProcessTimeout(
-                projectMilliseconds, graceMilliseconds),
-            Is.GreaterThan(projectMilliseconds + graceMilliseconds));
+            Program.GetPublicationTimeout(projectMilliseconds, graceMilliseconds),
+            Is.EqualTo(TimeSpan.FromMilliseconds(expectedMilliseconds)));
     }
 
     [TestCase("input", "response.input_mismatch")]
@@ -693,6 +706,14 @@ public sealed class LauncherArgumentTests
                     Does.Contain(
                         "SharpProof Unknown C.M Postcondition claim claim-1 " +
                         "(UnsupportedExpression)"));
+                Assert.That(outputCapture.ToString(), Does.Contain(
+                    LauncherPresentation.SourcePrefix(manifest.Claims[0].Location) + ": Unknown claim-1 (UnsupportedExpression)."));
+                Assert.That(outputCapture.ToString(), Does.Contain("More time does not add expression support."));
+                Assert.That(outputCapture.ToString(), Does.Contain(
+                    "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md"));
+                Assert.That(outputCapture.ToString(), Does.Contain(
+                    "selected callables=2, claims=2; Proven=0, Refuted=0, Unknown=2; incomplete callables=2"));
+                Assert.That(outputCapture.ToString(), Does.Contain("declared user/trusted assumptions=1, used=1;"));
                 Assert.That(errorCapture.ToString(), Does.Contain("SP0047"));
                 Assert.That(errorCapture.ToString(), Does.Contain("SP0048"));
                 Assert.That(

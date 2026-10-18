@@ -7,6 +7,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
@@ -204,14 +206,13 @@ public sealed class AnalyzerPipelineLongFuzzTests
         return caseResult;
     }
 
-    private sealed record Observation(string? Violation, string? Error, int Inputs);
+    internal sealed record Observation(string? Violation, string? Error, int Inputs);
 
     // Executes the Release-compiled method on a fixed input grid. EnforcePure
-    // counts writes to State through a property, so a net-zero write sequence
-    // such as State--; State++ is still observed as a write.
-    private static class RuntimeOracle
+    // tracks direct State writes through a property and supported ref-alias
+    // assignments after their stores, so net-zero writes remain observable.
+    internal static class RuntimeOracle
     {
-        private const string StateField = "public static int State;";
         private const string TrackedState =
             "private static int s_state; public static int StateWrites; " +
             "public static int State { get { return s_state; } set { s_state = value; StateWrites++; } }";
@@ -220,9 +221,17 @@ public sealed class AnalyzerPipelineLongFuzzTests
         {
             System.ArgumentNullException.ThrowIfNull(mode);
             System.ArgumentNullException.ThrowIfNull(source);
-            var trackWrites = mode == ContractClaimProgramGenerator.EnforcePure &&
-                !source.Contains("ref State", StringComparison.Ordinal);
-            var runtimeSource = trackWrites ? source.Replace(StateField, TrackedState, StringComparison.Ordinal) : source;
+            var trackWrites = mode == ContractClaimProgramGenerator.EnforcePure;
+            var runtimeSource = source;
+            if (trackWrites)
+            {
+                var instrumented = InstrumentPureStateWrites(source);
+                if (instrumented.Error != null)
+                {
+                    return new(null, instrumented.Error, 0);
+                }
+                runtimeSource = instrumented.Source!;
+            }
             var tree = CSharpSyntaxTree.ParseText(runtimeSource, new CSharpParseOptions(LanguageVersion.CSharp12));
             var compilation = CSharpCompilation.Create("FuzzRt_" + Guid.NewGuid().ToString("N"), [tree],
                 TestMetadataReferences.WithSharpProof,
@@ -257,6 +266,152 @@ public sealed class AnalyzerPipelineLongFuzzTests
             finally
             {
                 context.Unload();
+            }
+        }
+
+        private static (string? Source, string? Error) InstrumentPureStateWrites(string source)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+            var root = tree.GetRoot();
+            var compilation = CSharpCompilation.Create("FuzzInstrument_" + Guid.NewGuid().ToString("N"), [tree],
+                TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    nullableContextOptions: NullableContextOptions.Enable));
+            var model = compilation.GetSemanticModel(tree);
+            var stateFields = root.DescendantNodes().OfType<FieldDeclarationSyntax>()
+                .SelectMany(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.Declaration.Variables.Select(variable =>
+                    variable is null ? throw new ArgumentNullException(nameof(variable)) : (Field: field, Variable: variable, Symbol: model.GetDeclaredSymbol(variable) as IFieldSymbol)))
+                .Where(static candidate => candidate.Symbol is
+                {
+                    Name: "State",
+                    IsStatic: true,
+                    DeclaredAccessibility: Accessibility.Public,
+                    Type.SpecialType: SpecialType.System_Int32
+                })
+                .ToArray();
+            if (stateFields.Length != 1)
+            {
+                return (null, Unsupported("could not uniquely identify the public static int State field"));
+            }
+
+            var stateField = stateFields[0];
+            if (stateField.Field.Declaration.Variables.Count != 1 || stateField.Variable.Initializer != null ||
+                stateField.Field.AttributeLists.Count != 0)
+            {
+                return (null, Unsupported("State field declaration is outside the supported generator shape"));
+            }
+
+            bool RefersToState(ExpressionSyntax expression)
+            {
+                ArgumentNullException.ThrowIfNull(expression);
+                return SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(expression).Symbol, stateField.Symbol);
+            }
+
+            var changes = new List<TextChange>
+            {
+                new(stateField.Field.Span, TrackedState)
+            };
+            var stateRefExpressions = root.DescendantNodes().OfType<RefExpressionSyntax>()
+                .Where(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : RefersToState(reference.Expression)).ToArray();
+            var aliases = new List<(RefExpressionSyntax Reference, LocalDeclarationStatementSyntax Statement,
+                ExpressionStatementSyntax? Write)>();
+            foreach (var reference in stateRefExpressions)
+            {
+                if (reference.Expression is not IdentifierNameSyntax { Identifier.ValueText: "State" } ||
+                    reference.Parent is not EqualsValueClauseSyntax initializer ||
+                    initializer.Parent is not VariableDeclaratorSyntax variable ||
+                    variable.Initializer != initializer ||
+                    model.GetDeclaredSymbol(variable) is not ILocalSymbol local ||
+                    variable.Parent is not VariableDeclarationSyntax declaration ||
+                    declaration.Variables.Count != 1 || declaration.Type is not RefTypeSyntax refType ||
+                    local.Type.SpecialType != SpecialType.System_Int32 ||
+                    declaration.Parent is not LocalDeclarationStatementSyntax localStatement ||
+                    localStatement.Parent is not BlockSyntax block)
+                {
+                    return (null, Unsupported("ref State is not a local int alias in a block"));
+                }
+
+                var aliasReferences = root.DescendantNodes().OfType<IdentifierNameSyntax>()
+                    .Where(identifier => identifier is null ? throw new ArgumentNullException(nameof(identifier)) : SymbolEqualityComparer.Default.Equals(
+                        model.GetSymbolInfo(identifier).Symbol, local)).ToArray();
+                if (local.RefKind == RefKind.Ref && refType.ReadOnlyKeyword.IsKind(SyntaxKind.None))
+                {
+                    var index = block.Statements.IndexOf(localStatement);
+                    if (index < 0 || index + 1 >= block.Statements.Count ||
+                        block.Statements[index + 1] is not ExpressionStatementSyntax writeStatement ||
+                        writeStatement.Expression is not AssignmentExpressionSyntax assignment ||
+                        !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                        assignment.Right is RefExpressionSyntax ||
+                        assignment.Left is not IdentifierNameSyntax left ||
+                        !SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(left).Symbol, local) ||
+                        aliasReferences.Length != 1 || !ReferenceEquals(aliasReferences[0], left))
+                    {
+                        return (null, Unsupported("mutable ref State alias does not match the generated adjacent simple assignment shape"));
+                    }
+                    aliases.Add((reference, localStatement, writeStatement));
+                }
+                else if (!refType.ReadOnlyKeyword.IsKind(SyntaxKind.None) && local.RefKind != RefKind.None)
+                {
+                    if (aliasReferences.Any(IsByRefUse))
+                    {
+                        return (null, Unsupported("read-only ref State alias escapes through a by-reference use"));
+                    }
+                    aliases.Add((reference, localStatement, null));
+                }
+                else
+                {
+                    return (null, Unsupported("ref State alias kind is unsupported"));
+                }
+            }
+
+            if (root.DescendantNodes().OfType<ArgumentSyntax>().Any(argument =>
+                    argument is null ? throw new ArgumentNullException(nameof(argument)) : !argument.RefKindKeyword.IsKind(SyntaxKind.None) && RefersToState(argument.Expression)) ||
+                root.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>().Any(unary =>
+                    unary is null ? throw new ArgumentNullException(nameof(unary)) : unary.IsKind(SyntaxKind.AddressOfExpression) && RefersToState(unary.Operand)))
+            {
+                return (null, Unsupported("State is passed or exposed by reference outside a supported local alias"));
+            }
+
+            foreach (var alias in aliases)
+            {
+                changes.Add(new TextChange(alias.Reference.Expression.Span, "s_state"));
+                if (alias.Write != null)
+                {
+                    // Increment only after the assignment completed. If evaluating
+                    // its RHS throws, execution never reaches this inserted count.
+                    changes.Add(new TextChange(new TextSpan(alias.Write.Span.End, 0), " StateWrites++;"));
+                }
+            }
+
+            return (tree.GetText().WithChanges(changes).ToString(), null);
+
+            bool IsByRefUse(IdentifierNameSyntax identifier)
+            {
+                ArgumentNullException.ThrowIfNull(identifier);
+                SyntaxNode use = identifier;
+                while (use.Parent is ParenthesizedExpressionSyntax parenthesized &&
+                    ReferenceEquals(parenthesized.Expression, use))
+                {
+                    use = parenthesized;
+                }
+                if (use.Parent is RefExpressionSyntax ||
+                    use.Parent is PrefixUnaryExpressionSyntax addressOf && addressOf.IsKind(SyntaxKind.AddressOfExpression) ||
+                    use.Parent is AssignmentExpressionSyntax assignment && ReferenceEquals(assignment.Left, use) ||
+                    use.Parent is PostfixUnaryExpressionSyntax postfix &&
+                        (postfix.IsKind(SyntaxKind.PostIncrementExpression) || postfix.IsKind(SyntaxKind.PostDecrementExpression)) ||
+                    use.Parent is PrefixUnaryExpressionSyntax prefix &&
+                        (prefix.IsKind(SyntaxKind.PreIncrementExpression) || prefix.IsKind(SyntaxKind.PreDecrementExpression)))
+                {
+                    return true;
+                }
+                return use.Parent is ArgumentSyntax argument &&
+                    model.GetOperation(argument) is IArgumentOperation { Parameter.RefKind: not RefKind.None };
+            }
+
+            static string Unsupported(string reason)
+            {
+                ArgumentNullException.ThrowIfNull(reason);
+                return "unsupported EnforcePure runtime oracle: " + reason;
             }
         }
 

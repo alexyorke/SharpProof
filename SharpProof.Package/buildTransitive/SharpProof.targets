@@ -14,6 +14,10 @@
   </PropertyGroup>
   <Import Project="$(_SharpProofConsumerContractPath)" />
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
+    <!-- Workspace APIs are supplied by the IDE and are never loaded by command-line compiler hosts. -->
+    <Analyzer Include="$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" Condition="'$(DesignTimeBuild)' == 'true'">
+      <SharpProofAnalyzerRole>CodeFix</SharpProofAnalyzerRole>
+    </Analyzer>
     <Analyzer Include="$(_SharpProofAnalyzerPath)">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
     </Analyzer>

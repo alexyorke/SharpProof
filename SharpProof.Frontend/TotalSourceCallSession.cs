@@ -146,6 +146,20 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             ? (empty, model) : null;
     }
 
+    private static bool IsCapturedParameterUse(IParameterReferenceOperation use)
+    {
+        use = RepositoryParameterGuard.NotNull(use, nameof(use));
+        for (var parent = use.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent is IDeconstructionAssignmentOperation assignment && assignment.Target.DescendantsAndSelf().Contains(use))
+            { return true; }
+            if (parent is IAnonymousFunctionOperation lambda && !SymbolEqualityComparer.Default.Equals(lambda.Symbol, use.Parameter.ContainingSymbol) ||
+                parent is ILocalFunctionOperation local && !SymbolEqualityComparer.Default.Equals(local.Symbol, use.Parameter.ContainingSymbol))
+            { return true; }
+        }
+        return false;
+    }
+
     private static string IlKey(IMethodSymbol method)
     { method = RepositoryParameterGuard.NotNull(method, nameof(method)); return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
@@ -251,6 +265,33 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Closed outer types
         // may share that body only when their intrinsic signature is unchanged.
         frame = caller.CreateFrame(method.OriginalDefinition);
+        // Specialize only immutable by-value parameters. Captured storage and
+        // ref/out escapes are excluded by scanning the complete declaration.
+        var arrayArguments = arguments.Where(argument =>
+            TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) &&
+            caller.ConcreteArray(argument.Value) != null).ToArray();
+        IOperation[] declarationOperations = [];
+        if (arrayArguments.Length != 0)
+        {
+            try
+            {
+                declarationOperations = CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree)
+                    .GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().ToArray() ?? [];
+            }
+            catch (ArgumentException)
+            { frame = null; return false; }
+        }
+        foreach (var argument in arrayArguments)
+        {
+            var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
+            if (declarationOperations.Length != 0 && caller.ConcreteArray(argument.Value) is { } array &&
+                !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
+                    SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
+                    (use.Parent is IAssignmentOperation assignment && assignment.Target == use ||
+                     use.Parent is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
+                     IsCapturedParameterUse(use)))))
+            { frame.SpecializeArrayParameter(parameter, array); }
+        }
         if (instance != null)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))

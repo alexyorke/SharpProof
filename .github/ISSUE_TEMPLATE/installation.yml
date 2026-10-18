@@ -1,0 +1,20 @@
+name: Installation or host integration
+description: Package restore, compiler host, native loading, or repository tooling failure.
+body:
+  - type: markdown
+    attributes:
+      value: "Check docs/preview-support.md and docs/support.md. Repository builds/tests/packing run in the canonical Linux container. Review all information before posting publicly."
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and packages
+      description: OS/architecture/filesystem, SDK, IDE/compiler host if relevant, all SharpProof versions, container or native consumer, clone or Git worktree.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command, failure and reproduction
+      description: Exact sanitized command, bounded error excerpt, minimal project/settings, and expected behavior. Remove credentials from feed URLs and paths.
+    validations:
+      required: true

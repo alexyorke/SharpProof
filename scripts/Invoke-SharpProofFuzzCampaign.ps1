@@ -101,7 +101,7 @@ try {
         throw 'Fuzz source changed while rebuilding the runner.'
     }
     $runnerAssembly = Join-Path $repositoryRoot `
-        'Tools\SharpProof.Fuzz\bin\Release\net9.0\SharpProof.Fuzz.dll'
+        'Tools\SharpProof.Fuzz\bin\Release\net10.0\SharpProof.Fuzz.dll'
     if (-not (Test-Path -LiteralPath $runnerAssembly -PathType Leaf)) {
         throw 'The rebuilt fuzz runner assembly is missing.'
     }

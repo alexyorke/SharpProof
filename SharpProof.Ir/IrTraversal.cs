@@ -1,4 +1,5 @@
 namespace SharpProof.Ir;
+
 internal static class IrTraversal
 {
     internal static ImmutableArray<IrTerm> GetChildren(IrTerm term)

@@ -11,6 +11,11 @@ if (-not $IsWindows -or
         [Runtime.InteropServices.Architecture]::X64) {
     throw 'Native proof acceptance requires Windows x64.'
 }
+if ([Environment]::Version.Major -lt 10) {
+    throw ('Native proof acceptance requires PowerShell 7.6 or later running on .NET 10 or later. ' +
+        "This PowerShell process runs .NET $([Environment]::Version). " +
+        'Update PowerShell; installing the .NET SDK alone does not update its runtime.')
+}
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
 $packages = @(Get-ChildItem -LiteralPath $source -File |
@@ -22,7 +27,7 @@ $sdk = (Get-Content (Join-Path $repositoryRoot 'global.json') -Raw | ConvertFrom
 $root = Join-Path ([IO.Path]::GetTempPath()) ('SharpProof Windows proofs ' + [char]0x03bb + ' ' + [Guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $root 'consumer with spaces'
 $cache = Join-Path $root 'packages'
-$resultPath = Join-Path $consumer 'obj/Release/net9.0/SharpProof/result.json'
+$resultPath = Join-Path $consumer 'obj/Release/net10.0/SharpProof/result.json'
 $encoding = [Text.UTF8Encoding]::new($false)
 $previousPackages = $env:NUGET_PACKAGES
 
@@ -75,7 +80,7 @@ function Assert-ProofOutcome {
 }
 
 function Test-WindowsPublicationPaths {
-    $hostDll = Join-Path $cache "sharpproof.verifier/$version/tools/net9/SharpProof.Host.dll"
+    $hostDll = Join-Path $cache "sharpproof.verifier/$version/tools/net10/SharpProof.Host.dll"
     # Load from bytes so the acceptance process does not lock its test cache.
     $assembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($hostDll))
     $lease = $assembly.GetType('SharpProof.Host.PublicationLease', $true)
@@ -156,7 +161,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $consumer 'Consumer.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <SharpProofProfile>advisory</SharpProofProfile>
     <SharpProofVerify>true</SharpProofVerify>
     <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>

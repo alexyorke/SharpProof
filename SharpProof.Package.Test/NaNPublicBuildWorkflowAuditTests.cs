@@ -112,7 +112,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(Path.Combine(publication, "result.json")))!;
         var packageRoot = Path.Combine(packageCache, "sharpproof.verifier", feed.Version);
-        var packageWorker = Path.Combine(packageRoot, "tools", "net9", "SharpProof.Worker.dll");
+        var packageWorker = Path.Combine(packageRoot, "tools", "net10", "SharpProof.Worker.dll");
         var packageNative = Path.Combine(packageRoot, "tools", "native", "linux-x64", "libz3.so");
         var nativeSha256 = WorkerProtocolJson.ComputeSha256(await File.ReadAllBytesAsync(packageNative));
         var workerSha256 = WorkerBinaryIdentity.ComputeSha256(packageWorker, nativeSha256);

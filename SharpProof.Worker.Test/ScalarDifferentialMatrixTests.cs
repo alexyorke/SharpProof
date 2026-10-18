@@ -647,6 +647,8 @@ public sealed class ScalarDifferentialMatrixTests
         using var project = DifferentialProject.Create(
             CreateUnsupportedConversionSource());
         var request = project.CreateRequest();
+        using var runtime = project.EmitRuntimeAssembly();
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -656,17 +658,45 @@ public sealed class ScalarDifferentialMatrixTests
                 "Conversion(",
                 StringComparison.Ordinal)))
             .ToArray();
+        var methodNames = new[]
+        {
+            "UncheckedLongConversion",
+            "CheckedLongConversion",
+            "UncheckedNegativeByteConversion",
+            "UncheckedAboveRangeByteConversion",
+            "UncheckedUnsignedConversion"
+        };
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(conversions, Has.Length.EqualTo(4));
+            Assert.That(conversions, Has.Length.EqualTo(methodNames.Length));
+            foreach (var methodName in methodNames)
+            {
+                var conversion = conversions.Single(result =>
+                    result is null ? throw new ArgumentNullException(nameof(result)) : CallableId(response, result).Contains(
+                        "." + methodName + "(",
+                        StringComparison.Ordinal));
+                Assert.That(conversion.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(conversion.Reason, Is.EqualTo(WorkerClaimReason.None));
+                Assert.That(conversion.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            }
+
             Assert.That(
-                conversions.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.All.EqualTo(WorkerClaimOutcome.Proven));
+                RequireRuntimeMethod(subject, "UncheckedLongConversion").Invoke(null, [long.MaxValue]),
+                Is.EqualTo(-1));
             Assert.That(
-                conversions.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.All.EqualTo(WorkerClaimReason.None));
+                RequireRuntimeMethod(subject, "CheckedLongConversion").Invoke(null, [(long)int.MinValue]),
+                Is.EqualTo(int.MinValue));
+            Assert.That(
+                RequireRuntimeMethod(subject, "UncheckedNegativeByteConversion").Invoke(null, [-1]),
+                Is.EqualTo(byte.MaxValue));
+            Assert.That(
+                RequireRuntimeMethod(subject, "UncheckedAboveRangeByteConversion").Invoke(null, [257]),
+                Is.EqualTo((byte)1));
+            Assert.That(
+                RequireRuntimeMethod(subject, "UncheckedUnsignedConversion").Invoke(null, [0x80000000U]),
+                Is.EqualTo(int.MinValue));
         }
     }
 
@@ -815,26 +845,35 @@ public sealed class ScalarDifferentialMatrixTests
 
             public static class ScalarDifferentialSubject {
                 public static int UncheckedLongConversion(long value) {
-                    Contract.Ensures(
-                        Contract.Result<int>() >= int.MinValue);
+                    Contract.Requires(value == long.MaxValue);
+                    Contract.Ensures(Contract.Result<int>() == -1);
                     return unchecked((int)value);
                 }
 
                 public static int CheckedLongConversion(long value) {
+                    Contract.Requires(value == int.MinValue);
                     Contract.Ensures(
-                        Contract.Result<int>() >= int.MinValue);
+                        Contract.Result<int>() == int.MinValue);
                     return checked((int)value);
                 }
 
-                public static byte UncheckedByteConversion(int value) {
+                public static byte UncheckedNegativeByteConversion(int value) {
+                    Contract.Requires(value == -1);
                     Contract.Ensures(
-                        Contract.Result<byte>() >= byte.MinValue);
+                        Contract.Result<byte>() == byte.MaxValue);
+                    return unchecked((byte)value);
+                }
+
+                public static byte UncheckedAboveRangeByteConversion(int value) {
+                    Contract.Requires(value == 257);
+                    Contract.Ensures(Contract.Result<byte>() == 1);
                     return unchecked((byte)value);
                 }
 
                 public static int UncheckedUnsignedConversion(uint value) {
+                    Contract.Requires(value == 0x80000000U);
                     Contract.Ensures(
-                        Contract.Result<int>() >= int.MinValue);
+                        Contract.Result<int>() == int.MinValue);
                     return unchecked((int)value);
                 }
             }

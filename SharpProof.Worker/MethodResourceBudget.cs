@@ -12,6 +12,8 @@ internal sealed class MethodResourceBudget(
     private readonly long _startingResourceCount = RequireNonnegative(readConsumedResourceCount?.Invoke() ?? 0);
     private long _reservedResourceCount;
 
+    // Keep the actual reservation boundary visible to native resource witnesses.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     internal bool TryStartQuery()
     {
         var consumed = GetConsumedResourceCount();

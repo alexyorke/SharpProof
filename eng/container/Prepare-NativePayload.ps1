@@ -101,6 +101,53 @@ finally {
 
 Write-Output $payloadDirectory
 
+$linuxArm64 = $z3.linuxArm64
+$linuxArm64Archive = Join-Path $resolvedDownload "z3-$($z3.version)-linux-arm64.whl"
+$linuxArm64StagingLibrary = Join-Path $resolvedDownload "z3-$($z3.version)-linux-arm64-libz3.so"
+try {
+    if (-not (Test-Path -LiteralPath $linuxArm64Archive -PathType Leaf)) {
+        Invoke-WebRequest -Uri ([string]$linuxArm64.archiveUrl) -OutFile $linuxArm64Archive
+    }
+    Assert-Sha256 $linuxArm64Archive ([string]$linuxArm64.archiveSha256) 'Linux ARM64 Z3 wheel'
+    $linuxArm64Zip = [System.IO.Compression.ZipFile]::OpenRead($linuxArm64Archive)
+    try {
+        # The official wheel also contains an older libz3.so.4.10. Extract only
+        # the exact catalog-owned entry, never a wildcard or a directory tree.
+        $linuxArm64Entry = $linuxArm64Zip.GetEntry([string]$linuxArm64.archiveLibraryPath)
+        if ($null -eq $linuxArm64Entry) {
+            throw 'The verified Linux ARM64 Z3 wheel is missing its catalog-owned native entry.'
+        }
+        Assert-Equal ([int64]$linuxArm64Entry.Length) ([int64]$linuxArm64.libraryBytes) 'Linux ARM64 libz3.so byte length'
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($linuxArm64Entry, $linuxArm64StagingLibrary, $true)
+    }
+    finally { $linuxArm64Zip.Dispose() }
+    Assert-Sha256 $linuxArm64StagingLibrary ([string]$linuxArm64.librarySha256) 'Linux ARM64 libz3.so'
+    $linuxArm64PayloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-arm64"
+    [System.IO.Directory]::CreateDirectory($linuxArm64PayloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $linuxArm64StagingLibrary -Destination (Join-Path $linuxArm64PayloadDirectory 'libz3.so') -Force
+    [ordered]@{
+        schemaVersion = 1
+        platform = 'linux/arm64'
+        version = [string]$z3.version
+        sourceUrl = [string]$linuxArm64.archiveUrl
+        sourceMetadataUrl = [string]$linuxArm64.sourceMetadataUrl
+        files = @([ordered]@{
+                name = 'libz3.so'
+                bytes = [int64]$linuxArm64.libraryBytes
+                sha256 = [string]$linuxArm64.librarySha256
+            })
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath (Join-Path $linuxArm64PayloadDirectory 'payload.json') -Encoding utf8NoBOM
+}
+finally {
+    foreach ($temporaryPath in @($linuxArm64StagingLibrary, $linuxArm64Archive)) {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+    }
+}
+Write-Output $linuxArm64PayloadDirectory
+
 $windows = $z3.windows
 $windowsArchive = Join-Path $resolvedDownload "z3-$($z3.version)-x64-win.zip"
 $windowsExtractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-win-extract"

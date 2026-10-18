@@ -1,6 +1,6 @@
 SharpProof third-party notices
 
-The SharpProof analyzer and container-only Linux amd64 verifier packages redistribute the
+The SharpProof analyzer and supported verifier packages redistribute the
 following third-party components. The authoritative package-to-file inventory
 is eng/release/third-party-components.json and is validated against every
 release package.
@@ -27,6 +27,11 @@ Microsoft Z3
 
 Package: Microsoft.Z3 4.12.2
 Source: https://github.com/Z3Prover/z3/tree/z3-4.12.2
+Linux ARM64 native library: z3-solver 4.12.2.0, z3/lib/libz3.so from the
+official manylinux2014_aarch64 wheel. The archive and extracted library are
+independently pinned by SHA-256 in eng/container/toolchain.json.
+Distribution: https://pypi.org/project/z3-solver/4.12.2.0/
+Distribution metadata: https://pypi.org/pypi/z3-solver/4.12.2.0/json
 License: MIT
 Copyright (c) Microsoft Corporation
 
