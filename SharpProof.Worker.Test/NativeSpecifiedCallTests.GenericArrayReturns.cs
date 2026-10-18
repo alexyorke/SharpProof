@@ -37,7 +37,6 @@ public sealed partial class NativeSpecifiedCallTests
 
     [TestCase("System.Collections.Generic.IList<int> unknown", "return Read<int>(unknown);", "static T Read<T>(System.Collections.Generic.IList<T> list) => list[0];")]
     [TestCase("int[] values, System.Collections.Generic.IList<int> unknown", "return Read<int>(values, unknown);", "static T Read<T>(System.Collections.Generic.IList<T> list, System.Collections.Generic.IList<T> other) { list = other; return list[0]; }")]
-    [TestCase("int[] values", "return Read<int, int>(values);", "static U Read<T, U>(System.Collections.Generic.IList<T> list) => default(U);")]
     public async Task UnprovenGenericArrayReturnRepresentationsStayConservative(string parameters, string call, string helper)
     {
         ArgumentNullException.ThrowIfNull(parameters);
@@ -198,10 +197,10 @@ public sealed partial class NativeSpecifiedCallTests
     }
 
     [Test]
-    public async Task NestedGenericReturnDoesNotBorrowAnotherTypeParametersArrayEvidence()
+    public async Task NestedClosedGenericReturnDoesNotBorrowArrayElementValues()
     {
         await CheckInterfaceArrayContract("int[] values", "Contract.Ensures(Contract.Result<int>() == 17); return Outer<int>(values);",
-            WorkerClaimOutcome.Unknown, members:
+            WorkerClaimOutcome.Refuted, members:
             "static T Outer<T>(System.Collections.Generic.IList<T> list) { return Inner<T, T>(list); " +
             "static U Inner<V, U>(System.Collections.Generic.IList<V> values) => default(U); }");
     }

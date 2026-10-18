@@ -33,9 +33,9 @@ public sealed partial class NativeSpecifiedCallTests
     }
 
     [Test]
-    public async Task GenericDefaultWithoutScalarParameterEvidenceRemainsConservative()
+    public async Task ClosedGenericDefaultRetainsKnownEffects()
     {
-        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 0); return Reset<int>(); static T Reset<T>() => default(T);",
-            WorkerClaimOutcome.Unknown);
+        await CheckInterfaceArrayEffects("[DoesNotThrow, ZeroAllocations, EnforcePure]", "",
+            "return Reset<int>(); static T Reset<T>() => default(T);", true, true, true);
     }
 }

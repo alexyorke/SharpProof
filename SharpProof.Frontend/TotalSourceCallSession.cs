@@ -282,6 +282,25 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Reconcile parameter and
         // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
+        // A constructed symbol supplies exact scalar type arguments even when no
+        // value parameter mentions them. Preserve each declaration's own symbols.
+        if (!Spend(method.TypeArguments.Length))
+        { frame = null; return false; }
+        for (var ordinal = 0; ordinal < method.TypeArguments.Length; ordinal++)
+        {
+            if (caller.KnownScalarType(method.TypeArguments[ordinal]) is { } scalar)
+            { frame.SpecializeTypeParameter(method.OriginalDefinition.TypeParameters[ordinal], scalar); }
+        }
+        for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
+        {
+            if (!Spend(owner.TypeArguments.Length + 1))
+            { frame = null; return false; }
+            for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
+            {
+                if (caller.KnownScalarType(owner.TypeArguments[ordinal]) is { } scalar)
+                { frame.SpecializeTypeParameter(owner.OriginalDefinition.TypeParameters[ordinal], scalar); }
+            }
+        }
         // Value and array parameters keep their representation through rebinding. Interface
         // provenance requires immutable storage without captures or ref escapes.
         var receiverArguments = arguments.Where(argument =>
@@ -321,10 +340,6 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDefaultComparerParameter(parameter); }
             }
         }
-        // The argument representation must have specialized this exact return T;
-        // another type parameter cannot borrow that evidence.
-        if (scalarReturnSpecialization && frame.Factory.GetVariableInfo(frame.Result!.Value).Type != caller.Type(method.ReturnType))
-        { frame = null; return false; }
         if (instance != null)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))

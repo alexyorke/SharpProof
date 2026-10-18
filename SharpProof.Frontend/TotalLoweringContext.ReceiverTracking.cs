@@ -306,7 +306,7 @@ public sealed partial class TotalLoweringContext
         return CSharpOperationSemantics.IsScalar(known) ? known : null;
     }
 
-    private void SpecializeTypeParameter(ITypeParameterSymbol parameter, ITypeSymbol scalar)
+    internal void SpecializeTypeParameter(ITypeParameterSymbol parameter, ITypeSymbol scalar)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         scalar = RepositoryParameterGuard.NotNull(scalar, nameof(scalar));

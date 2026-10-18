@@ -232,6 +232,17 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("uint Target(uint x) { return Reset<uint>(x); } static T Reset<T>(T value) => default(T);", uint.MaxValue, 0u)]
     [TestCase("long Target(long x) { return Reset<long>(x); } static T Reset<T>(T value) => default(T);", long.MinValue, 0L)]
     [TestCase("ulong Target(ulong x) { return Reset<ulong>(x); } static T Reset<T>(T value) => default(T);", ulong.MaxValue, 0UL)]
+    [TestCase("bool Target(bool x) { return Reset<bool>(); } static T Reset<T>() => default(T);", true, false)]
+    [TestCase("char Target(char x) { return Reset<char>(); } static T Reset<T>() => default(T);", char.MaxValue, char.MinValue)]
+    [TestCase("sbyte Target(sbyte x) { return Reset<sbyte>(); } static T Reset<T>() => default(T);", sbyte.MinValue, (sbyte)0)]
+    [TestCase("byte Target(byte x) { return Reset<byte>(); } static T Reset<T>() => default(T);", byte.MaxValue, (byte)0)]
+    [TestCase("short Target(short x) { return Reset<short>(); } static T Reset<T>() => default(T);", short.MinValue, (short)0)]
+    [TestCase("ushort Target(ushort x) { return Reset<ushort>(); } static T Reset<T>() => default(T);", ushort.MaxValue, (ushort)0)]
+    [TestCase("int Target(int x) { return Reset<int>(); } static T Reset<T>() => default(T);", int.MinValue, 0)]
+    [TestCase("uint Target(uint x) { return Reset<uint>(); } static T Reset<T>() => default(T);", uint.MaxValue, 0u)]
+    [TestCase("long Target(long x) { return Reset<long>(); } static T Reset<T>() => default(T);", long.MinValue, 0L)]
+    [TestCase("ulong Target(ulong x) { return Reset<ulong>(); } static T Reset<T>() => default(T);", ulong.MaxValue, 0UL)]
+    [TestCase("bool Target(int x) { return Outer<int>.Inner<bool>.Reset(); } static class Outer<T> { public static class Inner<U> { public static U Reset() => default(U); } }", 17, false)]
     public void ScalarFramesPreserveWidthsAndDefaultConstants(string members, object input, object expected)
     {
         System.ArgumentNullException.ThrowIfNull(expected);
