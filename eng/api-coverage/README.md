@@ -1,12 +1,11 @@
 # .NET API coverage inventory
 
 The automatic inventory covers every declared public, protected, and protected-internal
-type/member in **Microsoft.NETCore.App.Ref 9.0.18 / net9.0**. The canonical .NET 10
-tooling image retains this exact reference pack from the digest-pinned .NET SDK
-9.0.316 image. The manifest records the generation SDK (10.0.402); the toolchain
-catalog separately pins the reference pack's source SDK, image, and digest. This is
-a framework API inventory, not an inventory of SDK command-line tools. It does not
-load implementation assemblies or execute API bodies.
+type/member in **Microsoft.NETCore.App.Ref 10.0.13 / net10.0**, supplied by the canonical
+.NET SDK 10.0.402 container. The additional pinned .NET 9 reference-pack stage remains
+available for compatibility checks; it does not select the active inventory universe.
+This is a framework API inventory, not an inventory of
+SDK command-line tools. It does not load implementation assemblies or execute API bodies.
 
 The unit is `(defining assembly name, XML documentation declaration ID)`. Overloads
 and generic arity have distinct identities. Nested types are included only when their
@@ -41,7 +40,7 @@ summary. The `dotnet-api-inventory-*` artifact contains the complete `inventory.
 `manifest.json`, `delta.json`, and `report.md`, even when the baseline comparison fails.
 TSV has no header: assembly, declaration ID, symbol kind, status, evidence (`-` when absent).
 
-The reviewed `net9.0.tsv` baseline gates additions, removals, and every changed evidence
+The reviewed `net10.0.tsv` baseline gates additions, removals, and every changed evidence
 row. Equal totals cannot conceal churn. Loss of a catalog row, known facet, or recognized
 intrinsic fails the gate. The manifest additionally pins SDK identity, all reference
 assembly SHA-256 checksums, and the catalog semantic digest, so semantic changes with
@@ -103,7 +102,7 @@ approving a lower count. After reviewing intentional changes, copy the candidate
 
 ```sh
 docker compose run --rm tooling dev -lc \
-  'cp artifacts/api-coverage/inventory.tsv eng/api-coverage/net9.0.tsv && cp artifacts/api-coverage/manifest.json eng/api-coverage/net9.0.manifest.json'
+  'cp artifacts/api-coverage/inventory.tsv eng/api-coverage/net10.0.tsv && cp artifacts/api-coverage/manifest.json eng/api-coverage/net10.0.manifest.json'
 ```
 
 Run the gate again without candidate mode and commit both baselines with an explanation.
@@ -137,7 +136,7 @@ Getter evidence never credits a setter. Unknown result relations remain unknown.
 
 ### First implementation batch
 
-The scan found 636 framework uses with zero unresolved sites. The following five
+The scan found 641 framework uses with zero unresolved sites. The following five
 previously unmodeled getters account for 41 read sites in the fixed universe:
 
 | API | Read sites | Added evidence |
@@ -160,13 +159,21 @@ partial API models, not collection-content or full heap models.
 
 ### Integer comparisons and Count result guarantees
 
-The frontend now models the exact -1/0/1 result of the typed
-`Int32/Int64/UInt32/UInt64.CompareTo` overloads, and direct
-`Comparer<int/long/uint/ulong>.Default.Compare` calls. It evaluates receivers
-and arguments in source order, including named argument reordering. The Default
-getter still executes as an opaque call: its initialization, allocation, and
-exception possibilities are retained. Custom comparers, generic type parameters,
-object overloads, and smaller integer types do not inherit this model.
+The frontend models typed comparisons for all nine supported integer types.
+`SByte/Byte/Int16/UInt16/Char.CompareTo` return the exact Int32-promoted difference;
+`Int32/Int64/UInt32/UInt64.CompareTo` return -1/0/1. Proven default comparers use
+the corresponding result, retaining non-unit differences for smaller types.
+The runtime/IR witnesses cover each overload and default comparer across ordered
+boundary pairs, including signed extrema and UTF-16 surrogate code units.
+Default identity flows through aliases, compatible joins, CFG captures and
+immutable source parameters. Generic helpers use declaration-owned scalar type
+arguments or proven array element types, including local-function symbol clones.
+Receivers and arguments retain source order, including named arguments. The
+Default getter remains an opaque call with initialization, allocation and exception
+possibilities; wrong-contract replay after that call remains a separate gap.
+Custom comparers, unbound generic types, Boolean and object overloads do not inherit
+integer semantics. The promoted-difference behavior is also visible in the
+[CoreLib implementation](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/SByte.cs).
 
 The four concrete Count getters above now additionally constrain normal results to
 `Count >= 0` in native lowering. This does not imply strict positivity, collection
@@ -261,3 +268,5 @@ while its other effects remain Unknown. Native opaque-call IR currently retains 
 a may-throw bit, so a native AllowedExceptions claim for this getter remains Unknown;
 a regression test records that boundary. Importing exact exception types into native
 opaque calls is separate follow-up work, not a guarantee supplied by this batch.
+
+See [the comprehensive gap backlog](gaps.md) for every ranked API/access row, all partial declaration evidence, cross-cutting limitations and completion criteria.

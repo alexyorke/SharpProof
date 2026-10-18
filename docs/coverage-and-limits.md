@@ -45,7 +45,8 @@ Effect contracts separate read/write regions, allocations, exceptions, capabilit
 ## API specifications
 
 The [automatic .NET API inventory](../eng/api-coverage/README.md) compares the pinned
-.NET 9 framework surface with default catalog and audited intrinsic evidence. CI
+.NET 10 framework surface (`Microsoft.NETCore.App.Ref` 10.0.13, `net10.0`)
+with default catalog and audited intrinsic evidence. CI
 reports API additions/removals and fails on changes to reviewed support evidence.
 This is separate from executable line coverage and does not imply full API semantics.
 The same gate publishes an API/facet-to-test matrix and requires executed behavioral

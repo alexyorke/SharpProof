@@ -148,11 +148,13 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
     }
 
-    [Test]
-    public async Task FullLengthProofDomainIsPreservedWhileOversizedWitnessesAbstain()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task FullLengthProofDomainIsPreservedWhileOversizedWitnessesAbstain(bool array)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var text = factory.CreateVariable("text", factory.StringType);
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
+        var text = factory.CreateVariable("text", type);
         var length = factory.Length(factory.Variable(text));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var nonnegative = factory.Binary(IrBinaryOperator.GreaterThanOrEqual, length, factory.Integer(0));
@@ -167,6 +169,39 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(witness.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
     }
 
+    [TestCase(false, 1)]
+    [TestCase(true, 1)]
+    [TestCase(false, 64)]
+    [TestCase(true, 64)]
+    [TestCase(false, 65)]
+    [TestCase(true, 65)]
+    [TestCase(false, 257)]
+    [TestCase(true, 257)]
+    public async Task WitnessPreferenceRetriesUnboundedQueriesAndKeepsLargeCounterexamples(bool array, int minimum)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
+        var input = factory.CreateVariable("input", type);
+        var length = factory.Length(factory.Variable(input));
+        var atLeast = factory.Binary(IrBinaryOperator.GreaterThanOrEqual, length, factory.Integer(minimum));
+        using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        var query = Query(factory, [NotNull(factory, input), Assume(factory, atLeast),
+            Assume(factory, factory.Binary(IrBinaryOperator.LessThanOrEqual, length, factory.Integer(minimum + 32)))],
+            factory.Boolean(false), [input]);
+        var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        var value = result.Model!.Assignments[input];
+        var actual = array ? value.Elements.Length : value.String.Length;
+        Assert.That(actual, Is.GreaterThanOrEqualTo(minimum));
+        if (minimum <= 64)
+        { Assert.That(actual, Is.LessThanOrEqualTo(64)); }
+        AssertAssumptions(factory, query, result.Model.Assignments);
+        // Reuse the session: a failed bounded preference cannot turn a later
+        // large-input counterexample into a proof or leak a previous goal.
+        var wrong = Query(factory, query.Assumptions,
+            factory.Binary(IrBinaryOperator.LessThan, length, factory.Integer(minimum)), [input]);
+        Assert.That(await new ProofKernel(session).VerifyAsync(wrong, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
+    }
     [TestCase(0, false, 1UL)]
     [TestCase(8, true, 255UL)]
     [TestCase(16, false, 65535UL)]

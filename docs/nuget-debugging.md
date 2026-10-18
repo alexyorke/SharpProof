@@ -68,6 +68,11 @@ adding another build package. The
 documents the same kinds of compiler, source-path, and build-isolation concerns.
 Reproducibility remains a measured property of the actual outputs.
 
+The [reviewed API inventory](../eng/api-coverage/README.md) uses the pinned
+`Microsoft.NETCore.App.Ref` 10.0.13 / `net10.0` surface. The additional .NET 9
+reference pack supports compatibility checks; it does not define the active
+API inventory or the default verifier's SDK requirement.
+
 After committing all source and harness changes, run the smaller experiment:
 
 ```powershell
