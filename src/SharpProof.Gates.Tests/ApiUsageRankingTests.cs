@@ -17,6 +17,8 @@ namespace SharpProof.Gates.Test;
 public sealed class ApiUsageRankingTests
 {
     private static readonly bool[] FreshDictionaryCalls = [true, false, false];
+    private static readonly bool[] FreshListCalls = [true, false];
+    private static readonly bool[] FreshListIndexers = [true, true, false, false, false];
     private static readonly bool[] FreshDictionaryIndexers = [true, true, false, false];
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -180,6 +182,14 @@ public sealed class ApiUsageRankingTests
                     : knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch";
             }
 
+            if (CSharpOperationSemantics.IsListStateDeclaration(symbol))
+            {
+                var use = model.GetOperation(syntax);
+                status = use is IObjectCreationOperation creation && CSharpOperationSemantics.IsEmptyListCreation(creation) || knownIntrinsics.Contains(syntax.SpanStart) ||
+                    symbol is IPropertySymbol { GetMethod: { } getter } && CSharpOperationSemantics.IsNonnegativeCollectionCount(getter)
+                    ? "partially-modeled" : "unmodeled-dispatch";
+            }
+
             if (model.GetOperation(syntax) is IPropertyReferenceOperation length && CSharpOperationSemantics.IsLength(length))
             { status = "partially-modeled"; }
             var access = "call";
@@ -197,7 +207,8 @@ public sealed class ApiUsageRankingTests
                 {
                     status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null && !knownIntrinsics.Contains(syntax.SpanStart) ? "unmodeled-dispatch" : access == "read-write" ? "unmodeled-access" : "partially-modeled";
                 }
-                else if (symbol is IPropertySymbol { IsIndexer: true } dictionary && CSharpOperationSemantics.IsDictionaryStateDeclaration(dictionary))
+                else if (symbol is IPropertySymbol { IsIndexer: true } collection &&
+                    (CSharpOperationSemantics.IsDictionaryStateDeclaration(collection) || CSharpOperationSemantics.IsListStateDeclaration(collection)))
                 {
                     status = !knownIntrinsics.Contains(syntax.SpanStart) ? "unmodeled-dispatch"
                         : access == "read-write" ? "unmodeled-access" : "partially-modeled";
@@ -246,7 +257,7 @@ public sealed class ApiUsageRankingTests
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "read")), Is.EqualTo(1));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "write")), Is.EqualTo(1));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "read-write")), Is.EqualTo(1));
-            Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-setter")), Is.EqualTo(2));
+            Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Status == "unmodeled-dispatch")), Is.EqualTo(3));
             Assert.That(sites.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Access == "call")), Is.EqualTo(1));
             Assert.That(gaps.Single(), Does.Contain("System.Double"));
         }
@@ -376,6 +387,32 @@ public sealed class ApiUsageRankingTests
             Is.EqualTo(FreshDictionaryIndexers));
     }
 
+    [Test]
+    public void UsageScanCreditsOwnedListAliasesAndInitializersWithoutCreditingUnprovenDispatch()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class ListUsageProbe {
+                public static void Target(bool choose, System.Collections.Generic.IList<int> incoming) {
+                    var fresh = new System.Collections.Generic.List<int>() { 17 };
+                    System.Collections.Generic.IList<int> alias = fresh;
+                    var mixed = choose ? alias : incoming;
+                    fresh.Add(23); incoming.Add(31);
+                    _ = fresh[0]; alias[0] = 29; _ = incoming[0]; _ = mixed[0]; alias[0]++;
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var tree = compilation.SyntaxTrees.Single();
+        var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
+        var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        Assert.That(known.Contains(creation.SpanStart), Is.True);
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
+            Is.EqualTo(FreshListCalls));
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
+            Is.EqualTo(FreshListIndexers));
+    }
+
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
     {
         global::System.ArgumentNullException.ThrowIfNull(model);
@@ -394,18 +431,27 @@ public sealed class ApiUsageRankingTests
             context.TrackArrayReceivers(graph);
             context.TrackDefaultComparers(graph);
             context.TrackDefaultDictionaries(graph);
+            context.TrackFreshLists(graph);
+            foreach (var creation in graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IObjectCreationOperation>())
+            {
+                if (CSharpOperationSemantics.IsEmptyListCreation(creation))
+                { known.Add(creation.Syntax.SpanStart); }
+            }
             foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
                 if (context.IsDefaultIntegerComparison(invocation) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsDefaultDictionaryStateMember(invocation.TargetMethod) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance))
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance) ||
+                    invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) && context.IsFreshList(invocation.Instance))
                 { known.Add(invocation.Syntax.SpanStart); }
             }
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null ||
                     property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance))
+                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance) ||
+                    property.Instance != null && property.Property.GetMethod is { } listGetter && CSharpOperationSemantics.IsListStateMember(listGetter) && context.IsFreshList(property.Instance) &&
+                    property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation))
                 {
                     known.Add(property.Syntax.SpanStart);
                 }
