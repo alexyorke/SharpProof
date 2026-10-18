@@ -1,6 +1,7 @@
 apicompat
 binlogs
 bodyless
+buildx
 callees
 cifs
 csharp
