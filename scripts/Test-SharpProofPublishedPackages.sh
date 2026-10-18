@@ -40,6 +40,6 @@ while IFS=$'\t' read -r id version filename expected extra; do
     sleep 10
   done
   count=$((count + 1))
-done <"$package_dir/packages.tsv"
+done < "$package_dir/packages.tsv"
 [[ "$count" -gt 0 ]]
 echo "Verified $count package identities ($mode)."

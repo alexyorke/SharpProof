@@ -43,13 +43,14 @@ jobs:
           severity-cutoff: high
           only-fixed: true
           output-format: json
-          output-file: toolchain-vulnerabilities.json
+          output-file: ${{ runner.temp }}/toolchain-vulnerabilities.json
           cache-db: false
+          config: .grype.yaml
       - name: Retain the complete image vulnerability report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: toolchain-vulnerabilities-${{ github.sha }}-${{ github.run_attempt }}
-          path: toolchain-vulnerabilities.json
+          path: ${{ runner.temp }}/toolchain-vulnerabilities.json
           if-no-files-found: error
           retention-days: 30

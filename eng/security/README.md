@@ -92,3 +92,5 @@ fail the job; the JSON report is retained for 30 days. Findings without a publis
 fix remain in the report for triage. Scanner/SBOM action SHAs and Grype/Syft versions
 are pinned. Review those tool versions during image servicing; add reviewed,
 expiring exceptions only with a documented rationale and remediation owner.
+
+The serviced minimum-host fixture uses SDK 9.0.319 in the same 9.0.3xx/Roslyn 4.14 feature band; consumer version eligibility remains 9.0.300. .NET 8 fixtures use 8.0.32 servicing packs/runtime. The explicitly pinned PowerShell 7.5 Ubuntu image replaces the stale Debian copy, and the unused SDK-bundled PowerShell tool store is removed. The sole scanner exception is GO-2026-6604 for the exact Linux shfmt binary: the upstream advisory affects Windows junction handling only. Review it when servicing shfmt.

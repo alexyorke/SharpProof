@@ -49,4 +49,5 @@ foreach ($package in $packages) {
 [IO.File]::WriteAllText((Join-Path $packageRoot 'packages.tsv'), ($rows -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 $lock = @{ version = 1; dependencies = @{ release = $inventory } } | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $packageRoot 'packages.lock.json'), $lock + "`n", [Text.UTF8Encoding]::new($false))
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Test-SharpProofPublishedPackages.sh') -Destination $packageRoot
 Write-Output "Recorded identities and SHA-512 hashes for $($packages.Count) release packages."
