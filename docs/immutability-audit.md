@@ -2026,3 +2026,15 @@ returned result; preserve null resets and budget/cancellation behavior. ForgetOr
 must enumerate the original state while removing from a builder. Alias cycle guards
 may use hash builders. Persistent abstract-state dictionaries remain snapshots for
 joins. Status: open before edits.
+## Additional constant declaration inventory
+
+IMM-M032: Coordinator inspected 16 scalar/enum constant declarations across 12 test
+files identified by the read-only 1,248-file test/helper audit. These are fixed values
+passed to explicitly typed APIs, integer arithmetic, assertions or generated-source
+counts; no writes/ref/out uses occur. Convert callerValue, localCount, attribute
+capabilities, effect unknown/allocation/uncertainty markers, expectedOwnerKind, two
+operation stages and invalid stage, specification version/hash, natural-budget call
+and field counts, and publication grace/expected milliseconds to typed constants.
+Keep actual caller-owned exception arrays and captured/mutated variables unchanged.
+The lexical audit does not establish exhaustive CFG coverage; other candidates remain
+open. Status: open before edits.
