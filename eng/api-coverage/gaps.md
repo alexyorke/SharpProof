@@ -146,6 +146,16 @@ constructors with capacities/comparers, growth faults, views and removal stay op
 Reference-value contents and invoked callbacks need their own models; storing a
 reference does not model every operation on the referenced object.
 
+Verification on implementation commit `38f110971`: all 24 coverage-counted changed
+trusted-code lines are covered (100%, no uncovered lines), compared with master
+`0c52c313d`. The report retains two source-mapping diagnostics for a local function
+declaration and a continued property pattern. The canonical container passes 2,003
+frontend tests, 640 contract tests, 659 selected worker tests, 80 selected IR tests,
+74 selected SMT tests, 35 selected effects tests including the strict inventory
+checks, and 30 selected Gates tests including usage ranking. The filtered collection
+certifies changed-code coverage; it does not certify full aggregate coverage.
+Complete exact-head CI remains required before merging. No coverage floor changed.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -178,7 +188,7 @@ reference does not model every operation on the referenced object.
   owners. Commit `56d140aa9` adds 120 native proof/refutation cases, eleven CLR/IR
   boundary cases and method/owner budget sweeps; 1,406 selected worker, 1,866
   frontend and 468 Gates tests pass, with changed trusted code 317/317 covered.
-  Unbound or unsupported non-scalar type arguments, generic operators, ref/out
+  Unbound or unsupported non-scalar type arguments, other generic operators, ref/out
   signatures, reference/non-SZ arrays and mutable/captured or otherwise unproven
   interface receiver representations remain open. Type specialization alone does
   not establish collection contents, default/custom dispatch or callback effects.
