@@ -700,7 +700,9 @@
           "eng/shared/Polyfills/NotNullAttribute.cs",
           "eng/shared/Polyfills/NullableAttributes.cs",
           "SharpProof.Worker/GlobalUsings.cs",
-          "SharpProof.Worker/MethodResourceBudget.cs"
+          "SharpProof.Worker/MethodResourceBudget.cs",
+          "SharpProof.CompilerCollector/CompilerCollectorDiagnosticDescriptors.cs",
+          "SharpProof.CompilerCollector/CompilerSemanticUsings.cs"
         ],
         "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
       },
