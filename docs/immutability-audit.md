@@ -2192,3 +2192,13 @@ insertion enumeration directly. Freeze copies before substitution, cells before 
 and graph maps/sets before Encoding/Loop publication. Preserve nullable cell state as
 heap-forgotten. Use existing CallSnapshot for immutable call arguments; Havoc has only
 params-array APIs, so retain those explicit boundary adapters. Status: open before edits.
+## Fuzz statistics observation correction inventory
+
+IMM-M042: The full ordinary Worker run exposed two downstream reflection-based controls
+that still cast LongFuzzSession._counts to Dictionary<string,int> after the earlier
+statistics-builder conversion. Both fail with InvalidCastException before checking
+purity outcomes. Coordinator traced all _counts consumers; only these two casts remain.
+Expose an immutable Counts snapshot from the test session and read it directly. The
+lock control needs separate snapshots before and after its second RunCase; preserve
+pre-control refutation scalars and post-control proven count. Keep the private builder
+and the session's intended mutable counting behavior. Status: open before edits.
