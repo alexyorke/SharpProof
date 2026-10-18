@@ -2,7 +2,7 @@
 
 This is the committed work list for API support and its evidence. Baseline: merged
 API inventory/provenance work at master `52cc38fea`, followed by the verified
-dictionary slice below. Counts are static source sites,
+dictionary slices below. Counts are static source sites,
 not runtime frequency. A passing test, a modeled effect, and a proved caller
 postcondition are separate claims.
 
@@ -42,8 +42,8 @@ access kind and value domains satisfy the production guard.
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance remains supported. |
-| D: Dictionary | Fresh default-comparer integer-key/scalar-value state is verified; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
-| C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. This MR supports tracked Default integer aliases and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
+| D: Dictionary | Fresh default-comparer integer-key state with scalar/reference values is verified; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
+| C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Count/getter/Add have partial effects; constructors, stores, range operations and count/content relationships remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
@@ -91,19 +91,70 @@ All 177 selected worker/loop/artifact/replay controls, eight keyed IR controls a
 the mathematical-integer-key SMT rejection test pass. Keyed loop cuts forget
 memory and replay preserves 32/64-bit keys. Framework observations that disagree
 with the expected state now decline replay authority instead of throwing.
-Changed trusted-code coverage is verified above; exact-head CI remains pending.
+MR #317 auto-merged as `3809aaf3b` after all 25 CI checks passed, including aggregate coverage and platform consumers.
 
 This closes a semantic slice, not the Dictionary work item or its corpus sites.
 The 40 ranked index reads span 13 source files. Representative declarations in
 those files use `TVertex/int`, `int/TVertex`, `T/int`, `T/long`, nested graph/trie
 types, and `uint/BigInteger`; these need type, value-storage and comparer/callback
-models beyond primitive scalar state. All ranked dictionary index reads,
+models beyond the verified integer-key state and supported scalar/reference values. All ranked dictionary index reads,
 Add/ContainsKey calls and the index write still show unmodeled dispatch; the eight parameterless corpus constructions have an
 unsupported key/value domain. Missing/duplicate-key paths retain opaque fallback
 and have explicit Unknown controls; their original proof probes remain preserved
 under `artifacts/api-coverage/open-gap-probes/`. Incoming or escaped references,
 custom comparers, reference/unbound key types, capacities and constructor overloads,
 views, removal/clear, and precise growth/exception behavior remain actionable gaps.
+
+## Verified reference dictionary values
+
+The integer-key state model now stores reference identities as well as scalars.
+Supported reference values include object, string, class, interface and delegate
+values, admitted arrays whose elements are not arrays, and type parameters with
+reference-type evidence such as a class constraint. Native tests prove returned
+identity and alias updates and refute claims about a distinct reference. A null
+value retains membership and remains different from an absent key. Symbolic Int64
+keys retain distinct values across their full width.
+
+A stored value can leave through a getter without publishing its owning dictionary.
+Receiver publication, self-storage, closure capture and aliases of those escapes
+still remove the ownership fact. Direct frontend controls cover these distinctions.
+Compiled CLR/IR cases cover snapshots, replacement through aliases, stored nulls,
+array identity and shared mutation. A CLR/IR probe also verifies that dictionary
+state operations never call the stored values' virtual equality or hashing methods.
+
+Pure clauses preserve compiler-established CLR reference conversions to object,
+including arrays and reference-constrained type parameters. This permits native
+ReferenceEquals result contracts and generic reference-identity proofs, with
+wrong-claim controls. It does not admit boxing or arbitrary generic operators.
+Keyed entry cells have no complete replay reconstruction: their values stay
+unconstrained until ordered stores supply evidence. Removing mandatory freshness
+reads of unknown entry cells lets valid stored references replay without inventing
+entry contents. Existing freshness controls for fields without keys remain in place.
+
+The five dictionary registrations use the more accurate evidence label
+`fresh-default-integer-key-dictionary-state`. The declaration counts remain 43
+partial and 55,630 unmodeled; no declaration is fully modeled. SDK, reference pack,
+assembly checksums and catalog digest are unchanged. The usage ranking still has
+all 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one write awaiting
+actual receiver/domain evidence; all eight parameterless corpus constructions
+still lack supported domains. These sites remain actionable gaps.
+
+This closes reference-value storage/identity within the owned integer-key slice.
+Reference or unsupported keys, unconstrained generic/structure values, arrays of
+arrays, arbitrary incoming/custom-comparer receivers, missing/duplicate keys,
+constructors with capacities/comparers, growth faults, views and removal stay open.
+Reference-value contents and invoked callbacks need their own models; storing a
+reference does not model every operation on the referenced object.
+
+Verification on implementation commit `38f110971`: all 24 coverage-counted changed
+trusted-code lines are covered (100%, no uncovered lines), compared with master
+`0c52c313d`. The report retains two source-mapping diagnostics for a local function
+declaration and a continued property pattern. The canonical container passes 2,003
+frontend tests, 640 contract tests, 659 selected worker tests, 80 selected IR tests,
+74 selected SMT tests, 35 selected effects tests including the strict inventory
+checks, and 30 selected Gates tests including usage ranking. The filtered collection
+certifies changed-code coverage; it does not certify full aggregate coverage.
+Complete exact-head CI remains required before merging. No coverage floor changed.
 
 ## Cross-cutting gaps previously identified
 
@@ -137,15 +188,15 @@ views, removal/clear, and precise growth/exception behavior remain actionable ga
   owners. Commit `56d140aa9` adds 120 native proof/refutation cases, eleven CLR/IR
   boundary cases and method/owner budget sweeps; 1,406 selected worker, 1,866
   frontend and 468 Gates tests pass, with changed trusted code 317/317 covered.
-  Unbound or unsupported non-scalar type arguments, generic operators, ref/out
+  Unbound or unsupported non-scalar type arguments, other generic operators, ref/out
   signatures, reference/non-SZ arrays and mutable/captured or otherwise unproven
   interface receiver representations remain open. Type specialization alone does
   not establish collection contents, default/custom dispatch or callback effects.
   Generic local IList/ICollection Count branches
   and full Swap postconditions retain source declaration/ordinal/assembly ownership,
   with native proofs/refutations and compiled CLR/IR normal/fault agreement.
-- Count >= 0 is weaker than a collection representation invariant. Fresh scalar
-  dictionary Count/content consistency is now verified within the slice below.
+- Count >= 0 is weaker than a collection representation invariant. Fresh integer-key
+  dictionary Count/content consistency is verified within the documented domain.
   Lists, arbitrary dictionary receivers, queues and stacks remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
   state. Proving a comparison result does not erase these effects. Parameters that
@@ -347,9 +398,9 @@ These 43 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Byte.CompareTo(System.Byte) | intrinsic=integer-comparison |
 | M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | intrinsic=default-integer-comparer-only |
-| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-scalar-dictionary-state |
-| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-scalar-dictionary-state |
-| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-scalar-dictionary-state |
+| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state |
+| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state |
+| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0 |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
@@ -374,8 +425,8 @@ These 43 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
-| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-scalar-dictionary-state |
-| P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-scalar-dictionary-state |
+| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state |
+| P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface |
 | P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative |

@@ -247,11 +247,11 @@ helper postconditions also run through the worker. The full swap postcondition
 currently reaches the worker verification-condition construction budget; runtime
 model evidence does not turn that Unknown into a proof.
 
-### Fresh scalar dictionary state
+### Fresh integer-key dictionary state
 
 Parameterless framework `Dictionary<TKey,TValue>` construction now establishes
 empty shared state for proven local, unescaped receivers with primitive integer
-keys and scalar values. Count, successful Add, present-key index reads, ContainsKey
+keys and scalar or reference values. Count, successful Add, present-key index reads, ContainsKey
 and simple index assignments observe that shared state through aliases. Key equality
 preserves the full integer width; argument evaluation captures values before later
 mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
@@ -265,6 +265,15 @@ have executed normal-state and wrong-claim evidence; CLR/IR oracle and native te
 cover all nine integer key types. They grant no universal API, exception, allocation
 or callback guarantee. The complete boundaries and remaining corpus sites are in
 [gaps.md](gaps.md#verified-dictionary-state-slice).
+
+Reference values retain identity, stored nulls and alias updates. Supported class,
+interface, delegate and array domains include reference-constrained type parameters;
+unconstrained generic values and arrays of arrays remain outside the model. Pure
+ReferenceEquals clauses retain reference identity when converting these values to
+object. Publishing a fetched value does not publish its dictionary owner; capturing
+or publishing the owner still removes its ownership fact. CLR/IR comparisons and
+native proof/refutation controls cover the new behavior. See the
+[reference-value evidence and remaining boundaries](gaps.md#verified-reference-dictionary-values).
 
 ### Highest remaining priorities
 

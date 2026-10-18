@@ -111,7 +111,7 @@ internal static class DotnetApiInventory
         }
 
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
-        { evidence.Add("intrinsic=fresh-default-scalar-dictionary-state"); }
+        { evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state"); }
 
         if (symbol is IMethodSymbol method)
         {

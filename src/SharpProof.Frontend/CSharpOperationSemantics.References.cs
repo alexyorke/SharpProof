@@ -115,7 +115,10 @@ internal static partial class CSharpOperationSemantics
 
     // Type-parameter and non-scalar struct values are opaque: they may be
     // stored, passed, returned and given to opaque calls, but no operator,
-    // conversion or field read applies to them. Opaque-enabled body defaults
+    // conversion or field read applies without independent compiler evidence.
+    // A reference-constrained T can preserve identity through an implicit CLR
+    // reference conversion; this grants no value-type boxing or user operator.
+    // Opaque-enabled body defaults
     // produce approximated values without invoking a constructor. Only opaque calls
     // can observe a struct's contents, so a call that mutates it through
     // `this` changes nothing the IR can read.
@@ -324,6 +327,12 @@ internal static partial class CSharpOperationSemantics
             {
                 return Exact(operands[0] is IrNullTerm ? factory.Null(target) : operands[0]);
             }
+            // An implicit CLR reference conversion to object preserves identity,
+            // including array references used by pure ReferenceEquals clauses.
+            if (target == factory.ObjectType && conversion is
+                { OperatorMethod: null, Conversion: { IsImplicit: true, IsReference: true } } &&
+                factory.GetTypeInfo(operands[0].Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
+            { return Exact(factory.Cast(target, operands[0])); }
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
         if (operation is IBinaryOperation binary && operands.Length == 2 &&
