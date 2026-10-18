@@ -224,7 +224,10 @@ param(
 
     [string]$TestResultsDirectory = '',
 
-    [ValidateSet('all', 'semantic', 'package')]
+    # CI runs the package phase of pr in a separate parallel job.
+    [switch]$SkipPackageTests,
+
+    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,

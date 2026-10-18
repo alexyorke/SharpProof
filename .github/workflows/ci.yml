@@ -23,30 +23,141 @@ jobs:
   repository-quality:
     uses: ./.github/workflows/quality.yml
 
-  formatting:
+  canonical-main:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
+
+      # The package phase runs in canonical-package, in parallel.
+      - name: Run the single-build non-Gates semantic PR phases
+        run: >-
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
+          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining -SkipPackageTests
+
+      - name: Upload container gate evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  canonical-package:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      # The package phase of pr, with the same Release configuration and
+      # canonical filter. -Fast skips analyzers in this build only;
+      # canonical-main's full solution build enforces them.
+      - name: Run the PR package phase
+        run: >-
+          docker compose run --rm tooling package-tests
+          -Configuration Release -Fast
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Upload package phase timing evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-package-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/timings
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  canonical-gates:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      # -Fast skips analyzers in this build only; canonical-main's full
+      # solution build, required through build-and-test, enforces them.
+      - name: Run the complete canonical Gates cohort
+        run: >-
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
+          -Configuration Release -Fast -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      # Repository formatting runs here rather than on its own runner, saving
+      # a runner slot and a tooling image build; build-and-test requires
+      # this job, so the formatting gate is unchanged.
       - name: Require C#, PowerShell, and shell linting and formatting
+        if: ${{ !cancelled() }}
         run: docker compose run --rm tooling format-check
 
-  dotnet-api-inventory:
+      - name: Upload Gates cohort and timing evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  self-application:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
+
+      - name: Apply SharpProof to every tracked project
+        run: docker compose run --rm tooling self-apply -Configuration Release
+
+      # The API inventory runs here rather than on its own runner: it adds
+      # about two minutes to a job well inside the canonical-main critical
+      # path, and saves a runner slot and a tooling image build per run.
       - name: Check pinned .NET API inventory and support evidence
+        if: ${{ !cancelled() }}
         run: >-
           docker compose run --rm tooling test
           -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj
@@ -89,101 +200,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  canonical-main:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
         with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Run the single-build non-Gates PR phases
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
-          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining
-
-      - name: Upload container gate evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts
-          if-no-files-found: warn
-          retention-days: 14
-
-  canonical-gates:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Run the complete canonical Gates cohort
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
-          -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
-          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-
-      - name: Upload Gates cohort and timing evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts
-          if-no-files-found: error
-          retention-days: 14
-
-  self-application:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Apply SharpProof to every tracked project
-        run: docker compose run --rm tooling self-apply -Configuration Release
+          mode: report
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, formatting, repository-quality]
+    needs: [canonical-main, canonical-package, canonical-gates, self-application, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
         env:
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
+          SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
-          SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
           SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
-          SHARPPROOF_FORMATTING_RESULT: ${{ needs.formatting.result }}
         run: |
           if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
             echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
             exit 1
           fi
-          if [[ "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
-            echo "Repository formatting failed: $SHARPPROOF_FORMATTING_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success ]]; then
-            echo "Canonical jobs, self-application, or API inventory failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
+            echo "Canonical jobs (Gates includes formatting), or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1
           fi
 
@@ -222,6 +263,12 @@ jobs:
           path: artifacts/canonical-cohorts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
   exact-sha-security:
     uses: ./.github/workflows/security-reusable.yml

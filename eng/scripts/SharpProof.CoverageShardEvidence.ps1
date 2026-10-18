@@ -179,7 +179,7 @@ function Assert-SharpProofCoverageShardManifest {
         @($recorded | Where-Object { Test-SharpProofCoverageReportName -Path $_ }).Count -eq 0 -or
         @($recorded | Where-Object { $_ -like '*/coverage-cohort.json' }).Count -ne 1 -or
         @($recorded | Where-Object { $_ -eq 'coverage-authority.json' }).Count -ne 1 -or
-        ($Phase -eq 'semantic' -and $recorded -cnotcontains 'coverage-cohort.json')) {
+        ($Phase -eq 'semantic-projects' -and $recorded -cnotcontains 'coverage-cohort.json')) {
         throw "Coverage shard '$Phase' evidence file set differs from its completion manifest."
     }
     foreach ($file in $manifest.files) {

@@ -72,8 +72,8 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `corpus` | Canonical corpus and support-ratchet checks |
 | `corpus-update` | Intentional corpus observation update |
 | `coverage` | Release coverage and acceptance checks; requires a comparison ref |
-| `coverage-shard` | Collect one Release coverage half with `-CoveragePhase semantic` or `package` |
-| `coverage-gate` | Validate and merge both downloaded coverage shards; requires a comparison ref |
+| `coverage-shard` | Collect one Release coverage shard with `-CoveragePhase semantic-gates`, `semantic-worker`, `semantic-projects`, or `package` |
+| `coverage-gate` | Validate and merge all four downloaded coverage shards; requires a comparison ref |
 | `dependency-audit` | Locked restore and dependency vulnerability audit |
 | `security` | Dependency audit and full Release build with banned-API enforcement |
 | `fuzz-nightly` | Clean exact-commit fuzz campaign |
@@ -93,7 +93,7 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates` and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` is supported only by `pr` and `pr-gates`, for CI runs that execute the package phase in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
 
 After packing clean source, test the exported package bytes:
 
@@ -119,11 +119,11 @@ pwsh -File eng/scripts/Invoke-SharpProof.ps1 coverage -Configuration Release
 
 The comparison ref must already be available in the checkout's Git metadata. The wrapper mounts that metadata read-only and does not fetch refs.
 
-CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) runs semantic and package coverage on separate runners, then downloads both for `coverage-gate`. Each shard records the source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence and independently rebuilds production authority before enforcing coverage. Inside the semantic run, the scheduler reserves the complete semantic project phase's worker slots so solver work does not overlap other worker-heavy shards. These scheduling rules do not alter proof budgets, timeouts, or coverage floors.
+CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) runs four coverage shards on separate runners (the Gates project, the Worker remainder, the other semantic tasks, and the package tests), then downloads all four for `coverage-gate`. Each shard records the source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence and independently rebuilds production authority before enforcing coverage. Inside the Gates shard, the scheduler reserves every worker slot so solver work does not overlap other worker-heavy tasks. These scheduling rules do not alter proof budgets, timeouts, or coverage floors.
 
 Coverage validation caches coverage credits for each production assembly, source, and line from that assembly's matching PDB ranges within one run. It preserves every overlapping sequence-point start and keeps lines that are permitted without granting coverage credit. The cache is rebuilt from independently authenticated current binaries and PDBs on each invocation. Project totals include every document owned by the project's evaluated `Compile` items and authenticated module, including linked sources outside its directory. Aggregate totals sum assembly/source/start obligations, so source compiled into two production assemblies contributes separately for each assembly. Repeated reports use maximum hits within the same assembly; another production or test assembly cannot supply its coverage.
 
-CI uploads the semantic and package coverage timing profiles from `artifacts/timings/*-coverage.json` alongside the coverage reports. These profiles show test phase and shard durations when investigating slow runs.
+Each CI shard uploads its timing profile from `artifacts/timings/*-coverage.json` in the same artifact as its coverage reports. These profiles show test phase and shard durations when investigating slow runs.
 
 ## Long-running fuzz campaign
 

@@ -18,7 +18,10 @@ param(
 
     [string]$TestResultsDirectory = '',
 
-    [ValidateSet('all', 'semantic', 'package')]
+    # CI runs the package phase of pr in a separate parallel job.
+    [switch]$SkipPackageTests,
+
+    [ValidateSet('all', 'semantic-gates', 'semantic-worker', 'semantic-projects', 'package')]
     [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
@@ -68,9 +71,14 @@ if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
     $Command -notin @('pr', 'pr-gates', 'semantic-tests')) {
     throw 'Canonical cohort options are supported only for pr, pr-gates, and semantic-tests.'
 }
+if ($SkipPackageTests -and $Command -notin @('pr', 'pr-gates')) {
+    throw '-SkipPackageTests is supported only for pr and pr-gates.'
+}
 if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
     throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
+# CI collects each coverage shard on its own runner; the gate requires all.
+$coverageShardNames = @('semantic-gates', 'semantic-worker', 'semantic-projects', 'package')
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
     throw '-CoveragePhase is supported only for coverage-shard.'
@@ -219,7 +227,7 @@ function Invoke-SharpProofSolutionBuild(
 
 function Invoke-SharpProofCoverageAuthorityBuild {
     # The gate recomputes every production PDB and source identity. Its build
-    # need not also compile the test projects already exercised by both shards
+    # need not also compile the test projects already exercised by the shards
     # and the required PR gate. Derive this complete set from the same inventory
     # authority as the validator instead of maintaining another project list.
     $selectionPath = Join-Path ([IO.Path]::GetTempPath()) (
@@ -242,9 +250,12 @@ function Invoke-SharpProofCoverageAuthorityBuild {
         } | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
         Invoke-SharpProofRequiredDotnet @('restore', $filterPath, '--locked-mode')
+        # Analyzers do not change binaries or PDBs, and the canonical PR build
+        # already enforces them; skip them as the shards do.
         Invoke-SharpProofRequiredDotnet @(
             'build', $filterPath, '--configuration', 'Release', '--no-restore',
-            '-p:ContinuousIntegrationBuild=true')
+            '-p:ContinuousIntegrationBuild=true',
+            '-p:RunAnalyzersDuringBuild=false')
     }
     finally {
         foreach ($temporaryPath in @($filterPath, $selectionPath)) {
@@ -307,7 +318,8 @@ switch ($Command) {
     }
     'pr' {
         & $PSCommandPath -Command 'pr-gates' -Configuration 'Release' `
-            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory
+            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory `
+            -SkipPackageTests:$SkipPackageTests
     }
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
@@ -363,10 +375,13 @@ switch ($Command) {
 
         # Build the complete source tree once with the self lane disabled so
         # every analyzer and generator output is available as a stable input.
+        # Analyzer diagnostics are not needed here: each per-project
+        # self-application build below runs every analyzer again.
         Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
             'build', 'SharpProof.slnx', '--configuration', $Configuration,
             '--no-restore', '--nologo',
+            '-p:RunAnalyzersDuringBuild=false',
             '-p:SharpProofSelfApplication=false',
             '-p:SharpProofProfile=off',
             '-p:SharpProofVerify=false',
@@ -421,8 +436,10 @@ switch ($Command) {
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofSemanticTests.ps1' `
             'PR semantic validation failed.' $semanticTestArguments
 
-        Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofPackageTests.ps1' `
-            'PR package validation failed.' $prTestArguments
+        if (-not $SkipPackageTests) {
+            Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofPackageTests.ps1' `
+                'PR package validation failed.' $prTestArguments
+        }
     }
     'test' {
         $targetName = [IO.Path]::GetFileName($Target)
@@ -577,15 +594,19 @@ switch ($Command) {
         }
     }
     'coverage-shard' {
-        # One runner collects one half of the default coverage run. The
+        # One runner collects one part of the default coverage run. The
         # coverage-gate job merges every shard and enforces the thresholds.
-        if ($CoveragePhase -notin @('semantic', 'package')) {
-            throw 'coverage-shard requires -CoveragePhase semantic or package.'
+        if ($CoveragePhase -notin $coverageShardNames) {
+            throw ('coverage-shard requires -CoveragePhase ' + ($coverageShardNames -join ', ') + '.')
         }
         # Identical sources in different private container workspaces must
         # produce the same MVID/PDB identity even outside GitHub Actions.
+        # Analyzers do not change those binaries and the canonical PR build
+        # already enforces them, so shards and the gate skip them.
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
-            -AdditionalBuildArguments @('-p:ContinuousIntegrationBuild=true')
+            -AdditionalBuildArguments @(
+            '-p:ContinuousIntegrationBuild=true',
+            '-p:RunAnalyzersDuringBuild=false')
         $coverageShardArguments = @{
             ResultsDirectory = (Join-Path $repositoryRoot (
                     'artifacts/coverage/' + $CoveragePhase))
@@ -612,8 +633,8 @@ switch ($Command) {
         foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura*.xml' -File |
                     Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })) {
             $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
-            if ($relativeReport -cnotmatch '^(semantic|package)/') {
-                throw 'coverage-gate found a report outside the two authenticated shards.'
+            if (($relativeReport -split '/')[0] -cnotin $coverageShardNames) {
+                throw 'coverage-gate found a report outside the authenticated shards.'
             }
         }
 
@@ -622,7 +643,7 @@ switch ($Command) {
         # validator compares each envelope with the gate's own recomputation.
         $authorityKeys = [Collections.Generic.List[string]]::new()
         $authorityFiles = [Collections.Generic.List[string]]::new()
-        foreach ($shardName in @('semantic', 'package')) {
+        foreach ($shardName in $coverageShardNames) {
             $shardRoot = Join-Path $coverageRoot $shardName
             Assert-SharpProofCoverageShardManifest -Root $shardRoot -Phase $shardName
             $shardAuthorityPath = Join-Path $shardRoot 'coverage-authority.json'
@@ -655,7 +676,7 @@ switch ($Command) {
                 ($shardModules -join ','))
             $authorityFiles.Add($shardAuthorityPath)
         }
-        if ($authorityKeys[0] -cne $authorityKeys[1]) {
+        if (@($authorityKeys | Select-Object -Unique).Count -ne 1) {
             throw 'Coverage shards recorded different authority evidence; the gate fails closed.'
         }
         Copy-Item `
