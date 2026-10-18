@@ -2621,9 +2621,14 @@ public sealed class WorkerMsBuildIntegrationTests
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
         var verifyCoreElements = verifyCore.Elements().ToList();
-        var runnerTask = targets.Descendants("UsingTask")
-            .Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("TaskName")?.Value ==
-                "SharpProof.BuildTasks.RunVerifier"));
+        var runnerTasks = targets.Descendants("UsingTask")
+            .Where(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("TaskName")?.Value ==
+                "SharpProof.BuildTasks.RunVerifier"))
+            .ToArray();
+        var coreRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Condition")?.Value ==
+            "'$(MSBuildRuntimeType)' == 'Core'"));
+        var fullRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Runtime")?.Value ==
+            "NET"));
         var verifierExitError = verifyCore.Descendants("Error")
             .Single(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.StartsWith(
                 "SharpProof verifier failed with exit code",
@@ -2736,9 +2741,20 @@ public sealed class WorkerMsBuildIntegrationTests
                 Does.Contain(
                     "'$(_SharpProofVerifierHasStructuredError)' != 'true'"));
             Assert.That(verifyCore.Descendants("Exec"), Is.Empty);
-            Assert.That(
-                runnerTask.Attribute("AssemblyFile")?.Value,
-                Is.EqualTo("$(_SharpProofBuildTasksPath)"));
+            Assert.That(runnerTasks, Has.Length.EqualTo(2));
+            foreach (var runnerTask in runnerTasks)
+            {
+                Assert.That(
+                    runnerTask.Attribute("AssemblyFile")?.Value,
+                    Is.EqualTo("$(_SharpProofBuildTasksPath)"));
+            }
+            Assert.That(coreRunnerTask.Attribute("Runtime"), Is.Null);
+            Assert.That(coreRunnerTask.Attribute("TaskFactory"), Is.Null);
+            Assert.That(fullRunnerTask.Attribute("TaskFactory")?.Value, Is.EqualTo("TaskHostFactory"));
+            Assert.That(fullRunnerTask.Attribute("Condition")?.Value,
+                Does.Contain("'$(MSBuildRuntimeType)' == 'Full'")
+                    .And.Contain("'$(UsingMicrosoftNETSdk)' == 'true'")
+                    .And.Contain("VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0')"));
             Assert.That(
                 s_reconstructionListArtifacts.Where(targetXml.Contains),
                 Is.Empty);
@@ -3835,8 +3851,8 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             ArgumentException.ThrowIfNullOrEmpty(repository);
             ArgumentException.ThrowIfNullOrEmpty(configuration);
-            var packageDirectory = Path.Combine(repository, "src", "SharpProof.Package");
-            var manifest = XDocument.Load(Path.Combine(packageDirectory, "SharpProof.nuspec"));
+            var packageDirectory = Path.Combine(repository, "src", "SharpProof.Verifier");
+            var manifest = XDocument.Load(Path.Combine(packageDirectory, "SharpProof.Verifier.nuspec"));
             var payload = TempDirectory.CreateOwned(
                 "SharpProof.Compiler.Payload.Test", string.Empty,
                 "Refusing to remove an unexpected compiler payload directory.");
@@ -3857,6 +3873,11 @@ public sealed class WorkerMsBuildIntegrationTests
                         source.Replace("$configuration$", configuration, StringComparison.Ordinal)
                             .Replace('\\', Path.DirectorySeparatorChar)));
                     File.Copy(sourcePath, Path.Combine(payload.FullName, Path.GetFileName(sourcePath)));
+                }
+                if (!File.Exists(Path.Combine(payload.FullName, "SharpProof.Analyzer.Core.dll")) ||
+                    !File.Exists(Path.Combine(payload.FullName, "SharpProof.Compiler.Semantics.dll")))
+                {
+                    throw new InvalidDataException("The verifier manifest did not supply the shared compiler payload.");
                 }
                 s_sharedCompilerPayload = payload;
                 return SecurityElement.Escape(payload.FullName);

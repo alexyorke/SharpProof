@@ -1,5 +1,6 @@
 <Project TreatAsLocalProperty="_SharpProofAnalyzerDirectory;_SharpProofCollectorDirectory;_SharpProofCompilerCollectorPath">
   <PropertyGroup>
+    <_SharpProofPortableTargetsImported>true</_SharpProofPortableTargetsImported>
     <_SharpProofAnalyzerDirectory Condition="'$(_SharpProofTestAnalyzerDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerPath>$(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>

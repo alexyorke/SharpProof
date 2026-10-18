@@ -7,56 +7,23 @@
     <authors>$authors$</authors>
     <license type="expression">$license$</license>
     <readme>$readme$</readme>
+    <icon>icon.png</icon>
     <projectUrl>$projecturl$</projectUrl>
-    <description>Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.</description>
-    <releaseNotes>SharpProof 1.0 preview with opt-in effect analysis, compiler-bound contracts, accountable bounded postcondition verification, fail-closed language gating, and conservative external boundaries.</releaseNotes>
+    <description>Complete SharpProof analysis and postcondition verification with one PackageReference and automatic MSBuild integration on Windows, macOS, and glibc Linux x64/ARM64. Unsupported selected code remains visibly incomplete.</description>
+    <releaseNotes>Verification is enabled by default using the .NET 10 SDK. Explicit advisory or off profiles retain portable analyzer-only workflows.</releaseNotes>
     <copyright>$copyright$</copyright>
     <tags>SharpProof Roslyn Analyzer Purity StaticAnalysis MethodEffects Capabilities ZeroAllocations ExceptionContracts Preconditions Contracts</tags>
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
-        <dependency id="SharpProof.Attributes" version="[$version$]" />
+        <dependency id="SharpProof.Verifier" version="[$version$]" />
       </group>
     </dependencies>
   </metadata>
   <files>
-    <file src="buildTransitive\SharpProof.props" target="buildTransitive" />
-    <file src="buildTransitive\SharpProof.ConsumerContract.props" target="buildTransitive" />
-    <file src="buildTransitive\SharpProof.targets" target="buildTransitive" />
-    <file src="..\..\README.md" />
+    <file src="README.md" />
+    <file src="..\..\eng\branding\icon.png" target="" />
     <file src="..\..\LICENSE" />
-    <file src="..\..\artifacts\bin\SharpProof.CodeFixes\$configuration$\netstandard2.0\SharpProof.CodeFixes.dll" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.CodeFixes\$configuration$\netstandard2.0\SharpProof.CodeFixes.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\..\THIRD-PARTY-NOTICES.txt" />
-    <file src="..\..\artifacts\bin\SharpProof.Analyzer\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.Analyzer\$configuration$\netstandard2.0\SharpProof.Analyzer.pdb" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.ContractForGenerator\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.ContractForGenerator\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.pdb" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.dll" target="tools\collector" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.pdb" target="tools\collector" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.*.pdb" target="tools\shared\netstandard2.0" exclude="**\SharpProof.CompilerCollector.pdb" />
-    <file src="..\..\artifacts\bin\SharpProof.Analyzer.Core\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.Analyzer.Core\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.pdb" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Compiler.Semantics.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Dataflow.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Effects.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Frontend.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Ir.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Buffers.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Collections.Immutable.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.IO.Pipelines.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Memory.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Numerics.Vectors.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Reflection.Metadata.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Text.Encoding.CodePages.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Text.Encodings.Web.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Text.Json.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\System.Threading.Tasks.Extensions.dll" target="tools\shared\netstandard2.0" />
   </files>
 </package>

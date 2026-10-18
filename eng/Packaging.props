@@ -1,7 +1,8 @@
 <Project>
   <PropertyGroup>
     <Authors>$(SharpProofPublisher)</Authors>
-    <PackageCopyright>Copyright (c) $(SharpProofPublisher)</PackageCopyright>
+    <PackageCopyright>$(SharpProofCopyright)</PackageCopyright>
+    <Copyright>$(PackageCopyright)</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
     <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
@@ -14,6 +15,12 @@
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <!-- Arcade contributes the single SDK-packed icon item from this path. -->
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)branding/icon.png</PackageIconFullPath>
+    <!-- First publication has no compatible prior baseline. Release maintainers
+         explicitly pin a reviewed version once one exists. -->
+    <PackageValidationBaselineVersion Condition="'$(SharpProofPackageValidationBaselineVersion)' != ''">$(SharpProofPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
     <RepositoryCommit Condition="'$(RepositoryCommit)' == ''">$(GITHUB_SHA)</RepositoryCommit>
   </PropertyGroup>
 </Project>

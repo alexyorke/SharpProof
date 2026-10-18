@@ -8,31 +8,55 @@ namespace SharpProof.Worker.Test;
 [Platform("Linux")]
 public sealed class WindowsHostPolicyTests
 {
-    [Test]
-    public void NativeHostUsesRuntimeArchitectureAndEmbeddedContract()
+    [TestCase(Architecture.X64, "win-x64")]
+    [TestCase(Architecture.Arm64, "win-arm64")]
+    public void NativeHostUsesRuntimeArchitectureAndEmbeddedContract(Architecture architecture, string rid)
     {
-        Assert.That(ContainerContract.ValidateHostRequired(true, false, Architecture.X64, Architecture.X64).Platform,
-            Is.EqualTo("win-x64"));
+        ArgumentNullException.ThrowIfNull(rid);
+        Assert.That(ContainerContract.ValidateHostRequired(true, false, architecture, architecture).Platform, Is.EqualTo(rid));
         Assert.Throws<PlatformNotSupportedException>((Action)(() =>
-            ContainerContract.ValidateHostRequired(true, false, Architecture.Arm64, Architecture.X64)));
-        Assert.Throws<PlatformNotSupportedException>((Action)(() =>
-            ContainerContract.ValidateHostRequired(false, false, Architecture.X64, Architecture.X64)));
+            ContainerContract.ValidateHostRequired(false, false, architecture, architecture)));
     }
 
-    [Test]
-    public void WindowsDllPathBelongsToPackageAndIgnoresNativeRoot()
+    [TestCase(Architecture.Arm64, Architecture.X64)]
+    [TestCase(Architecture.X64, Architecture.Arm64)]
+    [TestCase(Architecture.X86, Architecture.X86)]
+    public void WindowsRejectsTranslatedOrUnsupportedHosts(Architecture host, Architecture process)
     {
+        Assert.Throws<PlatformNotSupportedException>((Action)(() =>
+            ContainerContract.ValidateHostRequired(true, false, host, process)));
+    }
+
+    [TestCase(Architecture.X64, "win-x64")]
+    [TestCase(Architecture.Arm64, "win-arm64")]
+    public void WindowsDllPathBelongsToPackageAndIgnoresNativeRoot(Architecture architecture, string rid)
+    {
+        ArgumentNullException.ThrowIfNull(rid);
         using var temporary = new TempDirectory("SharpProof.WindowsPath.");
         var tools = Path.Combine(temporary.FullName, "tools");
         var assembly = Path.Combine(tools, "net10", "SharpProof.Host.dll");
-        var contract = ContainerContract.ValidateWindowsRequired(Architecture.X64);
+        var contract = ContainerContract.ValidateWindowsRequired(architecture);
         Assert.That(ContainerContract.ResolveZ3LibraryPath(contract, true, assembly, "/untrusted/native"),
-            Is.EqualTo(Path.Combine(tools, "native", "win-x64", "libz3.dll")));
+            Is.EqualTo(Path.Combine(tools, "native", rid, "libz3.dll")));
         Assert.Throws<ArgumentException>((Action)(() => PublicationLease.CanonicalMember(temporary.FullName, true)));
         Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.CanonicalMember(Path.Combine(temporary.FullName, "ambiguous. ", "result.json"), true)));
     }
 
+    [TestCase("../outside")]
+    [TestCase("win-x64/../../outside")]
+    [TestCase("/absolute/outside")]
+    [TestCase("linux-arm64")]
+    [TestCase("WIN-ARM64")]
+    public void WindowsNativePathRejectsUnvalidatedRuntimeIdentifiers(string platform)
+    {
+        ArgumentNullException.ThrowIfNull(platform);
+        using var temporary = new TempDirectory("SharpProof.WindowsPath.Invalid.");
+        var assembly = Path.Combine(temporary.FullName, "tools", "net10", "SharpProof.Host.dll");
+        var contract = ContainerContract.ValidateWindowsRequired(Architecture.X64) with { Platform = platform };
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            ContainerContract.ResolveZ3LibraryPath(contract, true, assembly, "/untrusted/native")));
+    }
     [Test]
     public void VerifiedAbsolutePathLoaderLoadsTheExplicitLibrary()
     {

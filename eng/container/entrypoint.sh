@@ -78,7 +78,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly | fuzz-nightly | pack)
+    nightly | fuzz-nightly | pack | pack-tool)
       return 0
       ;;
     *)
@@ -188,6 +188,33 @@ else
     -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
 fi
 mkdir -p "${task_root}/artifacts"
+# The optional tool feed is an explicit input to its following qualification
+# task. Copy only its release archives and known identity sidecars; keep all
+# other ignored artifact output outside the private workspace snapshot.
+if [[ "${command_name}" == tool-consumer ]]; then
+  package_source=""
+  previous_argument=""
+  for argument in "$@"; do
+    if [[ "${previous_argument,,}" == -packagesource ]]; then
+      package_source="${argument}"
+      break
+    fi
+    previous_argument="${argument}"
+  done
+  case "${package_source}" in
+    artifacts/tool-packages | artifacts/tool-packages/ | ./artifacts/tool-packages | ./artifacts/tool-packages/)
+      mkdir -p "${task_root}/artifacts/tool-packages"
+      for package_input in "${repo_root}"/artifacts/tool-packages/*.nupkg \
+        "${repo_root}"/artifacts/tool-packages/packages.tsv \
+        "${repo_root}"/artifacts/tool-packages/packages.lock.json \
+        "${repo_root}"/artifacts/tool-packages/Test-SharpProofPublishedPackages.sh; do
+        if [[ -f "${package_input}" && ! -L "${package_input}" ]]; then
+          cp -a -- "${package_input}" "${task_root}/artifacts/tool-packages/"
+        fi
+      done
+      ;;
+  esac
+fi
 # Build outputs are centralized by Arcade. Keep bin/obj/toolset private to
 # this task instead of writing them through a shared host artifacts symlink.
 case "${command_name}" in

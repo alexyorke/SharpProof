@@ -43,30 +43,64 @@ all three workflow identities, branch, event, SHA and conclusion before attestin
 or publishing. Missing, pending, cancelled and failed runs reject the release.
 Tag-only security and every native/portable exact-artifact consumer must also pass.
 
-The package job generates `packages.tsv` and a release-only `packages.lock.json` identity inventory from each packed nuspec and its SHA-512. The inventory describes the release artifacts, not a consumer restore. The SBOM scans unpacked package contents together with that inventory and must contain every qualified package ID/version.
-All consumers, provenance and publication use the immutable artifact ID emitted by the package job; run/commit/attempt artifact names are never overwritten. After qualification, a separate least-privilege job creates an SPDX package-graph
-SBOM and signed provenance/SBOM attestations for the exact downloaded artifacts.
-The publish job verifies provenance against this repository, workflow, tag and SHA
-before requesting NuGet credentials. `release-evidence-<sha>-<attempt>` retains the
-SBOM and SHA-256 checksums; attestations remain available through GitHub's API.
+The package job generates a five-column `packages.tsv`: package ID, version,
+archive filename, original archive SHA-512, and NuGet's signing-independent content
+hash. Its release-only `packages.lock.json` is an identity inventory for these
+archives, not a consumer restore graph. The optional `SharpProof.Tool` has a
+separate qualified feed, manifest and immutable artifact identity.
 
-Public publication checks any existing package bytes before pushing, rejects any
-mismatch, and downloads every published `.nupkg` afterward to verify its SHA-512.
-A duplicate response is accepted only if the feed returns the qualified bytes.
-The post-publication check retries feed propagation for up to eleven ten-second
-waits per package. Authentication, transport and non-404 HTTP failures fail closed.
-NuGet's public download API does not expose `.snupkg` archives for this comparison;
-symbol packages are covered by local checksums and provenance. The private preview
-feed has no assumed public download API, does not use the public byte checker, and rejects duplicate pushes rather than silently skipping them.
+Consumers, provenance and publication download the immutable artifact IDs emitted
+by the producing jobs. Run/commit/attempt artifact names are never overwritten;
+partial retries retain the exact bound IDs rather than selecting newer artifacts
+by name. The tool's qualification is separate from the core package graph.
 
-Verify a downloaded package with:
+After consumer and security qualification, a separate least-privilege provenance
+job generates the reviewed SPDX 2.3 shipped-payload SBOM, release manifest and
+checksums from the exact original archives. This inventory describes reviewed
+redistributed components and payload hashes; it is not a scanner-generated
+complete dependency graph or vulnerability scan. The workflow also retains a supplemental scanner-generated package-graph SBOM; it does not replace the reviewed shipped-payload inventory or extend the core SBOM to tool dependencies.
+The tool has separate workflow
+provenance and checksums; its dependency closure is not included in the core SBOM.
+The job signs core workflow/SBOM and tool provenance subjects and retains the
+bundles and evidence as `signed-release-evidence-<sha>-<attempt>`, downloaded through the provenance job's immutable evidence artifact ID. It needs `attestations: write`
+and `id-token: write`, without package-publishing credentials.
+
+The publisher downloads those exact package and evidence artifacts, verifies
+checksums and signed bundles against the canonical repository, workflow, tag,
+source SHA and hosted-runner policy, then requests NuGet credentials. It needs
+`attestations: read` rather than permission to create replacement attestations.
+Original archive SHA-256/SHA-512 hashes and attestations authenticate the original
+release assets; they do not assert that NuGet's repository-signature envelope
+leaves the ZIP bytes unchanged.
+
+Public publication checks existing versions before pushing and downloads every
+published `.nupkg` afterward. It validates the NuGet repository signature and
+compares signing-independent content with the qualified manifest. A different
+payload or an invalid repository signature fails publication; a duplicate push
+response alone is insufficient. NuGet's public download API does not expose
+`.snupkg` archives for this comparison; symbol packages retain their original
+checksums and provenance. The private preview feed has no assumed public download
+API, skips the public-feed checker, and rejects duplicate pushes instead of
+silently skipping them. Neither a package comparison nor a fixture run establishes
+that a public release or account configuration has succeeded.
+
+Verify the original GitHub release asset against its downloaded bundle:
 
 ```sh
-gh attestation verify SharpProof.Verifier.<version>.nupkg \
-  --repo alexyorke/SharpProof \
+gh attestation verify SharpProof.<version>.nupkg \
+  --bundle provenance.sigstore.json --repo alexyorke/SharpProof \
   --signer-workflow alexyorke/SharpProof/.github/workflows/package-consumers.yml \
-  --source-ref refs/tags/v<version> --source-digest <commit-sha>
+  --source-ref refs/tags/v<version> --source-digest <commit-sha> \
+  --deny-self-hosted-runners
 ```
+
+For a package downloaded from NuGet.org, validate its repository signature through
+NuGet's supported signature tooling and compare signing-independent content using
+the qualified release manifest. Do not strip signatures or rewrite ZIPs to force
+a match with the original release asset's whole-file hash. See the
+[release process](../release/README.md) for bundle subjects and account setup.
+
+This release workflow requires unsigned original package archives; manifest generation rejects any `.signature.p7s` entry. Public-feed verification accepts only NuGet.org repository-primary signatures, uses SDK 10 signature verification with explicit SHA-256 certificate fingerprints obtained from the official repository, checks the repository service index, and compares NuGet content hashes. Wrong certificate pins, changed content, author-signed archives and repository-countersigned archives fail closed. A `trustedSigners` configuration alone does not enforce this policy; the explicit certificate pins do. Attributes assembly strong-name signing is a separate identity mechanism.
 
 Exercise the release rejection paths in the canonical container:
 

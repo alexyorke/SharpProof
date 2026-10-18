@@ -27,4 +27,4 @@ To test already packed artifacts:
 docker compose run --rm tooling samples -Configuration Release -PackageSource artifacts/container-packages
 ```
 
-Applications reference Attributes as a compile dependency and keep SharpProof private. Full strict container verification also references Verifier privately. See [getting started](../../docs/getting-started.md) for package shape and [Test-SharpProofSamples.ps1](../../eng/scripts/Test-SharpProofSamples.ps1) for the executable assertions.
+The standard consumer needs one `SharpProof` reference, no activation properties, and no `PrivateAssets="all"`; its exact-version dependencies supply the application Attributes API and full verifier automatically. These samples deliberately select advisory/verification policies where needed to demonstrate portable diagnostics, mixed outcomes, or reviewed trust; their explicit overrides are not required installation steps. The Library sample exercises strict verification. See [getting started](../../docs/getting-started.md) for the standard setup and [Test-SharpProofSamples.ps1](../../eng/scripts/Test-SharpProofSamples.ps1) for the executable assertions.

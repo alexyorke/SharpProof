@@ -3,12 +3,4 @@
     <SharpProofProfile>strict</SharpProofProfile>
     <SharpProofFeatures>contracts</SharpProofFeatures>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="SharpProof.Attributes"
-                      Version="$(SharpProofSamplePackageVersion)" />
-    <PackageReference Include="SharpProof.Verifier"
-                      Version="$(SharpProofSamplePackageVersion)"
-                      PrivateAssets="all"
-                      Condition="'$(ContinuousIntegrationBuild)' == 'true'" />
-  </ItemGroup>
 </Project>

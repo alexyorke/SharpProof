@@ -4,27 +4,10 @@
   <PropertyGroup>
     <NuspecFile>SharpProof.nuspec</NuspecFile>
     <PackageId>SharpProof</PackageId>
+    <IncludeSymbols>false</IncludeSymbols>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      PrivateAssets="all"
-                      TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
-                      PrivateAssets="all"
-                      TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      PrivateAssets="all"
-                      TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      PrivateAssets="all"
-                      TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
+    <ProjectReference Include="..\SharpProof.Verifier\SharpProof.Verifier.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"

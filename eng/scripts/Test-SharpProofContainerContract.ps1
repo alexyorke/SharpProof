@@ -18,6 +18,9 @@ if ([string]::IsNullOrWhiteSpace($ComposePath)) {
 $catalog = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/toolchain.json') -Raw |
     ConvertFrom-Json
+$apiInventoryManifest = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng/api-coverage/net10.0.manifest.json') -Raw |
+    ConvertFrom-Json
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -116,8 +119,8 @@ function Assert-DockerfileAuthority {
             Image    = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
         },
         [pscustomobject]@{
-            Argument = 'DOTNET_API_REFERENCE_IMAGE'
-            Image    = "$($ToolchainCatalog.dotnet.apiReferenceImage)@$($ToolchainCatalog.dotnet.apiReferenceImageDigest)"
+            Argument = 'DOTNET_API_INVENTORY_IMAGE'
+            Image    = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
         },
         [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
@@ -177,7 +180,8 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
-        'FROM ${DOTNET_API_REFERENCE_IMAGE} AS api-reference',
+        'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
+        'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
@@ -190,6 +194,28 @@ function Assert-DockerfileAuthority {
         }
     }
 
+
+    $windowsNativeLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS windows-native'
+    $windowsNativeText = $windowsNativeLines -join "`n"
+    foreach ($required in @(
+            'COPY eng/container/windows-native/ /opt/sharpproof-windows-cross/',
+            'COPY eng/container/toolchain.json /opt/sharpproof-windows-cross/toolchain.json',
+            '/bin/bash /opt/sharpproof-windows-cross/build.sh',
+            'python3 /opt/sharpproof-windows-cross/verify-output.py',
+            '/opt/sharpproof-windows-cross/toolchain.json /output /payload')) {
+        if (-not $windowsNativeText.Contains($required, [StringComparison]::Ordinal)) {
+            throw "Dockerfile windows-native stage is missing '$required'."
+        }
+    }
+    foreach ($url in @(
+            [string]$ToolchainCatalog.z3.windowsCrossBuild.sourceUrl,
+            [string]$ToolchainCatalog.z3.windowsCrossBuild.compilerUrl)) {
+        if (-not $windowsNativeText.Contains($url, [StringComparison]::Ordinal)) {
+            throw "Dockerfile windows-native stage does not use the catalog input '$url'."
+        }
+    }
 
     $powershellLines = Get-DockerfileStageLines `
         -Lines $lines `
@@ -204,13 +230,17 @@ function Assert-DockerfileAuthority {
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
-    $apiReferencePack = 'Microsoft.NETCore.App.Ref/' +
-    [string]$ToolchainCatalog.dotnet.apiReferencePackVersion
+    $apiInventoryPackPath = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($ToolchainCatalog.dotnet.apiInventoryPackVersion)"
     Assert-SingleMatchingLine `
         $toolchainLines `
-        '^COPY --from=api-reference ' `
-        "COPY --from=api-reference /usr/share/dotnet/packs/$apiReferencePack /usr/share/dotnet/packs/$apiReferencePack" `
-        'API inventory reference pack'
+        '^COPY --from=api-inventory ' `
+        "COPY --from=api-inventory $apiInventoryPackPath $apiInventoryPackPath" `
+        'exact reviewed API reference pack copy'
+    Assert-SingleMatchingLine `
+        $toolchainLines `
+        '^COPY --from=windows-native ' `
+        'COPY --from=windows-native /payload/ /opt/sharpproof/windows-native/' `
+        'verified Windows native payload copy'
     foreach ($required in @(
             'ARG USER_UID=1000',
             'ARG USER_GID=1000',
@@ -391,6 +421,8 @@ Assert-Exact `
     $catalog.platform `
     'Acceptance container platform'
 
+Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API inventory generation SDK'
+Assert-Exact $catalog.dotnet.apiInventoryImage ("mcr.microsoft.com/dotnet/sdk:{0}-bookworm-slim" -f $catalog.dotnet.apiInventorySdkVersion) 'API inventory source image version'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
 Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
 if ($AuthorityOnly) {
@@ -441,15 +473,24 @@ if ($null -eq $z3Package) {
 $versions = [xml](Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/Versions.props') -Raw)
 Assert-Exact $versions.Project.PropertyGroup.MicrosoftZ3Version $catalog.z3.version 'Microsoft.Z3 version'
 Assert-Exact `
-    $packageProjects.projects[-1] `
-    'src/SharpProof.Verifier/SharpProof.Verifier.csproj' `
-    'Verifier package project'
+($packageProjects.projects -join '|') `
+    'src/SharpProof.Attributes/SharpProof.Attributes.csproj|src/SharpProof.Verifier/SharpProof.Verifier.csproj|src/SharpProof.Package/SharpProof.Package.csproj' `
+    'Package projects in dependency order'
 Assert-Exact `
     $catalog.support.verifierPackageId `
     'SharpProof.Verifier' `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
+    $apiInventoryPack = "/usr/share/dotnet/packs/$($apiInventoryManifest.pack)/$($apiInventoryManifest.version)/ref/$($apiInventoryManifest.framework)"
+    if (-not (Test-Path -LiteralPath $apiInventoryPack -PathType Container)) {
+        throw "The reviewed active API inventory reference pack is missing: $apiInventoryPack"
+    }
+    $compatibilityFramework = 'net{0}.0' -f ([version]$catalog.dotnet.apiInventoryPackVersion).Major
+    $compatibilityPack = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($catalog.dotnet.apiInventoryPackVersion)/ref/$compatibilityFramework"
+    if (-not (Test-Path -LiteralPath $compatibilityPack -PathType Container)) {
+        throw "The retained compatibility reference pack is missing: $compatibilityPack"
+    }
     $markerPath = $env:SHARPPROOF_CONTAINER_CONTRACT
     if ([string]::IsNullOrWhiteSpace($markerPath)) {
         throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'
@@ -495,24 +536,27 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $managedSha256 `
         $catalog.z3.managedAssemblySha256 `
         'Installed managed Z3 SHA-256 digest'
-    $windowsNative = Join-Path `
-    ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
-        "z3/$($catalog.z3.version)/win-x64/libz3.dll"
-    $windowsInformation = Get-Item -LiteralPath $windowsNative
-    Assert-Exact $windowsInformation.Length $catalog.z3.windows.libraryBytes 'Installed Windows Z3 size'
-    $windowsSha256 = (Get-FileHash -LiteralPath $windowsNative -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-Exact $windowsSha256 $catalog.z3.windows.librarySha256 'Installed Windows Z3 SHA-256 digest'
-    $windowsManaged = Join-Path (Split-Path -Parent $windowsNative) 'Microsoft.Z3.dll'
-    $windowsManagedInformation = Get-Item -LiteralPath $windowsManaged
-    Assert-Exact `
-        $windowsManagedInformation.Length `
-        $catalog.z3.windows.managedAssemblyBytes `
-        'Installed Windows managed Z3 size'
-    $windowsManagedSha256 = (Get-FileHash -LiteralPath $windowsManaged -Algorithm SHA256).Hash.ToLowerInvariant()
-    Assert-Exact `
-        $windowsManagedSha256 `
-        $catalog.z3.windows.managedAssemblySha256 `
-        'Installed Windows managed Z3 SHA-256 digest'
+    foreach ($architecture in @('x64', 'arm64')) {
+        $windowsCatalog = if ($architecture -ceq 'x64') { $catalog.z3.windows } else { $catalog.z3.windowsArm64 }
+        $windowsNative = Join-Path `
+        ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
+            "z3/$($catalog.z3.version)/win-$architecture/libz3.dll"
+        $windowsInformation = Get-Item -LiteralPath $windowsNative
+        Assert-Exact $windowsInformation.Length $windowsCatalog.libraryBytes "Installed Windows $architecture Z3 size"
+        $windowsSha256 = (Get-FileHash -LiteralPath $windowsNative -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-Exact $windowsSha256 $windowsCatalog.librarySha256 "Installed Windows $architecture Z3 SHA-256 digest"
+        $windowsManaged = Join-Path (Split-Path -Parent $windowsNative) 'Microsoft.Z3.dll'
+        $windowsManagedInformation = Get-Item -LiteralPath $windowsManaged
+        Assert-Exact `
+            $windowsManagedInformation.Length `
+            $catalog.z3.managedAssemblyBytes `
+            "Installed Windows $architecture managed Z3 size"
+        $windowsManagedSha256 = (Get-FileHash -LiteralPath $windowsManaged -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-Exact `
+            $windowsManagedSha256 `
+            $catalog.z3.managedAssemblySha256 `
+            "Installed Windows $architecture managed Z3 SHA-256 digest"
+    }
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {
@@ -533,12 +577,6 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         if (-not (Test-Path -LiteralPath $packPath -PathType Container)) {
             throw "The minimum-SDK framework pack is missing: $packPath"
         }
-    }
-    $apiReferencePath = Join-Path `
-        '/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref' `
-        "$($catalog.dotnet.apiReferencePackVersion)/ref/net9.0/System.Runtime.dll"
-    if (-not (Test-Path -LiteralPath $apiReferencePath -PathType Leaf)) {
-        throw "The pinned API inventory reference pack is missing: $apiReferencePath"
     }
 }
 

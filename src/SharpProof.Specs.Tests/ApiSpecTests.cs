@@ -616,7 +616,7 @@ public sealed class ApiSpecTests
         var reference = MetadataReference.CreateFromFile(
             typeof(Contract).Assembly.Location);
 
-        var resolved = ResolveContractRequires(reference, string.Empty);
+        var resolved = ResolveContractRequires(reference, GetPublicKeyToken(reference));
 
         using (Assert.EnterMultipleScope())
         {
@@ -638,7 +638,7 @@ public sealed class ApiSpecTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var resolved = new ApiSpecResolver(ApiSpecTable.Create([
-            ContractRequiresDeclaration(string.Empty)
+            ContractRequiresDeclaration(GetPublicKeyToken(reference))
         ])).Resolve(compilation);
         var contract = compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.Contract");
@@ -701,7 +701,39 @@ public sealed class ApiSpecTests
             () => CreateSharpProofPackageReference(
                 CreateContractSource(
                     typeof(Contract).Assembly.GetName().Version!,
-                    includeConditionalAttributes: true)));
+                    includeConditionalAttributes: true),
+                [.. typeof(Contract).Assembly.GetName().GetPublicKey()!]),
+            GetPublicKeyToken);
+    }
+
+    [TestCase("")]
+    [TestCase("0000000000000000")]
+    public void AuthenticSignedContractSpecsRejectAnUnsignedOrDifferentKeyIdentity(string publicKeyToken)
+    {
+        ArgumentNullException.ThrowIfNull(publicKeyToken);
+        var reference = MetadataReference.CreateFromFile(typeof(Contract).Assembly.Location);
+        var resolved = ResolveContractRequires(reference, publicKeyToken);
+        Assert.That(resolved.Specs, Is.Empty);
+        Assert.That(resolved.Failures, Is.Not.Empty);
+    }
+
+    [Test]
+    public void DefaultContractSpecsPinTheStableStrongNameIdentity()
+    {
+        var approvedContractIdentities = 0;
+        foreach (var template in ApiSpecTable.Default.Templates)
+        {
+            foreach (var identity in template.Target.ApprovedAssemblies)
+            {
+                if (identity.Name == "SharpProof.Attributes")
+                {
+                    Assert.That(identity.PublicKeyToken, Is.EqualTo("75825c3e099f5fac"));
+                    Assert.That(identity.ReferenceFamily, Is.EqualTo(ApiSpecReferenceFamily.SharpProofPackage));
+                    approvedContractIdentities++;
+                }
+            }
+        }
+        Assert.That(approvedContractIdentities, Is.EqualTo(5));
     }
 
     [TestCase("netstandard2.0")]

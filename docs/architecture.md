@@ -23,7 +23,9 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Worker` | Artifact preparation, native claims, VC checks, replay, response cache |
 | `SharpProof.Host` | Container/native loading and host infrastructure |
 | `SharpProof.BuildTasks` / `SharpProof.Verify` | MSBuild integration and verifier orchestration |
-| `SharpProof.Package` / `SharpProof.Verifier` | Portable and verifier package assembly |
+| `SharpProof.Package` | Metadata-only standard package facade with exact verifier dependency |
+| `SharpProof.Verifier` | Analyzer/collector, MSBuild integration, managed worker and native solver package assets |
+| `SharpProof.Tool` | Optional separately packaged doctor and stored-evidence explanation commands |
 
 The solution lists production and test projects in [SharpProof.slnx](../SharpProof.slnx). Package identity and implementation assembly visibility do not make these internal components supported consumer APIs.
 
@@ -39,7 +41,7 @@ The worker consumes this closed artifact rather than reparsing a guessed source 
 
 The build integration also checks that the artifact belongs to the current compiler capture. The collector publishes a completion token after writing the artifact, while MSBuild validates the matching invocation before verification. A stable capture-request path avoids adding a new incremental compiler input for every build. Request, compiler manifest, and response publication then bind the same invocation; reusing an unrelated result file cannot satisfy that check. See [collector publication](../src/SharpProof.CompilerCollector/FinalCompilationCollector.cs), [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [capture/cache regression tests](../src/SharpProof.Worker.Tests/Pr275ActualCompilerCaptureCacheTests.cs).
 
-The public contract assembly is checked by exact supported identity and payload evidence. The unsigned package does not supply public-key authentication. Lookalikes do not create assumptions.
+The public contract assembly is checked by exact supported identity and payload evidence. Attributes is fully strong-named with a deliberately public, stable open-source identity key; that provides Framework reference compatibility, not publisher authentication. Package/repository signatures and release attestations have separate verification scopes described in the [release process](../eng/release/README.md). Lookalikes do not create assumptions.
 
 ## Native verification
 
@@ -73,7 +75,11 @@ A cache hit does not introduce a new proof rule. Transient timeouts, cancellatio
 
 ## Build and package boundary
 
-The portable package supplies analyzers and compiler tooling without application compile assets. Attributes supplies the application API. Verifier supplies build tooling and Linux amd64 worker dependencies, including pinned managed and native Z3.
+The standard consumer authors one `SharpProof` reference. Its exact dependency graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`: the facade has no assembly, Attributes supplies the transitive application API, and Verifier owns the analyzer/collector, MSBuild tasks, managed worker and pinned Z3 assets. Strict full verification activates automatically with SDK 10 on supported Windows, macOS and glibc Linux x64/ARM64 hosts; Verifier remains a compatibility entrypoint. Explicit advisory/off profiles retain their documented host and activation boundaries. See the [support matrix](preview-support.md).
+
+Tooling assemblies carry embedded portable PDBs and compile sources; Attributes retains portable PDBs. Symbol packaging and coverage extract matching tooling PDBs from those same built assemblies rather than rebuilding them. The assembly-free facade has no symbol package. See [NuGet debugging](nuget-debugging.md) for exact symbol/source checks.
+
+`SharpProof.Tool` is an optional separate .NET tool, outside the standard application dependency graph and core package feed. Its doctor inspects bounded host prerequisites; explain interprets stored worker evidence rather than producing a new proof. Its archive, consumer qualification and release provenance remain separate from the core three-package/two-symbol graph. The repository PowerShell wrapper is a maintainer/container entrypoint, not an additional consumer installation requirement.
 
 Profiles select activation; worker policy decides what results the build accepts. Consumer examples live under [samples](../src/samples/README.md). Pinned inputs live in [eng/container/toolchain.json](../eng/container/toolchain.json). The tag workflow checks packed consumers before publication; see [release process](../eng/release/README.md).
 

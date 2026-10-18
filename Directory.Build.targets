@@ -39,7 +39,29 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
 
+  <Target Name="_EmbedSharpProofSourceDocuments" BeforeTargets="CoreCompile"
+          Condition="'$(SharpProofProductionProject)' == 'true' AND $([System.String]::Copy('$(SharpProofProjectName)').StartsWith('SharpProof.'))">
+    <ItemGroup>
+      <EmbeddedFiles Include="@(Compile)" />
+    </ItemGroup>
+  </Target>
+
   <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+  <!-- Arcade defaults its binaries to Microsoft copyright; this repository owns its metadata. -->
+  <PropertyGroup>
+    <Copyright>$(SharpProofCopyright)</Copyright>
+  </PropertyGroup>
+  <!-- Arcade supplies Microsoft signing defaults during its target import.
+       Restore the published contract identity and full signature afterward. -->
+  <PropertyGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Attributes'">
+    <StrongNameKeyId>SharpProofAttributes</StrongNameKeyId>
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <PublicSign>false</PublicSign>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng/signing/SharpProof.Attributes.snk</AssemblyOriginatorKeyFile>
+    <PublicKeyToken>75825c3e099f5fac</PublicKeyToken>
+    <PublicKey>00240000048000001401000006020000002400005253413100080000010001002f87437eca79b033323b7c924dfacd6f91b32c5702766edab201c61f6618d86de0097be88f7644f4f1198c2f83903e33f20720844189c1e5fa2e1bf1e1f2cc8e3ebe59d0df34a380d6fb2acce71e5336a5db86a304c620516514a0be5fd496ab17712caf2f9bbf457801ecae31181335e57c994b01912294c5dcef8c824472995f5f50b731d11f2cd5c2f0a1fcd0621ae59f1ad19379d47b669c28c852b3c4e53c8bdcb976667651fd65b6895881eb8830b4fe8c5e353049af56ad4086be0783e70b327eb2be2543061c5143a490f9178becdfdb4205719561884942632be4a7278c15fa253c5ea3147449ccc6064ef37d4027fd13268c8886fcab595d71bfc1</PublicKey>
+  </PropertyGroup>
   <!-- Retain the published preview version instead of Arcade's developer/CI suffix. -->
   <PropertyGroup>
     <Version>$(SharpProofPackageVersion)</Version>

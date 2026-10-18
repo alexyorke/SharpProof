@@ -15,6 +15,9 @@ include_fragments = "full"
 # URLs in documentation examples and code snippets are part of the audit too.
 include_verbatim = true
 
+# This normative attestation predicate type is a semantic identifier, not a dereferenceable webpage.
+exclude = ['^https://spdx\.dev/Document/v2\.3$']
+
 timeout = 30
 max_retries = 2
 retry_wait_time = 2

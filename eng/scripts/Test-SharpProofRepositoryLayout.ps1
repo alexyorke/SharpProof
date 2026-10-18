@@ -22,6 +22,55 @@ $evaluations = [Collections.Generic.List[object]]::new()
 function Require([bool]$Condition, [string]$Message) {
     if (-not $Condition) { $failures.Add($Message) }
 }
+function Test-ExplicitPackageImport {
+    param([string]$ManifestPath, [string]$ImporterPath, [string]$ImportProject)
+    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf) -or
+        -not $ImportProject.StartsWith('$(MSBuildThisFileDirectory)', [StringComparison]::Ordinal)) { return $false }
+    $suffix = $ImportProject.Substring('$(MSBuildThisFileDirectory)'.Length).Replace('\', '/')
+    if ([string]::IsNullOrWhiteSpace($suffix) -or $suffix -match '[$@%*?:;]' -or
+        $suffix.StartsWith('/') -or $suffix.Split('/') -contains '..' -or $suffix.Split('/') -contains '.') { return $false }
+    [xml]$manifest = Get-Content -LiteralPath $ManifestPath -Raw
+    $mappings = [Collections.Generic.List[object]]::new()
+    foreach ($entry in $manifest.SelectNodes('/*[local-name()="package"]/*[local-name()="files"]/*[local-name()="file"]')) {
+        $source = $entry.GetAttribute('src').Replace('\', '/')
+        $destination = $entry.GetAttribute('target').Replace('\', '/')
+        if ([string]::IsNullOrWhiteSpace($source) -or $source -match '[$@%*?;]' -or
+            $destination -match '[$@%*?:;]' -or $destination.StartsWith('/') -or
+            $destination.Split('/') -contains '..' -or $destination.Split('/') -contains '.') { continue }
+        $sourcePath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ManifestPath) $source))
+        $member = ($destination.TrimEnd('/') + '/' + [IO.Path]::GetFileName($source)).TrimStart('/')
+        $mappings.Add([pscustomobject]@{ Source = $sourcePath; Member = $member })
+    }
+    $importers = @($mappings | Where-Object { $_.Source -ceq [IO.Path]::GetFullPath($ImporterPath) })
+    if ($importers.Count -ne 1 -or -not (Test-Path -LiteralPath $ImporterPath -PathType Leaf)) { return $false }
+    $memberDirectory = [IO.Path]::GetDirectoryName($importers[0].Member).Replace('\', '/')
+    $memberTarget = ($memberDirectory + '/' + $suffix).TrimStart('/')
+    $targets = @($mappings | Where-Object { $_.Member -ceq $memberTarget })
+    return $targets.Count -eq 1 -and (Test-Path -LiteralPath $targets[0].Source -PathType Leaf)
+}
+# Exercise the same package-relative resolution with absent declarations and
+# absent source bytes: neither a mapping alone nor an existing unrelated file suffices.
+$importProbe = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-layout-import-' + [Guid]::NewGuid().ToString('N'))
+[IO.Directory]::CreateDirectory($importProbe) | Out-Null
+try {
+    $probeImporter = Join-Path $importProbe 'Importer.props'
+    $probeSource = Join-Path $importProbe 'Imported.props'
+    $probeManifest = Join-Path $importProbe 'Probe.nuspec'
+    [IO.File]::WriteAllText($probeImporter, '<Project/>')
+    [IO.File]::WriteAllText($probeSource, '<Project/>')
+    [IO.File]::WriteAllText($probeManifest, '<package><files><file src="Importer.props" target="buildTransitive"/><file src="Imported.props" target="buildTransitive"/></files></package>')
+    $probeProject = '$(MSBuildThisFileDirectory)Imported.props'
+    Require (Test-ExplicitPackageImport $probeManifest $probeImporter $probeProject) 'Package import positive control failed.'
+    Require (-not (Test-ExplicitPackageImport (Join-Path $importProbe 'Absent.nuspec') $probeImporter $probeProject)) 'Package import accepted an absent manifest.'
+    [IO.File]::WriteAllText($probeManifest, '<package><files><file src="Importer.props" target="buildTransitive"/></files></package>')
+    Require (-not (Test-ExplicitPackageImport $probeManifest $probeImporter $probeProject)) 'Package import accepted an absent mapping.'
+    [IO.File]::WriteAllText($probeManifest, '<package><files><file src="Importer.props" target="buildTransitive"/><file src="Imported.props" target="buildTransitive"/><file src="Imported.props" target="buildTransitive"/></files></package>')
+    Require (-not (Test-ExplicitPackageImport $probeManifest $probeImporter $probeProject)) 'Package import accepted ambiguous target mappings.'
+    Require (-not (Test-ExplicitPackageImport $probeManifest $probeImporter '$(MSBuildThisFileDirectory)../Imported.props')) 'Package import accepted traversal.'
+    [IO.File]::WriteAllText($probeManifest, '<package><files><file src="Importer.props" target="buildTransitive"/><file src="Absent.props" target="buildTransitive"/></files></package>')
+    Require (-not (Test-ExplicitPackageImport $probeManifest $probeImporter '$(MSBuildThisFileDirectory)Absent.props')) 'Package import accepted an absent mapped source.'
+}
+finally { Remove-Item -LiteralPath $importProbe -Recurse -Force }
 $required = @('global.json', 'NuGet.config', 'Directory.Build.props',
     'Directory.Build.targets', 'Directory.Packages.props', 'LICENSE',
     'build.sh', 'build.cmd', 'build.ps1', 'restore.sh', 'restore.cmd',
@@ -141,7 +190,19 @@ foreach ($relative in $files) {
             $target = if ([IO.Path]::IsPathRooted($value)) { [IO.Path]::GetFullPath($value) }
             else { [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $absolute) $value)) }
             if ($target.StartsWith((Join-Path $repositoryRoot 'artifacts') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) { continue }
-            Require (Test-Path -LiteralPath $target) "Missing static MSBuild input: $relative -> $value"
+            $inputExists = Test-Path -LiteralPath $target
+            if (-not $inputExists -and $node.LocalName -eq 'Import') {
+                $ownerDirectory = Split-Path -Parent $absolute
+                while ($ownerDirectory.StartsWith($repositoryRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) {
+                    $manifests = @(Get-ChildItem -LiteralPath $ownerDirectory -Filter '*.nuspec' -File)
+                    if ($manifests.Count -gt 0) {
+                        $inputExists = $manifests.Count -eq 1 -and (Test-ExplicitPackageImport $manifests[0].FullName $absolute $node.GetAttribute('Project'))
+                        break
+                    }
+                    $ownerDirectory = Split-Path -Parent $ownerDirectory
+                }
+            }
+            Require $inputExists "Missing static MSBuild input: $relative -> $value"
         }
     }
 }

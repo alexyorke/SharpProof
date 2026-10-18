@@ -16,6 +16,7 @@
       "src\\SharpProof.Smt.Tests\\SharpProof.Smt.Tests.csproj",
       "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj",
       "src\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
+      "src\\SharpProof.Tool.Tests\\SharpProof.Tool.Tests.csproj",
       "src\\SharpProof.Fuzz.Tests\\SharpProof.Fuzz.Tests.csproj",
       "src\\SharpProof.Gates.Tests\\SharpProof.Gates.Tests.csproj",
       "src\\SharpProof.Verify.Tests\\SharpProof.Verify.Tests.csproj"

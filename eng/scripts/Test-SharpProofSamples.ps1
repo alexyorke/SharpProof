@@ -187,11 +187,10 @@ function Test-SampleProjectInventory {
             throw "Sample project references are forbidden: $($projectFile.FullName)"
         }
         $references = @($project.SelectNodes('//PackageReference'))
-        if ($projectFile.BaseName -cne 'Outcomes') {
-            $references += $sharedReferences
-        }
-        if ($references.Count -eq 0) {
-            throw "Sample project has no package reference: $($projectFile.FullName)"
+        $references += $sharedReferences
+        if ($references.Count -ne 1 -or [string]$references[0].Include -cne 'SharpProof' -or
+            $references[0].HasAttribute('PrivateAssets')) {
+            throw "Every sample must consume one public SharpProof package reference: $($projectFile.FullName)"
         }
         foreach ($reference in $references) {
             $id = [string]$reference.Include
@@ -239,6 +238,15 @@ function New-LocalPackageFeed {
     }
     foreach ($project in @($manifest.projects)) {
         $projectPath = Join-Path $repositoryRoot ([string]$project)
+        $build = Invoke-CapturedDotNet -Arguments @(
+            'build', $projectPath, '--configuration', $Configuration, '--nologo',
+            '-p:GeneratePackageOnBuild=false')
+        Assert-ExitCode $build $true "Building $projectPath before symbol extraction"
+    }
+    & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') `
+        -RepositoryRoot $repositoryRoot -Configuration $Configuration
+    foreach ($project in @($manifest.projects)) {
+        $projectPath = Join-Path $repositoryRoot ([string]$project)
         $pack = Invoke-CapturedDotNet -Arguments @(
             'pack',
             $projectPath,
@@ -246,6 +254,8 @@ function New-LocalPackageFeed {
             $sampleConfiguration,
             '--output',
             $feed,
+            '--no-build',
+            '--no-restore',
             '--nologo'
         )
         Assert-ExitCode $pack $true "Packing $projectPath"

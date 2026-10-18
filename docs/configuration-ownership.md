@@ -15,6 +15,7 @@ effective defaults, limits, wire formats, and explicit caller overrides.
 | Convenience-operation deadline | [AnalysisDefaults](../src/SharpProof.Ir/AnalysisDefaults.cs) | Analyzer, compiler capture, contract binding, frontend queries, IR interpretation; explicit caller-token overloads keep caller deadlines |
 | Dataflow widening and iteration defaults | [ForwardDataflowAnalysisOptions](../src/SharpProof.Dataflow/ForwardDataflowAnalysis.cs) | General analysis and advisory analysis; advisory analysis retains its separate iteration budget |
 | Advisory iteration, term-work and synthetic-edge defaults | [CoreIrAdvisoryInterpreter](../src/SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs) | Both Run overloads |
+| Optional tool SDK-discovery limits | [SdkProbe](../src/SharpProof.Tool/SdkProbe.cs) | Tool doctor discovery: 15-second timeout, 5-second process cleanup wait, and 4096 characters per stdout/stderr stream; separate from solver budgets and analysis deadlines |
 | Host contract environment names | [HostEnvironmentVariables](../src/SharpProof.Host/HostEnvironmentVariables.cs) | Contract readers and trusted child environment allowlist |
 | Atomic publication retry count | [AtomicFile](../src/SharpProof.Ir/AtomicFile.cs) | Staging-name allocation and publication retries |
 | Fuzz case, seed and parallelism settings | [FuzzOptions](../src/SharpProof.Fuzz/FuzzOptions.cs) | CLI parsing/help, runner validation and summary admission |
@@ -59,8 +60,8 @@ The initial inventory was the complete tracked tree at master
 f10651eaeb7efb531263e7e5ae5158b07507411d: 2,275 files, including 1,846 C#,
 PowerShell and shell source files. Ten parallel audits partitioned analyzer,
 worker, host/package/protocol, SMT/dataflow, compiler/frontend, models/contracts,
-gates/fuzz/tools, scripts/engineering, root/build/CI, and
-fixtures/samples/templates/documentation. Project configuration also received
+gates/fuzz/tools, eng/scripts/engineering, root/build/CI, and
+fixtures/src/samples/templates/documentation. Project configuration also received
 a cross-cutting scan.
 
 The review inventoried every tracked path, searched source/configuration files

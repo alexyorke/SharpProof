@@ -174,6 +174,8 @@ if (-not $NoBuild) {
     }
 }
 
+& (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
+
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingStem = 'semantic-tests-' + $Configuration.ToLowerInvariant()

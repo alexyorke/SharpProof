@@ -15,6 +15,21 @@ $inventory = [ordered]@{}
 foreach ($package in $packages) {
     $archive = [IO.Compression.ZipFile]::OpenRead($package.FullName)
     try {
+        # Release archives are unsigned; assembly strong names are separate.
+        $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $archive.Entries) {
+            $name = $entry.FullName
+            if (-not $name -or $name.StartsWith('/') -or $name.Contains('\') -or $name.Contains(':') -or
+                @($name.Split('/') | Where-Object { $_ -in @('.', '..') }).Count -or -not $names.Add($name)) {
+                throw 'The original package has an ambiguous, duplicate, or unsafe ZIP member.'
+            }
+            if ([IO.Path]::GetFileName($name).Equals('.signature.p7s', [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Original release archives must be unsigned; author-signed archives are not supported by this publication workflow.'
+            }
+            $content = $entry.Open()
+            try { $content.CopyTo([IO.Stream]::Null) }
+            finally { $content.Dispose() }
+        }
         $specs = @($archive.Entries | Where-Object { $_.FullName -match '^[^/]+\.nuspec$' })
         if ($specs.Count -ne 1) { throw 'A package must contain exactly one root nuspec.' }
         $settings = [Xml.XmlReaderSettings]::new()
@@ -35,9 +50,11 @@ foreach ($package in $packages) {
                 throw 'Package identity must use a normalized NuGet version and a safe filename.'
             }
             $hash = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA512).Hash.ToLowerInvariant()
-            $rows.Add("$id`t$version`t$($package.Name)`t$hash")
+            # For unsigned archives NuGet's content hash equals the raw SHA-512.
+            $contentHash = [Convert]::ToBase64String([Convert]::FromHexString($hash))
+            $rows.Add("$id`t$version`t$($package.Name)`t$hash`t$contentHash")
             if ($inventory.Contains($id)) { throw 'Duplicate package identity in release inventory.' }
-            $inventory[$id] = @{ type = 'Direct'; resolved = $version; contentHash = [Convert]::ToBase64String([Convert]::FromHexString($hash)) }
+            $inventory[$id] = @{ type = 'Direct'; resolved = $version; contentHash = $contentHash }
         }
         finally {
             $reader.Dispose()
@@ -50,4 +67,4 @@ foreach ($package in $packages) {
 $lock = @{ version = 1; dependencies = @{ release = $inventory } } | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $packageRoot 'packages.lock.json'), $lock + "`n", [Text.UTF8Encoding]::new($false))
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Test-SharpProofPublishedPackages.sh') -Destination $packageRoot
-Write-Output "Recorded identities and SHA-512 hashes for $($packages.Count) release packages."
+Write-Output "Recorded identities, original archive SHA-512, and NuGet content hashes for $($packages.Count) unsigned release packages."

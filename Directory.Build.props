@@ -7,6 +7,7 @@
   <PropertyGroup>
     <!-- Keep logical/assembly identities stable while adopting Arcade test filenames. -->
     <SharpProofProjectName>$(MSBuildProjectName)</SharpProofProjectName>
+    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Tool.Tests'">SharpProof.Tool.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'ConsoleLoggingAnalyzer.Tests'">ConsoleLoggingAnalyzer.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Tests'">SharpProof.Analyzer.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Architecture.Tests'">SharpProof.ArchitectureTest</SharpProofProjectName>
@@ -29,6 +30,8 @@
     <SignAssembly>false</SignAssembly>
     <Company>$(SharpProofPublisher)</Company>
     <Authors>$(SharpProofPublisher)</Authors>
+    <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon />
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -94,6 +97,10 @@
       '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">true</SharpProofUsesIrIdentifiers>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true' AND $([System.String]::Copy('$(SharpProofProjectName)').StartsWith('SharpProof.')) AND '$(SharpProofProjectName)' != 'SharpProof.Attributes'">
+    <!-- Tooling carries symbols into Roslyn shadow copies and MSBuild task hosts. -->
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
   <ItemGroup Condition="'$(SharpProofUsesIrIdentifiers)' == 'true'">
     <!--
       These aliases keep the internal IR vocabulary readable while all ID
@@ -272,6 +279,6 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Attributes'">
-    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017;RS0041</WarningsAsErrors>
   </PropertyGroup>
 </Project>

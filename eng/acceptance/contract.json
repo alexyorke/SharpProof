@@ -527,7 +527,12 @@
           "src/SharpProof.Package/buildTransitive/SharpProof.props",
           "src/SharpProof.Package/buildTransitive/SharpProof.targets",
           "src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
-          "src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
+          "src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets",
+          "src/SharpProof.Attributes/SharpProof.Attributes.csproj",
+          "src/SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj",
+          "Directory.Build.props",
+          "eng/Versions.props",
+          "eng/signing/SharpProof.Attributes.snk"
         ]
       },
       {
@@ -548,6 +553,9 @@
           "eng/container/dev-command.sh",
           "eng/container/dev-init.sh",
           "eng/container/Prepare-NativePayload.ps1",
+          "eng/container/windows-native/build.sh",
+          "eng/container/windows-native/inspect-pe.py",
+          "eng/container/windows-native/verify-output.py",
           "eng/container/New-ContainerContract.ps1",
           "compose.yaml",
           "eng/scripts/Invoke-SharpProofContainer.ps1",
@@ -559,9 +567,14 @@
           "eng/scripts/Test-SharpProofContainerContract.ps1",
           "eng/scripts/Test-SharpProofPackageConsumers.ps1",
           "eng/scripts/Test-SharpProofPortableConsumer.ps1",
+          "eng/scripts/Test-SharpProofPlugAndPlayConsumer.ps1",
+          "eng/scripts/Test-SharpProofVisualStudioConsumer.ps1",
           "eng/scripts/Test-SharpProofWindowsNativePayload.ps1",
           "eng/scripts/Test-SharpProofWindowsProofs.ps1",
-          "eng/scripts/Test-SharpProofMacOsVerifierConsumer.ps1"
+          "eng/scripts/Test-SharpProofMacOsVerifierConsumer.ps1",
+          "eng/scripts/SharpProof.EmbeddedSymbols.psm1",
+          "eng/scripts/Export-SharpProofEmbeddedSymbols.ps1",
+          "SharpProof.slnx"
         ]
       },
       {
@@ -573,6 +586,7 @@
           "src/SharpProof.Gates/SharpProof.Gates.csproj",
           "src/SharpProof.Verifier/SharpProof.Verifier.nuspec",
           "eng/coverage/baseline.json",
+          "eng/api-coverage/net10.0.manifest.json",
           "eng/release/third-party-components.json",
           "eng/scripts/Get-SharpProofDevCheckPlan.ps1",
           "eng/scripts/Assert-SharpProofJsonProperties.ps1",
@@ -584,9 +598,35 @@
           "eng/scripts/Read-SharpProofSdkPolicy.ps1",
           "eng/scripts/Test-SharpProofDependencyAudit.ps1",
           "eng/scripts/Test-SharpProofSamples.ps1",
+          "eng/scripts/Test-SharpProofFacadePackageRegression.ps1",
           "eng/scripts/Test-SharpProofSymbolPackages.ps1",
+          "eng/scripts/Test-SharpProofThirdPartyInventory.ps1",
+          "eng/scripts/Test-SharpProofThirdPartyInventoryRegression.ps1",
           "eng/scripts/SharpProof.SymbolPackageValidator.cs",
-          "eng/scripts/package-projects.json"
+          "eng/scripts/package-projects.json",
+          "eng/branding/icon.png",
+          "eng/branding/icon.svg",
+          "eng/signing/README.md",
+          "src/SharpProof.Attributes/README.md",
+          "src/SharpProof.Package/README.md",
+          "src/SharpProof.Verifier/README.md",
+          "src/SharpProof.Tool/SharpProof.Tool.csproj",
+          "src/SharpProof.Tool/packages.lock.json",
+          "src/SharpProof.Tool/README.md",
+          "src/SharpProof.Tool.Tests/SharpProof.Tool.Tests.csproj",
+          "src/SharpProof.Tool.Tests/packages.lock.json",
+          "eng/scripts/Test-SharpProofEmbeddedSymbolsRegression.ps1",
+          "eng/scripts/Test-SharpProofOfflineStackTraces.ps1",
+          "eng/scripts/Test-SharpProofReproduciblePackages.ps1",
+          "eng/scripts/New-SharpProofReleaseEvidence.ps1",
+          "eng/scripts/New-SharpProofToolReleaseEvidence.ps1",
+          "eng/scripts/Test-SharpProofReleaseEvidence.ps1",
+          "eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1",
+          "eng/scripts/Test-SharpProofPublicApiGovernance.ps1",
+          "eng/scripts/Test-SharpProofReleaseAttestations.sh",
+          "eng/scripts/Test-SharpProofReleaseAttestationsRegression.sh",
+          "eng/scripts/Pack-SharpProofTool.ps1",
+          "eng/scripts/Test-SharpProofToolConsumer.ps1"
         ]
       },
       {
@@ -603,8 +643,8 @@
           "src/SharpProof.Fuzz/TotalProgramFuzzing.cs",
           "src/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
           "src/SharpProof.Fuzz/packages.lock.json",
-          "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
-          "scripts/SharpProof.FuzzEvidenceLifecycle.ps1"
+          "eng/scripts/Assert-SharpProofFuzzRunnerResult.ps1",
+          "eng/scripts/SharpProof.FuzzEvidenceLifecycle.ps1"
         ]
       },
       {

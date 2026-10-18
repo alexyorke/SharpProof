@@ -13,6 +13,9 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
+| [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest SDK discovery and scoped explanation of stored evidence |
+| [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
+| [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
 | [Consumer performance](consumer-performance.md) | Comparable build measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
@@ -38,7 +41,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Source declaration reference](generated/source-reference.md) | Generated literal configuration, API, diagnostic, and command declarations |
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
-| [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64 proofs, supported paths, resource boundary, and CI |
+| [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64/ARM64 proofs, static runtime payloads, supported paths, and CI |
 
 ## Develop and qualify
 

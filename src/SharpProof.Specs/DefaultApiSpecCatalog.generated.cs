@@ -215,7 +215,7 @@ public sealed class ApiSpecTemplate
 public sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "7";
+    public const string DefaultTableVersion = "8";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -243,7 +243,7 @@ public sealed partial class ApiSpecTable
             new("System.Core", "b77a5c561934e089", ApiSpecReferenceFamily.NetStandardReferencePack),
         ];
         ImmutableArray<ApiSpecAssemblyIdentity> assemblySetSharpProofAttributes = [
-            new("SharpProof.Attributes", "", ApiSpecReferenceFamily.SharpProofPackage),
+            new("SharpProof.Attributes", "75825c3e099f5fac", ApiSpecReferenceFamily.SharpProofPackage),
         ];
         var evidenceContractSemantics = new SpecEvidence(SpecEvidenceKind.Documented, "sharpproof-compiler-bound-ghost-contract");
         var evidenceDocumented = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-api-contract");

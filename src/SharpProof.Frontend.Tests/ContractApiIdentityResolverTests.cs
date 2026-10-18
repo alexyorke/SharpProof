@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Reflection;
+using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -9,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 public sealed class ContractApiIdentityResolverTests
 {
     [Test]
-    public void ExactUnsignedPackagePayloadIsAccepted()
+    public void ExactStrongNamedPackagePayloadIsAccepted()
     {
         var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
         var reference = MetadataReference.CreateFromFile(assembly.Location);
@@ -18,12 +20,34 @@ public sealed class ContractApiIdentityResolverTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(assembly.GetName().GetPublicKey(), Is.Empty);
+            Assert.That(Convert.ToHexString(assembly.GetName().GetPublicKeyToken()!), Is.EqualTo("75825C3E099F5FAC"));
             Assert.That(resolver.Contract, Is.Not.Null);
             Assert.That(
                 resolver.ResolveAttribute(ContractApiMetadata.NotNull),
                 Is.Not.Null);
         }
+    }
+
+    [Test]
+    public void StrongNameIdentityDoesNotAuthorizeModifiedPackageBytes()
+    {
+        var authentic = typeof(SharpProof.Attributes.Contract).Assembly;
+        var image = File.ReadAllBytes(authentic.Location);
+        using (var pe = new PEReader(new MemoryStream(image, writable: false)))
+        {
+            var signature = pe.PEHeaders.CorHeader!.StrongNameSignatureDirectory;
+            Assert.That(pe.PEHeaders.TryGetDirectoryOffset(signature, out var offset), Is.True);
+            image[offset] ^= 1;
+        }
+        using var temporary = new TempDirectory("SharpProof.SignedPayload.Test-");
+        var path = Path.Combine(temporary.FullName, "SharpProof.Attributes.dll");
+        File.WriteAllBytes(path, image);
+        Assert.That(AssemblyName.GetAssemblyName(path).FullName, Is.EqualTo(authentic.GetName().FullName));
+        var resolver = ContractApiIdentityResolver.ForCompilation(CreateConsumer(MetadataReference.CreateFromFile(path)));
+        Assert.That(resolver.Contract, Is.Null);
+        Assert.That(resolver.ResolveAttribute(ContractApiMetadata.NotNull), Is.Null);
+        Assert.That(resolver.UnreadableContractApiReason, Is.Null,
+            "A changed payload is an identity rejection, not an unreadable-file diagnostic.");
     }
 
     [Test]

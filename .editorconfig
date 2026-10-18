@@ -19,6 +19,8 @@ switch_case_indent = true
 space_redirects = true
 
 [*.cs]
+# Analyze public APIs even when their declaration files are missing.
+dotnet_public_api_analyzer.require_api_files = false
 indent_style = space
 indent_size = 4
 tab_width = 4
