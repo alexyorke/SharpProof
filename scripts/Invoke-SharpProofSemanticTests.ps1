@@ -418,11 +418,13 @@ if ($CoverageTaskGroup -ne 'All') {
         'worker-remainder-heavy',
         'worker-remainder-other',
         'worker-fixed-checksum')
+    # Capture the name first: inside switch, $_ is the switch value.
     $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
+            $taskName = [string]$_.Name
             switch ($CoverageTaskGroup) {
-                'Gates' { $_.Name -cin $gatesTaskNames }
-                'Worker' { $_.Name -cin $workerTaskNames }
-                'Projects' { $_.Name -cnotin ($gatesTaskNames + $workerTaskNames) }
+                'Gates' { $taskName -cin $gatesTaskNames }
+                'Worker' { $taskName -cin $workerTaskNames }
+                'Projects' { $taskName -cnotin ($gatesTaskNames + $workerTaskNames) }
             }
         })
     if ($tasks.Count -eq 0) {
