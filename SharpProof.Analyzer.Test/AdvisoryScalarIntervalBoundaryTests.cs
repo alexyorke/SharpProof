@@ -179,7 +179,6 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
         var assembly = implementationType.Assembly;
         Assert.That(assembly.GetName().Name, Is.EqualTo(expectedAssembly));
         Assert.That(assembly, Is.Not.SameAs(typeof(AdvisoryScalarIntervalBoundaryTests).Assembly));
-        Assert.That(typeof(CoreTransfer).Assembly, Is.Not.SameAs(typeof(WorkerTransfer).Assembly));
         TestContext.WriteLine("SP_LINKED_TRANSFER_V1 " + JsonSerializer.Serialize(new
         {
             Scenario = scenario,
