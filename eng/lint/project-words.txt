@@ -9,6 +9,7 @@ disjointness
 getpid
 glibcxx
 libc
+linq
 katex
 lowerer
 multitargeted
@@ -19,6 +20,7 @@ noncapturing
 nonexhaustive
 nonignored
 nonlocal
+nonnegativity
 nonsemantic
 nonvacuous
 ntfs
