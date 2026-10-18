@@ -43,9 +43,18 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 0)).Value, state, depth + 1);
         var right = LowerClause(invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == (primitive ? 0 : 1))).Value, state, depth + 1);
         var classification = First(left.Classification, right.Classification);
+        var safe = And(left.SafeCondition, right.SafeCondition);
+        if (!primitive && !_context.IsDefaultIntegerComparer(invocation.Instance!))
+        {
+            var receiver = LowerClause(invocation.Instance!, state, depth + 1);
+            if (!receiver.Classification.IsExact)
+            { return Failed(invocation, receiver.Classification.Abstention); }
+            classification = First(classification, receiver.Classification);
+            safe = And(receiver.SafeCondition, And(safe,
+                _factory.Binary(IrBinaryOperator.NotEqual, receiver.Value, _factory.Null(receiver.Value.Type))));
+        }
         return classification.IsExact
-            ? new(CSharpOperationSemantics.IntegerComparison(_factory, left.Value, right.Value),
-                And(left.SafeCondition, right.SafeCondition), classification)
+            ? new(CSharpOperationSemantics.IntegerComparison(_factory, left.Value, right.Value), safe, classification)
             : Failed(invocation, classification.Abstention);
     }
 
@@ -69,6 +78,14 @@ internal sealed partial class RoslynTotalExpressionLowerer
             { return Approximate(invocation, lowered.Continuation, lowered.Classification.Abstention); }
             values[argument.Parameter!.Ordinal] = lowered.Value;
             block = lowered.Continuation;
+        }
+        // A proven default-or-null receiver still faults when it is null.
+        // Invocation arguments have already run before this receiver check.
+        if (!primitive)
+        {
+            block = ApplyRule(invocation, new TotalScalarRule(_factory.Boolean(true),
+                [new(IrExceptionKind.NullReference, _factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))],
+                FrontendSubsetClassification.Exact), block).Continuation;
         }
         return new(CSharpOperationSemantics.IntegerComparison(_factory,
             primitive ? receiver.Value : values[0], primitive ? values[0] : values[1]),

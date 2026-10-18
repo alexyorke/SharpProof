@@ -307,6 +307,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             (TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) ||
              method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is IArrayTypeSymbol { IsSZArray: true, ElementType: ITypeParameterSymbol }) &&
             caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value) ||
+            caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) != null).ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
@@ -322,6 +323,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
+            if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
+            { frame.SpecializeNullableDefaultComparerParameter(parameter); }
             if (parameter.Type is ITypeParameterSymbol && caller.KnownScalarType(argument.Parameter.Type) is { } scalar)
             {
                 frame.SpecializeScalarParameter(parameter, scalar);
