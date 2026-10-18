@@ -1726,3 +1726,18 @@ and visited membership, and freeze ordered observations before consumers. Preser
 successor push order, reversed child order in exception tracing, iterator laziness,
 default comparers, and reference identity of CFG nodes. Region-ID maps and two
 reachability membership snapshots can be immutable. Status: open, recorded before edits.
+## Contract scoped construction follow-up inventory
+
+IMM-M016: ContractClauseInventoryBuilder.CreateCore accumulates occurrences,
+classification ordinals and a direct-clause cache through repeatedly rebound roots.
+Use scoped array/dictionary builders, freeze occurrences before stable source sorting,
+and keep ordinal updates inside the existing eager projection. Cache helpers receive
+the owned builder without ref; strict AddUnique semantics remain. Retained compilation
+caches remain immutable roots. Status: open.
+
+IMM-M017: ContractExpressionBinder.BindOldArgument, ContractVariableTransfer.CreateSubstitutions,
+TotalContractInvocationMaterialization.Bind and TotalContractExpressionBinder.BindTotalCore
+have method-owned substitution/allowed-variable/ordered-clause accumulation. Use builders,
+preserve overwrite versus duplicate rejection, and freeze substitutions before lowerer use
+and clauses before publication. Retained binder pre-state caches remain immutable roots.
+Coordinator inspected callsites and failure paths before edits. Status: open.
