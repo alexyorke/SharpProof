@@ -1146,7 +1146,12 @@ Evidence: artifacts/immutability-portable-preservation2.log.
   clause aliases map back by original reference into the complete clause list.
 - All 193 focused compiler/diagnostic/source-assumption/retained-input checks pass.
   Evidence: artifacts/immutability-compiler-model-focused2.log. The full ordinary
-  suite is running; this checkpoint is not yet counted as broadly verified.
+  run completed all 19 projects: 11,590 passed, five CodeFix assertion failures,
+  one existing package skip. Worker passed 5,331, Gates 470 and Package 336.
+  The five failures were Has.Count reflection against ImmutableArray; commit
+  0e1cefcee changes those assertions to Has.Length. All 20 CodeFix tests then
+  passed in artifacts/immutability-codefix-array-tests.log. This is combined
+  verification; a fresh full run of the corrected commit has not been claimed.
 - Retained PE bytes, fixed region tables, generated domain samples, diagnostic
   observations, options snapshots and code-action lists now use immutable storage.
   Additional metadata traversal and corpus/fuzz lookup state is persistent.
@@ -1159,3 +1164,25 @@ Evidence: artifacts/immutability-portable-preservation2.log.
 The refreshed inventory parses 1,809 tracked/new non-vendored C# files and records
 3,887 syntax candidates (12 explicit program-subject exclusions). These remain
 review candidates; the comprehensive stopping condition is still open.
+
+### PowerShell exhaustive syntax inventory
+
+- Universe: all 58 tracked .ps1/.psm1 files outside artifacts and pinned eng/common,
+  including executable documentation and container scripts. Canonical PowerShell
+  AST parsing passed all 58; no parse failures.
+- docs/immutability-powershell-residuals.tsv records 915 deduplicated syntax sites:
+  140 generic collection constructors, 208 mutation calls, 74 compound assignments,
+  35 increments, 49 indexed assignments and 409 assignments containing literal
+  collections. Literal detection includes nested RHS syntax, so these are review
+  candidates rather than 915 confirmed violations. Framework/native adapters and
+  explicit mutable subjects require evidence-backed classification.
+- Stable content-based IDs avoid shifting every row when a candidate is removed.
+  Coverage, source path, line/column, owner, syntax detail and review status are
+  recorded for each candidate. Main remains the sole writer.
+- The first inventory attempt saw Git's container ownership guard and produced an
+  empty inventory. The corrected run configured a read-only per-process safe
+  directory, asserted a nonempty tracked universe and regenerated the file.
+  Evidence: artifacts/immutability-powershell-inventory2.log.
+- Completion requires classifying every recorded candidate and resolving each
+  confirmed unnecessary mutation. This script inventory closes the coverage gap;
+  it does not close the remaining implementation work.
