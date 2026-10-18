@@ -1823,3 +1823,13 @@ The corrected Worker transitive build has zero warnings/errors; the checksum con
 test passes. The two Explicit LongFuzz tests were not selected by the name-only filter;
 a category-qualified bounded run is still required. This run is not evidence of their
 execution. Evidence: immutability-worker-observation-longfuzz-tests2.log.
+## Portable projection input follow-up inventory
+
+IMM-M024: PortableIrModel projection decoder contexts and corresponding Decode* helpers
+accept int[] despite initialized immutable wire Items. Coordinator traced all three callers:
+PortableIrGraphCodec validates term/instruction/location Items before invoking projections.
+Accept ImmutableArray<int> and remove seven transient Items.ToArray copies. Retain the
+invalid/default wire rejection, legacy constructor adapters and params IrTerm[]/IrVarId[]
+results required by IR APIs. DecodeMember can use the existing GetOrCreateMemberSnapshot
+with immutable parameter types; preserve its preceding wire guard and scope validation.
+Do not normalize default decoder input to empty. Status: open before edits.
