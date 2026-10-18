@@ -2,9 +2,13 @@
 
 This is the committed work list for API support and its evidence. Baseline: merged
 API inventory/provenance work at master `52cc38fea`, followed by the verified
-dictionary slices below. Counts are static source sites,
+collection and scalar slices below. Counts are static source sites,
 not runtime frequency. A passing test, a modeled effect, and a proved caller
 postcondition are separate claims.
+
+The verified sections record chronological checkpoints. Later slices supersede
+older descriptions of remaining boundaries; the universe, priorities and complete
+tables reflect the current inventory and report.
 
 ## Universe and completeness
 
@@ -44,7 +48,7 @@ access kind and value domains satisfy the production guard.
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and exact List allocations/aliases are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
 | D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key membership and scalar/reference contents remain separate; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
-| L: Lists and collection contents | Fresh List construction and concrete List Count, Add and scalar/reference get/set now share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
+| L: Lists and collection contents | Fresh List construction and concrete List Count, Add and scalar/reference/opaque get/set now share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
@@ -402,6 +406,12 @@ cases compile the original OSS0002 Swap and verify the copied value, including
 full decimal bits, NaN payloads, nullable values, large integers and structs with
 managed references and enum bits. Executed inventory evidence also checks opaque helper storage
 against CLR decimal bits and rejects a deliberately wrong returned-value claim.
+
+Canonical container verification on `48a27b949` passes 5,618 worker tests,
+2,049 frontend tests, all 471 Gates tests, 1,134 analyzer tests, 640 contract tests,
+481 IR tests, 368 SMT tests and 29 inventory/evidence tests. Both changed executable
+trusted-code lines are covered, with no uncovered or unmapped changed lines. The
+filtered run does not certify the full aggregate floor; CI enforces that floor.
 
 Opaque means stored, passed and returned without interpretation. Struct field
 access, numeric operators, conversions, equality/comparer callbacks and defaults
