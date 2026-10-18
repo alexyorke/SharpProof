@@ -237,6 +237,15 @@ function New-LocalPackageFeed {
     }
     foreach ($project in @($manifest.projects)) {
         $projectPath = Join-Path $repositoryRoot ([string]$project)
+        $build = Invoke-CapturedDotNet -Arguments @(
+            'build', $projectPath, '--configuration', $Configuration, '--nologo',
+            '-p:GeneratePackageOnBuild=false')
+        Assert-ExitCode $build $true "Building $projectPath before symbol extraction"
+    }
+    & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') `
+        -RepositoryRoot $repositoryRoot -Configuration $Configuration
+    foreach ($project in @($manifest.projects)) {
+        $projectPath = Join-Path $repositoryRoot ([string]$project)
         $pack = Invoke-CapturedDotNet -Arguments @(
             'pack',
             $projectPath,
@@ -244,6 +253,8 @@ function New-LocalPackageFeed {
             $Configuration,
             '--output',
             $feed,
+            '--no-build',
+            '--no-restore',
             '--nologo'
         )
         Assert-ExitCode $pack $true "Packing $projectPath"

@@ -51,6 +51,7 @@ public sealed class ProjectDagTests
             ["SharpProof.Logging"] = [],
             ["SharpProof.Smt"] = ["SharpProof.Verify"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
+            ["SharpProof.Tool"] = ["SharpProof.Worker.Protocol"],
             ["SharpProof.Verify"] = ["SharpProof.Specs"],
             ["SharpProof.Worker"] = [
                 "SharpProof.CompilerArtifact",

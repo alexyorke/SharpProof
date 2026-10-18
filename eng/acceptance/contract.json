@@ -619,6 +619,7 @@
           "scripts/New-SharpProofToolReleaseEvidence.ps1",
           "scripts/Test-SharpProofReleaseEvidence.ps1",
           "scripts/Test-SharpProofReleaseEvidenceRegression.ps1",
+          "scripts/Test-SharpProofPublicApiGovernance.ps1",
           "scripts/Test-SharpProofReleaseAttestations.sh",
           "scripts/Test-SharpProofReleaseAttestationsRegression.sh",
           "scripts/Pack-SharpProofTool.ps1",

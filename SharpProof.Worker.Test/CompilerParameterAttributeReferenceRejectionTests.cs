@@ -88,6 +88,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             var foreignName = "OrdinaryParameterAttributes_" + kind;
             byte[]? attributeImage = null;
             string? attributePath = null;
+            AssemblyIdentity? foreignIdentity = null;
             var libraryReferences = TestMetadataReferences.WithSharpProof;
             if (!shipped)
             {
@@ -96,6 +97,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
                     TestMetadataReferences.WithoutSharpProof);
                 Assert.That(attributes.Assembly.Identity.IsRetargetable, Is.EqualTo(retargetable));
                 Assert.That(attributes.Assembly.Identity.PublicKey, Is.Empty);
+                foreignIdentity = attributes.Assembly.Identity;
                 attributeImage = Emit(attributes);
                 using (var attributePe = new PEReader(new MemoryStream(attributeImage, writable: false)))
                 {
@@ -131,6 +133,7 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             Assert.That(SymbolEqualityComparer.Default.Equals(selected, actualShipped), Is.True);
             Assert.That(selected!.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(PositiveAttribute).Assembly.GetName().Name));
             Assert.That(selected.ContainingAssembly.Identity.IsRetargetable, Is.False);
+            Assert.That(selected.ContainingAssembly.Identity.PublicKeyToken, Is.Not.Empty);
 
             var tree = consumer.SyntaxTrees.Single();
             var root = await tree.GetRootAsync();
@@ -170,10 +173,22 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             }
             var identityRead = CompilerTotalIlBodyProvider.TryReadAssemblyIdentity(reader, assemblyHandle,
                 selected.ContainingAssembly.Identity, out var identity);
-            Assert.That(identityRead, Is.EqualTo(!retargetable));
+            // The omitted foreign attributes are unsigned; the shipped contract API is now signed.
+            // The identity reader must reject their empty key before constructing a matching contract-API identity.
+            Assert.That(identityRead, Is.EqualTo(shipped));
             if (identityRead)
             {
-                Assert.That(identity.Equals(selected.ContainingAssembly.Identity), Is.EqualTo(shipped));
+                Assert.That(identity, Is.EqualTo(selected.ContainingAssembly.Identity));
+            }
+            if (!shipped && !retargetable)
+            {
+                // Keep a positive structural control: this is a valid ordinary attribute dependency,
+                // omitted from the consumer's references, rather than malformed assembly-reference data.
+                Assert.That(foreignIdentity, Is.Not.Null);
+                Assert.That(CompilerTotalIlBodyProvider.TryReadAssemblyIdentity(reader, assemblyHandle,
+                    foreignIdentity!, out var parsedForeign), Is.True);
+                Assert.That(parsedForeign, Is.EqualTo(foreignIdentity));
+                Assert.That(parsedForeign, Is.Not.EqualTo(selected.ContainingAssembly.Identity));
             }
 
             var references = CompilerCompilationCapture.CaptureReferences(consumer.References,

@@ -403,6 +403,8 @@ switch ($Command) {
             'Embedded symbol package regressions failed.'
         Invoke-RequiredScript 'scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
             'Release SBOM and attestation policy regressions failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofPublicApiGovernance.ps1' `
+            'Public API governance controls failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'

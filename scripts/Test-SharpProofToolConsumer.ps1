@@ -111,5 +111,7 @@ File.WriteAllText(args[0], WorkerProtocolJson.SerializeResponse(response));
         throw 'Local manifest does not pin the exact installed SharpProof.Tool version and command.'
     }
     Write-Host "Optional tool $version installed and executed from exact feed; consumer evidence: $scratch"
+    # The rejected malformed-result subprocess is a passing negative control.
+    $global:LASTEXITCODE = 0
 }
 finally { Pop-Location }
