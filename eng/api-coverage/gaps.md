@@ -197,7 +197,7 @@ scalar/reference scope. No SDK, reference assembly, catalog or inventory pin cha
 
 Parameterless framework dictionary construction and owned Count no longer require
 primitive keys. On normal constructor return the result is fresh and has zero
-Count, regardless of key or value type. For a nonprimitive or open key type,
+Count, regardless of key or value type. For a non-primitive or open key type,
 default-comparer initialization remains an opaque operation with allocation,
 exception and arbitrary existing-state effects. Fresh dictionary state is
 established only after its normal continuation, preserving those effects without

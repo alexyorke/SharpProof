@@ -283,7 +283,7 @@ facts; generic/reference-key operations and custom/incoming comparer state remai
 [empty-state evidence and remaining gaps](gaps.md#verified-empty-dictionary-state-across-value-domains).
 
 Parameterless default construction and owned Count also support generic/reference
-keys. Nonprimitive-key comparer initialization retains arbitrary heap, allocation
+keys. Non-primitive-key comparer initialization retains arbitrary heap, allocation
 and fault effects before fresh zero-Count state is established. This covers the
 four paired generic-key corpus constructions; hashing, membership and contents for
 those keys still need models. Native refutation remains Unknown without concrete
