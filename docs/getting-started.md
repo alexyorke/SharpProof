@@ -11,11 +11,11 @@ Targeting an older application framework does not require running the verifier o
 1. Obtain the current packages from your configured feed; this checkout does not imply public NuGet availability. See [obtaining packages](#obtain-this-checkouts-packages).
 2. Add this single reference to your project, or use the [verified project template](../templates/README.md):
 
-```xml
-<ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
-</ItemGroup>
-```
+   ```xml
+   <ItemGroup>
+     <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+   </ItemGroup>
+   ```
 
 3. Save this complete compilation unit as `Counter.cs`, then run `dotnet build -c Release` in your consumer directory:
 

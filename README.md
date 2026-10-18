@@ -4,6 +4,20 @@ SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style pro
 
 **This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
+## Repository checks
+
+Run all repository lint, spelling, package compatibility, and link checks with one
+Docker command:
+
+```sh
+docker compose run --rm --build lint
+```
+
+It builds the pinned toolchain and lint tools automatically, writes reports under
+`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
+`pwsh -File scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](eng/lint/README.md)
+for scope and individual checks.
+
 ## Packages
 
 The standard setup is `dotnet add package SharpProof` using your configured feed, or this one reference with no SharpProof configuration properties:

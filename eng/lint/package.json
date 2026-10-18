@@ -1,0 +1,13 @@
+{
+  "name": "sharpproof-repository-lint",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": ">=22.18.0" },
+  "dependencies": {
+    "markdownlint": "0.41.1",
+    "cspell": "10.4.0"
+  },
+  "overrides": {
+    "katex": "0.18.11"
+  }
+}

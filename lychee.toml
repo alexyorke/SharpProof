@@ -1,0 +1,28 @@
+# Scan link-bearing documentation and web formats throughout the checkout.
+extensions = [
+  "md", "markdown", "mdx", "qmd", "rmd", "mkd", "mkdn", "mdwn", "mdown", "mkdown",
+  "html", "htm", "rst", "txt", "css",
+]
+# Include .github and other hidden source directories, but never Git metadata.
+hidden = true
+exclude_path = ['(^|/)\.git(/|$)']
+# Respect ignore files so build outputs and the report do not become inputs.
+no_ignore = false
+
+# Check file/directory targets, Markdown headings, HTML IDs, and web fragments.
+include_fragments = "full"
+# URLs in documentation examples and code snippets are part of the audit too.
+include_verbatim = true
+
+# This normative attestation predicate type is a semantic identifier, not a dereferenceable webpage.
+exclude = ['^https://spdx\.dev/Document/v2\.3$']
+
+timeout = 30
+max_retries = 2
+retry_wait_time = 2
+max_concurrency = 8
+host_concurrency = 2
+host_request_interval = "250ms"
+# Do not reuse cached successes or treat HTTP errors/timeouts as valid links.
+cache = false
+accept_timeouts = false

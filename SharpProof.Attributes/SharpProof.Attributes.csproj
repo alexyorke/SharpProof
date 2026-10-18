@@ -6,6 +6,7 @@
     <PublicSign>false</PublicSign>
     <AssemblyOriginatorKeyFile>..\eng\signing\SharpProof.Attributes.snk</AssemblyOriginatorKeyFile>
     <IsPackable>true</IsPackable> 
+    <EnablePackageValidation>true</EnablePackageValidation>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>SharpProof.Attributes</PackageId>
     <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
