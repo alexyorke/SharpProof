@@ -320,6 +320,12 @@ and eight usage-ranking tests. All 63 analyzer mode/effect controls pass, includ
 unknown growth faults and allocation. Layout passes for all 59 projects. CI still
 requires aggregate and changed-code coverage plus platform/package consumers.
 
+The complete worker suite also passes all 5,505 tests, and the complete analyzer
+suite passes all 1,134 tests. Effect-contract diagnostics
+retain the first source location and prefer a mutation/call summary at that same
+operation over its broad internal read site. A compiled read-only List control
+still reports the read violation; the existing mutation assertion is unchanged.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
