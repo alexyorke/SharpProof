@@ -99,9 +99,21 @@ access kind and value domains satisfy the production guard.
   may be custom comparers, generic types without concrete evidence and mutable
   helper parameters still need dispatch/provenance work. Null-coalescing comparer
   selection in generic corpus sorts is a concrete next dataflow task.
-  A no-argument generic default-comparer matrix also exposes local type-parameter
-  recognition, exact small-integer comparison semantics and replay of wrong
-  contracts after opaque default-getter initialization as remaining gaps.
+  Closed scalar generic default comparers now resolve local-function type parameters
+  through the same declaration-owned type resolver. Typed SByte/Byte/Int16/UInt16/Char
+  CompareTo and proven default-comparer calls retain the exact promoted Int32
+  difference; the larger integer types retain -1/0/1. Implementation/test commit
+  `38e35988b` verifies 33 native cases and ordered CLR/IR boundary pairs for all nine
+  integer types; 1,439 selected worker, 1,868 frontend, 468 Gates and 27 inventory
+  tests pass, with changed trusted code 319/319 covered. The five new intrinsic
+  registrations add partial evidence without claiming universal API coverage.
+  Commit `b898a640f` sweeps the entire 0-4096 construction allowance for real
+  precondition and exception-filter imports, compares successful IR results with CLR
+  execution, and covers both budget exits exposed by aggregate CI coverage.
+  Replay of wrong contracts after opaque default-getter initialization remains
+  open: 18 preserved cases still abstain because the normal-return choice consumes
+  an approximation. A fix must model a valid initialized-cache witness, singleton
+  identity and conservative cold/fault paths rather than bypass replay validation.
 - Catalog and audited-intrinsic evidence gates require executed behavioral probes
   and wrong-claim controls for modeled requirements. They do not automatically map
   every repository test to every possible supported behavior. New facets need an
