@@ -30,24 +30,24 @@ block: b8 cfg:6
 block: b9 cfg:8
   i12 op2 Goto b10 source=none
 block: b10 cfg:9
-  i13 op7 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:375+4
-  i14 op6 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1"#t5)v7) source=total-generic-field-identity.cs:375+10
-  i15 op8 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b13 : b14 source=total-generic-field-identity.cs:375+10
+  i13 op7 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:tokens["cell"]#6
+  i14 op6 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1"#t5)v7) source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
+  i15 op8 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b13 : b14 source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
 block: b11 cfg:10
   i56 op2 Return void source=none
 block: b12 exceptional:exit
   i2 op2 ExceptionalExit source=none
 block: b13 throw
-  i16 op8 Throw NullReference -> b12 source=total-generic-field-identity.cs:375+10
+  i16 op8 Throw NullReference -> b12 source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
 block: b14 normal
-  i17 op9 Assign v8:bool[width=0,signed=False] = true source=total-generic-field-identity.cs:375+10
-  i18 op6 Assign v9:bool[width=0,signed=False] = (pure:m0((("object"#t3)v4)) == 3) source=total-generic-field-identity.cs:375+10
-  i19 op6 Goto b16 source=total-generic-field-identity.cs:375+10
+  i17 op9 Assign v8:bool[width=0,signed=False] = true source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
+  i18 op6 Assign v9:bool[width=0,signed=False] = (pure:m0((("object"#t3)v4)) == 3) source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
+  i19 op6 Goto b16 source=total-generic-field-identity.cs:tokens["cell",".","Set","(",")"]#1
 block: b15 call:continued
-  i30 op15 Assign v18:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:395+4
-  i31 op14 Assign v15:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1"#t5)v18) source=total-generic-field-identity.cs:395+17
-  i32 op16 Assign v19:int[width=32,signed=True] = 7 source=total-generic-field-identity.cs:411+1
-  i33 op17 Branch (v18 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b21 : b22 source=total-generic-field-identity.cs:395+17
+  i30 op15 Assign v18:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:tokens["cell"]#7
+  i31 op14 Assign v15:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1"#t5)v18) source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
+  i32 op16 Assign v19:int[width=32,signed=True] = 7 source=total-generic-field-identity.cs:tokens["7"]#2
+  i33 op17 Branch (v18 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b21 : b22 source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
 block: b16 call:body
   i20 op10 Assign v5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = v4 source=none
   i21 op10 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer`1.Cell`1[width=0,signed=False] = v4 source=none
@@ -55,23 +55,23 @@ block: b16 call:body
 block: b17 call:body
   i23 op10 Goto b18 source=none
 block: b18 call:body
-  i24 op11 Assign v10:int[width=32,signed=True] = 7 source=total-generic-field-identity.cs:629+1
-  i25 op12 Assign v11:int[width=32,signed=True] = v10 source=total-generic-field-identity.cs:621+9
-  i26 op13 Write Field (("object"#t3)v5).m0 = v10 source=total-generic-field-identity.cs:621+9
+  i24 op11 Assign v10:int[width=32,signed=True] = 7 source=total-generic-field-identity.cs:tokens["7"]#3
+  i25 op12 Assign v11:int[width=32,signed=True] = v10 source=total-generic-field-identity.cs:tokens["Value","=","7"]#1
+  i26 op13 Write Field (("object"#t3)v5).m0 = v10 source=total-generic-field-identity.cs:tokens["Value","=","7"]#1
   i27 op10 Goto b19 source=none
 block: b19 call:body
   i28 op10 Goto b15 source=none
 block: b20 call:body
   i29 op10 ExceptionalExit source=none
 block: b21 throw
-  i34 op17 Throw NullReference -> b12 source=total-generic-field-identity.cs:395+17
+  i34 op17 Throw NullReference -> b12 source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
 block: b22 normal
-  i35 op18 Assign v20:bool[width=0,signed=False] = true source=total-generic-field-identity.cs:395+17
-  i36 op14 Assign v12:int[width=32,signed=True] = v19 source=total-generic-field-identity.cs:395+17
-  i37 op14 Goto b24 source=total-generic-field-identity.cs:395+17
+  i35 op18 Assign v20:bool[width=0,signed=False] = true source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
+  i36 op14 Assign v12:int[width=32,signed=True] = v19 source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
+  i37 op14 Goto b24 source=total-generic-field-identity.cs:tokens["cell",".","Property","=","7"]#1
 block: b23 call:continued
-  i50 op24 Assign v23:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:429+4
-  i51 op25 Branch (v23 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b29 : b30 source=total-generic-field-identity.cs:429+10
+  i50 op24 Assign v23:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}[width=0,signed=False] = v1 source=total-generic-field-identity.cs:tokens["cell"]#8
+  i51 op25 Branch (v23 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)) ? b29 : b30 source=total-generic-field-identity.cs:tokens["cell",".","Value"]#3
 block: b24 call:body
   i38 op19 Assign v13:int[width=32,signed=True] = v12 source=none
   i39 op19 Assign v14:int[width=32,signed=True] = v12 source=none
@@ -81,20 +81,20 @@ block: b24 call:body
 block: b25 call:body
   i43 op19 Goto b26 source=none
 block: b26 call:body
-  i44 op20 Assign v21:int[width=32,signed=True] = v13 source=total-generic-field-identity.cs:740+5
-  i45 op21 Assign v22:int[width=32,signed=True] = v21 source=total-generic-field-identity.cs:732+13
-  i46 op22 Write Field (("object"#t3)v16).m0 = v21 source=total-generic-field-identity.cs:732+13
+  i44 op20 Assign v21:int[width=32,signed=True] = v13 source=total-generic-field-identity.cs:tokens["value"]#1
+  i45 op21 Assign v22:int[width=32,signed=True] = v21 source=total-generic-field-identity.cs:tokens["Value","=","value"]#1
+  i46 op22 Write Field (("object"#t3)v16).m0 = v21 source=total-generic-field-identity.cs:tokens["Value","=","value"]#1
   i47 op19 Goto b27 source=none
 block: b27 call:body
   i48 op19 Goto b23 source=none
 block: b28 call:body
   i49 op19 ExceptionalExit source=none
 block: b29 throw
-  i52 op25 Throw NullReference -> b12 source=total-generic-field-identity.cs:429+10
+  i52 op25 Throw NullReference -> b12 source=total-generic-field-identity.cs:tokens["cell",".","Value"]#3
 block: b30 normal
-  i53 op26 Assign v24:int[width=32,signed=True] = pure:m0((("object"#t3)v23)) source=total-generic-field-identity.cs:429+10
-  i54 op23 Assign v3:int[width=32,signed=True] = v24 source=total-generic-field-identity.cs:429+10
-  i55 op23 Return v3 source=total-generic-field-identity.cs:429+10
+  i53 op26 Assign v24:int[width=32,signed=True] = pure:m0((("object"#t3)v23)) source=total-generic-field-identity.cs:tokens["cell",".","Value"]#3
+  i54 op23 Assign v3:int[width=32,signed=True] = v24 source=total-generic-field-identity.cs:tokens["cell",".","Value"]#3
+  i55 op23 Return v3 source=total-generic-field-identity.cs:tokens["cell",".","Value"]#3
 term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String} width=0 signed=False value=v0
 term: ir1 Boolean type=t0:bool width=0 signed=False value=true
 term: ir3 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String} width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Outer{System.Int32}.Cell{System.String}"#t4)null)

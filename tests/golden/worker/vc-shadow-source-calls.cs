@@ -28,7 +28,8 @@ public static class Subject
         Contract.Requires(x == 3);
         Contract.Ensures(Contract.Result<int>() == x);
         Contract.Ensures(Contract.Result<int>() == Contract.Old(x));
-        for (int i = 0; i < 2; i++) x = Increment(x);
+        for (int i = 0; i < 2; i++)
+            x = Increment(x);
         return x;
     }
     private static int Increment(int value) { return value + 1; }

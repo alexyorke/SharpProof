@@ -11,108 +11,108 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op1 Havoc Variables/Approximation [v3:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:460+6
-  i6 op2 Assign v4:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v3 source=total-generic-buffer-insert.cs:460+6
-  i7 op3 Havoc Variables/Approximation [v5:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:467+4
-  i8 op4 Assign v6:int[width=32,signed=True] = v5 source=total-generic-buffer-insert.cs:467+4
-  i9 op6 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] = v1 source=total-generic-buffer-insert.cs:475+5
-  i10 op7 Branch (v4 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b10 : b11 source=total-generic-buffer-insert.cs:460+12
+  i5 op1 Havoc Variables/Approximation [v3:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:tokens["_items"]#3
+  i6 op2 Assign v4:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v3 source=total-generic-buffer-insert.cs:tokens["_items"]#3
+  i7 op3 Havoc Variables/Approximation [v5:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_end"]#2
+  i8 op4 Assign v6:int[width=32,signed=True] = v5 source=total-generic-buffer-insert.cs:tokens["_end"]#2
+  i9 op6 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] = v1 source=total-generic-buffer-insert.cs:tokens["value"]#2
+  i10 op7 Branch (v4 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b10 : b11 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b3 cfg:2
-  i42 op31 Havoc Variables/Approximation [v25:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:585+6
-  i43 op32 Assign v26:int[width=32,signed=True] = v25 source=total-generic-buffer-insert.cs:585+6
-  i44 op33 Assign v27:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:594+1
-  i45 op34 Assign v28:int[width=32,signed=True] = (v26 + v27) source=total-generic-buffer-insert.cs:585+10
-  i46 op35 Havoc Variables/Approximation [v29:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:599+6
-  i47 op36 Assign v30:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v29 source=total-generic-buffer-insert.cs:599+6
-  i48 op37 Branch (v30 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b22 : b23 source=total-generic-buffer-insert.cs:599+13
+  i42 op31 Havoc Variables/Approximation [v25:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_start"]#4
+  i43 op32 Assign v26:int[width=32,signed=True] = v25 source=total-generic-buffer-insert.cs:tokens["_start"]#4
+  i44 op33 Assign v27:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:tokens["1"]#3
+  i45 op34 Assign v28:int[width=32,signed=True] = (v26 + v27) source=total-generic-buffer-insert.cs:tokens["_start","+","1"]#1
+  i46 op35 Havoc Variables/Approximation [v29:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:tokens["_items"]#5
+  i47 op36 Assign v30:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v29 source=total-generic-buffer-insert.cs:tokens["_items"]#5
+  i48 op37 Branch (v30 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b22 : b23 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#3
 block: b4 cfg:3
-  i59 op45 Havoc Variables/Approximation [v34:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:641+6
-  i60 op46 Assign v35:int[width=32,signed=True] = v34 source=total-generic-buffer-insert.cs:641+6
-  i61 op47 Havoc Variables/Approximation [v37:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False]] source=total-generic-buffer-insert.cs:650+6
-  i62 op47 Assign v40:int[width=32,signed=True] = 0 source=total-generic-buffer-insert.cs:650+6
-  i63 op47 Goto b29 source=total-generic-buffer-insert.cs:650+6
+  i59 op45 Havoc Variables/Approximation [v34:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_count"]#3
+  i60 op46 Assign v35:int[width=32,signed=True] = v34 source=total-generic-buffer-insert.cs:tokens["_count"]#3
+  i61 op47 Havoc Variables/Approximation [v37:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False]] source=total-generic-buffer-insert.cs:tokens["Length"]#5
+  i62 op47 Assign v40:int[width=32,signed=True] = 0 source=total-generic-buffer-insert.cs:tokens["Length"]#5
+  i63 op47 Goto b29 source=total-generic-buffer-insert.cs:tokens["Length"]#5
 block: b5 cfg:5
   i81 op0 Goto b7 source=none
 block: b6 cfg:4
-  i82 op56 Havoc Variables/Approximation [v46:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:661+6
-  i83 op57 Assign v47:int[width=32,signed=True] = v46 source=total-generic-buffer-insert.cs:661+6
-  i84 op58 Assign v48:int[width=32,signed=True] = (v47 + 1) source=total-generic-buffer-insert.cs:659+8
-  i85 op59 Assign v49:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:659+8
-  i86 op60 Write Field source=total-generic-buffer-insert.cs:659+8
-  i87 op61 Assign v50:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:659+8
+  i82 op56 Havoc Variables/Approximation [v46:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_count"]#4
+  i83 op57 Assign v47:int[width=32,signed=True] = v46 source=total-generic-buffer-insert.cs:tokens["_count"]#4
+  i84 op58 Assign v48:int[width=32,signed=True] = (v47 + 1) source=total-generic-buffer-insert.cs:tokens["++","_count"]#1
+  i85 op59 Assign v49:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:tokens["++","_count"]#1
+  i86 op60 Write Field source=total-generic-buffer-insert.cs:tokens["++","_count"]#1
+  i87 op61 Assign v50:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:tokens["++","_count"]#1
   i88 op0 Goto b7 source=none
 block: b7 cfg:6
-  i89 op62 Havoc Variables/Approximation [v51:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:641+35
-  i90 op63 Assign v52:int[width=32,signed=True] = v51 source=total-generic-buffer-insert.cs:641+35
-  i91 op64 Assign v53:int[width=32,signed=True] = v52 source=total-generic-buffer-insert.cs:632+44
-  i92 op65 Write Field source=total-generic-buffer-insert.cs:632+44
+  i89 op62 Havoc Variables/Approximation [v51:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_count","<","Length","?","++","_count",":","_count"]#1
+  i90 op63 Assign v52:int[width=32,signed=True] = v51 source=total-generic-buffer-insert.cs:tokens["_count","<","Length","?","++","_count",":","_count"]#1
+  i91 op64 Assign v53:int[width=32,signed=True] = v52 source=total-generic-buffer-insert.cs:tokens["_count","=","_count","<","Length","?","++","_count",":","_count"]#1
+  i92 op65 Write Field source=total-generic-buffer-insert.cs:tokens["_count","=","_count","<","Length","?","++","_count",":","_count"]#1
   i93 op0 Goto b8 source=none
 block: b8 cfg:7
   i94 op0 Return void source=none
 block: b9 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b10 throw
-  i11 op7 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:460+12
+  i11 op7 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b11 normal
-  i12 op8 Branch ((v6 < 0) || (v6 >= len(v4))) ? b12 : b13 source=total-generic-buffer-insert.cs:460+12
+  i12 op8 Branch ((v6 < 0) || (v6 >= len(v4))) ? b12 : b13 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b12 throw
-  i13 op8 Throw IndexOutOfRange -> b9 source=total-generic-buffer-insert.cs:460+12
+  i13 op8 Throw IndexOutOfRange -> b9 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b13 normal
-  i14 op9 Assign v8:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:460+12
-  i15 op5 Havoc Variables/Approximation [v9:bool[width=0,signed=False]] source=total-generic-buffer-insert.cs:460+20
-  i16 op10 Branch v9 ? b14 : b15 source=total-generic-buffer-insert.cs:460+12
+  i14 op9 Assign v8:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
+  i15 op5 Havoc Variables/Approximation [v9:bool[width=0,signed=False]] source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]","=","value"]#1
+  i16 op10 Branch v9 ? b14 : b15 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b14 throw
-  i17 op10 Throw Unknown -> b9 source=total-generic-buffer-insert.cs:460+12
+  i17 op10 Throw Unknown -> b9 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b15 normal
-  i18 op11 Assign v10:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:460+12
-  i19 op5 Write Element source=total-generic-buffer-insert.cs:460+20
-  i20 op12 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:498+4
-  i21 op13 Assign v12:int[width=32,signed=True] = v11 source=total-generic-buffer-insert.cs:498+4
-  i22 op14 Assign v13:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:505+1
-  i23 op15 Assign v14:int[width=32,signed=True] = (v12 + v13) source=total-generic-buffer-insert.cs:498+8
-  i24 op16 Havoc Variables/Approximation [v15:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:510+6
-  i25 op17 Assign v16:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v15 source=total-generic-buffer-insert.cs:510+6
-  i26 op18 Branch (v16 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b16 : b17 source=total-generic-buffer-insert.cs:510+13
+  i18 op11 Assign v10:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
+  i19 op5 Write Element source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]","=","value"]#1
+  i20 op12 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_end"]#4
+  i21 op13 Assign v12:int[width=32,signed=True] = v11 source=total-generic-buffer-insert.cs:tokens["_end"]#4
+  i22 op14 Assign v13:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:tokens["1"]#2
+  i23 op15 Assign v14:int[width=32,signed=True] = (v12 + v13) source=total-generic-buffer-insert.cs:tokens["_end","+","1"]#1
+  i24 op16 Havoc Variables/Approximation [v15:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:tokens["_items"]#4
+  i25 op17 Assign v16:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v15 source=total-generic-buffer-insert.cs:tokens["_items"]#4
+  i26 op18 Branch (v16 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b16 : b17 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#2
 block: b16 throw
-  i27 op18 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:510+13
+  i27 op18 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#2
 block: b17 normal
-  i28 op19 Assign v17:int[width=32,signed=True] = len(v16) source=total-generic-buffer-insert.cs:510+13
-  i29 op20 Branch (v17 == 0) ? b18 : b19 source=total-generic-buffer-insert.cs:497+26
+  i28 op19 Assign v17:int[width=32,signed=True] = len(v16) source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#2
+  i29 op20 Branch (v17 == 0) ? b18 : b19 source=total-generic-buffer-insert.cs:tokens["(","_end","+","1",")","%","_items",".","Length"]#1
 block: b18 throw
-  i30 op20 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:497+26
+  i30 op20 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:tokens["(","_end","+","1",")","%","_items",".","Length"]#1
 block: b19 normal
-  i31 op21 Branch ((v14 == -2147483648) && (v17 == -1)) ? b20 : b21 source=total-generic-buffer-insert.cs:497+26
+  i31 op21 Branch ((v14 == -2147483648) && (v17 == -1)) ? b20 : b21 source=total-generic-buffer-insert.cs:tokens["(","_end","+","1",")","%","_items",".","Length"]#1
 block: b20 throw
-  i32 op21 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:497+26
+  i32 op21 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:tokens["(","_end","+","1",")","%","_items",".","Length"]#1
 block: b21 normal
-  i33 op22 Assign v18:int[width=32,signed=True] = (v14 % v17) source=total-generic-buffer-insert.cs:497+26
-  i34 op23 Assign v19:int[width=32,signed=True] = v18 source=total-generic-buffer-insert.cs:490+33
-  i35 op24 Write Field source=total-generic-buffer-insert.cs:490+33
-  i36 op26 Havoc Variables/Approximation [v20:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:537+4
-  i37 op27 Assign v21:int[width=32,signed=True] = v20 source=total-generic-buffer-insert.cs:537+4
-  i38 op28 Havoc Variables/Approximation [v22:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:545+6
-  i39 op29 Assign v23:int[width=32,signed=True] = v22 source=total-generic-buffer-insert.cs:545+6
-  i40 op30 Assign v24:bool[width=0,signed=False] = (v21 == v23) source=total-generic-buffer-insert.cs:537+14
-  i41 op25 Branch v24 ? b3 : b4 source=total-generic-buffer-insert.cs:537+14
+  i33 op22 Assign v18:int[width=32,signed=True] = (v14 % v17) source=total-generic-buffer-insert.cs:tokens["(","_end","+","1",")","%","_items",".","Length"]#1
+  i34 op23 Assign v19:int[width=32,signed=True] = v18 source=total-generic-buffer-insert.cs:tokens["_end","=","(","_end","+","1",")","%","_items",".","Length"]#1
+  i35 op24 Write Field source=total-generic-buffer-insert.cs:tokens["_end","=","(","_end","+","1",")","%","_items",".","Length"]#1
+  i36 op26 Havoc Variables/Approximation [v20:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_end"]#5
+  i37 op27 Assign v21:int[width=32,signed=True] = v20 source=total-generic-buffer-insert.cs:tokens["_end"]#5
+  i38 op28 Havoc Variables/Approximation [v22:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_start"]#2
+  i39 op29 Assign v23:int[width=32,signed=True] = v22 source=total-generic-buffer-insert.cs:tokens["_start"]#2
+  i40 op30 Assign v24:bool[width=0,signed=False] = (v21 == v23) source=total-generic-buffer-insert.cs:tokens["_end","==","_start"]#1
+  i41 op25 Branch v24 ? b3 : b4 source=total-generic-buffer-insert.cs:tokens["_end","==","_start"]#1
 block: b22 throw
-  i49 op37 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:599+13
+  i49 op37 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#3
 block: b23 normal
-  i50 op38 Assign v31:int[width=32,signed=True] = len(v30) source=total-generic-buffer-insert.cs:599+13
-  i51 op39 Branch (v31 == 0) ? b24 : b25 source=total-generic-buffer-insert.cs:584+28
+  i50 op38 Assign v31:int[width=32,signed=True] = len(v30) source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#3
+  i51 op39 Branch (v31 == 0) ? b24 : b25 source=total-generic-buffer-insert.cs:tokens["(","_start","+","1",")","%","_items",".","Length"]#1
 block: b24 throw
-  i52 op39 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:584+28
+  i52 op39 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:tokens["(","_start","+","1",")","%","_items",".","Length"]#1
 block: b25 normal
-  i53 op40 Branch ((v28 == -2147483648) && (v31 == -1)) ? b26 : b27 source=total-generic-buffer-insert.cs:584+28
+  i53 op40 Branch ((v28 == -2147483648) && (v31 == -1)) ? b26 : b27 source=total-generic-buffer-insert.cs:tokens["(","_start","+","1",")","%","_items",".","Length"]#1
 block: b26 throw
-  i54 op40 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:584+28
+  i54 op40 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:tokens["(","_start","+","1",")","%","_items",".","Length"]#1
 block: b27 normal
-  i55 op41 Assign v32:int[width=32,signed=True] = (v28 % v31) source=total-generic-buffer-insert.cs:584+28
-  i56 op42 Assign v33:int[width=32,signed=True] = v32 source=total-generic-buffer-insert.cs:575+37
-  i57 op43 Write Field source=total-generic-buffer-insert.cs:575+37
+  i55 op41 Assign v32:int[width=32,signed=True] = (v28 % v31) source=total-generic-buffer-insert.cs:tokens["(","_start","+","1",")","%","_items",".","Length"]#1
+  i56 op42 Assign v33:int[width=32,signed=True] = v32 source=total-generic-buffer-insert.cs:tokens["_start","=","(","_start","+","1",")","%","_items",".","Length"]#1
+  i57 op43 Write Field source=total-generic-buffer-insert.cs:tokens["_start","=","(","_start","+","1",")","%","_items",".","Length"]#1
   i58 op0 Goto b4 source=none
 block: b28 call:continued
-  i79 op55 Assign v45:bool[width=0,signed=False] = (v35 < v40) source=total-generic-buffer-insert.cs:641+15
-  i80 op44 Branch v45 ? b6 : b5 source=total-generic-buffer-insert.cs:641+15
+  i79 op55 Assign v45:bool[width=0,signed=False] = (v35 < v40) source=total-generic-buffer-insert.cs:tokens["_count","<","Length"]#1
+  i80 op44 Branch v45 ? b6 : b5 source=total-generic-buffer-insert.cs:tokens["_count","<","Length"]#1
 block: b29 call:body
   i64 op48 Assign v38:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False] = v37 source=none
   i65 op48 Assign v39:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False] = v37 source=none
@@ -120,21 +120,21 @@ block: b29 call:body
 block: b30 call:body
   i67 op48 Goto b31 source=none
 block: b31 call:body
-  i68 op50 Assign v41:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = pure:m0((("object"#t3)v38)) source=total-generic-buffer-insert.cs:391+6
-  i69 op51 Branch (v41 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b34 : b35 source=total-generic-buffer-insert.cs:391+13
+  i68 op50 Assign v41:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = pure:m0((("object"#t3)v38)) source=total-generic-buffer-insert.cs:tokens["_items"]#2
+  i69 op51 Branch (v41 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b34 : b35 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#1
 block: b32 call:body
   i70 op48 Goto b28 source=none
 block: b33 call:body
   i71 op48 ExceptionalExit source=none
 block: b34 call:body
-  i72 op51 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:391+13
+  i72 op51 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#1
 block: b35 call:body
-  i73 op52 Assign v42:int[width=32,signed=True] = len(v41) source=total-generic-buffer-insert.cs:391+13
-  i74 op53 Assign v43:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:407+1
-  i75 op54 Assign v44:int[width=32,signed=True] = (v42 - v43) source=total-generic-buffer-insert.cs:391+17
-  i76 op49 Assign v36:int[width=32,signed=True] = v44 source=total-generic-buffer-insert.cs:391+17
-  i77 op49 Assign v40:int[width=32,signed=True] = v36 source=total-generic-buffer-insert.cs:391+17
-  i78 op49 Goto b28 source=total-generic-buffer-insert.cs:391+17
+  i73 op52 Assign v42:int[width=32,signed=True] = len(v41) source=total-generic-buffer-insert.cs:tokens["_items",".","Length"]#1
+  i74 op53 Assign v43:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:tokens["1"]#1
+  i75 op54 Assign v44:int[width=32,signed=True] = (v42 - v43) source=total-generic-buffer-insert.cs:tokens["_items",".","Length","-","1"]#1
+  i76 op49 Assign v36:int[width=32,signed=True] = v44 source=total-generic-buffer-insert.cs:tokens["_items",".","Length","-","1"]#1
+  i77 op49 Assign v40:int[width=32,signed=True] = v36 source=total-generic-buffer-insert.cs:tokens["_items",".","Length","-","1"]#1
+  i78 op49 Goto b28 source=total-generic-buffer-insert.cs:tokens["_items",".","Length","-","1"]#1
 term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0 width=0 signed=False value=v0
 term: ir1 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v3
 term: ir2 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v4

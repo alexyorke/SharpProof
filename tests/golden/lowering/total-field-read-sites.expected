@@ -11,38 +11,38 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op2 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:259+4
-  i6 op3 Branch (v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b8 : b9 source=total-field-read-sites.cs:259+9
+  i5 op2 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:tokens["cell"]#2
+  i6 op3 Branch (v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b8 : b9 source=total-field-read-sites.cs:tokens["cell",".","Flag"]#1
 block: b3 cfg:3
-  i10 op5 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:284+4
-  i11 op6 Branch (v6 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b10 : b11 source=total-field-read-sites.cs:284+10
+  i10 op5 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:tokens["cell"]#4
+  i11 op6 Branch (v6 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b10 : b11 source=total-field-read-sites.cs:tokens["cell",".","Value"]#1
 block: b4 cfg:2
-  i16 op9 Assign v9:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:271+4
-  i17 op10 Branch (v9 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b12 : b13 source=total-field-read-sites.cs:271+10
+  i16 op9 Assign v9:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:tokens["cell"]#3
+  i17 op10 Branch (v9 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b12 : b13 source=total-field-read-sites.cs:tokens["cell",".","Count"]#1
 block: b5 cfg:4
-  i22 op14 Assign v11:int[width=32,signed=True] = v8 source=total-field-read-sites.cs:259+35
-  i23 op13 Assign v3:int[width=32,signed=True] = v11 source=total-field-read-sites.cs:259+35
-  i24 op13 Return v3 source=total-field-read-sites.cs:259+35
+  i22 op14 Assign v11:int[width=32,signed=True] = v8 source=total-field-read-sites.cs:tokens["cell",".","Flag","?","cell",".","Count",":","cell",".","Value"]#1
+  i23 op13 Assign v3:int[width=32,signed=True] = v11 source=total-field-read-sites.cs:tokens["cell",".","Flag","?","cell",".","Count",":","cell",".","Value"]#1
+  i24 op13 Return v3 source=total-field-read-sites.cs:tokens["cell",".","Flag","?","cell",".","Count",":","cell",".","Value"]#1
 block: b6 cfg:5
   i25 op0 Return void source=none
 block: b7 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b8 throw
-  i7 op3 Throw NullReference -> b7 source=total-field-read-sites.cs:259+9
+  i7 op3 Throw NullReference -> b7 source=total-field-read-sites.cs:tokens["cell",".","Flag"]#1
 block: b9 normal
-  i8 op4 Assign v5:bool[width=0,signed=False] = pure:m0((("object"#t3)v4)) source=total-field-read-sites.cs:259+9
-  i9 op1 Branch v5 ? b4 : b3 source=total-field-read-sites.cs:259+9
+  i8 op4 Assign v5:bool[width=0,signed=False] = pure:m0((("object"#t3)v4)) source=total-field-read-sites.cs:tokens["cell",".","Flag"]#1
+  i9 op1 Branch v5 ? b4 : b3 source=total-field-read-sites.cs:tokens["cell",".","Flag"]#1
 block: b10 throw
-  i12 op6 Throw NullReference -> b7 source=total-field-read-sites.cs:284+10
+  i12 op6 Throw NullReference -> b7 source=total-field-read-sites.cs:tokens["cell",".","Value"]#1
 block: b11 normal
-  i13 op7 Assign v7:int[width=32,signed=True] = pure:m1((("object"#t3)v6)) source=total-field-read-sites.cs:284+10
-  i14 op8 Assign v8:int[width=32,signed=True] = v7 source=total-field-read-sites.cs:284+10
+  i13 op7 Assign v7:int[width=32,signed=True] = pure:m1((("object"#t3)v6)) source=total-field-read-sites.cs:tokens["cell",".","Value"]#1
+  i14 op8 Assign v8:int[width=32,signed=True] = v7 source=total-field-read-sites.cs:tokens["cell",".","Value"]#1
   i15 op0 Goto b5 source=none
 block: b12 throw
-  i18 op10 Throw NullReference -> b7 source=total-field-read-sites.cs:271+10
+  i18 op10 Throw NullReference -> b7 source=total-field-read-sites.cs:tokens["cell",".","Count"]#1
 block: b13 normal
-  i19 op11 Assign v10:int[width=32,signed=True] = pure:m2((("object"#t3)v9)) source=total-field-read-sites.cs:271+10
-  i20 op12 Assign v8:int[width=32,signed=True] = v10 source=total-field-read-sites.cs:271+10
+  i19 op11 Assign v10:int[width=32,signed=True] = pure:m2((("object"#t3)v9)) source=total-field-read-sites.cs:tokens["cell",".","Count"]#1
+  i20 op12 Assign v8:int[width=32,signed=True] = v10 source=total-field-read-sites.cs:tokens["cell",".","Count"]#1
   i21 op0 Goto b5 source=none
 term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v0
 term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v1

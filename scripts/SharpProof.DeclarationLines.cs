@@ -68,7 +68,8 @@ internal static class SharpProofDeclarationLines
             var tokensByLine = new Dictionary<int, List<SyntaxToken>>();
             foreach (var token in root.DescendantTokens())
             {
-                if (token.Span.Length == 0) continue;
+                if (token.Span.Length == 0)
+                    continue;
                 int start = text.Lines.GetLineFromPosition(token.SpanStart).LineNumber + 1;
                 int end = text.Lines.GetLineFromPosition(token.Span.End - 1).LineNumber + 1;
                 for (int line = start; line <= end; line++)

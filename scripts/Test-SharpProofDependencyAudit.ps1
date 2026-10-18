@@ -19,10 +19,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$auditTimeoutSeconds = $TimeoutSeconds
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 
 function Resolve-RepositoryPathValue {
     param(
@@ -79,7 +80,7 @@ function Get-ExactProperty {
     if ($null -eq $property) {
         throw "Dependency audit report is missing '$Name'."
     }
-    return ,$property.Value
+    return , $property.Value
 }
 
 function ConvertTo-CanonicalHttpsSource {
@@ -240,7 +241,7 @@ function Invoke-DependencyAudit {
 
     $standardOutput = Join-Path `
         $TemporaryDirectory `
-        ('.dependency-audit.' + [Guid]::NewGuid().ToString('N') + '.json')
+    ('.dependency-audit.' + [Guid]::NewGuid().ToString('N') + '.json')
     $standardError = [IO.Path]::ChangeExtension($standardOutput, '.stderr.txt')
     $wrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
     $dotnetArguments = @(
@@ -259,7 +260,7 @@ function Invoke-DependencyAudit {
     try {
         $process = Start-SharpProofEncodedPowerShell `
             -WrapperPath $wrapper `
-            -TimeoutSeconds $TimeoutSeconds `
+            -TimeoutSeconds $auditTimeoutSeconds `
             -Arguments $dotnetArguments `
             -WorkingDirectory $repositoryRoot `
             -StandardOutput $standardOutput `
@@ -350,9 +351,9 @@ if ([StringComparer]::OrdinalIgnoreCase.Equals(
         $resolvedOutput,
         $resolvedConfiguration) -or
     ($null -ne $resolvedReport -and
-        [StringComparer]::OrdinalIgnoreCase.Equals(
-            $resolvedOutput,
-            $resolvedReport))) {
+    [StringComparer]::OrdinalIgnoreCase.Equals(
+        $resolvedOutput,
+        $resolvedReport))) {
     throw 'OutputPath cannot overwrite an audit input.'
 }
 [IO.Directory]::CreateDirectory($outputDirectory) |
@@ -487,8 +488,8 @@ foreach ($project in @($projectValue)) {
             "'frameworks' array.")
     }
     $observedFrameworks =
-        [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::Ordinal)
+    [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
     foreach ($framework in @($frameworkProperty.Value)) {
         $frameworkName = [string](Get-ExactProperty `
                 -Value $framework `
@@ -575,22 +576,22 @@ if ($vulnerablePackages.Count -ne 0) {
 [Array]::Sort($projectPaths, [StringComparer]::Ordinal)
 $evidence = [pscustomobject][ordered]@{
     schemaVersion = 1
-    gate = 'dependencyAudit'
-    passed = $true
-    parameters = $parameters
-    auditSources = $observedSourceArray
-    projects = $projectPaths
-    counts = [pscustomobject][ordered]@{
-        projects = $projectPaths.Count
+    gate          = 'dependencyAudit'
+    passed        = $true
+    parameters    = $parameters
+    auditSources  = $observedSourceArray
+    projects      = $projectPaths
+    counts        = [pscustomobject][ordered]@{
+        projects           = $projectPaths.Count
         vulnerablePackages = 0
-        problems = 0
+        problems           = 0
     }
 }
 $json = ($evidence | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
 $temporaryOutput = Join-Path `
     $outputDirectory `
-    ('.' + [IO.Path]::GetFileName($resolvedOutput) + '.' +
-        [Guid]::NewGuid().ToString('N') + '.tmp')
+('.' + [IO.Path]::GetFileName($resolvedOutput) + '.' +
+    [Guid]::NewGuid().ToString('N') + '.tmp')
 try {
     [IO.File]::WriteAllText(
         $temporaryOutput,

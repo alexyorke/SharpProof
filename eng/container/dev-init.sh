@@ -30,7 +30,7 @@ test -n "${contract_path}" && test -f "${contract_path}"
 sp contract
 sp restore
 
-cat <<'EOF'
+cat << 'EOF'
 SharpProof persistent development volume is ready.
 Use: sp check | sp test-changed | sp build | sp pr
 EOF

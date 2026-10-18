@@ -2,25 +2,30 @@ using SharpProof.Attributes;
 
 namespace SharpProof.Samples.Preconditions;
 
-public static class PreconditionExamples {
-    public static int Positive(int value) {
+public static class PreconditionExamples
+{
+    public static int Positive(int value)
+    {
         Contract.Requires(value > 0);
         return value;
     }
 
     public static int KnownGoodCall() => Positive(1);
 
-    public static string RequiredText([NotNull] string value) {
+    public static string RequiredText([NotNull] string value)
+    {
         System.ArgumentNullException.ThrowIfNull(value);
         return value;
     }
 
-    public static int RequiredPositive([Positive] int value) {
+    public static int RequiredPositive([Positive] int value)
+    {
         System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
         return value;
     }
 
-    public static int RequiredRange([InRange(0, 10)] int value) {
+    public static int RequiredRange([InRange(0, 10)] int value)
+    {
         System.ArgumentOutOfRangeException.ThrowIfNegative(value);
         System.ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 10);
         return value;
@@ -32,8 +37,10 @@ public static class PreconditionExamples {
         RequiredRange(5);
 }
 
-public sealed class PositiveCount {
-    public PositiveCount(int count) {
+public sealed class PositiveCount
+{
+    public PositiveCount(int count)
+    {
         Contract.Requires(count > 0);
         Count = count;
     }
