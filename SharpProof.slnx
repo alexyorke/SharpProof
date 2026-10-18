@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SharpProof.Compiler.Semantics/SharpProof.Compiler.Semantics.csproj" />
     <Project Path="src/SharpProof.Fuzz/SharpProof.Fuzz.csproj" />
     <Project Path="src/ConsoleLoggingAnalyzer.Tests/ConsoleLoggingAnalyzer.Tests.csproj" />
     <Project Path="src/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />

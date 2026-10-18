@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
@@ -12,13 +12,24 @@ namespace SharpProof.Analyzer.Test;
 public sealed class ConfigurationDiagnosticsRegressionTests
 {
     [Test]
+    public void ConfigurationIssueRejectsUninitializedValue()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(static () => _ = new CompilerConfigurationIssue(default, Location.None)));
+
+        Assert.That(exception?.ParamName, Is.EqualTo("value"));
+        Assert.That(exception?.Message,
+            Does.Contain("A configuration issue requires a key, value, and reason."));
+    }
+
+    [Test]
     public void GlobalOptionsRethrowsAggregateCancellation()
     {
         var provider = new AggregateCancellationOptionsProvider(
             failGlobalOptions: true);
 
         Assert.Throws<AggregateException>(
-            (Action)(() => AnalyzerConfiguration.FromOptions(provider)));
+            (Action)(() => CompilerConfiguration.FromOptions(provider)));
     }
 
     [Test]
@@ -39,7 +50,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
                 SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
                     compilation,
                     options,
-                    AnalyzerConfiguration.AdvisoryAll,
+                    CompilerConfiguration.AdvisoryAll,
                     TestContext.CurrentContext.CancellationToken)));
     }
 

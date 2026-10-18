@@ -86,55 +86,13 @@ internal static class EffectContractDiagnostics
     internal static ImmutableArray<EffectClaimEvaluation> Declare(
         IMethodSymbol method, Location location, AnalyzerSession session, CancellationToken cancellationToken)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         session = ArgumentNullGuard.NotNull(session, nameof(session));
-        var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
-        var summaryContracts = Select(attributes, session.Attributes.EffectContract);
-        var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
-        var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);
-        var capabilities = DecodeCapabilities(capabilitiesAttributes, location, session, static _ => { });
-        var exceptions = DecodeAllowedExceptions(allowedExceptions, session.Compilation, location, session, static _ => { });
-        cancellationToken.ThrowIfCancellationRequested();
-        var contract = summaryContracts.IsDefaultOrEmpty
-            ? new EffectContractResolution(EffectContractResolutionKind.Missing, EffectSummary.Bottom)
-            : session.ResolveEffectContract(method);
-        var declared = summaryContracts.IsDefaultOrEmpty ? default : EffectSummaryProjector.Project(contract.Summary);
-        var bodyless = method is { IsAbstract: true } or { IsExtern: true };
-        var trusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid && declared.IsComplete;
-        var throws = contract.Summary.Throws;
-        var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>(6);
-        Add(Select(attributes, session.Attributes.EnforcePure), EffectEvaluationContractKind.EnforcePure, EffectClaimConstraint.Empty,
-            established: EffectContractMappings.IsObservablePure(contract.Summary));
-        Add(Select(attributes, session.Attributes.ZeroAllocations), EffectEvaluationContractKind.ZeroAllocations, EffectClaimConstraint.Empty,
-            established: (declared.Effects & EffectContractKind.Allocates) == 0);
-        Add(capabilitiesAttributes, EffectEvaluationContractKind.AllowedCapabilities,
-            new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []), capabilities.IsValid,
-            (declared.Capabilities & ~capabilities.Value) == 0);
-        Add(Select(attributes, session.Attributes.DoesNotThrow), EffectEvaluationContractKind.DoesNotThrow, EffectClaimConstraint.Empty,
-            established: throws.IsEmpty);
-        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
-            new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
-            !throws.IncludesUnknown && throws.Types.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (exceptions.Types.Any(allowed => allowed is null ? throw new System.ArgumentNullException(nameof(allowed)) : (EffectTypeFacts.IsDerivedFrom(type, allowed))))));
-        Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
-            new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
-            contract.Kind != EffectContractResolutionKind.Invalid, true);
-        return evaluations.ToImmutable();
-
-        void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
-            bool valid = true, bool established = false)
-        {
-            constraint = RepositoryParameterGuard.NotNull(constraint, nameof(constraint));
-            if (selected.IsDefaultOrEmpty)
-            { return; }
-            established &= trusted && valid;
-            var projected = EffectEvaluationProjections.Classify(
-                established, false, valid, trusted, trusted, EffectEvaluationReason.EffectSummaryIncomplete);
-            var (outcome, reason, certainty) = EffectEvaluationProducerTupleCatalog.Require(
-                projected.Outcome, projected.Reason, projected.Certainty);
-            evaluations.Add(new EffectClaimEvaluation(kind, selected, outcome, reason, certainty,
-                trusted ? "trusted-boundary" : "native", null, constraint, null, Location.None, []));
-        }
+        ArgumentNullGuard.NotNull(location, nameof(location));
+        return [.. EffectClaimDeclarations.Declare(method, session.Semantics, cancellationToken)
+            .Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : new EffectClaimEvaluation(claim.Kind, claim.Attributes,
+                claim.Outcome, claim.Reason, claim.Certainty, claim.Evidence, null,
+                claim.Constraint, null, Location.None, []))];
     }
 
     // Advisory feedback for the effect claims a callable declares. The
@@ -214,67 +172,37 @@ internal static class EffectContractDiagnostics
         ImmutableArray<AttributeData> attributes, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
-
         RepositoryParameterGuard.ThrowIfInvalid(attributes.IsDefault, nameof(attributes));
         fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
-        var value = EffectContractCapabilityKind.None;
-        foreach (var attribute in attributes)
-        {
-            if (attribute.ConstructorArguments.Length == 1 &&
-                EffectContractMetadata.TryConvertInt64(
-                    attribute.ConstructorArguments[0].Value, out var raw) &&
-                raw >= 0 &&
-                (raw & ~(long)EffectContractMetadata.AllCapabilities) == 0)
+        return EffectContractArguments.DecodeCapabilities(attributes,
+            (attribute, contract, reason) =>
             {
-                value |= (EffectContractCapabilityKind)raw;
-                continue;
-            }
-            ReportInvalidOnce(
-                attribute, "[AllowedCapabilities]",
-                "expected a defined SharpProofCapability flags value",
-                fallbackLocation, session, reportDiagnostic);
-            return (EffectContractCapabilityKind.None, false);
-        }
-        return (value, true);
+                attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+                contract = ArgumentNullGuard.NotNull(contract, nameof(contract));
+                reason = ArgumentNullGuard.NotNull(reason, nameof(reason));
+                ReportInvalidOnce(attribute, contract, reason, fallbackLocation, session, reportDiagnostic);
+            });
     }
 
     private static (ImmutableArray<INamedTypeSymbol> Types, bool IsValid) DecodeAllowedExceptions(
         ImmutableArray<AttributeData> attributes, Compilation compilation, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
-
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
-        var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
-        var valid = true;
-        foreach (var attribute in attributes)
-        {
-            var arguments = attribute.ConstructorArguments;
-            var values = arguments.Length == 1 && arguments[0].Kind == TypedConstantKind.Array
-                ? arguments[0].Values
-                : default;
-            if (exceptionType != null &&
-                !values.IsDefault &&
-                values.All(argument => argument.Value is INamedTypeSymbol type &&
-                    !type.IsUnboundGenericType &&
-                    EffectTypeFacts.IsDerivedFrom(type, exceptionType)))
+        return EffectContractArguments.DecodeAllowedExceptions(attributes, compilation,
+            (attribute, contract, reason) =>
             {
-                types.AddRange(values.Select(static argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : ((INamedTypeSymbol)argument.Value!))));
-                continue;
-            }
-            ReportInvalidOnce(
-                attribute, "[AllowedExceptions]",
-                "expected only closed System.Exception-derived types",
-                fallbackLocation, session, reportDiagnostic);
-            valid = false;
-        }
-        return valid ? (types.ToImmutable(), true) : ([], false);
+                attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+                contract = ArgumentNullGuard.NotNull(contract, nameof(contract));
+                reason = ArgumentNullGuard.NotNull(reason, nameof(reason));
+                ReportInvalidOnce(attribute, contract, reason, fallbackLocation, session, reportDiagnostic);
+            });
     }
 
     private static void ReportInvalidOnce(
@@ -330,13 +258,4 @@ internal static class EffectContractDiagnostics
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         return [.. attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (ContractSelectionInventory.Is(attribute, expected)))];
     }
-}
-
-internal sealed partial record EffectClaimConstraint
-{
-    internal static EffectClaimConstraint Empty
-    {
-        get;
-    } =
-        new(EffectContractKind.None, EffectContractCapabilityKind.None, []);
 }

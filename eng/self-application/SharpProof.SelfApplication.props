@@ -44,6 +44,7 @@
     </Analyzer>
     <Analyzer Include="
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.Core.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Compiler.Semantics.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Contracts.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Dataflow.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Effects.dll;

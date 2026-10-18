@@ -1,4 +1,3 @@
-using SharpProof.Analyzer;
 
 // This builder runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
@@ -41,13 +40,13 @@ internal sealed partial class ClaimManifestBuilder(
         new(() => ContractApiSymbols.TryCreate(compilation));
     private readonly Lazy<EffectiveContractSourceResolver> _lazyContractSources =
         new(() => EffectiveContractSourceResolver.ForCompilation(compilation, cancellationToken));
-    private readonly Lazy<AnalyzerSession> _lazyEffectSession =
-        new(() => new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken));
+    private readonly Lazy<CompilerSemanticSession> _lazyEffectSession =
+        new(() => new(compilation, cancellationToken));
     private ContractClauseInventoryBuilder _clauses => _lazyClauses.Value;
     private ContractSelectionInventory _attributes => _lazyAttributes.Value;
     private ContractApiSymbols? _intrinsics => _lazyIntrinsics.Value;
     private EffectiveContractSourceResolver _contractSources => _lazyContractSources.Value;
-    private AnalyzerSession _effectSession => _lazyEffectSession.Value;
+    private CompilerSemanticSession _effectSession => _lazyEffectSession.Value;
 
     private static CSharpCompilation InitializeCompilation(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
@@ -326,11 +325,6 @@ internal sealed partial class ClaimManifestBuilder(
 
         callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
         var target = seed.Method;
-        _ = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
-            target,
-            _effectSession,
-            static _ => { },
-            cancellationToken);
 
         var resolution = _contractSources.Resolve(target, implementationBody: null, cancellationToken);
         var source = resolution.Source;
@@ -393,7 +387,7 @@ internal sealed partial class ClaimManifestBuilder(
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
             ? CreateEffectClaims(
-                EffectContractDiagnostics.Declare(target, location, _effectSession, cancellationToken),
+                EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
@@ -617,7 +611,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
     }
 
     private ImmutableArray<ManifestEffectClaim> CreateEffectClaims(
-        ImmutableArray<EffectClaimEvaluation> evaluations,
+        ImmutableArray<EffectClaimDeclaration> evaluations,
         IMethodSymbol method,
         string callableId,
         int ordinalOffset,
@@ -694,7 +688,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
     }
 
     private ManifestEffectClaim CreateEffectClaim(
-        EffectClaimEvaluation evaluation,
+        EffectClaimDeclaration evaluation,
         IMethodSymbol method,
         string callableId,
         int ordinal,
@@ -734,7 +728,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
     private static CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
-        EffectClaimEvaluation evaluation,
+        EffectClaimDeclaration evaluation,
         bool isSupported)
     {
         claimId = RepositoryParameterGuard.NotNull(claimId, nameof(claimId));

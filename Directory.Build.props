@@ -75,6 +75,7 @@
     <CopyLocalLockFileAssemblies Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">true</CopyLocalLockFileAssemblies>
     <SharpProofUsesIrIdentifiers Condition="
       '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Core' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' Or
       '$(SharpProofProjectName)' == 'SharpProof.Contracts' Or
@@ -106,6 +107,7 @@
                         '$(SharpProofProjectName)' == 'DefensiveCodingAnalyzer' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Analyzer' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Core' OR
+                        '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerProbe.TestAsset' OR

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
@@ -45,9 +45,9 @@ public sealed class AnalyzerCorePublicGuardCoverageTests
     public void AnalyzerOptionsRejectNullAndAcceptInitializedEmptyOptions()
     {
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>
-            AnalyzerConfiguration.FromOptions((AnalyzerOptions)null!)));
+            CompilerConfiguration.FromOptions((AnalyzerOptions)null!)));
         Assert.That(error!.ParamName, Is.EqualTo("options"));
-        var configuration = AnalyzerConfiguration.FromOptions(new AnalyzerOptions([]));
+        var configuration = CompilerConfiguration.FromOptions(new AnalyzerOptions([]));
         Assert.That(configuration.InvalidConfigurationValues, Is.Empty);
     }
 

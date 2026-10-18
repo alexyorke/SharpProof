@@ -107,6 +107,13 @@
           "System.Runtime.CompilerServices.Unsafe": "4.5.3"
         }
       },
+      "sharpproof.compiler.semantics": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Contracts": "[1.0.0-preview.1, )",
+          "SharpProof.Effects": "[1.0.0-preview.1, )"
+        }
+      },
       "sharpproof.contracts": {
         "type": "Project",
         "dependencies": {

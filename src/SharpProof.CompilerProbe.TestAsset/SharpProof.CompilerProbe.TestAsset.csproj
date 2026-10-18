@@ -11,13 +11,13 @@
   <ItemGroup>
     <Compile Include="..\..\eng\CompilerAdditionalTextStability.cs"
              Link="CompilerAdditionalTextStability.cs" />
-    <Compile Include="..\SharpProof.Ir\HashEncoding.cs"
+    <Compile Include="..\..\eng\shared\HashEncoding.cs"
              Link="HashEncoding.cs" />
-    <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
+    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
     <Compile Include="..\SharpProof.Ir\AtomicFile.cs"
              Link="AtomicFile.cs" />
-    <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
     <Using Include="System.Threading.Tasks" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />

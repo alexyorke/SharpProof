@@ -12,6 +12,7 @@ public sealed class AnalyzerArchitectureTests
 {
     private static readonly string[] ExpectedAnalyzerReferences = [
         "SharpProof.Analyzer.Core",
+        "SharpProof.Compiler.Semantics",
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
@@ -25,6 +26,7 @@ public sealed class AnalyzerArchitectureTests
     private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
+        "SharpProof.Compiler.Semantics",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
@@ -146,17 +148,15 @@ public sealed class AnalyzerArchitectureTests
         var testAssembly =
             typeof(AnalyzerArchitectureTests).Assembly.GetName().Name;
         var sharpProofNames = names
-            .Where(static name =>
-                name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith("SharpProof.", StringComparison.Ordinal)))
-            .Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!string.Equals(
-                name,
-                testAssembly,
-                StringComparison.Ordinal)))
-            // The test project references this repository-only analyzer directly.
-            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!string.Equals(
-                name,
-                "SharpProof.DefensiveCodingAnalyzer",
-                StringComparison.Ordinal)))
+            .Where(name =>
+            {
+                ArgumentNullException.ThrowIfNull(name);
+                return name.StartsWith("SharpProof.", StringComparison.Ordinal) &&
+                    !string.Equals(name, testAssembly, StringComparison.Ordinal) &&
+                    !string.Equals(name,
+                        typeof(SharpProof.DefensiveCodingAnalyzer.ParameterGuardAnalyzer).Assembly.GetName().Name,
+                        StringComparison.Ordinal);
+            })
             .ToArray();
 
         using (Assert.EnterMultipleScope())

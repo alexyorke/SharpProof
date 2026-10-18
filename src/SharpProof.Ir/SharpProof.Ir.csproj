@@ -5,10 +5,11 @@
     <NoWarn>$(NoWarn);CA1720</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -30,5 +31,10 @@
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs" Link="ArgumentNullGuard.cs" />
+    <Compile Include="..\..\eng\shared\HashEncoding.cs" Link="HashEncoding.cs" />
+    <Compile Include="..\..\eng\shared\Utf16WellFormedness.cs" Link="Utf16WellFormedness.cs" />
   </ItemGroup>
 </Project>

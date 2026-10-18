@@ -14,13 +14,14 @@ public sealed class ProjectDagTests
             ["ConsoleLoggingAnalyzer"] = [],
             ["DefensiveCodingAnalyzer"] = [],
             ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
-            ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
+            ["SharpProof.Analyzer.Core"] = ["SharpProof.Compiler.Semantics"],
+            ["SharpProof.Compiler.Semantics"] = ["SharpProof.Contracts", "SharpProof.Effects"],
             ["SharpProof.Attributes"] = [],
             ["SharpProof.BuildTasks"] = ["SharpProof.Host", "SharpProof.Worker.Protocol"],
             ["SharpProof.CodeFixes"] = [],
             ["SharpProof.CompilerArtifact"] = ["SharpProof.Ir", "SharpProof.Worker.Protocol"],
             ["SharpProof.CompilerCollector"] = [
-                "SharpProof.Analyzer.Core",
+                "SharpProof.Compiler.Semantics",
                 "SharpProof.CompilerArtifact"
             ],
             ["SharpProof.ContractForGenerator"] = [],
@@ -81,6 +82,8 @@ public sealed class ProjectDagTests
         "SharpProof.CodeFixes",
         "SharpProof.Attributes",
         "SharpProof.Contracts",
+        "SharpProof.CompilerCollector",
+        "SharpProof.Compiler.Semantics",
         "SharpProof.Effects",
         "SharpProof.Frontend",
     ];
@@ -90,14 +93,15 @@ public sealed class ProjectDagTests
     [Test]
     public void EveryProductionProjectHasAnExplicitDagEntry()
     {
-        var production = SolutionProjects()
-            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!name.EndsWith("Tests", StringComparison.Ordinal)))
-            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!NonProductionProjects.Contains(name)))
-            .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal);
-
-        Assert.That(
-            production,
-            Is.EquivalentTo(AllowedReferences.Keys));
+        var production = new List<string>();
+        foreach (var name in SolutionProjects())
+        {
+            if (!name.EndsWith("Tests", StringComparison.Ordinal) && !NonProductionProjects.Contains(name))
+            {
+                production.Add(name);
+            }
+        }
+        Assert.That(production, Is.EquivalentTo(AllowedReferences.Keys));
     }
 
     [Test]
@@ -105,93 +109,247 @@ public sealed class ProjectDagTests
     {
         foreach (var (project, allowed) in AllowedReferences)
         {
-            Assert.That(
-                ProjectReferences(project).Order(StringComparer.Ordinal),
-                Is.EqualTo(allowed.Order(StringComparer.Ordinal)),
-                project);
+            Assert.That(ProjectReferences(project), Is.EquivalentTo(allowed), project);
         }
+    }
+
+    [Test]
+    public void EvaluatedRuntimeReferencesFollowTheDag()
+    {
+        var inventory = EvaluatedItems();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in inventory)
+        {
+            if (!AllowedReferences.TryGetValue(item.Project, out var allowed))
+            {
+                continue;
+            }
+            seen.Add(item.Project);
+            if (item.Kind == "ProjectReference")
+            {
+                Assert.That(allowed, Does.Contain(Path.GetFileNameWithoutExtension(item.Value)), item.Project);
+            }
+        }
+        Assert.That(seen, Is.EquivalentTo(AllowedReferences.Keys));
     }
 
     [TestCase("SharpProof.Worker")]
     public void WorkerRuntimeClosureIsCompilerNeutral(string root)
     {
-        System.ArgumentNullException.ThrowIfNull(root);
-        var closure = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
-        pending.Push(root);
-        while (pending.TryPop(out var project))
+        ArgumentException.ThrowIfNullOrEmpty(root);
+        var closure = RuntimeClosure(root);
+        Assert.That(closure.Intersect(CompilerFacingProjects), Is.Empty);
+        foreach (var item in EvaluatedItems())
         {
-            if (closure.Add(project))
+            if (closure.Contains(item.Project) && item.Kind == "PackageReference")
             {
-                foreach (var reference in ProjectReferences(project))
-                {
-                    pending.Push(reference);
-                }
+                Assert.That(item.Value.StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal) &&
+                    !item.Value.EndsWith("Analyzers", StringComparison.Ordinal), Is.False,
+                    item.Project + " -> " + item.Value);
             }
         }
+    }
 
-        Assert.That(closure.Intersect(CompilerFacingProjects), Is.Empty);
+    [Test]
+    public void CollectorAndSharedSemanticsDoNotDependOnAnalyzerPolicy()
+    {
+        foreach (var project in new[] { "SharpProof.CompilerCollector", "SharpProof.Compiler.Semantics" })
+        {
+            var closure = RuntimeClosure(project);
+            Assert.That(closure, Does.Not.Contain("SharpProof.Analyzer"));
+            Assert.That(closure, Does.Not.Contain("SharpProof.Analyzer.Core"));
+            Assert.That(closure, Does.Not.Contain("SharpProof.Worker"));
+            Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
+        }
+    }
+
+    [TestCase("SharpProof.Analyzer")]
+    [TestCase("SharpProof.CompilerCollector")]
+    public void PortableCompilerRuntimeDoesNotContainNativeVerification(string root)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(root);
+        var closure = RuntimeClosure(root);
+        Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
+        Assert.That(closure, Does.Not.Contain("SharpProof.Worker"));
+        Assert.That(closure, Does.Not.Contain("SharpProof.Verify"));
+        foreach (var item in EvaluatedItems())
+        {
+            if (closure.Contains(item.Project) && item.Kind == "PackageReference")
+            {
+                Assert.That(item.Value, Is.Not.EqualTo("Microsoft.Z3"));
+            }
+        }
+    }
+
+    [Test]
+    public void ProductionCompileItemsRespectSourceOwnership()
+    {
+        var repository = TestRepository.FindRoot();
+        foreach (var item in EvaluatedItems())
+        {
+            if (item.Kind != "Compile" || !AllowedReferences.ContainsKey(item.Project))
+            {
+                continue;
+            }
+            var owner = Path.GetDirectoryName(ProjectPath(item.Project))!;
+            var intermediates = Path.Combine(repository, "artifacts", "obj", item.Project);
+            if (IsWithin(item.Value, owner) || IsWithin(item.Value, intermediates))
+            {
+                continue;
+            }
+            var relative = Path.GetRelativePath(repository, item.Value).Replace('\\', '/');
+            var allowed = relative.StartsWith("eng/shared/", StringComparison.Ordinal) ||
+                relative == "src/DefensiveCodingAnalyzer/AllValuesValidAttribute.cs" ||
+                relative == "eng/ParameterGuard.cs" || relative == "eng/LoggingDefaults.cs" ||
+                relative == "eng/RoslynCfgFactory.cs" || relative == "eng/RoslynSymbolFacts.cs" ||
+                relative == "eng/CompilerAdditionalTextStability.cs" ||
+                relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
+            allowed |= item.Project == "SharpProof.Logging" &&
+                relative == "eng/logging/RepositoryLogger.cs";
+            if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")
+            {
+                allowed |= relative.StartsWith("eng/testing/", StringComparison.Ordinal) ||
+                    relative == "eng/scripts/SharpProof.JsonDefaults.cs";
+            }
+            Assert.That(allowed, Is.True, item.Project + " compiles source owned elsewhere: " + relative);
+        }
     }
 
     [Test]
     public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3()
     {
-        var z3Consumers = SolutionProjects()
-            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!name.EndsWith("Tests", StringComparison.Ordinal)))
-            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (ProjectFile(name)
-                .Descendants("PackageReference")
-                .Any(static reference =>
-                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string?)reference.Attribute("Include") == "Microsoft.Z3"))))
-            .ToArray();
-
-        Assert.That(z3Consumers, Is.SubsetOf(Z3Consumers));
-        // Guard against the scan silently matching nothing.
-        Assert.That(z3Consumers, Does.Contain("SharpProof.Smt"));
+        var consumers = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in EvaluatedItems())
+        {
+            if (item.Kind == "PackageReference" && item.Value == "Microsoft.Z3")
+            {
+                consumers.Add(item.Project);
+            }
+        }
+        Assert.That(consumers, Is.SubsetOf(Z3Consumers));
     }
 
     [Test]
     public void EverySolutionProjectHasALockFile()
     {
-        var missing = SolutionProjectPaths()
-            .Where(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (!File.Exists(Path.Combine(
-                Path.GetDirectoryName(path)!,
-                "packages.lock.json"))));
-
-        Assert.That(missing, Is.Empty);
+        foreach (var path in SolutionProjectPaths())
+        {
+            Assert.That(File.Exists(Path.Combine(Path.GetDirectoryName(path)!, "packages.lock.json")), Is.True, path);
+        }
     }
 
-    private static IEnumerable<string> SolutionProjectPaths()
+    private static bool IsWithin(string path, string directory)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentException.ThrowIfNullOrEmpty(directory);
+        var relative = Path.GetRelativePath(directory, path);
+        return !Path.IsPathRooted(relative) && relative != ".." &&
+            !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
+
+    private static HashSet<string> RuntimeClosure(string root)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(root);
+        var inventory = EvaluatedItems();
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.TryPop(out var project))
+        {
+            if (!result.Add(project))
+            {
+                continue;
+            }
+            foreach (var item in inventory)
+            {
+                if (item.Project == project && item.Kind == "ProjectReference")
+                {
+                    pending.Push(Path.GetFileNameWithoutExtension(item.Value));
+                }
+            }
+        }
+        return result;
+    }
+
+    private static List<ArchitectureItem> EvaluatedItems()
+    {
+        var result = new List<ArchitectureItem>();
+        var path = Path.Combine(AppContext.BaseDirectory, "architecture-items.tsv");
+        foreach (var line in File.ReadLines(path))
+        {
+            var parts = line.Split('|');
+            if (parts.Length != 3)
+            {
+                throw new InvalidDataException("Invalid architecture inventory entry.");
+            }
+            result.Add(new(parts[0], parts[1], parts[2]));
+        }
+        return result;
+    }
+
+    private static List<string> SolutionProjectPaths()
     {
         var root = TestRepository.FindRoot();
-        return XDocument.Load(Path.Combine(root, "SharpProof.slnx"))
-            .Descendants("Project")
-            .Select(static project => project is null ? throw new System.ArgumentNullException(nameof(project)) : ((string?)project.Attribute("Path")))
-            .Where(static path => path?.EndsWith(".csproj", StringComparison.Ordinal) == true)
-            .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (Path.Combine(root, path!.Replace('/', Path.DirectorySeparatorChar))));
+        var result = new List<string>();
+        foreach (var project in XDocument.Load(Path.Combine(root, "SharpProof.slnx")).Descendants("Project"))
+        {
+            var path = (string?)project.Attribute("Path") ?? throw new InvalidDataException("Missing project path.");
+            if (path.EndsWith(".csproj", StringComparison.Ordinal))
+            {
+                result.Add(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)));
+            }
+        }
+        return result;
     }
 
-    private static IEnumerable<string> SolutionProjects()
+    private static List<string> SolutionProjects()
     {
-        return SolutionProjectPaths().Select(Path.GetFileNameWithoutExtension)!;
+        var result = new List<string>();
+        foreach (var path in SolutionProjectPaths())
+        {
+            result.Add(Path.GetFileNameWithoutExtension(path));
+        }
+        return result;
     }
 
-    private static XDocument ProjectFile(string project)
+    private static string ProjectPath(string project)
     {
-        System.ArgumentNullException.ThrowIfNull(project);
-        var path = SolutionProjectPaths().Single(candidate =>
-            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (Path.GetFileNameWithoutExtension(candidate) == project));
-        return XDocument.Load(path);
+        ArgumentException.ThrowIfNullOrEmpty(project);
+        foreach (var path in SolutionProjectPaths())
+        {
+            if (Path.GetFileNameWithoutExtension(path) == project)
+            {
+                return path;
+            }
+        }
+        throw new InvalidDataException("Project is missing from the solution: " + project);
     }
 
     private static string[] ProjectReferences(string project)
     {
-        System.ArgumentNullException.ThrowIfNull(project);
-        return ProjectFile(project)
-            .Descendants("ProjectReference")
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string)reference.Attribute("Include")!))
-            .Select(static include => include is null ? throw new System.ArgumentNullException(nameof(include)) : (Path.GetFileNameWithoutExtension(
-                include.Replace('\\', Path.DirectorySeparatorChar))))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        ArgumentException.ThrowIfNullOrEmpty(project);
+        var references = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in XDocument.Load(ProjectPath(project)).Descendants("ProjectReference"))
+        {
+            var include = (string?)reference.Attribute("Include") ?? throw new InvalidDataException("Missing reference path.");
+            references.Add(Path.GetFileNameWithoutExtension(include.Replace('\\', Path.DirectorySeparatorChar)));
+        }
+        return [.. references];
+    }
+
+    private sealed class ArchitectureItem
+    {
+        internal ArchitectureItem(string project, string kind, string value)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(project);
+            ArgumentException.ThrowIfNullOrEmpty(kind);
+            ArgumentException.ThrowIfNullOrEmpty(value);
+            Project = project;
+            Kind = kind;
+            Value = value;
+        }
+        internal string Project { get; }
+        internal string Kind { get; }
+        internal string Value { get; }
     }
 }

@@ -49,4 +49,24 @@
     <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+  <!-- Architecture checks consume evaluated items, including inherited Compile links. -->
+  <Target Name="_SharpProofGetArchitectureItems" Returns="@(_SharpProofArchitectureItem)">
+    <ItemGroup>
+      <_SharpProofArchitectureItem Include="@(Compile->'%(FullPath)')">
+        <ProjectName>$(SharpProofProjectName)</ProjectName>
+        <Kind>Compile</Kind>
+      </_SharpProofArchitectureItem>
+      <!-- SDK-inferred transitive edges are derived from the declared graph. -->
+      <_SharpProofArchitectureItem Include="@(ProjectReference->'%(FullPath)')"
+                                  Exclude="@(_TransitiveProjectReferences->'%(FullPath)')"
+                                  Condition="'%(ProjectReference.ReferenceOutputAssembly)' != 'false'">
+        <ProjectName>$(SharpProofProjectName)</ProjectName>
+        <Kind>ProjectReference</Kind>
+      </_SharpProofArchitectureItem>
+      <_SharpProofArchitectureItem Include="@(PackageReference)">
+        <ProjectName>$(SharpProofProjectName)</ProjectName>
+        <Kind>PackageReference</Kind>
+      </_SharpProofArchitectureItem>
+    </ItemGroup>
+  </Target>
 </Project>

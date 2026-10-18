@@ -35,7 +35,9 @@
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.dll" target="tools\collector" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.pdb" target="tools\collector" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.*.pdb" target="tools\shared\netstandard2.0" exclude="**\SharpProof.CompilerCollector.pdb" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.dll" target="tools\shared\netstandard2.0" />
+    <file src="..\..\artifacts\bin\SharpProof.Analyzer.Core\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.dll" target="tools\shared\netstandard2.0" />
+    <file src="..\..\artifacts\bin\SharpProof.Analyzer.Core\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.pdb" target="tools\shared\netstandard2.0" />
+    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Compiler.Semantics.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Dataflow.dll" target="tools\shared\netstandard2.0" />

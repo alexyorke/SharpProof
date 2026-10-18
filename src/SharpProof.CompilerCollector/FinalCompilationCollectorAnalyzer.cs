@@ -4,7 +4,7 @@ namespace SharpProof.CompilerCollector;
 public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<DiagnosticDescriptor> s_supportedDiagnostics =
-        [GeneratedDiagnosticDescriptors.CompilerManifestFailureRule];
+        [CompilerCollectorDiagnosticDescriptors.CompilerManifestFailureRule];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         s_supportedDiagnostics;
@@ -22,7 +22,7 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
             compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
 
             var configuration =
-                AnalyzerConfiguration.FromOptions(compilationContext.Options);
+                CompilerConfiguration.FromOptions(compilationContext.Options);
             if (configuration.Profile == SharpProofProfile.Off)
             {
                 return;
