@@ -3259,54 +3259,6 @@ public sealed class PackageLayoutSmokeTests
         }
     }
 
-    private sealed class ReleaseEvidenceWorkspace : IDisposable
-    {
-        private readonly TempDirectory _temporary;
-        private readonly string _root;
-
-        private ReleaseEvidenceWorkspace(TempDirectory temporary)
-        {
-            System.ArgumentNullException.ThrowIfNull(temporary);
-            _temporary = temporary;
-            _root = temporary.FullName;
-            var root = _root;
-            OutputDirectory = Path.Combine(root, "output");
-            ManifestPath = Path.Combine(
-                OutputDirectory,
-                "SharpProof.release.json");
-        }
-
-        internal string OutputDirectory
-        {
-            get;
-        }
-        internal string ManifestPath
-        {
-            get;
-        }
-        internal static ReleaseEvidenceWorkspace Create()
-        {
-            var temporary = TempDirectory.CreateOwned(
-                "SharpProof.ReleaseEvidence.Test",
-                string.Empty,
-                "Refusing to remove an unexpected release-evidence directory.");
-            try
-            {
-                return new ReleaseEvidenceWorkspace(temporary);
-            }
-            catch
-            {
-                temporary.Dispose();
-                throw;
-            }
-        }
-
-        public void Dispose()
-        {
-            _temporary.Dispose();
-        }
-    }
-
     private readonly record struct PackagedAnalyzerItem(
         string FileName,
         string Role)
