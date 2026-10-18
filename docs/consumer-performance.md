@@ -2,10 +2,10 @@
 
 Measure the complete consumer workflow against the same source and environment without SharpProof analysis. More workers or a faster solver phase alone does not establish a better experience. Keep selected coverage and proof quality alongside timings.
 
-The repository provides [Measure-SharpProofConsumerPerformance.ps1](../scripts/Measure-SharpProofConsumerPerformance.ps1). Inside the canonical container after producing matching packages:
+The repository provides [Measure-SharpProofConsumerPerformance.ps1](../eng/scripts/Measure-SharpProofConsumerPerformance.ps1). Inside the canonical container after producing matching packages:
 
 ```text
-pwsh -NoLogo -NoProfile -File scripts/Measure-SharpProofConsumerPerformance.ps1 -PackageSource artifacts/container-packages -Iterations 3 -OutputDirectory artifacts/consumer-performance
+pwsh -NoLogo -NoProfile -File eng/scripts/Measure-SharpProofConsumerPerformance.ps1 -PackageSource artifacts/container-packages -Iterations 3 -OutputDirectory artifacts/consumer-performance
 ```
 
 The synthetic consumer compares Attributes-only, advisory portable analysis, and strict verification on the same eight-method workload. It records first build, no-op, warm rebuild, and small-edit timings, keeping restore separate and rotating variant order. The JSON records package hashes, SDK/platform, and selected proof quality. Treat synthetic results as a reproducible signal, not a guarantee for every application's size or language features.

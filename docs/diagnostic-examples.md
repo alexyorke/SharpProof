@@ -1,6 +1,6 @@
 # SharpProof diagnostics
 
-Portable diagnostic descriptors are owned by [GeneratedDiagnosticDescriptors.generated.cs](../SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs) and [ContractForDiagnosticDescriptors.generated.cs](../SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs). The files are hand-maintained.
+Portable diagnostic descriptors are owned by [GeneratedDiagnosticDescriptors.generated.cs](../src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs) and [ContractForDiagnosticDescriptors.generated.cs](../src/SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs). The files are hand-maintained.
 
 The portable default is `SharpProofProfile=advisory` with `SharpProofFeatures=all`. Profiles are advisory, strict, or off; features are effects, contracts, or all. Normal Roslyn configuration can change effective severity.
 
@@ -158,8 +158,8 @@ The launcher reports each claim's typed outcome, reason, and vacuity. The verifi
 | SP0048 | Declared user assumption or trusted boundary, with assumption-policy-dependent level |
 | SP0051 | Replayed refuted contract; reported as an error |
 
-These codes are owned by [VerifierDiagnosticCodes.cs](../SharpProof.Host/VerifierDiagnosticCodes.cs). A Refuted claim remains an error even under advisory verifier policy.
+These codes are owned by [VerifierDiagnosticCodes.cs](../src/SharpProof.Host/VerifierDiagnosticCodes.cs). A Refuted claim remains an error even under advisory verifier policy.
 
 Do not infer native effect refutations from a reserved portable diagnostic ID. Inspect structured worker results and optional SARIF, and use [Unknown reasons](unknown-reasons.md) to understand abstentions.
 
-The [Diagnostics and Outcomes samples](../samples/README.md) exercise actual reporting and worker records. [Golden tests](../tests/golden/README.md) freeze stable analyzer output.
+The [Diagnostics and Outcomes samples](../src/samples/README.md) exercise actual reporting and worker records. [Golden tests](../tests/golden/README.md) freeze stable analyzer output.

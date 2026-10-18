@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SharpProof.Dataflow.Test</AssemblyName>
+    <RootNamespace>SharpProof.Dataflow.Test</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
+  </ItemGroup>
+</Project>

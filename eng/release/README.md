@@ -5,7 +5,7 @@
 1. The package job runs `tooling pack -Configuration Release` in the canonical Linux amd64 container and uploads the packed three-package graph.
 2. Linux container, native Windows x64, and native macOS ARM64/x64 verifier consumers download those artifacts and run real proof and payload-integrity checks.
 3. Branches, pull requests, and tags run portable consumers on Linux, Windows, macOS ARM64, and macOS Intel against the exact packed artifacts. Tags additionally run exact-SHA security.
-4. A `v*` tag must exactly match `SharpProofPackageVersion` in [SharpProof.Release.props](../../SharpProof.Release.props).
+4. A `v*` tag must exactly match `SharpProofPackageVersion` in [eng/Versions.props](../Versions.props).
 5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the package artifacts and pushes with duplicate skipping.
 
 `v1.0.0-preview.1` selects the private-preview environment/feed. Other matching release tags select nuget.org and NuGet OIDC login. Feed credentials stay in the configured secret/environment mechanism.

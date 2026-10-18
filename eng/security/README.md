@@ -72,7 +72,7 @@ Exercise the release rejection paths in the canonical container:
 
 ```sh
 docker compose run --rm tooling dev -lc \
-  'pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofReleaseSecurity.ps1'
+  'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseSecurity.ps1'
 ```
 
 ## Toolchain servicing

@@ -69,4 +69,4 @@ jobs:
         shell: bash
         run: |
           gh auth setup-git
-          bash scripts/Update-SharpProofDocumentation.sh
+          bash eng/scripts/Update-SharpProofDocumentation.sh

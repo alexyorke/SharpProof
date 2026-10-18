@@ -25,7 +25,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
 | [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |
 | [Preview support](preview-support.md) | Container, filesystem, and threat-model boundary |
-| [Samples](../samples/README.md) | Executable package-consumer examples |
+| [Samples](../src/samples/README.md) | Executable package-consumer examples |
 
 ## Understand the implementation
 
@@ -46,13 +46,13 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 - [Container development](container-development.md): all commands and workspace modes.
 - [Documentation maintenance](documentation-maintenance.md): source-reference generation, local link checks, and automatic update PRs.
 - [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
-- [Corpus gate](../SharpProof.Gates/README.md) and [source provenance](../SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
+- [Corpus gate](../src/SharpProof.Gates/README.md) and [source provenance](../src/SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
 - [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
 - [Release process](../eng/release/README.md): tag checks, consumer matrix, and publication.
 - [Security policy](../SECURITY.md): private reporting and scope.
 
-The analyzer's [unshipped](../SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
+The analyzer's [unshipped](../src/SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../src/SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
 
 ## Documentation validation
 
-`SharpProof.Analyzer.Test/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. `tooling docs` checks generated source-reference drift, tracked local Markdown targets/heading anchors, and documentation automation regressions; `pr-gates` includes this check. External links and authored behavioral claims still need review against their supporting sources. See [documentation maintenance](documentation-maintenance.md).
+`src/SharpProof.Analyzer.Tests/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `src/SharpProof.Attributes.Tests/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. `tooling docs` checks generated source-reference drift, tracked local Markdown targets/heading anchors, and documentation automation regressions; `pr-gates` includes this check. External links and authored behavioral claims still need review against their supporting sources. See [documentation maintenance](documentation-maintenance.md).

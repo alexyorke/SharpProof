@@ -51,7 +51,7 @@ cancellation, and process-tree termination. Native runs do not have Docker's
 CPU/memory isolation or an OS memory quota. The caller must provision sufficient
 resources or supply an external execution boundary for untrusted workloads.
 
-Every PR runs `scripts/Test-SharpProofWindowsProofs.ps1` against packages built
+Every PR runs `eng/scripts/Test-SharpProofWindowsProofs.ps1` against packages built
 by the canonical container. This maintainer acceptance helper requires native
 Windows x64 PowerShell 7.6 or later running on .NET 10 or later because its path
 and lease checks load the packaged .NET 10 host assembly into PowerShell.

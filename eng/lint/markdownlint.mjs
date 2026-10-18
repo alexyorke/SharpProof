@@ -15,6 +15,8 @@ const files = explicitFiles.length ? explicitFiles : [...new Set(
     { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean)
 )].filter((file) => /\.md$/i.test(file)
   && !/(^|\/)(bin|obj|artifacts|node_modules)\//.test(file)
+  // Pinned Arcade sources are attested by the repository layout gate.
+  && !file.startsWith("eng/common/")
   && !file.startsWith("docs/generated/")
   && !/\.generated\.md$/i.test(file)
   && !/\/Corpus\/third-party\//.test(file)
