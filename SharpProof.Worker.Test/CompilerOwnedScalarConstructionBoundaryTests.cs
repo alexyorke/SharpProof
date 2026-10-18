@@ -83,7 +83,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
             var factory = total.Program.Factory;
             var entry = total.Parameters.Single().Entry;
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1)));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
             Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(statementCount + 1)));

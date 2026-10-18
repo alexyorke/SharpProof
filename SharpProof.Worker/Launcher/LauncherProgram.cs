@@ -604,7 +604,7 @@ internal static class Program
             return;
         }
 
-        if (response is not
+        if (response is null || response.CallableResults.IsDefault || response.ClaimResults.IsDefault || response.Errors.IsDefault || response is not
             {
                 RunStatus: WorkerRunStatus.TimedOut,
                 FailureReason: WorkerRunFailureReason.None,

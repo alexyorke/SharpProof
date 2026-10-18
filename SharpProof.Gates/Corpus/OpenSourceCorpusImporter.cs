@@ -287,9 +287,9 @@ SOFTWARE.
             }
         }
 
-        var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
-        var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
-        var declarationHashes = new HashSet<string>(StringComparer.Ordinal);
+        var files = ImmutableList<OpenSourceCorpusFile>.Empty;
+        var candidates = ImmutableList<ImportCandidate>.Empty;
+        var declarationHashes = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
                 ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
@@ -308,7 +308,7 @@ SOFTWARE.
                             relativePath,
                             cancellationToken)
                         .ConfigureAwait(false)));
-            files.Add(
+            files = files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
                     relativePath,
@@ -333,13 +333,14 @@ SOFTWARE.
                     OpenSourceCorpusCatalog.GetDeclaration(method);
                 var hash =
                     OpenSourceCorpusCatalog.ComputeNormalizedSha256(declaration);
-                if (!declarationHashes.Add(hash))
+                if (declarationHashes.Contains(hash))
                 {
                     continue;
                 }
 
+                declarationHashes = declarationHashes.Add(hash);
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
-                candidates.Add(
+                candidates = candidates.Add(
                     new ImportCandidate(
                         relativePath,
                         lineSpan.StartLinePosition.Line + 1,
@@ -348,7 +349,7 @@ SOFTWARE.
                         method.Identifier.ValueText));
             }
         }
-        return (files.ToImmutable(), candidates.ToImmutable());
+        return (files.ToImmutableArray(), candidates.ToImmutableArray());
     }
 
     private static bool IsCandidate(MethodDeclarationSyntax method)
@@ -377,7 +378,15 @@ SOFTWARE.
             .OrderBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
             .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()))
             .ToImmutableArray();
-        var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
+        ValidateCapacity(count);
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1512:Use ArgumentOutOfRangeException throw helper",
+            Justification = "Preserve the former builder's capacity exception without an ActualValue.")]
+        static void ValidateCapacity(int capacity)
+        {
+            if (capacity < 0)
+            { throw new ArgumentOutOfRangeException(nameof(capacity)); }
+        }
+        var selected = ImmutableList<ImportCandidate>.Empty;
         for (var offset = 0; selected.Count < count; offset++)
         {
             var addedThisRound = false;
@@ -388,7 +397,7 @@ SOFTWARE.
                     continue;
                 }
 
-                selected.Add(group[offset]);
+                selected = selected.Add(group[offset]);
                 addedThisRound = true;
                 if (selected.Count == count)
                 {
@@ -418,7 +427,7 @@ SOFTWARE.
                 $"{OpenSourceCorpusCatalog.MinimumSourceFileCount} are required.");
         }
 
-        return selected.ToImmutable();
+        return selected.ToImmutableArray();
     }
 
     internal static async Task<string> ReadGitAsync(
@@ -433,7 +442,8 @@ SOFTWARE.
         var startInfo = GateProcess.CreateCaptured(
             gitExecutable,
             workingDirectory);
-        foreach (var argument in arguments)
+        var capturedArguments = arguments.ToImmutableArray();
+        foreach (var argument in capturedArguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -445,7 +455,7 @@ SOFTWARE.
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"git {string.Join(" ", arguments)} failed: {result.Error.Trim()}");
+                $"git {string.Join(" ", capturedArguments)} failed: {result.Error.Trim()}");
         }
 
         return result.Output.Trim();

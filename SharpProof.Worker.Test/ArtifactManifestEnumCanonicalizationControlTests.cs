@@ -22,8 +22,8 @@ public sealed class ArtifactManifestEnumCanonicalizationControlTests
         var callable = artifact.Manifest.Callables.Single();
         Assert.That(callable.SelectedFeatures, Has.Length.EqualTo(2));
         Assert.That(callable.SelectionReasons, Has.Length.EqualTo(2));
-        var expectedFeatures = callable.SelectedFeatures.ToImmutableArray();
-        var expectedReasons = callable.SelectionReasons.ToImmutableArray();
+        var expectedFeatures = callable.SelectedFeatures;
+        var expectedReasons = callable.SelectionReasons;
         var expected = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         callable.SelectedFeatures = [.. callable.SelectedFeatures.Reverse()];
         callable.SelectionReasons = [.. callable.SelectionReasons.Reverse()];
@@ -32,8 +32,8 @@ public sealed class ArtifactManifestEnumCanonicalizationControlTests
         var producerReasons = callable.SelectionReasons;
         var actual = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actual, Is.EqualTo(expected));
-        Assert.That(callable.SelectedFeatures, Is.SameAs(producerFeatures));
-        Assert.That(callable.SelectionReasons, Is.SameAs(producerReasons));
+        Assert.That(callable.SelectedFeatures.Equals(producerFeatures), Is.True);
+        Assert.That(callable.SelectionReasons.Equals(producerReasons), Is.True);
         var decoded = CompilerManifestArtifactJson.Deserialize(actual, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Manifest.Callables.Single().SelectedFeatures, Is.EqualTo(expectedFeatures));
         Assert.That(decoded.Manifest.Callables.Single().SelectionReasons, Is.EqualTo(expectedReasons));

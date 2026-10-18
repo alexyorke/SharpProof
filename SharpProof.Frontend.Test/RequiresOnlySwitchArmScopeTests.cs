@@ -104,10 +104,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
                 var parameter = context.Parameters.Single();
                 var type = factory.GetVariableInfo(parameter.Entry).Type;
                 var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        [parameter.Entry] = factory.CreateReferenceValue(type, input)
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateReferenceValue(type, input)));
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));

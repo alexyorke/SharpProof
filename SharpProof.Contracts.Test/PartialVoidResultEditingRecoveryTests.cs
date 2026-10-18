@@ -108,7 +108,7 @@ public sealed class PartialVoidResultEditingRecoveryTests
             foreach (var value in new[] { false, true })
             {
                 var evaluation = new IrInterpreter(factory).Evaluate(result.Contracts.Clauses[0].Condition,
-                    new Dictionary<IrVarId, IrValue> { [resultVariable] = factory.CreateBooleanValue(value) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(resultVariable, factory.CreateBooleanValue(value)));
                 Assert.That(evaluation.Value!.Boolean, Is.EqualTo(value));
             }
         }

@@ -120,10 +120,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
             foreach (var sample in IntegerBoundarySamples[parameterIndex])
             {
-                var environment = new Dictionary<IrVarId, IrValue>
-                {
-                    [entry] = factory.CreateIntegerValue(input.Type, sample)
-                };
+                var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(input.Type, sample));
                 var expectedPositive = sample > 0;
                 var expectedInRange = sample >= -1L && sample <= 1L;
                 var positiveClause = projected.Clauses[parameterIndex * 2];
@@ -185,11 +182,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
             var input = factory.Variable(context.Parameters[parameterIndex].Entry);
             for (var sampleIndex = 0; sampleIndex < sampleValues[parameterIndex].Length; sampleIndex++)
             {
-                var environment = new Dictionary<IrVarId, IrValue>
-                {
-                    [context.Parameters[parameterIndex].Entry] = factory.CreateIntegerValue(
-                        input.Type, sampleValues[parameterIndex][sampleIndex])
-                };
+                var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[parameterIndex].Entry, factory.CreateIntegerValue(
+                        input.Type, sampleValues[parameterIndex][sampleIndex]));
                 Assert.That(interpreter.Evaluate(result.Clauses[parameterIndex].Value, environment).Value!.Boolean,
                     Is.EqualTo(expectedValues[parameterIndex][sampleIndex]));
             }
@@ -198,11 +192,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var ulongEntry = context.Parameters[2].Entry;
         var ulongType = factory.Variable(ulongEntry).Type;
         var maximumUlong = interpreter.Evaluate(
-            factory.Integer(ulongType, ulong.MaxValue), new Dictionary<IrVarId, IrValue>()).Value!;
-        var highUnsignedEnvironment = new Dictionary<IrVarId, IrValue>
-        {
-            [ulongEntry] = maximumUlong
-        };
+            factory.Integer(ulongType, ulong.MaxValue), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!;
+        var highUnsignedEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(ulongEntry, maximumUlong);
         Assert.That(interpreter.Evaluate(result.Clauses[2].Value, highUnsignedEnvironment).Value!.Boolean,
             Is.False);
     }
@@ -239,14 +230,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
                 _ => throw new ArgumentOutOfRangeException(nameof(parameterIndex))
             };
             var clause = projected.Clauses[parameterIndex];
-            var nullEnvironment = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = factory.CreateNullValue(input.Type)
-            };
-            var nonNullEnvironment = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = nonNullValue
-            };
+            var nullEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateNullValue(input.Type));
+            var nonNullEnvironment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, nonNullValue);
             Assert.That(interpreter.Evaluate(clause.Value, nullEnvironment).Value!.Boolean, Is.False);
             Assert.That(interpreter.Evaluate(clause.Value, nonNullEnvironment).Value!.Boolean, Is.True);
             Assert.That(interpreter.Evaluate(clause.SafeCondition, nullEnvironment).Value!.Boolean, Is.True);

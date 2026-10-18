@@ -73,10 +73,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
         var parameter = total.Parameters.Single();
         var factory = total.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(4)));

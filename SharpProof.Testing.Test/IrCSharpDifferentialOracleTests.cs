@@ -43,7 +43,7 @@ public sealed class IrCSharpDifferentialOracleTests
             var term = factory.Integer(index);
             var result = oracle.Compare(
                 term,
-                new Dictionary<IrVarId, IrValue>());
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
             Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement));
         }
 
@@ -77,10 +77,7 @@ public sealed class IrCSharpDifferentialOracleTests
         object?[] arguments =
         [
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [input] = factory.CreateIntegerValue(0)
-            },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input,factory.CreateIntegerValue(0)),
             null,
             null,
             null
@@ -117,7 +114,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             term,
-            new Dictionary<IrVarId, IrValue>());
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
 
         Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement));
         Assert.That(result.Interpreted.Value!.Boolean, Is.False);
@@ -137,7 +134,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             term,
-            new Dictionary<IrVarId, IrValue>());
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
 
         Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
     }
@@ -161,10 +158,7 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             factory.Variable(value),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = binding
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, binding));
 
         using (Assert.EnterMultipleScope())
         {
@@ -192,27 +186,15 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var value = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateSequenceValue(
                     sequenceType,
-                    [factory.CreateIntegerValue(17)]),
-                [index] = factory.CreateIntegerValue(0)
-            });
+                    [factory.CreateIntegerValue(17)])).SetItem(index, factory.CreateIntegerValue(0)));
         var outOfRange = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateSequenceValue(sequenceType, []),
-                [index] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateSequenceValue(sequenceType, [])).SetItem(index, factory.CreateIntegerValue(0)));
         var nullReceiver = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [values] = factory.CreateNullValue(sequenceType),
-                [index] = factory.CreateIntegerValue(0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(values, factory.CreateNullValue(sequenceType)).SetItem(index, factory.CreateIntegerValue(0)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -247,39 +229,27 @@ public sealed class IrCSharpDifferentialOracleTests
 
         var empty = oracle.Compare(
             factory.Variable(integerValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [integerValues] = factory.CreateSequenceValue(integers, [])
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(integerValues, factory.CreateSequenceValue(integers, [])));
         var scalarElements = oracle.Compare(
             factory.Variable(integerValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [integerValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(integerValues, factory.CreateSequenceValue(
                     integers,
-                    [factory.CreateIntegerValue(17)])
-            });
+                    [factory.CreateIntegerValue(17)])));
         var nestedElements = oracle.Compare(
             factory.Variable(nestedValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [nestedValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(nestedValues, factory.CreateSequenceValue(
                     nested,
                     [
                         factory.CreateSequenceValue(
                             integers,
                             [factory.CreateIntegerValue(1)]),
                         factory.CreateSequenceValue(integers, [])
-                    ])
-            });
+                    ])));
         var nullElement = oracle.Compare(
             factory.Variable(stringValues),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [stringValues] = factory.CreateSequenceValue(
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(stringValues, factory.CreateSequenceValue(
                     strings,
-                    [factory.CreateNullValue(factory.StringType)])
-            });
+                    [factory.CreateNullValue(factory.StringType)])));
 
         Assert.That(
             new[]

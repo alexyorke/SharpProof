@@ -22,7 +22,7 @@ public sealed class IrDefaultObjectReplayTests
         if (invalidateAgain)
         { heap.Invalidate(); }
         var result = new IrInterpreter(factory).Evaluate(factory.PureOpaque(field, factory.Variable(owner)),
-            new Dictionary<IrVarId, IrValue> { [owner] = value }, null, heap, default);
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, value), null, heap, default);
         Assert.That(result.Status, Is.EqualTo(invalidateAgain ? IrEvaluationStatus.Unsupported : IrEvaluationStatus.Value));
         Assert.That(heap.ConsumedApproximation, Is.EqualTo(invalidateAgain));
         if (!invalidateAgain)
@@ -44,7 +44,7 @@ public sealed class IrDefaultObjectReplayTests
         var heap = new IrHeap();
         heap.RegisterFreshObject(value);
         var result = new IrInterpreter(factory).Evaluate(factory.PureOpaque(field, factory.Variable(owner)),
-            new Dictionary<IrVarId, IrValue> { [owner] = value }, null, heap, default);
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, value), null, heap, default);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
     }
 }

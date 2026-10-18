@@ -189,7 +189,7 @@ public sealed class TypedProgramLoweringTests
         builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
         var parameter = subject.Context.Parameters.Single().Current;
         var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Value(parameter, input)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo((bool)subject.Invoke([input])!));
     }
@@ -223,7 +223,7 @@ public sealed class TypedProgramLoweringTests
         builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
         var parameter = subject.Context.Parameters.Single().Current;
         var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, subject.Value(parameter, input)));
         var expected = subject.Invoke([input]);
         if (expected is DivideByZeroException)
         {

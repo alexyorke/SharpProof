@@ -74,7 +74,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var execution = new IrProgramInterpreter(factory).Execute(lowering.Program, new Dictionary<IrVarId, IrValue>());
+        var execution = new IrProgramInterpreter(factory).Execute(lowering.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));

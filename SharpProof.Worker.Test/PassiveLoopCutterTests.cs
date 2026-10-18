@@ -136,7 +136,7 @@ public sealed class PassiveLoopCutterTests
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Is.Empty);
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
+    internal static (PassiveCallableCandidate Candidate, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
         ChangingHeapReceiverCandidate(bool conditional)
     {
         var subject = new PassiveCallableVcTests.ScalarSubject();
@@ -188,13 +188,7 @@ public sealed class PassiveLoopCutterTests
         requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         var candidate = new PassiveCallableCandidate("changing-heap-receiver", builder.Build(), [a, b, c, subject.Parameter], subject.Result,
             [.. requires], [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
-        return (candidate, new Dictionary<IrVarId, IrValue>
-        {
-            [a.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [b.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [c.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState()),
-            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
-        }, headerSite);
+        return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(a.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(b.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(c.Entry, factory.CreateReferenceValue(factory.ObjectType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)), headerSite);
     }
 
     [TestCase(false)]
@@ -215,7 +209,7 @@ public sealed class PassiveLoopCutterTests
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
-    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
+    internal static (PassiveCallableCandidate Candidate, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
     {
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var factory = subject.Factory;
@@ -264,12 +258,8 @@ public sealed class PassiveLoopCutterTests
         var candidate = new PassiveCallableCandidate("exception-loop-heap", builder.Build(), [owner, subject.Parameter], subject.Result,
             [.. requires],
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
-        return (candidate, new Dictionary<IrVarId, IrValue>
-        {
-            [owner.Entry] = array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
-                : factory.CreateReferenceValue(ownerType, new IrObjectState()),
-            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
-        });
+        return (candidate, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner.Entry, array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
+                : factory.CreateReferenceValue(ownerType, new IrObjectState())).SetItem(subject.Parameter.Entry, factory.CreateIntegerValue(2)));
     }
 
     [TestCase(false)]

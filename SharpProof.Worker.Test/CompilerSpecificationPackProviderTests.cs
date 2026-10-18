@@ -34,7 +34,7 @@ public sealed class CompilerSpecificationPackProviderTests
         var rule = model!.Apply([factory.Integer(integerType, left), factory.Integer(integerType, right)]);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var interpreted = new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>());
+        var interpreted = new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(interpreted.Value!.Integer, Is.EqualTo(Math.Max(left, right)));
         Assert.That(interpreted.Value.Type, Is.EqualTo(integerType));
         Assert.That(model.Apply([factory.Boolean(true), factory.Integer(integerType, right)]).Classification.IsExact, Is.False);

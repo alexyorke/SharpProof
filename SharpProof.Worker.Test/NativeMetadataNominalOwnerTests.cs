@@ -58,7 +58,7 @@ public sealed class NativeMetadataNominalOwnerTests
         var observations = new List<bool>();
         var marker = decoded.Body.CallPreconditions.Single().Instruction;
         var replay = new IrProgramInterpreter(factory).Execute(decoded.Body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = value }, 10000,
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value), 10000,
             new IrProgramReplayOptions(static _ => null)
             { AssignmentObserver = (instruction, assigned, _) => { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations.Add(assigned.Boolean); } } });
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -115,11 +115,7 @@ public sealed class NativeMetadataNominalOwnerTests
             var observations = 0;
             var marker = decoded.Body.CallPreconditions.Single().Instruction;
             var replay = new IrProgramInterpreter(factory).Execute(decoded.Body.Program,
-                new Dictionary<IrVarId, IrValue>
-                {
-                    [entries[0]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, token),
-                    [entries[1]] = factory.CreateReferenceValue(factory.ObjectType, other)
-                }, 10000,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, token)).SetItem(entries[1], factory.CreateReferenceValue(factory.ObjectType, other)), 10000,
                 new IrProgramReplayOptions(static _ => null)
                 { AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations++; } } });
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

@@ -77,7 +77,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         var entry = caller.Body.Parameters.Single().Entry;
         var factory = caller.Body.Program.Factory;
         var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 0)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
     }

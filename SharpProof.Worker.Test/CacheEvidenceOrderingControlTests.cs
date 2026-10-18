@@ -65,11 +65,11 @@ public sealed class CacheEvidenceOrderingControlTests
                 Reason = WorkerClaimReason.None,
                 ProofCore = ["z", "a"]
             })), budgets, WorkerCacheStatus.Written, 0);
-        Array.Reverse(response.CallableResults);
-        Array.Reverse(response.ClaimResults);
+        response.CallableResults = [.. response.CallableResults.Reverse()];
+        response.ClaimResults = [.. response.ClaimResults.Reverse()];
         foreach (var claim in response.ClaimResults)
         {
-            Array.Reverse(claim.ProofCore);
+            claim.ProofCore = [.. claim.ProofCore.Reverse()];
         }
         Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.True);
         var cache = new VerificationCache(directory.FullName, 100_000);

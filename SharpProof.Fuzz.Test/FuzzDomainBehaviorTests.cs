@@ -19,10 +19,7 @@ public sealed class FuzzDomainBehaviorTests
             factory.Binary(IrBinaryOperator.Divide, factory.Integer(1),
                 factory.Variable(divisor)), factory.Integer(1));
         var atZero = new IrInterpreter(factory).Evaluate(formula,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [divisor] = factory.CreateIntegerValue(factory.IntegerType, 0)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(divisor, factory.CreateIntegerValue(factory.IntegerType, 0)));
 
         Assert.That(atZero.Status, Is.EqualTo(expectedDefined
             ? IrEvaluationStatus.Value : IrEvaluationStatus.Exception));

@@ -95,7 +95,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
                 Assert.That(target.Invoke(null, [input]), Is.EqualTo(7));
                 var parameter = context.Parameters.Single();
                 var execution = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [parameter.Entry] = factory.CreateBooleanValue(input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateBooleanValue(input)));
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));

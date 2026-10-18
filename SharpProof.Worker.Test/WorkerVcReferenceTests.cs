@@ -276,7 +276,7 @@ public sealed class WorkerVcReferenceTests
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var replay = new IrProgramInterpreter(candidate!.Factory).Execute(candidate.Program, new Dictionary<IrVarId, IrValue>());
+        var replay = new IrProgramInterpreter(candidate!.Factory).Execute(candidate.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
     }

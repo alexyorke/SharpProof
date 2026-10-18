@@ -62,15 +62,15 @@ public sealed class CompilerManifestArtifactTests
             "internal static int A(int value) { Contract.Requires(value > 0); " +
             "Contract.Ensures(Contract.Result<int>() == value); return value; } }");
         var canonical = CompilerManifestArtifactJson.Serialize(artifact, TestContext.CurrentContext.CancellationToken);
-        { artifact = artifact with { Callables = (artifact.Callables.Reverse().ToArray()).ToImmutableArray() }; }
-        artifact.Manifest.Callables = artifact.Manifest.Callables.Reverse().ToArray();
-        artifact.Manifest.Claims = artifact.Manifest.Claims.Reverse().ToArray();
+        { artifact = artifact with { Callables = artifact.Callables.Reverse().ToImmutableArray() }; }
+        artifact.Manifest.Callables = artifact.Manifest.Callables.Reverse().ToImmutableArray();
+        artifact.Manifest.Claims = artifact.Manifest.Claims.Reverse().ToImmutableArray();
         foreach (var callable in artifact.Manifest.Callables)
         {
-            callable.SelectedFeatures = callable.SelectedFeatures.Reverse().ToArray();
-            callable.SelectionReasons = callable.SelectionReasons.Reverse().ToArray();
-            callable.ClaimIds = callable.ClaimIds.Reverse().ToArray();
-            callable.Assumptions = callable.Assumptions.Reverse().ToArray();
+            callable.SelectedFeatures = callable.SelectedFeatures.Reverse().ToImmutableArray();
+            callable.SelectionReasons = callable.SelectionReasons.Reverse().ToImmutableArray();
+            callable.ClaimIds = callable.ClaimIds.Reverse().ToImmutableArray();
+            callable.Assumptions = callable.Assumptions.Reverse().ToImmutableArray();
         }
         var manifest = artifact.Manifest;
         var payloads = artifact.Callables;
@@ -89,14 +89,14 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(JsonSerializer.Serialize(artifact, WorkerProtocolJson.SharedOptions), Is.EqualTo(before));
             Assert.That(artifact.Manifest, Is.SameAs(manifest));
             Assert.That(artifact.Callables.Equals(payloads), Is.True);
-            Assert.That(manifest.Callables, Is.SameAs(entries));
-            Assert.That(manifest.Claims, Is.SameAs(claims));
+            Assert.That(manifest.Callables.Equals(entries), Is.True);
+            Assert.That(manifest.Claims.Equals(claims), Is.True);
             foreach (var collection in collections)
             {
-                Assert.That(collection.Entry.SelectedFeatures, Is.SameAs(collection.SelectedFeatures));
-                Assert.That(collection.Entry.SelectionReasons, Is.SameAs(collection.SelectionReasons));
-                Assert.That(collection.Entry.ClaimIds, Is.SameAs(collection.ClaimIds));
-                Assert.That(collection.Entry.Assumptions, Is.SameAs(collection.Assumptions));
+                Assert.That(collection.Entry.SelectedFeatures.Equals(collection.SelectedFeatures), Is.True);
+                Assert.That(collection.Entry.SelectionReasons.Equals(collection.SelectionReasons), Is.True);
+                Assert.That(collection.Entry.ClaimIds.Equals(collection.ClaimIds), Is.True);
+                Assert.That(collection.Entry.Assumptions.Equals(collection.Assumptions), Is.True);
             }
         }
     }

@@ -65,7 +65,7 @@ public sealed class BulkFrontendIlWorkBoundaryTests
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
         var entry = context.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 1)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(8)));
         Assert.That(replay.ConsumedApproximation, Is.False);

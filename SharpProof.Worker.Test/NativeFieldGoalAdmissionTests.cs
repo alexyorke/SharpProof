@@ -78,12 +78,7 @@ public sealed class NativeFieldGoalAdmissionTests
             [.. requires], [ensures]);
 
         var owner = factory.CreateReferenceValue(boxType, new IrObjectState().WithField(field, initialValue));
-        var inputs = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, owner).SetItem(parameter.Current, owner).SetItem(parameter.Old, owner);
         var execution = new IrProgramInterpreter(factory).Execute(candidate.Program, inputs);
         using (Assert.EnterMultipleScope())
         {

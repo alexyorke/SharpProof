@@ -44,7 +44,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         var result = new CoreIrAdvisoryInterpreter(program, [flag])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
         var concrete = new IrProgramInterpreter(factory).Execute(program,
-            new Dictionary<IrVarId, IrValue> { { flag, factory.CreateBooleanValue(true) } }).ReturnValue!.Boolean;
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(true))).ReturnValue!.Boolean;
         Assert.That(concrete, Is.True);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
@@ -105,7 +105,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         foreach (var condition in new[] { false, true })
         {
             var concrete = new IrProgramInterpreter(factory).Execute(program,
-                new Dictionary<IrVarId, IrValue> { { flag, factory.CreateBooleanValue(condition) } }).ReturnValue!;
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(condition))).ReturnValue!;
             Assert.That(concrete.Kind, Is.EqualTo(condition ? IrValueKind.String : IrValueKind.Null));
             if (condition)
             {
@@ -172,7 +172,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         foreach (var input in new[] { false, true })
         {
             var concrete = new IrProgramInterpreter(factory).Execute(program,
-                new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(input) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(input)));
             Assert.That(concrete.ReturnValue!.Boolean, Is.EqualTo(input));
         }
     }

@@ -211,7 +211,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                     }
                 };
                 var replay = new IrProgramInterpreter(factory).Execute(body.Program,
-                    new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateBooleanValue(input) }, 10000, options);
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateBooleanValue(input)), 10000, options);
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.Boolean, Is.EqualTo(input));
                 Assert.That(observations, Is.EqualTo(ExpectedPreconditions));

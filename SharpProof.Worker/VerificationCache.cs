@@ -49,6 +49,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     CallableResults: { } callables,
                     ClaimResults: { } claims
                 } ||
+                callables.IsDefault || claims.IsDefault ||
                 !string.Equals(entry.InputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(entry.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
                 callables.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)) ||
@@ -132,13 +133,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         string expectedInputHash,
         WorkerClaimManifest expectedManifest)
     {
-        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
+        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is not null && !response.Errors.IsDefault && response is
         {
             RunStatus: WorkerRunStatus.Complete,
             FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
-            CallableResults: not null,
-            ClaimResults: not null
+            CallableResults.IsDefault: false,
+            ClaimResults.IsDefault: false
         } &&
         expectedManifest != null &&
         WorkerProtocolJson.ValidateKnownInputHash(

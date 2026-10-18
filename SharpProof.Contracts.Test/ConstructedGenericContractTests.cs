@@ -98,7 +98,7 @@ public sealed class ConstructedGenericContractTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -1, 1 })
         {
-            var values = new Dictionary<IrVarId, IrValue> { [parameter.Variable] = factory.CreateIntegerValue(type, input) };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(type, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));
         }
     }

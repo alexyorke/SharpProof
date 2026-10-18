@@ -44,11 +44,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
             for (var right = rightMinimum; right <= rightMinimum + 1; right++)
             {
                 var concrete = new IrProgramInterpreter(built.Program.Factory).Execute(built.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        { built.Left, built.Program.Factory.CreateIntegerValue(left) },
-                        { built.Right, built.Program.Factory.CreateIntegerValue(right) }
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(built.Left, built.Program.Factory.CreateIntegerValue(left)).SetItem(built.Right, built.Program.Factory.CreateIntegerValue(right)));
                 Assert.That(concrete.ReturnValue!.Boolean, Is.EqualTo(expected != 0));
             }
         }
@@ -81,11 +77,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
             for (var right = 1; right <= 3; right++)
             {
                 var concrete = new IrProgramInterpreter(built.Program.Factory).Execute(built.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        { built.Left, built.Program.Factory.CreateIntegerValue(left) },
-                        { built.Right, built.Program.Factory.CreateIntegerValue(right) }
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(built.Left, built.Program.Factory.CreateIntegerValue(left)).SetItem(built.Right, built.Program.Factory.CreateIntegerValue(right)));
                 observed.Add(concrete.ReturnValue!.Boolean);
             }
         }

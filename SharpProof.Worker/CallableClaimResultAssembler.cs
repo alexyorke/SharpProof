@@ -73,7 +73,7 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         return record;
     }
 
-    private static WorkerAssumptionEvidence[] ProjectAssumptions(
+    private static ImmutableArray<WorkerAssumptionEvidence> ProjectAssumptions(
         CompilerCallablePreparation target,
         Func<WorkerAssumptionEvidence, bool> isUsed)
     {
@@ -201,7 +201,7 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         return record;
     }
 
-    internal static WorkerAssumptionEvidence[] MarkAssumptionsUsed(
+    internal static ImmutableArray<WorkerAssumptionEvidence> MarkAssumptionsUsed(
         CompilerCallablePreparation target,
         IReadOnlySet<string> usedAssumptionIds)
     {

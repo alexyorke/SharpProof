@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
+using SharpProof.Ir;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 
@@ -44,7 +45,7 @@ internal static class NativeCorpusVerifier
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
-            var results = response.ClaimResults.ToDictionary(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
+            var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal);
             return [.. discovery.Targets.Values
                 .Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (claimsByCallable[target.Entry.CallableId].Any()))

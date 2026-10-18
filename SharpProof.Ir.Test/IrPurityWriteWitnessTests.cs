@@ -38,7 +38,7 @@ public sealed class IrPurityWriteWitnessTests
         var writes = new List<OperationId>();
         var witnesses = new List<OperationId>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = input }, 64, new IrProgramReplayOptions(_ => null)
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, input), 64, new IrProgramReplayOptions(_ => null)
             {
                 WritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); writes.Add(write.Operation); },
                 NonFreshWritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); witnesses.Add(write.Operation); }
@@ -92,7 +92,7 @@ public sealed class IrPurityWriteWitnessTests
         builder.Return(block, factory.CreateOperation());
         var observed = 0;
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
-            new Dictionary<IrVarId, IrValue> { [owner] = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(0)]) : factory.CreateNullValue(type) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(owner, array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(0)]) : factory.CreateNullValue(type)),
             64, new IrProgramReplayOptions(_ => null)
             {
                 WritePrefixObserver = (_, _) => observed++,

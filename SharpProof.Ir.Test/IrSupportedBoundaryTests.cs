@@ -55,7 +55,7 @@ public sealed class IrSupportedBoundaryTests
             new Dictionary<IrVarId, IrTerm> { [first] = factory.Integer(2) }, new HashSet<IrVarId> { second }, out var valid), Is.True);
         Assert.That(IrSubstitution.TrySubstitute(factory, sum,
             new Dictionary<IrVarId, IrTerm> { [first] = factory.Integer(2) }, new HashSet<IrVarId>(), out _), Is.False);
-        var result = new IrInterpreter(factory).Evaluate(valid, new Dictionary<IrVarId, IrValue> { [second] = factory.CreateIntegerValue(3) });
+        var result = new IrInterpreter(factory).Evaluate(valid, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(second, factory.CreateIntegerValue(3)));
         Assert.That(result.Value!.Integer, Is.EqualTo(5));
     }
 
@@ -76,7 +76,7 @@ public sealed class IrSupportedBoundaryTests
         var valid = new IrProgramInterpreter(factory).Execute(program);
         Assert.That(valid.ReturnValue!.Integer, Is.EqualTo(5));
         Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(factory).Execute(program,
-            new Dictionary<IrVarId, IrValue> { [target] = factory.CreateIntegerValue(1) })));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(target, factory.CreateIntegerValue(1)))));
     }
 
     [Test]

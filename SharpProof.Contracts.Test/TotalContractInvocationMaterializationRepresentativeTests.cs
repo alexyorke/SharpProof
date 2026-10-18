@@ -151,13 +151,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
                 {
                     foreach (var returned in new[] { false, true })
                     {
-                        var values = new Dictionary<IrVarId, IrValue>
-                        {
-                            [parameter.Entry] = factory.CreateBooleanValue(entry),
-                            [parameter.Current] = factory.CreateBooleanValue(current),
-                            [parameter.PreState] = factory.CreateBooleanValue(previous),
-                            [result] = factory.CreateBooleanValue(returned)
-                        };
+                        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateBooleanValue(entry)).SetItem(parameter.Current, factory.CreateBooleanValue(current)).SetItem(parameter.PreState, factory.CreateBooleanValue(previous)).SetItem(result, factory.CreateBooleanValue(returned));
                         var expected = new[] { entry, !current, returned == previous };
                         for (var index = 0; index < clauses.Length; index++)
                         {

@@ -198,7 +198,7 @@ internal static class TotalBodyLowering
         const EffectContractKind Reads = EffectContractKind.ReadsReceiverState | EffectContractKind.ReadsArgumentState |
             EffectContractKind.ReadsCapturedState | EffectContractKind.ReadsStaticState | EffectContractKind.ReadsAmbientState;
         var effects = IrOpaqueCallEffects.None;
-        foreach (var (kind, call) in new[] {
+        foreach (var (kind, call) in ImmutableArray.Create(
             (EffectContractKind.Throws, IrOpaqueCallEffects.Throws), (EffectContractKind.Allocates, IrOpaqueCallEffects.Allocates),
             (Writes, IrOpaqueCallEffects.Writes), (Reads, IrOpaqueCallEffects.Reads),
             (EffectContractKind.ReadsAmbientState | EffectContractKind.ReadsStaticState | EffectContractKind.ReadsCapturedState,
@@ -206,7 +206,7 @@ internal static class TotalBodyLowering
             (EffectContractKind.Synchronizes, IrOpaqueCallEffects.Synchronizes),
             (EffectContractKind.UsesNondeterminism, IrOpaqueCallEffects.Nondeterminism),
             (EffectContractKind.UsesNativeCode, IrOpaqueCallEffects.NativeCode),
-            (EffectContractKind.UsesReflection, IrOpaqueCallEffects.Reflection) })
+            (EffectContractKind.UsesReflection, IrOpaqueCallEffects.Reflection)))
         {
             if ((declared.Effects & kind) != 0)
             { effects |= call; }

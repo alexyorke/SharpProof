@@ -138,7 +138,7 @@ public sealed class NativeAllocationEffectTests
         var factory = total.Program.Factory;
         var count = 0;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = factory.CreateIntegerValue(factory.IntegerType, 0L) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, factory.CreateIntegerValue(factory.IntegerType, 0L)),
             1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
         Assert.That(execution.Exception?.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         var runtimeSource = source.Replace("10 / x", "Fault(x)", StringComparison.Ordinal)
@@ -197,7 +197,7 @@ public sealed class NativeAllocationEffectTests
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         var total = preparation.Total!;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(0)));
         Assert.That(execution.ReturnValue!.Boolean, Is.False);
     }
 
@@ -210,7 +210,7 @@ public sealed class NativeAllocationEffectTests
         var total = Prepare(source).Total!;
         var count = 0;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(input) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(input)),
             1000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => count++ });
         Assert.That(execution.Exception?.Kind, Is.EqualTo(expected));
         Assert.That(count, Is.Zero);
@@ -396,11 +396,7 @@ public sealed class NativeAllocationEffectTests
             "return new System.Action(Pass(instance, 10 / x).Sink); } }";
         var total = Prepare(source).Total!;
         var factory = total.Program.Factory;
-        var initial = new Dictionary<IrVarId, IrValue>
-        {
-            [total.Parameters[0].Entry] = factory.CreateNullValue(factory.GetVariableInfo(total.Parameters[0].Entry).Type),
-            [total.Parameters[1].Entry] = factory.CreateIntegerValue(factory.IntegerType, x)
-        };
+        var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters[0].Entry, factory.CreateNullValue(factory.GetVariableInfo(total.Parameters[0].Entry).Type)).SetItem(total.Parameters[1].Entry, factory.CreateIntegerValue(factory.IntegerType, x));
         var allocations = 0;
         var replay = new IrProgramInterpreter(factory).Execute(total.Program, initial, 10000,
             new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
@@ -734,10 +730,7 @@ public sealed class NativeAllocationEffectTests
         var total = preparation.Total!;
         var allocations = 0;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(total.Program.Factory.IntegerType, 0L)
-            }, 10000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(total.Parameters.Single().Entry, total.Program.Factory.CreateIntegerValue(total.Program.Factory.IntegerType, 0L)), 10000, new IrProgramReplayOptions(_ => null) { AllocationObserver = _ => allocations++ });
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         Assert.That(allocations, Is.Zero);

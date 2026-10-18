@@ -465,11 +465,11 @@ public sealed partial class IrAllocationInstruction
             var elements = Enumerable.Repeat(initial, count);
             if (!this.InitialValues.IsEmpty)
             {
-                var evaluatedElements = new IrValue[this.InitialValues.Length];
-                for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
+                var evaluatedElements = ImmutableList<IrValue>.Empty;
+                foreach (var initialValueTerm in this.InitialValues)
                 {
-                    var initialValue = state.Interpreter.Evaluate(this.InitialValues[initialIndex], state.Values, state.CancellationToken);
-                    evaluatedElements[initialIndex] = initialValue.Value!;
+                    var initialValue = state.Interpreter.Evaluate(initialValueTerm, state.Values, state.CancellationToken);
+                    evaluatedElements = evaluatedElements.Add(initialValue.Value!);
                 }
                 elements = evaluatedElements;
             }

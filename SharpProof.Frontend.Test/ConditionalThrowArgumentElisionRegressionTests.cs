@@ -72,7 +72,7 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
         var type = subject.Factory.GetVariableInfo(parameter).Type;
         var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue> { [parameter] = value });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, value));
         Assert.That(replay.Status, Is.EqualTo(exception != null
             ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         if (exception != null)

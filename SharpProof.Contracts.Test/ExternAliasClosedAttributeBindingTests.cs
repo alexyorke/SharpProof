@@ -131,10 +131,7 @@ public sealed class ExternAliasClosedAttributeBindingTests
         {
             var returned = (int)runtimeMethod.Invoke(null, new object[] { input })!;
             Assert.That(returned, Is.EqualTo(input));
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, input));
             Assert.That(interpreter.Evaluate(clause.Condition, values).Value!.Boolean,
                 Is.EqualTo(returned > 0));
         }

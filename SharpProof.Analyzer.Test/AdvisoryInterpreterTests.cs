@@ -26,7 +26,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         var interval = result.Outputs[0].Values[x];
         Assert.That(interval.Contains(0), Is.False);
         foreach (var input in new[] { false, true })
-        { var concrete = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { c, f.CreateBooleanValue(input) } }); Assert.That(interval.Contains(concrete.ReturnValue!.Integer), Is.True); }
+        { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(input))); Assert.That(interval.Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
     public void BranchEdgesRefineAndJoin()
@@ -51,7 +51,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         Assert.That(result.Inputs[1].Values[x].UpperBound, Is.EqualTo(4));
         Assert.That(result.Inputs[2].Values[x].LowerBound, Is.EqualTo(5));
         for (var input = 0; input <= 10; input++)
-        { var concrete = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { x, f.CreateIntegerValue(input) } }); Assert.That(result.Outputs[3].Values[y].Contains(concrete.ReturnValue!.Integer), Is.True); }
+        { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, f.CreateIntegerValue(input))); Assert.That(result.Outputs[3].Values[y].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
     public void WrappingAssignmentContainsConcreteByteResults()
@@ -67,7 +67,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         var result = new CoreIrAdvisoryInterpreter(program, [x]).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(x, IntervalValue.Range(254, 255)));
         Assert.That(result.Gaps, Is.Empty);
         foreach (var input in new[] { 254, 255 })
-        { var concrete = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { x, f.CreateIntegerValue(type, input) } }); Assert.That(result.Outputs[0].Values[x].Contains(concrete.ReturnValue!.Integer), Is.True); }
+        { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, f.CreateIntegerValue(type, input))); Assert.That(result.Outputs[0].Values[x].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     private static (IrProgram Program, IrVarId X) Loop()
     {
@@ -93,7 +93,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.Iterations, Is.LessThan(1000));
         for (var input = 0; input <= 5; input++)
-        { var concrete = new IrProgramInterpreter(program.Factory).Execute(program, new Dictionary<IrVarId, IrValue> { { x, program.Factory.CreateIntegerValue(input) } }); Assert.That(result.Outputs[3].Values[x].Contains(concrete.ReturnValue!.Integer), Is.True); }
+        { var concrete = new IrProgramInterpreter(program.Factory).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, program.Factory.CreateIntegerValue(input))); Assert.That(result.Outputs[3].Values[x].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
     public void IterationLimitIsExplicitlyIncomplete()
@@ -146,7 +146,7 @@ public sealed class CoreIrAdvisoryProductTests
         Assert.That(result.Outputs[0].Cardinality[s].Length.Contains(0), Is.True);
         Assert.That(result.Outputs[0].Cardinality[s].Length.Contains(2), Is.True);
         foreach (var condition in new[] { false, true })
-        { var actual = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { c, f.CreateBooleanValue(condition) } }); Assert.That(result.Outputs[0].Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
+        { var actual = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(condition))); Assert.That(result.Outputs[0].Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
         var empty = new IrProgramBuilder(f);
         var first = empty.CreateBlock();
         empty.Assign(first, f.CreateOperation(), s, f.Conditional(f.Variable(c), f.Null(f.StringType), f.String("")));
@@ -180,7 +180,7 @@ public sealed class CoreIrAdvisoryProductTests
         Assert.That(result.Inputs[2].Cardinality[s].Kind, Is.EqualTo(SequenceCardinalityKind.Empty));
         var values = new[] { f.CreateNullValue(type), f.CreateEmptyArrayValue(type), f.CreateSequenceValue(type, new[] { f.CreateIntegerValue(1), f.CreateIntegerValue(2) }) };
         foreach (var value in values)
-        { var actual = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { s, value } }); var output = result.Outputs[value.Kind == IrValueKind.Sequence && value.Elements.Length > 0 ? 1 : 2]; Assert.That(output.Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
+        { var actual = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(s, value)); var output = result.Outputs[value.Kind == IrValueKind.Sequence && value.Elements.Length > 0 ? 1 : 2]; Assert.That(output.Values[n].Contains(actual.ReturnValue!.Integer), Is.True); }
     }
     [TestCase(false)]
     [TestCase(true)]
@@ -355,7 +355,7 @@ public sealed class CoreIrAdvisoryResourceTests
         Assert.That(merged.Cardinality[value].Length.Contains(0), Is.True);
         Assert.That(merged.Cardinality[value].Length.Contains(2), Is.True);
         foreach (var condition in new[] { false, true })
-        { var concrete = new IrProgramInterpreter(f).Execute(program, new Dictionary<IrVarId, IrValue> { { c, f.CreateBooleanValue(condition) } }); Assert.That(merged.Values[n].Contains(concrete.ReturnValue!.Integer), Is.True); }
+        { var concrete = new IrProgramInterpreter(f).Execute(program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(c, f.CreateBooleanValue(condition))); Assert.That(merged.Values[n].Contains(concrete.ReturnValue!.Integer), Is.True); }
     }
     [Test]
     public void AggregateTermWorkStopsBeforePublishingPartialStates()
@@ -500,7 +500,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
             foreach (var input in new[] { -2, -1, 0, 1, 2 })
             {
                 var concrete = new IrProgramInterpreter(context.Factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { { context.Parameters[0].Entry, context.Factory.CreateIntegerValue(input) } });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[0].Entry, context.Factory.CreateIntegerValue(input)));
                 var compiled = (int)target.Invoke(null, [input])!;
                 Assert.That(concrete.ReturnValue!.Integer, Is.EqualTo(compiled));
                 Assert.That(abstractResult.Contains(concrete.ReturnValue.Integer), Is.True);

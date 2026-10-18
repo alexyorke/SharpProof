@@ -79,7 +79,7 @@ public sealed class WorkerResultAssemblerTests
                 new WorkerCallableManifestEntry
                 {
                     CallableId = "callable",
-                    Assumptions = null!
+                    Assumptions = default
                 }
             ],
             Claims =

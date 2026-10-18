@@ -325,7 +325,7 @@ public sealed partial class DotnetApiInventoryTests
                     var parameters = context.Parameters;
                     var arrayType = factory.GetVariableInfo(parameters[0].Entry).Type;
                     var arrayValue = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType, values.Select(value => factory.CreateIntegerValue(value)));
-                    var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue> { [parameters[0].Entry] = arrayValue, [parameters[1].Entry] = factory.CreateIntegerValue(index), [parameters[2].Entry] = factory.CreateIntegerValue(replacement) }, 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                    var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameters[0].Entry, arrayValue).SetItem(parameters[1].Entry, factory.CreateIntegerValue(index)).SetItem(parameters[2].Entry, factory.CreateIntegerValue(replacement)), 10000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                     if (replay.ConsumedApproximation && !handledBounds && fault is not ArgumentOutOfRangeException)
                     {
                         if (!wrongClaim)

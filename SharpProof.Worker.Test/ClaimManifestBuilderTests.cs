@@ -51,8 +51,7 @@ public sealed class ClaimManifestBuilderTests
             foreach (var input in FailingShadowInputs)
             {
                 var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)input) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)input)));
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));

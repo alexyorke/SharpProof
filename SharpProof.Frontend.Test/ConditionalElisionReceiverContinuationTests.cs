@@ -78,7 +78,7 @@ public sealed class ConditionalElisionReceiverContinuationTests
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [binding] = value });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding, value));
             if (!elided && input == null)
             {
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));

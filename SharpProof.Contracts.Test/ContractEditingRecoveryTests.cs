@@ -75,7 +75,7 @@ public sealed class ContractEditingRecoveryTests
         {
             Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
             var evaluation = new IrInterpreter(factory).Evaluate(result.Contracts.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue>());
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
             Assert.That(evaluation.Value!.Boolean, Is.True);
         }
         else

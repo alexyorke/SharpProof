@@ -249,7 +249,7 @@ public sealed class PassiveExceptionLoopTests
             factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(input)));
         var value = factory.CreateIntegerValue(factory.IntegerType, input);
         var actual = new IrProgramInterpreter(factory).Execute(candidate.Program,
-            new Dictionary<IrVarId, IrValue> { [subject.Parameter.Entry] = value, [subject.Parameter.Current] = value });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(subject.Parameter.Entry, value).SetItem(subject.Parameter.Current, value));
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());

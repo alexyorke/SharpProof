@@ -338,11 +338,10 @@ internal sealed class AnalyzerConfiguration
         out string value)
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
-        var keys = new[] {
+        var keys = ImmutableArray.Create(
             option.Key,
             "build_property." + option.Key,
-            "build_property." + option.BuildPropertyName
-        };
+            "build_property." + option.BuildPropertyName);
         foreach (var key in keys)
         {
             if (options.TryGetValue(key, out var found))

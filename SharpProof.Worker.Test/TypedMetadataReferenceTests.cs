@@ -48,14 +48,11 @@ public sealed class TypedMetadataReferenceTests
         Assert.That(clause.Attribute.ApplicationSyntaxReference, Is.Null);
         Assert.That(binder.BindTotalRequires(context).Failure, Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
         var entry = context.Parameters[0].Entry;
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [entry] = type == "ulong"
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, type == "ulong"
                 ? factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type,
                     ulong.Parse(input, System.Globalization.CultureInfo.InvariantCulture))
                 : factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type,
-                    long.Parse(input, System.Globalization.CultureInfo.InvariantCulture))
-        };
+                    long.Parse(input, System.Globalization.CultureInfo.InvariantCulture)));
         var interpreter = new IrInterpreter(factory);
         Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.EqualTo(expected));
         Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.True);
@@ -81,7 +78,7 @@ public sealed class TypedMetadataReferenceTests
         var value = !nonnull ? factory.CreateNullValue(entryType) : type == "string"
             ? factory.CreateStringValue("value") : factory.CreateReferenceValue(entryType, new object());
         var interpreter = new IrInterpreter(factory);
-        var values = new Dictionary<IrVarId, IrValue> { [entry] = value };
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value);
         Assert.That(interpreter.Evaluate(binding.Clauses.Single().Value, values).Value!.Boolean, Is.EqualTo(nonnull));
     }
 
@@ -179,7 +176,7 @@ public sealed class TypedMetadataReferenceTests
             var value = input == null ? factory.CreateNullValue(entryType) : type == "string"
                 ? factory.CreateStringValue((string)input) : factory.CreateReferenceValue(entryType, input);
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = value });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
             if (resultType == "bool")
@@ -282,8 +279,7 @@ public sealed class TypedMetadataReferenceTests
             var second = alias ? first : new string('x', 3);
             Assert.That(subject.Method.Invoke(null, [first, second]), Is.EqualTo(alias));
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue>
-                { [firstParameter.Entry] = factory.CreateStringValue(first), [secondParameter.Entry] = factory.CreateStringValue(second) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(firstParameter.Entry, factory.CreateStringValue(first)).SetItem(secondParameter.Entry, factory.CreateStringValue(second)));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo(alias));
         }

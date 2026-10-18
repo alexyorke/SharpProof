@@ -99,7 +99,7 @@ public sealed class TypedMetadataCallTests
         var type = factory.GetVariableInfo(entry).Type;
         var value = input is bool boolean ? factory.CreateBooleanValue(boolean) : input is ulong unsigned
             ? factory.CreateIntegerValue(type, unsigned) : factory.CreateIntegerValue(type, Convert.ToInt64(input, CultureInfo.InvariantCulture));
-        var execution = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue> { [entry] = value });
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
         if (expected is Type)
         { Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.Overflow)); }
         else if (expected is bool expectedBoolean)
@@ -128,7 +128,7 @@ public sealed class TypedMetadataCallTests
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(input).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(input).Type, 0)));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(1));
     }

@@ -7,13 +7,13 @@ internal static class CompilerExceptionConstraintEvidence
         IAssemblySymbol core, IEnumerable<CompilerEffectClaimArtifact> claims)
     {
         claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
-        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
+        var constraints = ImmutableList<CompilerTotalExceptionConstraint>.Empty;
         foreach (var evidence in claims)
         {
             var listsTypes = evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions ||
                 evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
                 (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
-            var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
+            var allowed = ImmutableList<IrExceptionKind>.Empty;
             foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
             {
                 var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
@@ -22,10 +22,10 @@ internal static class CompilerExceptionConstraintEvidence
                 if (listsTypes &&
                     CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
                         identity is null ? throw new System.ArgumentNullException(nameof(identity)) : (evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal))))
-                { allowed.Add(kind); }
+                { allowed = allowed.Add(kind); }
             }
-            constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));
+            constraints = constraints.Add(new(evidence.ClaimId, allowed.ToImmutableArray()));
         }
-        return constraints.ToImmutable();
+        return constraints.ToImmutableArray();
     }
 }

@@ -16,7 +16,7 @@ public sealed class Pr275CheckedNegationCoverageTests
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var expression = factory.Unary(IrUnaryOperator.Negate, factory.Variable(variable));
         var result = new IrInterpreter(factory).Evaluate(expression,
-            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateIntegerValue(input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(input)));
 
         Assert.That(result.Status, Is.EqualTo(overflows ? IrEvaluationStatus.Exception : IrEvaluationStatus.Value));
         if (overflows)

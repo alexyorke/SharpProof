@@ -456,8 +456,7 @@ public sealed class CompilerTotalCallableArtifactTests
             Assert.That(decoded.CallableId, Is.EqualTo(ordinary.CallableId));
             var input = decoded.Parameters.Single().Entry;
             var execution = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
-                new Dictionary<IrVarId, IrValue>
-                { [input] = decoded.Program.Factory.CreateIntegerValue(decoded.Program.Factory.GetVariableInfo(input).Type, 0L) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, decoded.Program.Factory.CreateIntegerValue(decoded.Program.Factory.GetVariableInfo(input).Type, 0L)));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.GetCurrentValue(input)!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
             Assert.That(execution.GetCurrentValue(decoded.Parameters.Single().Old)!.IntegerNumericValue,
@@ -681,7 +680,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
         var interpreter = new IrProgramInterpreter(total.Program.Factory);
-        var entries = new Dictionary<IrVarId, IrValue>();
+        var entries = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
         Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var result = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

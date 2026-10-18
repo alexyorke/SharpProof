@@ -782,11 +782,11 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-245 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:164` | `Line`: `int` | Init-only; retained mutable members remain under review |
 | MODEL-246 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:166` | `Column`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-247 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:172` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-248 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:174` | `SelectedFeatures`: `WorkerSelectedFeature[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-249 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:176` | `SelectionReasons`: `WorkerSelectionReason[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-248 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:174` | `SelectedFeatures`: `WorkerSelectedFeature[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-249 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:176` | `SelectionReasons`: `WorkerSelectionReason[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-250 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:178` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-251 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:180` | `ClaimIds`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-252 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:182` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-251 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:180` | `ClaimIds`: `string[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-252 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:182` | `Assumptions`: `WorkerAssumptionEvidence[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-253 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:188` | `ClaimId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-254 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:190` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-255 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:192` | `Ordinal`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
@@ -796,29 +796,29 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-259 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:200` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-260 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:206` | `SchemaVersion`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-261 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:208` | `Hash`: `string` | Preserve; public in-place SealManifest digest contract |
-| MODEL-262 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:210` | `Callables`: `WorkerCallableManifestEntry[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-263 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:212` | `Claims`: `WorkerClaimManifestEntry[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-262 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:210` | `Callables`: `WorkerCallableManifestEntry[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-263 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:212` | `Claims`: `WorkerClaimManifestEntry[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-264 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:368` | `Id`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-265 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:370` | `Kind`: `WorkerAssumptionKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-266 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:372` | `Used`: `bool` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-267 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:378` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-268 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:380` | `Coverage`: `WorkerCallableCoverage` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-269 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:382` | `Reason`: `WorkerCallableCoverageReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-270 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:384` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-270 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:384` | `Assumptions`: `WorkerAssumptionEvidence[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-271 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:390` | `ClaimId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-272 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:392` | `Outcome`: `WorkerClaimOutcome` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-273 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:394` | `Reason`: `WorkerClaimReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-274 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:396` | `EffectCertainty`: `WorkerEffectEvidenceCertainty` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-275 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:398` | `EffectWitness`: `WorkerEffectViolationWitness?` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-276 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:400` | `Vacuity`: `WorkerVacuityKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-277 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:402` | `ProofCore`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-278 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:404` | `Model`: `WorkerModelValue[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-279 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:406` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-277 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:402` | `ProofCore`: `string[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-278 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:404` | `Model`: `WorkerModelValue[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-279 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:406` | `Assumptions`: `WorkerAssumptionEvidence[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-280 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:412` | `Kind`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-281 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:414` | `Detail`: `string` | Init-only; retained mutable members remain under review |
 | MODEL-282 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:416` | `Effects`: `WorkerEffectSet` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-283 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:418` | `Capabilities`: `WorkerEffectCapabilitySet` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-284 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:420` | `ExactExceptionTypeHierarchy`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-284 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:420` | `ExactExceptionTypeHierarchy`: `string[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-285 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:422` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-286 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:428` | `Variable`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-287 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:430` | `Kind`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
@@ -843,10 +843,10 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-306 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:495` | `Manifest`: `WorkerClaimManifest` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-307 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:497` | `RunStatus`: `WorkerRunStatus` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-308 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:499` | `FailureReason`: `WorkerRunFailureReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-309 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:501` | `CallableResults`: `WorkerCallableResult[]` | Open; immutable array migration; setter preserves public canonicalization |
-| MODEL-310 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:503` | `ClaimResults`: `WorkerClaimResult[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-309 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:501` | `CallableResults`: `WorkerCallableResult[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
+| MODEL-310 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:503` | `ClaimResults`: `WorkerClaimResult[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 | MODEL-311 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:505` | `Summary`: `WorkerVerificationSummary` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
-| MODEL-312 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:507` | `Errors`: `WorkerProtocolError[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-312 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:507` | `Errors`: `WorkerProtocolError[]` | Implemented; ImmutableArray storage; setter preserves explicit public canonicalization; 666 affected checks passed |
 
 ### Remaining analyzer local-state candidates
 
@@ -1227,3 +1227,98 @@ PowerShell follow-up traced 12 ProcessStartInfo.ArgumentList adapters and seven
 already-immutable dictionary chains; their exact IDs are classified in the TSV.
 The remaining 893 script candidates are open. Rescanning preserves verified
 statuses only when the content/location identity matches.
+
+### Protocol collections and persistent construction checkpoint
+
+- All 14 protocol collection properties now retain ImmutableArray values. Their
+  setters remain for the tested public in-place canonicalization contract.
+  A custom converter preserves explicit null as default, initialized empty as
+  [], and null elements for validation. JsonRequired still rejects omissions.
+- Cache envelope collections use the same null sentinel. Admission rejects
+  defaults before enumeration or Length and checks both input and manifest
+  hashes before canonicalization. Peer review caught an accidentally removed
+  input-hash comparison; it was restored and a tampered-envelope regression
+  was added before committing this batch.
+- All 666 focused protocol/cache/compiler/result/golden Worker checks passed
+  before the tampered-envelope addition and decoder follow-up. These later
+  changes have separate checks in progress; that result is not attributed to
+  the later working tree. Evidence:
+  artifacts/immutability-protocol-arrays-worker-tests4.log.
+- Compiler Total decoding now uses persistent sets, lists, maps and queues.
+  Strict duplicate rejection, comparer choices, FIFO/append order, prologue
+  state joins and byte-for-byte metadata digest input were reviewed. Compiler
+  metadata resolution keeps reference-key equality, ordinal hash matching,
+  first representative selection and ambiguous first-two ordering.
+- IR opaque argument snapshots occur before validation/locking, recursive
+  rebuilding preserves pure/impure normalization, and external identity buckets
+  are getter-only immutable holders. Reentrant comparisons still execute
+  outside the gate and retry against the latest bucket before publication.
+- Effects and analyzer diagnostic construction now rebind persistent collections;
+  symbol and ordinal comparers and diagnostic publication order are preserved.
+- 135 exact read-only IrVarId/IrValue fixture maps in 49 I-R test files now use
+  immutable maps. Runtime values retain object identity. Seven files with
+  explicit malformed-state tests or construction updates were excluded from
+  this mechanical batch and remain individually tracked.
+- Host lease ownership and publication path snapshots use immutable collections;
+  file handles retain their required disposal lifecycle. Native corpus replay
+  environment and result lookups are persistent.
+- Changed-project selection uses immutable sets, stacks, nested maps and project
+  records. Remove's old Boolean result is preserved by Contains before Remove.
+  Six isolated Git repository workflows match the original selector exactly:
+  dependency changes, shared compile inputs, documentation, package changes,
+  embedded-newline paths and deleted projects. Evidence:
+  artifacts/immutability-selector-check.log. The actual worktree PlanOnly also
+  selected the same expected 17 ordinary projects plus package shards.
+- Portable decoding now uses immutable indexed state and publishes immutable
+  rows. Recursive type results are computed before reading/publishing the latest
+  persistent collection, so recursive children are not overwritten by a stale
+  receiver. Peer review and focused graph/cycle checks are in progress.
+- Remaining C# and script inventory entries are still candidates requiring
+  individual review. Local builders, callback logs and algorithm worklists are
+  not blanket exemptions. The comprehensive stopping condition remains open.
+Follow-up evidence for this checkpoint:
+
+- Both 19-project ordinary runs completed. The first passed 11,597 checks with
+  one failure; the fixture-map run passed 11,598 with one failure. Both had one
+  existing package skip. The sole failure in each was the stale NUnit
+  Matches<string[]> predicate over an immutable proof core. It now uses
+  ImmutableArray<string>; its isolated rerun passed. These are not reported as
+  passing full-suite runs. Evidence:
+  artifacts/immutability-protocol-arrays-all-tests.log,
+  artifacts/immutability-fixture-maps-all-tests.log and
+  artifacts/immutability-proof-core-array-test.log.
+- The decoder/cycle/cache follow-up passed all 198 Worker checks, including the
+  new cache-envelope input-hash corruption case. The finite-domain search now
+  passes immutable environments through recursion and uses the immutable IR
+  traversal stack; all 302 ordinary Fuzz checks passed.
+- A second exact fixture batch converted another 101 constructions in 72 files;
+  nine maps requiring producer adapters and two golden-owned helpers remain for
+  individual follow-up. Across both batches, 236 fixture maps are immutable.
+- The current affected-fixture run passed 2,345 checks across eight projects:
+  203 IR, 23 Testing, 27 Effects, 441 Frontend, 327 Contracts, 34 Analyzer,
+  three Fuzz and 1,287 Worker. Gates compilation rejected a negative-capacity
+  compatibility guard under CA2208/CA1512. The guard now validates a named
+  capacity parameter and explicitly preserves the former exception's absent
+  ActualValue; focused corpus validation and compilation are in progress.
+- Catalog/importer construction and corpus parallel observations now publish
+  persistent collections. Task.WhenAll preserves input task order without a
+  shared indexed buffer. Semaphore cancellation/release behavior is unchanged.
+- Literal preservation verified 2,471 original raw/interpolated tokens across
+  498 changed C# files. The scanner parses 1,810 non-vendored C# files and records
+  3,374 candidates, including 12 program-subject exclusions and 21 classified
+  protocol mutation contracts. C# rescans now preserve classifications when
+  candidate identity matches. Evidence:
+  artifacts/immutability-array-fixture-preservation2.log.
+- The refreshed PowerShell inventory has 898 candidates across 58 scripts with
+  zero parse failures: 53 are classified and 845 remain open. Main traced 34
+  additional persistent mutation-shaped calls in changed-test selection.
+  Evidence: artifacts/immutability-powershell-inventory5.log.
+- Canonical script/C# formatting passed with no patch; later capacity-guard
+  changes are validated separately. Evidence:
+  artifacts/immutability-array-fixture-format2.log.
+Corpus follow-up completed: all 63 selected checks passed. The final capacity
+guard builds with zero warnings/errors and preserves the old capacity parameter
+name and absent ActualValue. Evidence: artifacts/immutability-corpus-persistent-tests.log
+and artifacts/immutability-corpus-guard-build.log. The 2,345 affected fixture checks
+passed; their solution invocation failed only because of the now-corrected Gates
+compile-time guard diagnostics.

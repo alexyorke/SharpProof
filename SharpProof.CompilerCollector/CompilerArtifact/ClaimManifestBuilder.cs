@@ -396,33 +396,33 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectContractDiagnostics.Declare(target, location, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
-        var features = new HashSet<WorkerSelectedFeature>(selected);
+        var features = selected.ToImmutableHashSet();
         if (!postconditions.IsDefaultOrEmpty)
         {
-            features.Add(WorkerSelectedFeature.Contracts);
+            features = features.Add(WorkerSelectedFeature.Contracts);
         }
 
         if (!effects.IsDefaultOrEmpty)
         {
-            features.Add(WorkerSelectedFeature.Effects);
+            features = features.Add(WorkerSelectedFeature.Effects);
         }
 
-        var reasons = ImmutableArray.CreateBuilder<WorkerSelectionReason>(2);
+        var reasons = ImmutableArray<WorkerSelectionReason>.Empty;
         if (!selected.IsDefaultOrEmpty || !assumptions.IsDefaultOrEmpty)
         {
-            reasons.Add(WorkerSelectionReason.ExplicitAnnotation);
+            reasons = reasons.Add(WorkerSelectionReason.ExplicitAnnotation);
         }
 
         if (!postconditions.IsDefaultOrEmpty)
         {
-            reasons.Add(WorkerSelectionReason.DiscoveredPostcondition);
+            reasons = reasons.Add(WorkerSelectionReason.DiscoveredPostcondition);
         }
 
         var entry = new WorkerCallableManifestEntry
         {
             CallableId = callableId,
             SelectedFeatures = [.. features.OrderBy(static feature => feature)],
-            SelectionReasons = reasons.ToArray(),
+            SelectionReasons = reasons,
             Location = location.IsInSource
                 ? ToSourceLocation(location)
                 : postconditions.FirstOrDefault()?.Entry.Location ??
@@ -431,7 +431,7 @@ internal sealed partial class ClaimManifestBuilder(
                         : new WorkerSourceLocation()),
             ClaimIds = [.. postconditions.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId)),
                 .. effects.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId))],
-            Assumptions = assumptions.ToArray()
+            Assumptions = assumptions
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);

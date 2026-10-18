@@ -54,7 +54,7 @@ public sealed class MetadataInvocationBindingInvariantTests
             var expected = input - 7;
             Assert.That(subject.InvokeRoot(input), Is.EqualTo(expected));
             var replay = new IrProgramInterpreter(factory).Execute(owned.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, input)));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(expected)));

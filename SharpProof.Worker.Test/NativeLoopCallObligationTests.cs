@@ -45,7 +45,7 @@ public sealed class NativeLoopCallObligationTests
         {
             var integer = factory.CreateIntegerValue(factory.IntegerType, input);
             var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter.Entry] = integer, [parameter.Current] = integer, [parameter.Old] = integer });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, integer).SetItem(parameter.Current, integer).SetItem(parameter.Old, integer));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
             Assert.That(execution.Unsupported, Is.Null);
@@ -122,7 +122,7 @@ public sealed class NativeLoopCallObligationTests
         {
             var integer = factory.CreateIntegerValue(factory.IntegerType, input);
             var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter.Entry] = integer, [parameter.Current] = integer, [parameter.Old] = integer });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, integer).SetItem(parameter.Current, integer).SetItem(parameter.Old, integer));
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);
             Assert.That(execution.Unsupported, Is.Null);

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerResultAssembler
@@ -45,8 +47,8 @@ internal static class WorkerResultAssembler
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         ArgumentNullGuard.NotNull(callableResults, nameof(callableResults));
         ArgumentNullGuard.NotNull(claimResults, nameof(claimResults));
-        var callables = callableResults.ToArray();
-        var claims = claimResults.ToArray();
+        var callables = callableResults.ToImmutableArray();
+        var claims = claimResults.ToImmutableArray();
         var response = new WorkerVerifyResponse
         {
             RequestHash = requestHash ?? EmptyInputHash,
@@ -64,7 +66,7 @@ internal static class WorkerResultAssembler
                 Budgets = CloneBudgets(budgets),
                 ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds)
             },
-            Errors = errors?.ToArray() ?? []
+            Errors = errors?.ToImmutableArray() ?? []
         };
         return WorkerProtocolJson.CanonicalizeCopy(response);
     }
@@ -72,10 +74,10 @@ internal static class WorkerResultAssembler
     // Cache envelopes must retain their stored shapes until admission validates them.
     internal static WorkerVerifyResponse CreateCached(
         string inputHash, WorkerClaimManifest manifest,
-        WorkerCallableResult[] callableResults, WorkerClaimResult[] claimResults, WorkerBudgets budgets)
+        ImmutableArray<WorkerCallableResult> callableResults, ImmutableArray<WorkerClaimResult> claimResults, WorkerBudgets budgets)
     {
-        callableResults = RepositoryParameterGuard.NotNull(callableResults, nameof(callableResults));
-        claimResults = RepositoryParameterGuard.NotNull(claimResults, nameof(claimResults));
+        RepositoryParameterGuard.RequireInitialized(callableResults.IsDefault, nameof(callableResults), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(claimResults.IsDefault, nameof(claimResults), "Array must be initialized.");
         budgets = RepositoryParameterGuard.NotNull(budgets, nameof(budgets));
         inputHash = RepositoryParameterGuard.NotNull(inputHash, nameof(inputHash));
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
@@ -123,13 +125,13 @@ internal static class WorkerResultAssembler
         inputHash = RepositoryParameterGuard.NotNull(inputHash, nameof(inputHash));
         requestHash = RepositoryParameterGuard.NotNull(requestHash, nameof(requestHash));
         ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        var callables = (manifest.Callables ?? [])
+        var callables = (WorkerProtocolJson.EmptyIfDefault(manifest.Callables))
             .OfType<WorkerCallableManifestEntry>()
-            .ToArray();
-        var claims = (manifest.Claims ?? [])
+            .ToImmutableArray();
+        var claims = (WorkerProtocolJson.EmptyIfDefault(manifest.Claims))
             .OfType<WorkerClaimManifestEntry>()
-            .ToArray();
-        var runErrors = errors?.ToArray() ?? [];
+            .ToImmutableArray();
+        var runErrors = errors?.ToImmutableArray() ?? [];
         if (callables.Length == 0 && claims.Length == 0 && runErrors.Length == 0 &&
             failureReason == WorkerRunFailureReason.None &&
             status is WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled)
@@ -142,17 +144,16 @@ internal static class WorkerResultAssembler
                     : "The worker was canceled before selected callable evidence was published."
             }];
         }
-        var assumptionsByCallable = new Dictionary<
-            string, WorkerAssumptionEvidence[]>(StringComparer.Ordinal);
+        var assumptionsByCallable = ImmutableDictionary.Create<string, ImmutableArray<WorkerAssumptionEvidence>>(StringComparer.Ordinal);
         foreach (var callable in callables)
         {
             if (!string.IsNullOrWhiteSpace(callable.CallableId))
             {
                 if (!assumptionsByCallable.ContainsKey(callable.CallableId))
                 {
-                    assumptionsByCallable.Add(
+                    assumptionsByCallable = assumptionsByCallable.Add(
                         callable.CallableId,
-                        callable.Assumptions ?? []);
+                        WorkerProtocolJson.EmptyIfDefault(callable.Assumptions));
                 }
             }
         }
@@ -162,7 +163,7 @@ internal static class WorkerResultAssembler
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Incomplete,
                 Reason = callableReason,
-                Assumptions = callable.Assumptions ?? []
+                Assumptions = WorkerProtocolJson.EmptyIfDefault(callable.Assumptions)
             })),
             claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new WorkerClaimResult
             {
@@ -186,13 +187,13 @@ internal static class WorkerResultAssembler
     }
 
     internal static bool HasConflictingAssumptionKinds(
-        WorkerCallableResult[] callables, WorkerClaimResult[] claims)
+        ImmutableArray<WorkerCallableResult> callables, ImmutableArray<WorkerClaimResult> claims)
     {
-        ArgumentNullGuard.NotNull(callables, nameof(callables));
-        ArgumentNullGuard.NotNull(claims, nameof(claims));
-        var kinds = new Dictionary<string, WorkerAssumptionKind>(StringComparer.Ordinal);
-        foreach (var assumption in callables.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Assumptions ?? []))
-            .Concat(claims.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Assumptions ?? []))))
+        RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
+        var kinds = ImmutableDictionary.Create<string, WorkerAssumptionKind>(StringComparer.Ordinal);
+        foreach (var assumption in callables.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))
+            .Concat(claims.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))))
         {
             if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
             {
@@ -202,7 +203,7 @@ internal static class WorkerResultAssembler
             {
                 return true;
             }
-            kinds[assumption.Id] = assumption.Kind;
+            kinds = kinds.SetItem(assumption.Id, assumption.Kind);
         }
         return false;
     }
@@ -349,13 +350,13 @@ internal static class WorkerResultAssembler
 
     internal static bool MatchesCallableProjection(
         WorkerCallableResult callable,
-        WorkerClaimResult[] owned,
+        ImmutableArray<WorkerClaimResult> owned,
         WorkerRunStatus runStatus,
         WorkerRunFailureReason failureReason,
         bool hasErrors)
     {
         ArgumentNullGuard.NotNull(callable, nameof(callable));
-        ArgumentNullGuard.NotNull(owned, nameof(owned));
+        RepositoryParameterGuard.RequireInitialized(owned.IsDefault, nameof(owned), "Array must be initialized.");
         if (owned.Length == 0 &&
             !(runStatus == WorkerRunStatus.Failed && hasErrors))
         {

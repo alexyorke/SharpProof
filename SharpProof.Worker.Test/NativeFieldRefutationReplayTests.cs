@@ -46,12 +46,7 @@ public sealed class NativeFieldRefutationReplayTests
             [.. requires], [.. ensures]);
         var owner = factory.CreateReferenceValue(boxType,
             new IrObjectState().WithField(field, factory.CreateIntegerValue(0)));
-        var initialValues = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = owner,
-            [parameter.Current] = owner,
-            [parameter.Old] = owner
-        };
+        var initialValues = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, owner).SetItem(parameter.Current, owner).SetItem(parameter.Old, owner);
 
         var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, initialValues);
         using (Assert.EnterMultipleScope())
@@ -89,12 +84,7 @@ public sealed class NativeFieldRefutationReplayTests
             Assert.That(witness.Kind, Is.EqualTo(IrValueKind.Reference));
             Assert.That(witness.Reference, Is.TypeOf<IrObjectState>());
         }
-        var replayValues = new Dictionary<IrVarId, IrValue>
-        {
-            [parameter.Entry] = witness,
-            [parameter.Current] = witness,
-            [parameter.Old] = witness
-        };
+        var replayValues = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, witness).SetItem(parameter.Current, witness).SetItem(parameter.Old, witness);
         var replay = new IrProgramInterpreter(factory).Execute(candidate.Program, replayValues);
         using (Assert.EnterMultipleScope())
         {

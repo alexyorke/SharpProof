@@ -49,7 +49,7 @@ public sealed class NativeCallAssumptionProvenanceTests
             foreach (var b in new[] { false, true })
             {
                 var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                    new Dictionary<IrVarId, IrValue> { [first.Entry] = factory.CreateBooleanValue(a), [second.Entry] = factory.CreateBooleanValue(b) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(first.Entry, factory.CreateBooleanValue(a)).SetItem(second.Entry, factory.CreateBooleanValue(b)));
                 var stopped = assumed && !(a && b);
                 Assert.That(execution.Status, Is.EqualTo(stopped ? IrProgramExecutionStatus.AssumptionViolated : IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ConsumedApproximation, Is.False);

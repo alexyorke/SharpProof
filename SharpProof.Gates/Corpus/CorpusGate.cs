@@ -609,37 +609,31 @@ internal static class CorpusGate
 
         System.ArgumentNullException.ThrowIfNull(openSourceDocument);
         RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
-        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
         var syntheticCases = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToArray();
-        var syntheticObservations = new CorpusObservation[syntheticCases.Length];
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToImmutableArray();
         using var slots = new SemaphoreSlim(
             Math.Min(2, Math.Max(1, Environment.ProcessorCount)));
-        await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
+        // WhenAll publishes results in input task order, regardless of completion order.
+        var syntheticObservations = (await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
             async index =>
             {
                 RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
-
                 await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
-                    syntheticObservations[index] = await ObserveCaseAsync(
-                            syntheticCases[index], cancellationToken)
+                    return await ObserveCaseAsync(syntheticCases[index], cancellationToken)
                         .ConfigureAwait(false);
                 }
                 finally
                 {
                     slots.Release();
                 }
-            })).ConfigureAwait(false);
-        observations.AddRange(syntheticObservations);
-
-        observations.AddRange(
+            })).ConfigureAwait(false)).ToImmutableArray();
+        return syntheticObservations.AddRange(
             await OpenSourceCorpusRunner.ObserveAsync(
                     openSourceDocument,
                     cancellationToken)
                 .ConfigureAwait(false));
-        return observations.ToImmutable();
     }
 
     private static CorpusObservation Observe(

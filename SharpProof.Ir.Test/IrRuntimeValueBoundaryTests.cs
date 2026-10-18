@@ -37,7 +37,7 @@ public sealed class IrRuntimeValueBoundaryTests
     {
         var factory = new IrFactory(semantics);
         var interpreter = new IrInterpreter(factory);
-        var operand = interpreter.Evaluate(factory.Boolean(true), new Dictionary<IrVarId, IrValue>());
+        var operand = interpreter.Evaluate(factory.Boolean(true), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         var identity = interpreter.EvaluateCastValue(factory.BooleanType, operand);
         var incompatible = interpreter.EvaluateCastValue(factory.IntegerType, operand);
 
@@ -59,7 +59,7 @@ public sealed class IrRuntimeValueBoundaryTests
         var factory = new IrFactory(semantics);
         var variable = factory.CreateVariable("missing", factory.BooleanType);
         var interpreter = new IrInterpreter(factory);
-        var operand = interpreter.Evaluate(factory.Variable(variable), new Dictionary<IrVarId, IrValue>());
+        var operand = interpreter.Evaluate(factory.Variable(variable), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         var converted = interpreter.EvaluateCastValue(factory.IntegerType, operand);
 
         using (Assert.EnterMultipleScope())
@@ -84,7 +84,7 @@ public sealed class IrRuntimeValueBoundaryTests
             System.ArgumentNullException.ThrowIfNull(box);
             return interpreter.Evaluate(
                 factory.Variable(variable),
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateReferenceValue(factory.ObjectType, box) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateReferenceValue(factory.ObjectType, box)));
         }
         var valid = interpreter.EvaluateCastValue(factory.IntegerType, EvaluateBox(validBox));
         var invalid = interpreter.EvaluateCastValue(factory.IntegerType, EvaluateBox(invalidBox));

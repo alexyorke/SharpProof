@@ -122,7 +122,7 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             foreach (var flag in new[] { false, true })
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(flag)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(enabled ? flag ? 60 : 54 : 57)));
                 Assert.That(replay.ConsumedApproximation, Is.False);

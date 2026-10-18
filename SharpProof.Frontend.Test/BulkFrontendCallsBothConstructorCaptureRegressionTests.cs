@@ -129,7 +129,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
             foreach (var flag in new[] { false, true })
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue> { [context.Parameters.Single().Entry] = factory.CreateBooleanValue(flag) });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(flag)));
                 Assert.That(replay.Status, Is.EqualTo(enabled ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                 if (enabled)
                 {

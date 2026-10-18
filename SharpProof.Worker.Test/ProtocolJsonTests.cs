@@ -26,7 +26,7 @@ public sealed class ProtocolJsonTests
     public void SerializationCanonicalizesCopiesWithoutRewritingProducerOwners()
     {
         var manifest = CreateTwoCallableManifest();
-        manifest.Callables = manifest.Callables.Reverse().ToArray();
+        manifest.Callables = manifest.Callables.Reverse().ToImmutableArray();
         var response = CreateResponse(manifest);
         response = response with
         {
@@ -52,15 +52,51 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(JsonSerializer.Serialize(response, WorkerProtocolJson.SharedOptions), Is.EqualTo(before));
-            Assert.That(manifest.Callables, Is.SameAs(callables));
+            Assert.That(manifest.Callables.Equals(callables), Is.True);
             Assert.That(response.ClaimResults[0], Is.SameAs(claim));
-            Assert.That(claim.ProofCore, Is.SameAs(core));
+            Assert.That(claim.ProofCore.Equals(core), Is.True);
             Assert.That(claim.EffectWitness, Is.SameAs(witness));
-            Assert.That(witness.ExactExceptionTypeHierarchy, Is.SameAs(hierarchy));
+            Assert.That(witness.ExactExceptionTypeHierarchy.Equals(hierarchy), Is.True);
             Assert.That(canonical.RootElement.GetProperty("claimResults")[0].GetProperty("proofCore")[0].GetString(), Is.EqualTo("a"));
             Assert.That(canonical.RootElement.GetProperty("claimResults")[0].GetProperty("effectWitness").GetProperty("exactExceptionTypeHierarchy")[0].GetString(), Is.EqualTo("a"));
         }
     }
+    [Test]
+    public void RequiredWireArraysPreserveNullEmptyAndMalformedElementDistinctions()
+    {
+        var node = JsonSerializer.SerializeToNode(new WorkerClaimResult(), WorkerProtocolJson.SharedOptions)!.AsObject();
+        node.Remove("model");
+        Assert.Throws<JsonException>((Action)(() => JsonSerializer.Deserialize<WorkerClaimResult>(node.ToJsonString(), WorkerProtocolJson.SharedOptions)));
+
+        node["model"] = null;
+        var nullModel = JsonSerializer.Deserialize<WorkerClaimResult>(node.ToJsonString(), WorkerProtocolJson.SharedOptions)!;
+        Assert.That(nullModel.Model.IsDefault, Is.True);
+        Assert.That(JsonSerializer.SerializeToNode(nullModel, WorkerProtocolJson.SharedOptions)!["model"], Is.Null);
+        Assert.That(WorkerProtocolJson.AreValidModel(nullModel.Model), Is.False);
+
+        node["model"] = new JsonArray();
+        var emptyModel = JsonSerializer.Deserialize<WorkerClaimResult>(node.ToJsonString(), WorkerProtocolJson.SharedOptions)!;
+        Assert.That(emptyModel.Model.IsDefault, Is.False);
+        Assert.That(emptyModel.Model, Is.Empty);
+        Assert.That(WorkerProtocolJson.AreValidModel(emptyModel.Model), Is.True);
+
+        node["model"] = new JsonArray((JsonNode?)null);
+        var malformedModel = JsonSerializer.Deserialize<WorkerClaimResult>(node.ToJsonString(), WorkerProtocolJson.SharedOptions)!;
+        Assert.That(malformedModel.Model, Has.Length.EqualTo(1));
+        Assert.That(malformedModel.Model[0], Is.Null);
+        Assert.That(WorkerProtocolJson.AreValidModel(malformedModel.Model), Is.False);
+    }
+
+    [Test]
+    public void DefaultResponseArraysCannotBeCached()
+    {
+        var manifest = CreateTwoCallableManifest();
+        var response = CreateResponse(manifest);
+        Assert.That(VerificationCache.IsCacheable(response with { Errors = default }, InputHash, manifest), Is.False);
+        Assert.That(VerificationCache.IsCacheable(response with { CallableResults = default }, InputHash, manifest), Is.False);
+        Assert.That(VerificationCache.IsCacheable(response with { ClaimResults = default }, InputHash, manifest), Is.False);
+    }
+
     private static IEnumerable<TestCaseData> ProtocolScalingCases()
     {
         yield return new TestCaseData(
@@ -2347,10 +2383,10 @@ public sealed class ProtocolJsonTests
         if (size < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(size)); }
 
-        var callables = new WorkerCallableManifestEntry[size];
-        var claims = new WorkerClaimManifestEntry[size];
-        var callableResults = new WorkerCallableResult[size];
-        var claimResults = new WorkerClaimResult[size];
+        var callables = ImmutableList<WorkerCallableManifestEntry>.Empty;
+        var claims = ImmutableList<WorkerClaimManifestEntry>.Empty;
+        var callableResults = ImmutableList<WorkerCallableResult>.Empty;
+        var claimResults = ImmutableList<WorkerClaimResult>.Empty;
         var idPrefix = new string('x', 32);
         var location = new WorkerSourceLocation
         {
@@ -2364,7 +2400,7 @@ public sealed class ProtocolJsonTests
             var suffix = index.ToString("D6", CultureInfo.InvariantCulture);
             var callableId = "M:" + idPrefix + suffix;
             var claimId = "claim:" + idPrefix + suffix;
-            callables[index] = new WorkerCallableManifestEntry
+            callables = callables.Add(new WorkerCallableManifestEntry
             {
                 CallableId = callableId,
                 SelectedFeatures = [WorkerSelectedFeature.Contracts],
@@ -2373,33 +2409,33 @@ public sealed class ProtocolJsonTests
                 ],
                 Location = location,
                 ClaimIds = [claimId]
-            };
-            claims[index] = new WorkerClaimManifestEntry
+            });
+            claims = claims.Add(new WorkerClaimManifestEntry
             {
                 ClaimId = claimId,
                 CallableId = callableId,
                 Kind = WorkerClaimKind.Postcondition,
                 Evidence = WorkerClaimEvidence.DirectClause,
                 Location = location
-            };
-            callableResults[index] = new WorkerCallableResult
+            });
+            callableResults = callableResults.Add(new WorkerCallableResult
             {
                 CallableId = callableId,
                 Coverage = WorkerCallableCoverage.Complete,
                 Reason = WorkerCallableCoverageReason.None
-            };
-            claimResults[index] = new WorkerClaimResult
+            });
+            claimResults = claimResults.Add(new WorkerClaimResult
             {
                 ClaimId = claimId,
                 Outcome = WorkerClaimOutcome.Proven,
                 Reason = WorkerClaimReason.None
-            };
+            });
         }
 
         var manifest = new WorkerClaimManifest
         {
-            Callables = callables,
-            Claims = claims
+            Callables = callables.ToImmutableArray(),
+            Claims = claims.ToImmutableArray()
         };
         manifest.Hash = WorkerProtocolJson.ComputeManifestHash(manifest);
         return new WorkerVerifyResponse
@@ -2408,8 +2444,8 @@ public sealed class ProtocolJsonTests
             Manifest = manifest,
             RunStatus = WorkerRunStatus.Complete,
             FailureReason = WorkerRunFailureReason.None,
-            CallableResults = callableResults,
-            ClaimResults = claimResults,
+            CallableResults = callableResults.ToImmutableArray(),
+            ClaimResults = claimResults.ToImmutableArray(),
             Summary = new WorkerVerificationSummary
             {
                 CacheStatus = WorkerCacheStatus.Miss,
@@ -2534,7 +2570,7 @@ public sealed class ProtocolJsonTests
         return response;
     }
 
-    private static WorkerAssumptionEvidence[] CopyAssumptions(
+    private static ImmutableArray<WorkerAssumptionEvidence> CopyAssumptions(
         IEnumerable<WorkerAssumptionEvidence> assumptions)
     {
         System.ArgumentNullException.ThrowIfNull(assumptions);

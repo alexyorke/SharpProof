@@ -97,12 +97,7 @@ public sealed class ContractInvocationMaterializationBoundaryTests
             {
                 foreach (var resultValue in BooleanValues)
                 {
-                    var values = new Dictionary<IrVarId, IrValue>
-                    {
-                        [parameter] = context.Factory.CreateBooleanValue(input),
-                        [preState] = context.Factory.CreateBooleanValue(oldInput),
-                        [resultVariable] = context.Factory.CreateBooleanValue(resultValue)
-                    };
+                    var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, context.Factory.CreateBooleanValue(input)).SetItem(preState, context.Factory.CreateBooleanValue(oldInput)).SetItem(resultVariable, context.Factory.CreateBooleanValue(resultValue));
                     Assert.That(
                         interpreter.Evaluate(result.Clauses[0].Condition, values).Value!.Boolean,
                         Is.EqualTo(input));

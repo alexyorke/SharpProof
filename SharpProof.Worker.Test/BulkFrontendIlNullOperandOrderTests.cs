@@ -156,7 +156,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
                 var expected = input == null;
                 var value = input == null ? factory.CreateNullValue(entryType) : factory.CreateStringValue(input);
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    new Dictionary<IrVarId, IrValue> { [entry] = value });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.Boolean, Is.EqualTo(expected));
                 Assert.That(replay.ConsumedApproximation, Is.False);

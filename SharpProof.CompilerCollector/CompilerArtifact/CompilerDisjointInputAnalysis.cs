@@ -7,12 +7,12 @@ internal static class CompilerDisjointInputAnalysis
     internal static ImmutableArray<CompilerDisjointInputPair> Collect(IMethodSymbol method, CancellationToken cancellationToken)
     {
         // Only Roslyn's closed sealed class symbols certify impossible aliases.
-        var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
+        var pairs = ImmutableList<CompilerDisjointInputPair>.Empty;
         if (method.Parameters.Length > 128)
         { return []; }
         // Each pair consumes work in both directions, keeping its count below this limit.
         var remainingWork = CompilerArtifactLimits.MaximumInstructions;
-        var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken))).ToArray();
+        var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken))).ToImmutableArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
             left = RepositoryParameterGuard.NotNull(left, nameof(left));
@@ -38,11 +38,11 @@ internal static class CompilerDisjointInputAnalysis
                     !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
                     !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
                 {
-                    pairs.Add(new(left, right));
+                    pairs = pairs.Add(new(left, right));
                 }
             }
         }
-        return pairs.ToImmutable();
+        return pairs.ToImmutableArray();
     }
 
 }

@@ -60,8 +60,7 @@ public sealed class NativeSequenceIndexAdmissionTests
         foreach (var original in new[] { 0, 7 })
         {
             var replay = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                new Dictionary<IrVarId, IrValue>
-                { [parameter.Entry] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(original)]) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(original)])));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

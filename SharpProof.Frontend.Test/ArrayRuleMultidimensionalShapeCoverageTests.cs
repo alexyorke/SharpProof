@@ -27,7 +27,7 @@ public sealed class ArrayRuleMultidimensionalShapeCoverageTests
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         Assert.That(rule.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.False);
         Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));

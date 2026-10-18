@@ -55,6 +55,6 @@ public sealed class CfgExpressionLoweringCoverageTests
         var total = new RoslynTotalExpressionLowerer(new TotalLoweringContext(totalFactory, target)).LowerClause(operation);
         Assert.That(total.Classification.IsExact, Is.False);
         Assert.That(total.Classification.Abstention, Is.EqualTo(FrontendAbstention.InvalidOperation));
-        Assert.That(new IrInterpreter(totalFactory).Evaluate(total.SafeCondition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(totalFactory).Evaluate(total.SafeCondition, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
     }
 }

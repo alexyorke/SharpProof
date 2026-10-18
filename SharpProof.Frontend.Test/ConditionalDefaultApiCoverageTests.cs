@@ -63,11 +63,7 @@ public sealed class ConditionalDefaultApiCoverageTests
             var valueVariable = ((IrVariableTerm)whenTrue.Term).Variable;
             foreach (var choice in new[] { false, true })
             {
-                var values = new Dictionary<IrVarId, IrValue>
-                {
-                    [conditionVariable] = factory.CreateBooleanValue(choice),
-                    [valueVariable] = factory.CreateIntegerValue(factory.IntegerType, 7)
-                };
+                var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(conditionVariable, factory.CreateBooleanValue(choice)).SetItem(valueVariable, factory.CreateIntegerValue(factory.IntegerType, 7));
                 var evaluation = new IrInterpreter(factory).Evaluate(lowered.Term, values);
                 Assert.That(evaluation.Value!.IntegerNumericValue, Is.EqualTo(new BigInteger(choice ? 7 : 0)));
             }

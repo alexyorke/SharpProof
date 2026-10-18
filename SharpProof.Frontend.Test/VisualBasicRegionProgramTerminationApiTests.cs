@@ -82,7 +82,7 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
             Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!.Invoke(null, [3]), Is.EqualTo(4));
             var entry = context.Parameters.Single().Entry;
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 3) });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 3)));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(4)));
             Assert.That(replay.ConsumedApproximation, Is.False);

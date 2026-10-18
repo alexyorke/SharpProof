@@ -171,15 +171,19 @@ public sealed record WorkerCallableManifestEntry
     [JsonRequired]
     public string CallableId { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerSelectedFeature[] SelectedFeatures { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerSelectedFeature> SelectedFeatures { get; set; } = [];
     [JsonRequired]
-    public WorkerSelectionReason[] SelectionReasons { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerSelectionReason> SelectionReasons { get; set; } = [];
     [JsonRequired]
     public WorkerSourceLocation Location { get; init; } = new();
     [JsonRequired]
-    public string[] ClaimIds { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ClaimIds { get; set; } = [];
     [JsonRequired]
-    public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
 public sealed record WorkerClaimManifestEntry
@@ -207,9 +211,11 @@ public sealed record WorkerClaimManifest
     [JsonRequired]
     public string Hash { get; set; } = string.Empty;
     [JsonRequired]
-    public WorkerCallableManifestEntry[] Callables { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerCallableManifestEntry> Callables { get; set; } = [];
     [JsonRequired]
-    public WorkerClaimManifestEntry[] Claims { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerClaimManifestEntry> Claims { get; set; } = [];
 }
 
 public enum WorkerRunStatus
@@ -381,7 +387,8 @@ public sealed record WorkerCallableResult
     [JsonRequired]
     public WorkerCallableCoverageReason Reason { get; init; }
     [JsonRequired]
-    public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
 public sealed record WorkerClaimResult
@@ -399,11 +406,14 @@ public sealed record WorkerClaimResult
     [JsonRequired]
     public WorkerVacuityKind Vacuity { get; init; }
     [JsonRequired]
-    public string[] ProofCore { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ProofCore { get; set; } = [];
     [JsonRequired]
-    public WorkerModelValue[] Model { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerModelValue> Model { get; set; } = [];
     [JsonRequired]
-    public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
 }
 
 public sealed record WorkerEffectViolationWitness
@@ -417,7 +427,8 @@ public sealed record WorkerEffectViolationWitness
     [JsonRequired]
     public WorkerEffectCapabilitySet Capabilities { get; init; }
     [JsonRequired]
-    public string[] ExactExceptionTypeHierarchy { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ExactExceptionTypeHierarchy { get; set; } = [];
     [JsonRequired]
     public WorkerSourceLocation Location { get; init; } = new();
 }
@@ -498,13 +509,16 @@ public sealed record WorkerVerifyResponse
     [JsonRequired]
     public WorkerRunFailureReason FailureReason { get; init; }
     [JsonRequired]
-    public WorkerCallableResult[] CallableResults { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerCallableResult> CallableResults { get; set; } = [];
     [JsonRequired]
-    public WorkerClaimResult[] ClaimResults { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerClaimResult> ClaimResults { get; set; } = [];
     [JsonRequired]
     public WorkerVerificationSummary Summary { get; init; } = new();
     [JsonRequired]
-    public WorkerProtocolError[] Errors { get; set; } = [];
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerProtocolError> Errors { get; set; } = [];
 }
 
 public sealed class WorkerProtocolValidationResult
@@ -735,7 +749,7 @@ internal static class WorkerProtocolMetadata
             WorkerProtocolJson.AreDefinedUnique(value.SelectionReasons, WorkerSelectionReason.Unspecified, true)),
         new("callable_claim_ids", static value => WorkerProtocolJson.AreDistinctNonblank(value.ClaimIds)),
         new("callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
-        new("callable_assumption_usage", static value => (value.Assumptions ?? []).All(static item => item != null && !item.Used)),
+        new("callable_assumption_usage", static value => (WorkerProtocolJson.EmptyIfDefault(value.Assumptions)).All(static item => item != null && !item.Used)),
     ];
     internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimManifestEntry>> ManifestClaimRules = [
         new("claim_ordinal", static value => value.Ordinal >= 0),
@@ -750,7 +764,7 @@ internal static class WorkerProtocolMetadata
         new("response.callable_coverage", static value => WorkerProtocolJson.IsDefined(value.Coverage, WorkerCallableCoverage.Unspecified)),
         new("response.callable_reason", static value => WorkerProtocolMetadata.MatchesCallableCoverage(value.Coverage, value.Reason)),
         new("response.callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
-        new("response.callable_assumption_usage", static value => (value.Assumptions ?? []).All(static item => item != null && !item.Used)),
+        new("response.callable_assumption_usage", static value => (WorkerProtocolJson.EmptyIfDefault(value.Assumptions)).All(static item => item != null && !item.Used)),
     ];
     internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimResult>> ClaimResultRules = [
         new("response.claim_outcome", static value => WorkerProtocolJson.IsDefined(value.Outcome, WorkerClaimOutcome.Unspecified)),
@@ -760,9 +774,9 @@ internal static class WorkerProtocolMetadata
         new("response.assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
         new("response.vacuity_evidence", static value =>
             (!(value.Vacuity != WorkerVacuityKind.None)
-            || (value.ProofCore is { Length: > 0 }))),
+            || (!value.ProofCore.IsDefaultOrEmpty))),
         new("response.claim_payload", static value =>
-            WorkerProtocolMetadata.MatchesClaimPayload(value.Outcome, value.ProofCore is { Length: > 0 }, value.Model is { Length: > 0 })),
+            WorkerProtocolMetadata.MatchesClaimPayload(value.Outcome, !value.ProofCore.IsDefaultOrEmpty, !value.Model.IsDefaultOrEmpty)),
     ];
     internal static bool IsEffectWitnessValid(WorkerEffectViolationWitness value) =>
         (!string.IsNullOrWhiteSpace(value.Kind)
@@ -771,7 +785,7 @@ internal static class WorkerProtocolMetadata
         && WorkerProtocolMetadata.HasOnlyKnownFlags(value.Capabilities)
         && (value.Effects != WorkerEffectSet.None
         || value.Capabilities != WorkerEffectCapabilitySet.None)
-        && (!(value.ExactExceptionTypeHierarchy is { Length: > 0 })
+        && (!(!value.ExactExceptionTypeHierarchy.IsDefaultOrEmpty)
         || ((value.Effects & WorkerEffectSet.Throws) != 0))
         && WorkerProtocolJson.AreDistinctNonblank(value.ExactExceptionTypeHierarchy));
     internal static bool IsVersionsValid(WorkerVersionSummary value) =>

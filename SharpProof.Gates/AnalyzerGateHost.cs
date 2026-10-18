@@ -221,11 +221,7 @@ internal static class AnalyzerGateHost
         }
         else
         {
-            var values = new Dictionary<string, string>(
-                StringComparer.OrdinalIgnoreCase)
-            {
-                ["sharpproof_features"] = mode
-            };
+            var values = ImmutableDictionary.Create<string, string>(StringComparer.OrdinalIgnoreCase).Add("sharpproof_features", mode);
             options = new AnalyzerOptions(
                 [],
                 new DictionaryAnalyzerConfigOptionsProvider(values));

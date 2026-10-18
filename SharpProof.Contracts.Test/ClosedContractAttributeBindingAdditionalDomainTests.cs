@@ -213,14 +213,8 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationSites[0] is not null, Is.EqualTo(semantics == IrExecutionSemantics.Total));
 
         var interpreter = new IrInterpreter(factory);
-        var negative = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateIntegerValue(factory.IntegerType, -1)
-        };
-        var positive = new Dictionary<IrVarId, IrValue>
-        {
-            [variable] = factory.CreateIntegerValue(factory.IntegerType, 2)
-        };
+        var negative = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, -1));
+        var positive = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, 2));
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, negative).Value!.Boolean, Is.False);
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, positive).Value!.Boolean, Is.True);
     }
@@ -286,10 +280,10 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
             Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[NotNull] text"));
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateNullValue(factory.StringType) }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateNullValue(factory.StringType))).Value!.Boolean,
                 Is.False);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateStringValue("present") }).Value!.Boolean,
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateStringValue("present"))).Value!.Boolean,
                 Is.True);
             return;
         }
@@ -300,10 +294,7 @@ public sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var integerInterpreter = new IrInterpreter(factory);
         foreach (var input in PredicateInputs)
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(factory.IntegerType, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, input));
             Assert.That(integerInterpreter.Evaluate(result.Clauses[0].Condition, values).Value!.Boolean,
                 Is.EqualTo(input > 0));
             Assert.That(integerInterpreter.Evaluate(result.Clauses[1].Condition, values).Value!.Boolean,

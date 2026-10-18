@@ -104,7 +104,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var integer = factory.GetOrCreateIntegerType(32, true);
         var rule = bound.Apply([factory.Integer(integer, 7), factory.Integer(integer, 11)]);
         Assert.That(rule.Classification.IsExact, Is.True);
-        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Integer, Is.EqualTo(7));
+        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Integer, Is.EqualTo(7));
         Assert.That(bound.Apply([]).Classification.IsExact, Is.False);
         Assert.That(bound.Apply([factory.Boolean(true), factory.Integer(integer, 11)]).Classification.IsExact, Is.False);
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition with { ParameterTypes = [IrTypeKind.Boolean, IrTypeKind.Integer] }), Is.Null);

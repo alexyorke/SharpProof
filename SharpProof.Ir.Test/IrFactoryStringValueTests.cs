@@ -60,12 +60,9 @@ public sealed class IrFactoryStringValueTests
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             interpreter.Evaluate(
                 cast,
-                new Dictionary<IrVarId, IrValue>
-                {
-                    [source] = factory.CreateReferenceValue(
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(source, factory.CreateReferenceValue(
                         factory.ObjectType,
-                        malformed)
-                })));
+                        malformed)))));
 
         using (Assert.EnterMultipleScope())
         {

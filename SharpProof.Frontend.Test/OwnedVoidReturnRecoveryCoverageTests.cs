@@ -99,7 +99,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         var irReturns = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().ToArray();
         Assert.That(irReturns, Is.Not.Empty);
         Assert.That(irReturns.All(instruction => instruction.Value == null), Is.True);
-        var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>());
+        var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue, Is.Null);

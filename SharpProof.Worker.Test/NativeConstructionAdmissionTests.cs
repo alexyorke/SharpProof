@@ -78,12 +78,7 @@ public sealed class NativeConstructionAdmissionTests
         foreach (var value in new[] { false, true })
         {
             var inputValue = factory.CreateBooleanValue(value);
-            var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, new Dictionary<IrVarId, IrValue>
-            {
-                [input.Entry] = inputValue,
-                [input.Current] = inputValue,
-                [input.Old] = inputValue
-            });
+            var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input.Entry, inputValue).SetItem(input.Current, inputValue).SetItem(input.Old, inputValue));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

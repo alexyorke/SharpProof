@@ -53,10 +53,7 @@ public sealed class NestedLocalCfgFilteredExceptionBoundaryTests
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = context.Parameters.Single();
         var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Values[parameter.Current].IntegerNumericValue, Is.EqualTo(new BigInteger(input + 1)));
         if (input == 0)

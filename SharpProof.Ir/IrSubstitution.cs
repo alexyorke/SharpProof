@@ -300,16 +300,8 @@ public static class IrSubstitution
                 return opaque;
             }
 
-            return opaque.Purity == IrOpaquePurity.Pure
-                ? state.Factory.PureOpaque(
-                    opaque.Member,
-                    receiver,
-                    arguments.ToArray())
-                : state.Factory.ImpureOpaque(
-                    opaque.Operation,
-                    opaque.Member,
-                    receiver,
-                    arguments.ToArray());
+            return state.Factory.RebuildOpaque(
+                opaque.Member, receiver, arguments, opaque.Purity, opaque.Operation);
         }
 
         public IrTerm Visit(IrUnaryTerm unary, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)

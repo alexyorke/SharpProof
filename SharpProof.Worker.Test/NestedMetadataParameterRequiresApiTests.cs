@@ -97,7 +97,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         var factory = body.Program.Factory;
         var entry = body.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(18)));
         Assert.That(replay.ConsumedApproximation, Is.False);

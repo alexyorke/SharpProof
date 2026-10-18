@@ -42,7 +42,7 @@ public sealed class NativeMetadataReferenceOwnerTests
         var observed = new List<bool>();
         var marker = body.Body.CallPreconditions.Single().Instruction;
         var execution = new IrProgramInterpreter(factory).Execute(body.Body.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = input }, 10000,
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, input), 10000,
             new IrProgramReplayOptions(static _ => null)
             { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observed.Add(value.Boolean); } } });
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -82,7 +82,7 @@ public sealed class NativeMetadataReferenceOwnerTests
         var observations = 0;
         var marker = decoded.CallPreconditions.Single().Instruction;
         var result = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = decoded.Program.Factory.CreateNullValue(decoded.Program.Factory.StringType) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, decoded.Program.Factory.CreateNullValue(decoded.Program.Factory.StringType)),
             10000, new IrProgramReplayOptions(static _ => null)
             { AssignmentObserver = (instruction, _, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations++; } } });
         Assert.That(observations, Is.Zero);

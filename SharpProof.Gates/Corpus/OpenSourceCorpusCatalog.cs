@@ -187,8 +187,7 @@ internal static class OpenSourceCorpusCatalog
             ValidateSource(source, corpusDirectory);
         }
 
-        var files = new Dictionary<string, CompilationUnitSyntax>(
-            StringComparer.Ordinal);
+        var files = ImmutableDictionary.Create<string, CompilationUnitSyntax>(StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
             if (file is null)
@@ -233,16 +232,16 @@ internal static class OpenSourceCorpusCatalog
                     AnalyzerGateHost.ParseOptions,
                     file.Path)
                 .GetCompilationUnitRoot();
-            files.Add(key, root);
+            files = files.Add(key, root);
         }
 
-        var declarationIndexes = files.ToDictionary(
+        var declarationIndexes = files.ToImmutableDictionary(
             static pair => pair.Key,
             static pair => BuildDeclarationIndex(pair.Value),
             StringComparer.Ordinal);
 
-        var locations = new HashSet<string>(StringComparer.Ordinal);
-        var declarations = new HashSet<string>(StringComparer.Ordinal);
+        var locations = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var declarations = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         for (var index = 0; index < document.Methods.Length; index++)
         {
             var method = document.Methods[index];
@@ -276,12 +275,13 @@ internal static class OpenSourceCorpusCatalog
 
             var location =
                 $"{fileKey}|{method.StartLine}|{method.EndLine}";
-            if (!locations.Add(location))
+            if (locations.Contains(location))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source location: {location}.");
             }
 
+            locations = locations.Add(location);
             var declaration = FindDeclaration(
                 declarationIndexes[fileKey],
                 method);
@@ -296,12 +296,13 @@ internal static class OpenSourceCorpusCatalog
                     $"OSS corpus method {method.Id} declaration hash does not match.");
             }
 
-            if (!declarations.Add(declarationHash))
+            if (declarations.Contains(declarationHash))
             {
                 throw new InvalidDataException(
                     $"OSS corpus method {method.Id} duplicates another declaration.");
             }
 
+            declarations = declarations.Add(declarationHash);
             if (!string.Equals(
                     declaration.Identifier.ValueText,
                     method.MethodName,
@@ -336,8 +337,8 @@ internal static class OpenSourceCorpusCatalog
         }
 
         return new ValidationResult(
-            files.ToImmutableDictionary(StringComparer.Ordinal),
-            declarationIndexes.ToImmutableDictionary(StringComparer.Ordinal),
+            files,
+            declarationIndexes,
             sourceFileCount);
     }
 

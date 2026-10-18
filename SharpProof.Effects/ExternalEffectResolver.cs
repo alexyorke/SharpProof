@@ -50,7 +50,7 @@ internal sealed class ExternalEffectResolver
     internal EffectThrowSet ResolveExceptionSet(IEnumerable<string> metadataNames)
     {
         metadataNames = RepositoryParameterGuard.NotNull(metadataNames, nameof(metadataNames));
-        var types = new List<INamedTypeSymbol>();
+        var types = ImmutableList<INamedTypeSymbol>.Empty;
         foreach (var metadataName in metadataNames)
         {
             var type = _compilation.GetTypeByMetadataName(metadataName);
@@ -59,7 +59,7 @@ internal sealed class ExternalEffectResolver
                 return EffectThrowSet.Unknown;
             }
 
-            types.Add(type);
+            types = types.Add(type);
         }
         return EffectThrowSet.Create(types);
     }
@@ -72,7 +72,7 @@ internal sealed class ExternalEffectResolver
         var preconditionFree = true;
         var sawAttribute = false;
         var invalidAttributes =
-            ImmutableArray.CreateBuilder<EffectContractInvalidAttribute>();
+            ImmutableList<EffectContractInvalidAttribute>.Empty;
         foreach (var attribute in EnumerateDirectContractAttributes(method))
         {
             sawAttribute = true;
@@ -82,14 +82,14 @@ internal sealed class ExternalEffectResolver
                     out var candidate,
                     out var candidatePreconditionFree))
             {
-                invalidAttributes.Add(new(
+                invalidAttributes = invalidAttributes.Add(new(
                     attribute,
                     "expected a complete, internally consistent effect summary"));
                 continue;
             }
             if (resolvedSet && !resolved.Equals(candidate))
             {
-                invalidAttributes.Add(new(
+                invalidAttributes = invalidAttributes.Add(new(
                     attribute,
                     "expected duplicate declarations to describe identical effects"));
                 continue;
@@ -104,7 +104,7 @@ internal sealed class ExternalEffectResolver
         }
         if (invalidAttributes.Count != 0)
         {
-            return Invalid(invalidAttributes.ToImmutable());
+            return Invalid(invalidAttributes.ToImmutableArray());
         }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
@@ -212,7 +212,7 @@ internal sealed class ExternalEffectResolver
             }
         }
 
-        var exceptionTypes = new List<INamedTypeSymbol>();
+        var exceptionTypes = ImmutableList<INamedTypeSymbol>.Empty;
         foreach (var constant in thrown)
         {
             if (constant.Value is not INamedTypeSymbol type || !IsException(type))
@@ -220,7 +220,7 @@ internal sealed class ExternalEffectResolver
                 return false;
             }
 
-            exceptionTypes.Add(type);
+            exceptionTypes = exceptionTypes.Add(type);
         }
         if (((effects & EffectContractKind.Throws) != 0) !=
             (exceptionTypes.Count != 0))

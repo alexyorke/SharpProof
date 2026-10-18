@@ -52,16 +52,13 @@ public sealed class IrTypeMetadataAndDefaultControls
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var interpreter = new IrInterpreter(factory);
         var boxed = factory.CreateVariable("boxed", factory.ObjectType);
-        var operand = interpreter.Evaluate(factory.Variable(boxed), new Dictionary<IrVarId, IrValue>
-        {
-            [boxed] = factory.CreateReferenceValue(factory.ObjectType, new object())
-        });
+        var operand = interpreter.Evaluate(factory.Variable(boxed), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(boxed, factory.CreateReferenceValue(factory.ObjectType, new object())));
         var boolean = interpreter.EvaluateCastValue(factory.BooleanType, operand);
         var integer = interpreter.EvaluateCastValue(factory.IntegerType, operand);
         var strings = factory.GetOrCreateSequenceType(factory.StringType);
         var variable = factory.CreateVariable("empty", strings);
         var nullable = interpreter.Evaluate(factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)),
-            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateSequenceValue(strings, Array.Empty<IrValue>()) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateSequenceValue(strings, Array.Empty<IrValue>())));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(boolean.Status, Is.EqualTo(IrEvaluationStatus.Value));

@@ -25,11 +25,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
         Assert.That(rule.Value.Type, Is.EqualTo(width < 32 ? factory.IntegerType : type));
-        var environment = new Dictionary<IrVarId, IrValue>
-        {
-            [valueVariable] = factory.CreateIntegerValue(type, input),
-            [countVariable] = factory.CreateIntegerValue(factory.IntegerType, count)
-        };
+        var environment = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueVariable, factory.CreateIntegerValue(type, input)).SetItem(countVariable, factory.CreateIntegerValue(factory.IntegerType, count));
         Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));
     }

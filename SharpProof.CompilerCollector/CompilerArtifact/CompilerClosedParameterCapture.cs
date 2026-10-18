@@ -14,8 +14,8 @@ internal static class CompilerClosedParameterCapture
         parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         attributes = [];
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
-        var sequences = new HashSet<int>();
+        var result = ImmutableList<TotalIlClosedAttribute>.Empty;
+        var sequences = ImmutableHashSet<int>.Empty;
         var remainingRows = 1024;
         foreach (var parameterHandle in parameters)
         {
@@ -25,8 +25,9 @@ internal static class CompilerClosedParameterCapture
             var parameter = reader.GetParameter(parameterHandle);
             if (parameter.SequenceNumber == 0)
             { continue; }
-            if (parameter.SequenceNumber > method.Parameters.Length || !sequences.Add(parameter.SequenceNumber))
+            if (parameter.SequenceNumber > method.Parameters.Length || sequences.Contains(parameter.SequenceNumber))
             { return false; }
+            sequences = sequences.Add(parameter.SequenceNumber);
             foreach (var attributeHandle in parameter.GetCustomAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -113,7 +114,7 @@ internal static class CompilerClosedParameterCapture
                 { return false; }
                 if (!TryReadClosedBlob(reader, attribute.Value, inRange, out var minimum, out var maximum))
                 { return false; }
-                result.Add(new(method.MetadataToken, parameter.SequenceNumber - 1, parameter.SequenceNumber,
+                result = result.Add(new(method.MetadataToken, parameter.SequenceNumber - 1, parameter.SequenceNumber,
                     MetadataTokens.GetToken(parameterHandle), MetadataTokens.GetToken(attributeHandle),
                     MetadataTokens.GetToken(attribute.Constructor), CompilerIdentityBridge.CreateSymbolDisplay(expected),
                     CompilerIdentityBridge.CreateSymbolDisplay(expectedConstructor),
@@ -126,7 +127,7 @@ internal static class CompilerClosedParameterCapture
         var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
         if (binding.Failure == ContractBindingFailure.ContractApiUnavailable && result.Count == 0)
         { return true; }
-        return binding.IsSuccess && CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses, result.ToImmutable(),
+        return binding.IsSuccess && CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses, result.ToImmutableArray(),
             cancellationToken, out attributes);
     }
 

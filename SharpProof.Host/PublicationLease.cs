@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
@@ -11,7 +12,7 @@ namespace SharpProof.Host;
 internal sealed class PublicationLease : IDisposable
 {
     internal const int TimeoutMilliseconds = 30000;
-    private readonly List<FileStream> _members = [];
+    private ImmutableList<FileStream> _members = [];
     private PublicationLease() { }
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
@@ -25,7 +26,7 @@ internal sealed class PublicationLease : IDisposable
     internal static async Task<PublicationLease> AcquireAsync(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(paths);
-        var members = paths.Select(CanonicalMember).Distinct(PublicationPaths.Comparer).Order(PublicationPaths.Comparer).ToArray();
+        var members = paths.Select(CanonicalMember).Distinct(PublicationPaths.Comparer).Order(PublicationPaths.Comparer).ToImmutableArray();
         if (members.Length is < 1 or > 4)
         {
             throw new ArgumentException("A verification publication contains one to four stable members.", nameof(paths));
@@ -47,7 +48,7 @@ internal sealed class PublicationLease : IDisposable
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
-                        lease._members.Add(new FileStream(sidecar, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
+                        lease._members = lease._members.Add(new FileStream(sidecar, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
                         break;
                     }
                     catch (IOException) when (elapsed.ElapsedMilliseconds < TimeoutMilliseconds)
@@ -65,10 +66,10 @@ internal sealed class PublicationLease : IDisposable
         }
     }
 
-    internal static string[] ValidateMembers(IEnumerable<string> paths)
+    internal static ImmutableArray<string> ValidateMembers(IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
-        var members = paths.Select(CanonicalMember).ToArray();
+        var members = paths.Select(CanonicalMember).ToImmutableArray();
         if (members.Length is < 1 or > 4 || members.Distinct(PublicationPaths.Comparer).Count() != members.Length)
         {
             throw new ArgumentException("Verification publication members must be distinct canonical paths.", nameof(paths));
@@ -166,6 +167,6 @@ internal sealed class PublicationLease : IDisposable
         {
             member.Dispose();
         }
-        _members.Clear();
+        _members = [];
     }
 }

@@ -21,8 +21,7 @@ internal static class IrProgramCallHostExecution
             receiverValue = receiverResult.Value;
         }
 
-        var arguments = ImmutableArray.CreateBuilder<IrValue>(
-            call.Arguments.Length);
+        var arguments = ImmutableList<IrValue>.Empty;
         foreach (var argument in call.Arguments)
         {
             var argumentResult = evaluate(argument);
@@ -31,7 +30,7 @@ internal static class IrProgramCallHostExecution
                 return argumentResult;
             }
 
-            arguments.Add(argumentResult.Value ?? throw new InvalidOperationException(
+            arguments = arguments.Add(argumentResult.Value ?? throw new InvalidOperationException(
                 "A value evaluation result must carry a value."));
         }
 
@@ -43,7 +42,7 @@ internal static class IrProgramCallHostExecution
         }
 
         if (call.Target is not { } target ||
-            callHost?.Invoke(call, receiverValue, arguments.ToImmutable())
+            callHost?.Invoke(call, receiverValue, arguments.ToImmutableArray())
                 is not { } callResult ||
             callResult.Type != factory.GetVariableInfo(target).Type)
         {

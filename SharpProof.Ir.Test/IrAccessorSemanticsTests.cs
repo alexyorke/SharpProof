@@ -28,7 +28,7 @@ public sealed class IrAccessorSemanticsTests
             Assert.That(program.GetBlock(second).Terminator, Is.SameAs(secondReturn));
         }
         var result = new IrProgramInterpreter(factory).Execute(program,
-            new Dictionary<IrVarId, IrValue> { [condition] = factory.CreateBooleanValue(flag) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(condition, factory.CreateBooleanValue(flag)));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(expected));
     }
@@ -50,11 +50,7 @@ public sealed class IrAccessorSemanticsTests
         var differentOperand = factory.Binary(arithmetic, negated, factory.Integer(4));
         var comparisonTerm = factory.Binary(comparison, expression, factory.Integer(comparedValue));
         var result = new IrInterpreter(factory).Evaluate(comparisonTerm,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [left] = factory.CreateIntegerValue(9),
-                [right] = factory.CreateIntegerValue(3)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValue(9)).SetItem(right, factory.CreateIntegerValue(3)));
 
         using (Assert.EnterMultipleScope())
         {

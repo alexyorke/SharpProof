@@ -662,10 +662,10 @@ internal sealed partial class SharpProofAnalyzerEngine
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         analyzerOptions = ArgumentNullGuard.NotNull(analyzerOptions, nameof(analyzerOptions));
         configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableList<Diagnostic>.Empty;
         foreach (var invalidValue in configuration.InvalidConfigurationValues)
         {
-            diagnostics.Add(
+            diagnostics = diagnostics.Add(
                 CreateInvalidConfigurationDiagnostic(invalidValue));
         }
         // A failed options provider cannot be queried again safely. Other
@@ -679,7 +679,7 @@ internal sealed partial class SharpProofAnalyzerEngine
                 StringComparison.Ordinal));
         if (optionsProviderFailed)
         {
-            return diagnostics.ToImmutable();
+            return diagnostics.ToImmutableArray();
         }
 
         try
@@ -695,7 +695,7 @@ internal sealed partial class SharpProofAnalyzerEngine
                         analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
                 foreach (var invalidValue in invalidValues)
                 {
-                    diagnostics.Add(
+                    diagnostics = diagnostics.Add(
                         CreateInvalidConfigurationDiagnostic(
                             invalidValue,
                             Location.Create(tree, new TextSpan(0, 0))));
@@ -709,12 +709,12 @@ internal sealed partial class SharpProofAnalyzerEngine
         catch (Exception exception) when (
             exception is not OperationCanceledException)
         {
-            diagnostics.Add(
+            diagnostics = diagnostics.Add(
                 CreateInvalidConfigurationDiagnostic(
                     AnalyzerConfiguration.ProviderFailure(exception)));
         }
 
-        return diagnostics.ToImmutable();
+        return diagnostics.ToImmutableArray();
     }
 
     private static Action<CompilationAnalysisContext>

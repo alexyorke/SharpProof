@@ -65,12 +65,7 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
             {
                 foreach (var resultValue in BooleanValues)
                 {
-                    var values = new Dictionary<IrVarId, IrValue>
-                    {
-                        [parameter] = factory.CreateBooleanValue(input),
-                        [preState.Variable] = factory.CreateBooleanValue(oldInput),
-                        [result] = factory.CreateBooleanValue(resultValue)
-                    };
+                    var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, factory.CreateBooleanValue(input)).SetItem(preState.Variable, factory.CreateBooleanValue(oldInput)).SetItem(result, factory.CreateBooleanValue(resultValue));
                     Assert.That(
                         interpreter.Evaluate(fullContracts.Clauses[0].Condition, values).Value!.Boolean,
                         Is.EqualTo(input));
@@ -98,10 +93,7 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
             variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
         foreach (var input in BooleanValues)
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [requiresParameter] = factory.CreateBooleanValue(input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(requiresParameter, factory.CreateBooleanValue(input));
             Assert.That(
                 interpreter.Evaluate(requiresContracts.Clauses.Single().Condition, values).Value!.Boolean,
                 Is.EqualTo(input));

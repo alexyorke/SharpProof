@@ -63,7 +63,7 @@ public sealed class TotalMaterializationIntrinsicBoundaryTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { false, true })
         {
-            var values = new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateBooleanValue(input) };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateBooleanValue(input));
             Assert.That(interpreter.Evaluate(moduleResult.Clauses[0].Value, values).Value!.Boolean, Is.EqualTo(input));
             Assert.That(interpreter.Evaluate(publicResult.Clauses[0].Value, values).Value!.Boolean, Is.EqualTo(input));
             Assert.That(interpreter.Evaluate(moduleResult.Clauses[0].SafeCondition, values).Value!.Boolean, Is.True);

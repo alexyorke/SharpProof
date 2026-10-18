@@ -218,7 +218,7 @@ public sealed class NativeMetadataShadowRequiresTests
             AssignmentObserver = (instruction, assigned, _) =>
             { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (markers.Contains(instruction.Id)) { observations.Add(assigned.Boolean); } }
         };
-        var execution = new IrProgramInterpreter(factory).Execute(body.Program, new Dictionary<IrVarId, IrValue> { [entry] = value }, 10000, options);
+        var execution = new IrProgramInterpreter(factory).Execute(body.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value), 10000, options);
         Assert.That(execution.ConsumedApproximation, Is.False);
         return (execution, observations);
     }

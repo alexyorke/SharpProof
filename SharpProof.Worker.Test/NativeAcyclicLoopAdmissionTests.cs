@@ -58,12 +58,7 @@ public sealed class NativeAcyclicLoopAdmissionTests
         {
             var inputValue = factory.CreateBooleanValue(value);
             var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,
-                new Dictionary<IrVarId, IrValue>
-                {
-                    [input.Entry] = inputValue,
-                    [input.Current] = inputValue,
-                    [input.Old] = inputValue
-                });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input.Entry, inputValue).SetItem(input.Current, inputValue).SetItem(input.Old, inputValue));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

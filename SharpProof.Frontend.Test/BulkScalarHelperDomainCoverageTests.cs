@@ -135,7 +135,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         Assert.That(rule.Classification.IsExact, Is.False);
         Assert.That(rule.Classification.Abstention, Is.EqualTo(reason));
         Assert.That(rule.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(factory).Evaluate(rule.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
     }
 
     private static void Replay(TypedProgramSubject subject, object[] inputs, int expected)

@@ -37,10 +37,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -3, -2, 0, 1, 2, 3 })
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(value.Type, (long)input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(value.Type, (long)input));
             var expected = new[] { input > 0, input >= -2 && input <= 2 };
             for (var index = 0; index < expected.Length; index++)
             {

@@ -75,7 +75,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
                 var writes = lowered.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrWriteInstruction>().ToArray();
                 Assert.That(writes, Has.Length.EqualTo(1));
                 Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
-                var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>());
+                var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(BigInteger.Zero));

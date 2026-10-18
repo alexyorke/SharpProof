@@ -84,10 +84,7 @@ public sealed class IrProgramTests
 
         var execution = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [flag] = factory.CreateBooleanValue(condition)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(condition)));
 
         Assert.That(
             execution.Status,
@@ -139,10 +136,7 @@ public sealed class IrProgramTests
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [flag] = malformed
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, malformed));
 
         using (Assert.EnterMultipleScope())
         {
@@ -475,10 +469,7 @@ public sealed class IrProgramTests
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = factory.CreateIntegerValue(7)
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(value, factory.CreateIntegerValue(7)));
         return (result, havoc, value);
     }
 
@@ -566,10 +557,7 @@ public sealed class IrProgramTests
             "bounds-store",
             "bounds-return",
             factory.Integer(7));
-        var values = new Dictionary<IrVarId, IrValue>
-        {
-            [sequence] = factory.CreateSequenceValue(sequenceType, [])
-        };
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, factory.CreateSequenceValue(sequenceType, []));
         var interpreter = new IrProgramInterpreter(factory);
 
         var failing =

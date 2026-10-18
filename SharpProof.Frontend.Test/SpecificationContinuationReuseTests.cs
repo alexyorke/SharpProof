@@ -74,10 +74,7 @@ public sealed class SpecificationContinuationReuseTests
                 Assert.That(lowering.ConstructionLimitExceeded, Is.False);
                 var parameter = context.Parameters.Single();
                 var execution = new IrProgramInterpreter(factory).Execute(lowering.Program,
-                    new Dictionary<IrVarId, IrValue>
-                    {
-                        [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)
-                    });
+                    global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, input)));
                 Assert.That(execution.ConsumedApproximation, Is.False);
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(input)));

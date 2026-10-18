@@ -58,7 +58,7 @@ public sealed class TypedMetadataConversionTests
             var entryValue = source == "ulong" ? factory.CreateIntegerValue(entryType, (ulong)boundary) :
                 factory.CreateIntegerValue(entryType, (long)boundary);
             var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-                new Dictionary<IrVarId, IrValue> { [entry] = entryValue });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, entryValue));
             var description = $"{source} -> {target}, {mode}, input={boundary}";
             Assert.That(execution.ConsumedApproximation, Is.False, description);
             if (compiled is OverflowException)

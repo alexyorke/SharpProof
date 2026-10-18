@@ -117,7 +117,7 @@ public sealed class IrFactory
             }
             else
             {
-                bucket = new ExternalIdentityBucket<T>();
+                bucket = new ExternalIdentityBucket<T>([]);
                 _externalIdentityBuckets = _externalIdentityBuckets.Add(bucketKey, bucket);
             }
         }
@@ -128,6 +128,7 @@ public sealed class IrFactory
             ImmutableArray<ExternalIdentityEntry<T>> candidates;
             lock (_gate)
             {
+                bucket = (ExternalIdentityBucket<T>)_externalIdentityBuckets[bucketKey];
                 candidates = bucket.Entries.Skip(comparedCount).ToImmutableArray();
             }
 
@@ -142,13 +143,15 @@ public sealed class IrFactory
             comparedCount += candidates.Length;
             lock (_gate)
             {
+                bucket = (ExternalIdentityBucket<T>)_externalIdentityBuckets[bucketKey];
                 if (bucket.Entries.Count != comparedCount)
                 {
                     continue;
                 }
 
                 var id = CreateIdentityCore();
-                bucket.Entries = bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id));
+                _externalIdentityBuckets = _externalIdentityBuckets.SetItem(bucketKey,
+                    new ExternalIdentityBucket<T>(bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id))));
                 return id;
             }
         }
@@ -428,7 +431,7 @@ public sealed class IrFactory
             elementType = info.ElementType.Value;
         }
 
-        var values = ImmutableArray.CreateBuilder<IrValue>();
+        var values = ImmutableList<IrValue>.Empty;
         foreach (var value in elements)
         {
             if (value == null || value.Type != elementType)
@@ -438,13 +441,13 @@ public sealed class IrFactory
                     nameof(elements));
             }
 
-            values.Add(value);
+            values = values.Add(value);
         }
 
         return new IrValue(
             type,
             IrValueKind.Sequence,
-            values.ToImmutable());
+            values.ToImmutableArray());
     }
 
     public IrBooleanTerm Boolean(bool value)
@@ -562,7 +565,7 @@ public sealed class IrFactory
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
+        return Opaque(member, receiver, ImmutableArray.CreateRange(arguments), IrOpaquePurity.Pure, default);
     }
 
     public IrOpaqueTerm ImpureOpaque(OperationId operation, IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
@@ -570,7 +573,7 @@ public sealed class IrFactory
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
+        return Opaque(member, receiver, ImmutableArray.CreateRange(arguments), IrOpaquePurity.Impure, operation);
     }
 
     public IrTerm Unary(IrUnaryOperator @operator, IrTerm operand)
@@ -858,19 +861,22 @@ public sealed class IrFactory
         }
     }
 
-    private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
+    internal IrOpaqueTerm RebuildOpaque(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrOpaquePurity purity, OperationId operation)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var normalizedPurity = purity == IrOpaquePurity.Pure ? IrOpaquePurity.Pure : IrOpaquePurity.Impure;
+        RepositoryParameterGuard.ThrowIfInvalid(normalizedPurity == IrOpaquePurity.Impure && operation.IsDefault, nameof(operation));
+        return Opaque(member, receiver, arguments, normalizedPurity, normalizedPurity == IrOpaquePurity.Pure ? default : operation);
+    }
+
+    private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments, IrOpaquePurity purity, OperationId operation)
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         // Pure opaque terms use the default operation ID as an intentional sentinel.
         RepositoryParameterGuard.ThrowIfInvalid(purity == IrOpaquePurity.Impure && operation.IsDefault, nameof(operation));
-        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        var argumentBuilder =
-            ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
-        foreach (var argument in arguments)
-        {
-            argumentBuilder.Add(argument);
-        }
-        var immutableArguments = argumentBuilder.MoveToImmutable();
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var immutableArguments = arguments;
 
         lock (_gate)
         {
@@ -886,19 +892,14 @@ public sealed class IrFactory
             {
                 GetOperationInfoCore(operation, nameof(operation));
             }
-            var childIdBuilder =
-                ImmutableArray.CreateBuilder<int>(immutableArguments.Length + 1);
-            childIdBuilder.Add(receiver?.Id.Value ?? -1);
-            foreach (var argument in immutableArguments)
-            {
-                childIdBuilder.Add(argument.Id.Value);
-            }
+            var childIds = ImmutableArray.Create(receiver?.Id.Value ?? -1).AddRange(
+                immutableArguments.Select(static (IrTerm /* SPINT001: all values valid - call-shape validation rejects null arguments before interning */ argument) => argument.Id.Value));
 
             return Intern(new StructuralKey(
                     IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value,
                     IrOperatorCatalog.GetPurityKey(purity),
                     operation.IsDefault ? -1 : operation.Value,
-                    children: childIdBuilder.MoveToImmutable()),
+                    children: childIds),
                 (memberInfo.ReturnType, member, receiver, immutableArguments, purity, operation),
                 static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrOpaqueTerm(
                     id, state.ReturnType, state.member, state.receiver,
@@ -1074,12 +1075,9 @@ public sealed class IrFactory
 
     private abstract class ExternalIdentityBucket;
 
-    private sealed class ExternalIdentityBucket<T> : ExternalIdentityBucket where T : notnull
+    private sealed class ExternalIdentityBucket<T>(ImmutableList<ExternalIdentityEntry<T>> entries) : ExternalIdentityBucket where T : notnull
     {
-        public ImmutableList<ExternalIdentityEntry<T>> Entries
-        {
-            get; set;
-        } = [];
+        public ImmutableList<ExternalIdentityEntry<T>> Entries { get; } = ArgumentNullGuard.NotNull(entries, nameof(entries));
     }
 
     private sealed class ExternalIdentityEntry<T>(T value, IrIdentityId id) where T : notnull

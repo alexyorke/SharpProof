@@ -26,9 +26,9 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
         Assert.That(bound.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(new[] { BoundContractKind.Requires, BoundContractKind.Ensures }));
         var interpreter = new IrInterpreter(factory);
-        Assert.That(interpreter.Evaluate(bound.Clauses[0].Condition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean,
+        Assert.That(interpreter.Evaluate(bound.Clauses[0].Condition, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean,
             Is.EqualTo(value > 0));
-        Assert.That(interpreter.Evaluate(bound.Clauses[1].Condition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.True);
+        Assert.That(interpreter.Evaluate(bound.Clauses[1].Condition, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.True);
         for (var index = 0; index < contracts.Clauses.Length; index++)
         {
             var original = contracts.Clauses[index];

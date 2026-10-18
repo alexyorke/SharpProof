@@ -13,7 +13,7 @@ public static partial class WorkerProtocolJson
     {
         _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         manifest.Claims = [
-            .. (manifest.Claims ?? [])
+            .. (EmptyIfDefault(manifest.Claims))
                 .OrderBy(
                     static (WorkerClaimManifestEntry /* SPINT001: all values valid - null manifest entries are validated after sorting */ value) => value?.CallableId,
                     StringComparer.Ordinal)
@@ -35,7 +35,7 @@ public static partial class WorkerProtocolJson
             callable.SelectionReasons =
                 SortManifestEnums(callable.SelectionReasons);
             callable.ClaimIds = [
-                .. (callable.ClaimIds ?? [])
+                .. (EmptyIfDefault(callable.ClaimIds))
                     .OrderBy(id =>
                         id is null ? throw new System.ArgumentNullException(nameof(id)) : (FindClaimOrdinal(claimsById, id)))
                     .ThenBy(

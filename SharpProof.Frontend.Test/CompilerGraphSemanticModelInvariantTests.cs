@@ -140,7 +140,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         var binding = context.Parameters.Single();
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
-            new Dictionary<IrVarId, IrValue> { [binding.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, input) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, input)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(expected)));

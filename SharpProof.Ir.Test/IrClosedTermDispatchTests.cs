@@ -51,8 +51,7 @@ public sealed class IrClosedTermDispatchTests
         var left = legacy.CreateVariable("left", legacy.IntegerType);
         var right = legacy.CreateVariable("right", legacy.IntegerType);
         var legacyTerm = legacy.Binary(operation, legacy.Variable(left), legacy.Variable(right));
-        var unsupported = new IrInterpreter(legacy).Evaluate(legacyTerm, new Dictionary<IrVarId, IrValue>
-        { [left] = legacy.CreateIntegerValue(3), [right] = legacy.CreateIntegerValue(1) });
+        var unsupported = new IrInterpreter(legacy).Evaluate(legacyTerm, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, legacy.CreateIntegerValue(3)).SetItem(right, legacy.CreateIntegerValue(1)));
         Assert.That(unsupported.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(unsupported.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
         Assert.That(unsupported.Unsupported.Detail, Is.EqualTo("Unsupported integer operator: " + operation + "."));
@@ -61,8 +60,7 @@ public sealed class IrClosedTermDispatchTests
         var typedLeft = total.CreateVariable("left", total.IntegerType);
         var typedRight = total.CreateVariable("right", total.IntegerType);
         var typedTerm = total.Binary(operation, total.Variable(typedLeft), total.Variable(typedRight));
-        var supported = new IrInterpreter(total).Evaluate(typedTerm, new Dictionary<IrVarId, IrValue>
-        { [typedLeft] = total.CreateIntegerValue(3), [typedRight] = total.CreateIntegerValue(1) });
+        var supported = new IrInterpreter(total).Evaluate(typedTerm, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(typedLeft, total.CreateIntegerValue(3)).SetItem(typedRight, total.CreateIntegerValue(1)));
         Assert.That(supported.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(supported.Value!.Integer, Is.EqualTo(expected));
         Assert.That(supported.Value.Type, Is.EqualTo(total.IntegerType));

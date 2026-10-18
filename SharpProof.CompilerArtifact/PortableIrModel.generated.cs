@@ -281,18 +281,18 @@ internal sealed record PortableIrBlock
 internal sealed class DecodedPortableIrGraph(
     IrFactory factory,
     IrProgram? program,
-    IrTerm[] roots,
-    IrVarId[] variables,
-    IrInstruction[] instructions,
-    OperationId[] operations
+    ImmutableArray<IrTerm> roots,
+    ImmutableArray<IrVarId> variables,
+    ImmutableArray<IrInstruction> instructions,
+    ImmutableArray<OperationId> operations
 )
 {
     internal IrFactory Factory { get; } = factory;
     internal IrProgram? Program { get; } = program;
-    internal IReadOnlyList<IrTerm> Roots { get; } = roots.ToImmutableArray();
-    internal IReadOnlyList<IrVarId> Variables { get; } = variables.ToImmutableArray();
-    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions.ToImmutableArray();
-    internal IReadOnlyList<OperationId> Operations { get; } = operations.ToImmutableArray();
+    internal IReadOnlyList<IrTerm> Roots { get; } = roots;
+    internal IReadOnlyList<IrVarId> Variables { get; } = variables;
+    internal IReadOnlyList<IrInstruction> Instructions { get; } = instructions;
+    internal IReadOnlyList<OperationId> Operations { get; } = operations;
 }
 
 internal sealed class EncodedPortableIrGraph(

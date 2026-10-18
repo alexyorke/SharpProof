@@ -422,11 +422,11 @@ public static class FiniteDomainSmtDifferentialOracle
         matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
         RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         var interpreter = new IrInterpreter(factory);
-        var environment = new Dictionary<IrVarId, IrValue>();
-        return Search(0);
+        return Search(0, ImmutableDictionary<IrVarId, IrValue>.Empty);
 
-        bool Search(int index)
+        bool Search(int index, ImmutableDictionary<IrVarId, IrValue> environment)
         {
+            environment = RepositoryParameterGuard.NotNull(environment, nameof(environment));
             cancellationToken.ThrowIfCancellationRequested();
             if (index == variables.Length)
             {
@@ -445,12 +445,9 @@ public static class FiniteDomainSmtDifferentialOracle
             {
                 foreach (var value in BooleanDomain)
                 {
-                    environment[variable] =
-                        factory.CreateBooleanValue(value);
-                    var child = Search(index + 1);
+                    var child = Search(index + 1, environment.SetItem(variable, factory.CreateBooleanValue(value)));
                     if (requireMatch ? !child : child)
                     {
-                        environment.Remove(variable);
                         return requireMatch ? false : true;
                     }
                 }
@@ -459,12 +456,9 @@ public static class FiniteDomainSmtDifferentialOracle
             {
                 foreach (var value in IntegerDomain)
                 {
-                    environment[variable] =
-                        factory.CreateIntegerValue(variableType, value);
-                    var child = Search(index + 1);
+                    var child = Search(index + 1, environment.SetItem(variable, factory.CreateIntegerValue(variableType, value)));
                     if (requireMatch ? !child : child)
                     {
-                        environment.Remove(variable);
                         return requireMatch ? false : true;
                     }
                 }
@@ -473,7 +467,6 @@ public static class FiniteDomainSmtDifferentialOracle
             {
                 return false;
             }
-            environment.Remove(variable);
             return requireMatch;
         }
     }
@@ -651,18 +644,19 @@ public static class IrStructuralShrinker
             throw new ArgumentNullException(nameof(term));
         }
 
-        var seen = new HashSet<IrId>();
-        var pending = new Stack<IrTerm>();
-        pending.Push(term);
-        while (pending.Count != 0)
+        var seen = ImmutableHashSet<IrId>.Empty;
+        var pending = ImmutableStack<IrTerm>.Empty.Push(term);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
-            if (!seen.Add(current.Id))
+            var current = pending.Peek();
+            pending = pending.Pop();
+            if (seen.Contains(current.Id))
             {
                 continue;
             }
 
-            IrTraversal.PushChildren(current, pending);
+            seen = seen.Add(current.Id);
+            pending = IrTraversal.PushChildren(current, pending);
         }
         return seen.Count;
     }

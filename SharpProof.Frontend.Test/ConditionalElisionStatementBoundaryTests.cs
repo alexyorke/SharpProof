@@ -44,7 +44,7 @@ public sealed class ConditionalElisionStatementBoundaryTests
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-                new Dictionary<IrVarId, IrValue> { [parameter] = value });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter, value));
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(10)));
             Assert.That(replay.ConsumedApproximation, Is.False);

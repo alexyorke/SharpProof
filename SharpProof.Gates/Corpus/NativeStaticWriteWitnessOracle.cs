@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -29,13 +30,13 @@ internal static class NativeStaticWriteWitnessOracle
         { return Gap("UnsupportedWriteInvocationShape"); }
         // Native source writes retain their captured SDK span through replay.
         var span = preparation.Program.Factory.GetOperationInfo(evidence.WriteWitness!.Value).SourceSpan!;
-        var initial = new Dictionary<IrVarId, IrValue>();
+        var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
         foreach (var parameter in preparation.Parameters)
         {
             // The native solver projects every parameter from this owned preparation.
             var input = evidence.EntryModel[parameter.Entry];
-            initial[parameter.Entry] = input;
-            initial[parameter.Current] = input;
+            initial = initial.SetItem(parameter.Entry, input);
+            initial = initial.SetItem(parameter.Current, input);
         }
         var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, cancellationToken: cancellationToken);
@@ -43,7 +44,7 @@ internal static class NativeStaticWriteWitnessOracle
         { return Gap("NonTerminatingOrIncompleteWriteWitness"); }
         // The producer captures full paths while the SDK tree may retain a relative path.
         var trees = compilation.SyntaxTrees.Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (Path.GetFullPath(
-            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document)).ToArray();
+            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document)).ToImmutableArray();
         if (trees.Length != 1)
         { return Gap("UnsupportedWriteSourceSite"); }
         var tree = trees[0];

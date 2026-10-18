@@ -50,10 +50,7 @@ public sealed class IrUnboxingDifferentialRegressionTests
         {
             var result = oracle.Compare(
                 @case.Term,
-                new Dictionary<IrVarId, IrValue>
-                {
-                    [fixture.Value] = @case.Value
-                });
+                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(fixture.Value, @case.Value));
 
             Assert.That(
                 result.Status,
@@ -115,10 +112,7 @@ public sealed class IrUnboxingDifferentialRegressionTests
         System.ArgumentNullException.ThrowIfNull(value);
         return interpreter.Evaluate(
             term,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = value
-            });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, value));
     }
 
     private sealed record UnboxingFixture(

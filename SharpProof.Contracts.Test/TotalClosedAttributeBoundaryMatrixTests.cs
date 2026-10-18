@@ -93,11 +93,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                     BigInteger.Parse(Convert.ToString(actual, CultureInfo.InvariantCulture)!, CultureInfo.InvariantCulture);
                 Assert.That(returned, Is.EqualTo(value));
                 var expected = positive ? value > 0 : value >= minimum && value <= maximum;
-                var supplied = new Dictionary<IrVarId, IrValue>
-                {
-                    [entry] = signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value),
-                    [result] = signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value)
-                };
+                var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value)).SetItem(result, signed ? factory.CreateIntegerValue(type, (long)value) : factory.CreateIntegerValue(type, (ulong)value));
                 foreach (var clause in bound.Clauses)
                 {
                     var evaluation = new IrInterpreter(factory).Evaluate(clause.Value, supplied);
@@ -152,11 +148,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                     "int[]?" => factory.CreateSequenceValue(type, [factory.CreateIntegerValue(factory.GetTypeInfo(type).ElementType!.Value, 1L)]),
                     _ => factory.CreateReferenceValue(type, input)
                 };
-                var supplied = new Dictionary<IrVarId, IrValue>
-                {
-                    [context.Parameters[0].Entry] = value,
-                    [context.Result!.Value] = value
-                };
+                var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters[0].Entry, value).SetItem(context.Result!.Value, value);
                 foreach (var clause in bound.Clauses)
                 {
                     Assert.That(clause.Evidence, Is.EqualTo(BoundContractEvidence.ClosedAttribute));

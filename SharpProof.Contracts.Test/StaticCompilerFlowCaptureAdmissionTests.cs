@@ -88,16 +88,12 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         {
             foreach (var choose in new[] { false, true })
             {
-                var supplied = new Dictionary<IrVarId, IrValue>
+                var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(chooseVariable, factory.CreateBooleanValue(choose)).SetItem(valueVariable, typeName switch
                 {
-                    [chooseVariable] = factory.CreateBooleanValue(choose),
-                    [valueVariable] = typeName switch
-                    {
-                        "int" => factory.CreateIntegerValue((long)input),
-                        "bool" => factory.CreateBooleanValue((bool)input),
-                        _ => factory.CreateStringValue((string)input)
-                    }
-                };
+                    "int" => factory.CreateIntegerValue((long)input),
+                    "bool" => factory.CreateBooleanValue((bool)input),
+                    _ => factory.CreateStringValue((string)input)
+                });
                 var actual = interpreter.Evaluate(original.Term!, supplied).Value!;
                 object value = typeName switch
                 {

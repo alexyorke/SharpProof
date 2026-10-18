@@ -55,10 +55,7 @@ public sealed class ContractBinderTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -1L, 1L })
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [binding.Variable] = factory.CreateIntegerValue(factory.IntegerType, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding.Variable, factory.CreateIntegerValue(factory.IntegerType, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
                 Is.EqualTo(input > 0));
         }
@@ -105,10 +102,7 @@ public sealed class ContractBinderTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -1L, 1L })
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Variable] = factory.CreateIntegerValue(parameterType, input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(parameterType, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
                 Is.EqualTo(input > 0));
         }

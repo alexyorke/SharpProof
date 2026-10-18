@@ -19,13 +19,7 @@ public sealed class IrSnapshotEvaluationDepthBoundaryTests
             "field:Value", factory.IntegerType, false);
         var identity = new IrObjectState().WithField(field, factory.CreateIntegerValue(3));
         var value = factory.CreateReferenceValue(factory.ObjectType, identity);
-        var variables = new Dictionary<IrVarId, IrValue>
-        {
-            [current] = value,
-            [old] = value,
-            [flag] = factory.CreateBooleanValue(chooseOld),
-            [descend] = factory.CreateBooleanValue(true)
-        };
+        var variables = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(current, value).SetItem(old, value).SetItem(flag, factory.CreateBooleanValue(chooseOld)).SetItem(descend, factory.CreateBooleanValue(true));
         var heap = new IrHeap();
         heap.Fields.Add((identity, field), factory.CreateIntegerValue(7));
         var owner = factory.Conditional(factory.Variable(flag), factory.Variable(old), factory.Variable(current));

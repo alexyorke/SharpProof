@@ -123,7 +123,7 @@ public sealed class TypedReferenceProgramLoweringTests
         var entry = subject.Context.Parameters.Single().Entry;
         var value = Value(subject.Factory, subject.Factory.GetVariableInfo(entry).Type, input, []);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue> { [entry] = value });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(ReferenceEquals(replay.ReturnValue, value), Is.True);

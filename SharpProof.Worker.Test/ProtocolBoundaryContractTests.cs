@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -73,17 +74,17 @@ public sealed class ProtocolBoundaryContractTests
     public void ManifestHashOrdersEveryAssumptionKindAndRejectsUnknownKinds()
     {
         var manifest = Manifest();
-        var kinds = Enum.GetValues<WorkerAssumptionKind>().Reverse().ToArray();
+        var kinds = Enum.GetValues<WorkerAssumptionKind>().Reverse().ToImmutableArray();
         manifest.Callables[0].Assumptions = kinds.Select(kind => new WorkerAssumptionEvidence
         {
             Id = "assumption." + kind,
             Kind = kind
-        }).ToArray();
+        }).ToImmutableArray();
         WorkerProtocolJson.Canonicalize(manifest);
         Assert.That(manifest.Callables[0].Assumptions.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)),
             Is.EqualTo(Enum.GetValues<WorkerAssumptionKind>()));
         var hash = WorkerProtocolJson.ComputeManifestHash(manifest);
-        manifest.Callables[0].Assumptions = manifest.Callables[0].Assumptions.Reverse().ToArray();
+        manifest.Callables[0].Assumptions = manifest.Callables[0].Assumptions.Reverse().ToImmutableArray();
         Assert.That(WorkerProtocolJson.ComputeManifestHash(manifest), Is.EqualTo(hash));
         { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { Assumptions = manifest.Callables[0].Assumptions.ReplaceAt(0, manifest.Callables[0].Assumptions[0] with { Kind = (WorkerAssumptionKind)int.MaxValue }) }) }; }
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => WorkerProtocolJson.ComputeManifestHash(manifest)));
@@ -94,7 +95,7 @@ public sealed class ProtocolBoundaryContractTests
     public void ManifestValidationRejectsAbsentFeatureDeclarations(bool nullArray)
     {
         var manifest = Manifest();
-        manifest.Callables[0].SelectedFeatures = nullArray ? null! : [];
+        manifest.Callables[0].SelectedFeatures = nullArray ? default : [];
         Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("manifest.selected_features"));
     }
@@ -136,7 +137,7 @@ public sealed class ProtocolBoundaryContractTests
         {
             { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = (WorkerClaimOutcome)int.MaxValue }) }; }
         }
-        var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToArray();
+        var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToImmutableArray();
         Assert.That(codes, Does.Contain(callable ? "response.callable_coverage" : "response.claim_outcome"));
         Assert.That(codes, Does.Contain(callable ? "response.callable_reason" : "response.claim_reason"));
     }

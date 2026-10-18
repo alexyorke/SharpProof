@@ -27,10 +27,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -3, -2, 0, 2, 3 })
         {
-            var values = new Dictionary<IrVarId, IrValue>
-            {
-                [variable] = factory.CreateIntegerValue(type, (long)input)
-            };
+            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(type, (long)input));
             Assert.That(interpreter.Evaluate(result.Clauses[0].Value, values).Value!.Boolean,
                 Is.EqualTo(input >= -2 && input <= 2));
             Assert.That(interpreter.Evaluate(result.Clauses[0].SafeCondition, values).Value!.Boolean, Is.True);

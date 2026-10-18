@@ -69,12 +69,8 @@ public sealed class TotalClosedAttributeBoundarySampleTests
             object argument = typeName switch { "sbyte" => (sbyte)value, "ushort" => (ushort)value, _ => (ulong)value };
             var actualReturn = runtime.Invoke(null, [argument]);
             Assert.That(BigInteger.Parse(Convert.ToString(actualReturn, CultureInfo.InvariantCulture)!, CultureInfo.InvariantCulture), Is.EqualTo(value));
-            var supplied = new Dictionary<IrVarId, IrValue>
-            {
-                [entry] = info.Signed ? factory.CreateIntegerValue(inputType, (long)value) : factory.CreateIntegerValue(inputType, (ulong)value),
-                [result] = info.Signed ? factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (long)value) :
-                    factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (ulong)value)
-            };
+            var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, info.Signed ? factory.CreateIntegerValue(inputType, (long)value) : factory.CreateIntegerValue(inputType, (ulong)value)).SetItem(result, info.Signed ? factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (long)value) :
+                    factory.CreateIntegerValue(factory.GetVariableInfo(result).Type, (ulong)value));
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(requires.Value, supplied).Value!.Boolean, Is.EqualTo(value >= -129 && value <= 128));
             Assert.That(interpreter.Evaluate(ensures.Value, supplied).Value!.Boolean, Is.EqualTo(value >= -1 && value <= 1));

@@ -254,7 +254,7 @@ public sealed class WorkerVcExceptionSearchTests
         var factory = total.Program.Factory;
         var input = total.Parameters.Single().Entry;
         var replay = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 0) });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 0)));
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(replay.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
         var span = factory.GetOperationInfo(replay.Instruction!.Operation).SourceSpan!;

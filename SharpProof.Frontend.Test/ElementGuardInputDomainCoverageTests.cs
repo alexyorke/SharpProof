@@ -27,7 +27,7 @@ public sealed class ElementGuardInputDomainCoverageTests
         Assert.That(guard.Classification.IsExact, Is.False);
         Assert.That(guard.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(guard.Throws, Is.Empty);
-        Assert.That(new IrInterpreter(subject.Factory).Evaluate(guard.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(guard.Value, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean, Is.False);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

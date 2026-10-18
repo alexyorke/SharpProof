@@ -156,8 +156,8 @@ internal static class CompilerManifestArtifactJson
             {
                 Manifest = artifact.Manifest with
                 {
-                    Callables = artifact.Manifest.Callables?.Select(static (WorkerCallableManifestEntry /* SPINT001: all values valid - null entries are validated after canonicalization */ callable) =>
-                        callable is null ? null! : callable with { }).ToArray()!
+                    Callables = artifact.Manifest.Callables.IsDefault ? default : artifact.Manifest.Callables.Select(static (WorkerCallableManifestEntry /* SPINT001: all values valid - null entries are validated after canonicalization */ callable) =>
+                        callable is null ? null! : callable with { }).ToImmutableArray()
                 }
             };
             try

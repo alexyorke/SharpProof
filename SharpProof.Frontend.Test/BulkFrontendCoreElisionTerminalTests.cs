@@ -134,11 +134,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     var type = factory.GetVariableInfo(valueParameter).Type;
                     var value = input == null ? factory.CreateNullValue(type) : factory.CreateStringValue(input);
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        new Dictionary<IrVarId, IrValue>
-                        {
-                            [valueParameter] = value,
-                            [flagParameter] = factory.CreateBooleanValue(flag)
-                        });
+                        global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(valueParameter, value).SetItem(flagParameter, factory.CreateBooleanValue(flag)));
                     Assert.That(replay.Status, Is.EqualTo(enabled
                         ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
                     if (enabled)

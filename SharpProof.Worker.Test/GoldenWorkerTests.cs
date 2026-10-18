@@ -494,13 +494,13 @@ public sealed class GoldenWorkerTests
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var output = new StringBuilder();
-        WorkerClaimResult[]? original = null;
+        ImmutableArray<WorkerClaimResult> original = default;
         foreach (var run in new[] { "normal", "cache-hit" })
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.Errors, Is.Empty);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-            if (original != null)
+            if (!original.IsDefault)
             {
                 Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
                 Assert.That(JsonSerializer.Serialize(response.ClaimResults, WorkerProtocolJson.SharedOptions),

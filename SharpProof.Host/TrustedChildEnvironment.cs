@@ -46,7 +46,7 @@ internal static class TrustedChildEnvironment
         var inheritedValues = AllowedVariables
             .Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ((Name: name, Value: readEnvironmentVariable(name))))
             .Where(static item => item.Value is not null)
-            .ToArray();
+            .ToImmutableArray();
         string? dotNetRoot = null;
         if (validatedDotNetHostPath is not null)
         {

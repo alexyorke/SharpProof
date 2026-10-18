@@ -3981,7 +3981,7 @@ public sealed partial class WorkerTests
                     record.Reason))));
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.ProofCore)),
-            Has.All.Matches<string[]>(core => core is null ? throw new System.ArgumentNullException(nameof(core)) : (core.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("normal-completion:", StringComparison.Ordinal))))));
+            Has.All.Matches<ImmutableArray<string>>(core => core.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(core)) : (core.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith("normal-completion:", StringComparison.Ordinal))))));
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Vacuity)),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));

@@ -321,13 +321,9 @@ public sealed class NativePurityEffectTests
         var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
         var writes = new List<IrWriteRegion>();
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>
-            {
-                [entries[0]] = initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
-                    factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object()),
-                [entries[1]] = initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
-                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)
-            }, 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writes.Add(write.Region); } });
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
+                    factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object())).SetItem(entries[1], initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
+                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)), 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writes.Add(write.Region); } });
         Assert.That(execution.Status, Is.EqualTo(initiallyNull ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(writes.Contains(IrWriteRegion.Parameter), Is.EqualTo(!initiallyNull));
@@ -540,7 +536,7 @@ public sealed class NativePurityEffectTests
         var input = preparation.Total.Parameters.Single().Entry;
         var observed = 0;
         var execution = new IrProgramInterpreter(factory).Execute(preparation.Total.Program,
-            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 7L) },
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type, 7L)),
             maximumSteps: 10000, replayOptions: new IrProgramReplayOptions(static _ => null)
             {
                 WritePrefixObserver = (write, approximate) =>
@@ -640,23 +636,18 @@ public sealed class NativePurityEffectTests
         // The objects enter with the field values the runtime run used.
         var field = write.Field!.Value;
         var fieldType = factory.GetMemberInfo(field).ReturnType;
-        var replay = new IrProgramInterpreter(factory).Execute(total.Program, new Dictionary<IrVarId, IrValue>
-        {
-            [entries[0]] = nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(
-                factory.GetVariableInfo(entries[0]).Type, new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 5L))),
-            [entries[1]] = factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type,
-                new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 10L))),
-            [entries[2]] = factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)
-        }, 10000, new IrProgramReplayOptions(static _ => null)
-        {
-            WritePrefixObserver = (item, approximate) =>
-            {
-                System.ArgumentNullException.ThrowIfNull(item);
-                Assert.That(approximate, Is.False);
-                if (item.Region != IrWriteRegion.Local)
-                { Assert.That(item.Operation, Is.EqualTo(write.Operation)); observed++; }
-            }
-        });
+        var replay = new IrProgramInterpreter(factory).Execute(total.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], nullReceiver ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) : factory.CreateReferenceValue(
+                factory.GetVariableInfo(entries[0]).Type, new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 5L)))).SetItem(entries[1], factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type,
+                new IrObjectState().WithField(field, factory.CreateIntegerValue(fieldType, 10L)))).SetItem(entries[2], factory.CreateIntegerValue(factory.GetVariableInfo(entries[2]).Type, 7L)), 10000, new IrProgramReplayOptions(static _ => null)
+                {
+                    WritePrefixObserver = (item, approximate) =>
+                    {
+                        System.ArgumentNullException.ThrowIfNull(item);
+                        Assert.That(approximate, Is.False);
+                        if (item.Region != IrWriteRegion.Local)
+                        { Assert.That(item.Operation, Is.EqualTo(write.Operation)); observed++; }
+                    }
+                });
         Assert.That(replay.Status, Is.EqualTo(faults ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(observed, Is.EqualTo(faults ? 0 : 1));

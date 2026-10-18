@@ -99,14 +99,7 @@ public sealed class ContractVariableTransferBoundaryTests
             {
                 foreach (var resultValue in BooleanValues)
                 {
-                    var values = new Dictionary<IrVarId, IrValue>
-                    {
-                        [left] = factory.CreateBooleanValue(leftValue),
-                        [right] = factory.CreateBooleanValue(rightValue),
-                        [result] = factory.CreateBooleanValue(resultValue),
-                        [callbackOutputs[0]] = factory.CreateBooleanValue(leftValue),
-                        [callbackOutputs[1]] = factory.CreateBooleanValue(rightValue)
-                    };
+                    var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateBooleanValue(leftValue)).SetItem(right, factory.CreateBooleanValue(rightValue)).SetItem(result, factory.CreateBooleanValue(resultValue)).SetItem(callbackOutputs[0], factory.CreateBooleanValue(leftValue)).SetItem(callbackOutputs[1], factory.CreateBooleanValue(rightValue));
 
                     Assert.That(
                         interpreter.Evaluate(rebound.Clauses[0].Condition, values).Value!.Boolean,

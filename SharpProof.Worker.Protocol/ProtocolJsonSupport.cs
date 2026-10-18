@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ErrorBuilder = System.Collections.Immutable.ImmutableArray<SharpProof.Worker.Protocol.WorkerProtocolError>.Builder;
 
 namespace SharpProof.Worker.Protocol;
 
@@ -26,8 +25,7 @@ public static partial class WorkerProtocolJson
 
     private sealed class Validator
     {
-        private readonly ErrorBuilder _errors =
-            ImmutableArray.CreateBuilder<WorkerProtocolError>();
+        private ImmutableList<WorkerProtocolError> _errors = ImmutableList<WorkerProtocolError>.Empty;
 
         internal int Count => _errors.Count;
         internal WorkerProtocolValidationResult Result => new(_errors);
@@ -35,7 +33,7 @@ public static partial class WorkerProtocolJson
         internal void Add(string code)
         {
             code = RepositoryParameterGuard.NotNull(code, nameof(code));
-            _errors.Add(new WorkerProtocolError
+            _errors = _errors.Add(new WorkerProtocolError
             {
                 Code = code,
                 Message = $"Protocol invariant '{code}' was not satisfied."
