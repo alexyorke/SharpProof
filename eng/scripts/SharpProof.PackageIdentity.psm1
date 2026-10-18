@@ -7,10 +7,17 @@ $SharpProofPackageIds = @(
     'SharpProof.Verifier'
 ) | Sort-Object
 
+# The SharpProof entrypoint is a metadata-only facade; all executable payloads
+# and their portable PDBs live in Attributes and Verifier.
+$SharpProofSymbolPackageIds = @(
+    'SharpProof.Attributes',
+    'SharpProof.Verifier'
+) | Sort-Object
+
 $script:SharpProofPackagePushOrder = @(
     'SharpProof.Attributes',
-    'SharpProof',
-    'SharpProof.Verifier'
+    'SharpProof.Verifier',
+    'SharpProof'
 )
 
 function Get-SharpProofNuspecMetadata {
@@ -136,10 +143,11 @@ function Get-SharpProofPackageIdentitySet {
                 ForEach-Object { $_.Identity.Id } |
                 Sort-Object
         )
-        if (($actualIds -join '|') -ne ($SharpProofPackageIds -join '|')) {
+        $expectedIds = if ($extension -eq '.snupkg') { $SharpProofSymbolPackageIds } else { $SharpProofPackageIds }
+        if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
             throw (
                 "SharpProof package identity set requires one $extension " +
-                "for each expected ID; found '$($actualIds -join ', ')'.")
+                "for each expected ID '$($expectedIds -join ', ')'; found '$($actualIds -join ', ')'.")
         }
     }
 
@@ -172,5 +180,6 @@ Export-ModuleMember -Function @(
     'Get-SharpProofPackageIdentitySet'
 ) -Variable @(
     'SharpProofPackageIds',
+    'SharpProofSymbolPackageIds',
     'SharpProofPackagePushOrder'
 )

@@ -1564,6 +1564,164 @@ public sealed class BuildTaskTests
         Assert.That(File.ReadAllText(executable), Is.EqualTo("untrusted muxer"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void VerifierResolvesSdkTaskHostMuxerFromItsLoadedRuntime(bool configureAbsoluteMuxer)
+    {
+        using var directory = new TempDirectory("sharpproof-taskhost-muxer-");
+        var installation = CreateTaskHostInstallation(directory.FullName);
+        var executable = configureAbsoluteMuxer ? installation.Muxer : "dotnet";
+        Assert.That(RunVerifier.ResolveDotNetHost(executable, installation.AppHost,
+                installation.CoreLibrary, installation.EntryAssembly), Is.EqualTo(installation.Muxer));
+    }
+
+    [TestCase("null-process")]
+    [TestCase("relative-process")]
+    [TestCase("wrong-process-name")]
+    [TestCase("relative-runtime")]
+    [TestCase("null-entry")]
+    [TestCase("relative-entry")]
+    [TestCase("wrong-core-name")]
+    [TestCase("wrong-framework")]
+    [TestCase("wrong-shared")]
+    [TestCase("missing-core")]
+    [TestCase("outside-sdk")]
+    [TestCase("nested-sdk")]
+    [TestCase("wrong-entry")]
+    [TestCase("missing-process")]
+    [TestCase("missing-entry")]
+    [TestCase("missing-muxer")]
+    [TestCase("missing-fxr")]
+    [TestCase("other-configured-muxer")]
+    public void VerifierRejectsTaskHostRuntimeAndSdkIdentityMismatches(string mismatch)
+    {
+        ArgumentNullException.ThrowIfNull(mismatch);
+        using var directory = new TempDirectory("sharpproof-taskhost-mismatch-");
+        var installation = CreateTaskHostInstallation(directory.FullName);
+        string? process = installation.AppHost;
+        var coreLibrary = installation.CoreLibrary;
+        string? entryAssembly = installation.EntryAssembly;
+        var executable = "dotnet";
+        switch (mismatch)
+        {
+            case "null-process":
+                process = null;
+                break;
+            case "relative-process":
+                process = Path.GetFileName(installation.AppHost);
+                break;
+            case "wrong-process-name":
+                process = Path.Combine(directory.FullName, "arbitrary-host");
+                break;
+            case "relative-runtime":
+                coreLibrary = "System.Private.CoreLib.dll";
+                break;
+            case "null-entry":
+                entryAssembly = null;
+                break;
+            case "relative-entry":
+                entryAssembly = "MSBuild.dll";
+                break;
+            case "wrong-core-name":
+                coreLibrary = Path.Combine(Path.GetDirectoryName(coreLibrary)!, "Other.CoreLib.dll");
+                break;
+            case "wrong-framework":
+                coreLibrary = Path.Combine(directory.FullName, "shared", "Other.Framework", "10.0.12", "System.Private.CoreLib.dll");
+                break;
+            case "wrong-shared":
+                coreLibrary = Path.Combine(directory.FullName, "other", "Microsoft.NETCore.App", "10.0.12", "System.Private.CoreLib.dll");
+                break;
+            case "missing-core":
+                File.Delete(coreLibrary);
+                break;
+            case "outside-sdk":
+                process = Path.Combine(directory.FullName, Path.GetFileName(installation.AppHost));
+                break;
+            case "nested-sdk":
+                process = Path.Combine(Path.GetDirectoryName(installation.AppHost)!, "nested", Path.GetFileName(installation.AppHost));
+                break;
+            case "wrong-entry":
+                entryAssembly = Path.Combine(directory.FullName, "MSBuild.dll");
+                break;
+            case "missing-process":
+                File.Delete(installation.AppHost);
+                break;
+            case "missing-entry":
+                File.Delete(installation.EntryAssembly);
+                break;
+            case "missing-muxer":
+                File.Delete(installation.Muxer);
+                break;
+            case "missing-fxr":
+                Directory.Delete(Path.Combine(directory.FullName, "host", "fxr"));
+                break;
+            case "other-configured-muxer":
+                executable = CreateTaskHostInstallation(Path.Combine(directory.FullName, "other-installation")).Muxer;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mismatch));
+        }
+        if (mismatch is "wrong-core-name" or "wrong-framework" or "wrong-shared")
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(coreLibrary)!);
+            File.WriteAllText(coreLibrary, "mismatched runtime identity; never executed");
+        }
+        if (mismatch is "outside-sdk" or "nested-sdk")
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(process!)!);
+            File.WriteAllText(process!, "mismatched process identity; never executed");
+        }
+        if (mismatch == "wrong-entry")
+        {
+            File.WriteAllText(entryAssembly!, "mismatched entry assembly; never executed");
+        }
+        Action resolve = () => RunVerifier.ResolveDotNetHost(executable, process, coreLibrary, entryAssembly);
+        Assert.That(resolve, Throws.InvalidOperationException);
+    }
+
+    [TestCase("process")]
+    [TestCase("entry")]
+    [TestCase("runtime")]
+    [TestCase("muxer")]
+    [Platform("Linux")]
+    public void VerifierRejectsTaskHostLinksIntoAnotherInstallation(string linkedMember)
+    {
+        ArgumentNullException.ThrowIfNull(linkedMember);
+        using var directory = new TempDirectory("sharpproof-taskhost-link-");
+        var installation = CreateTaskHostInstallation(Path.Combine(directory.FullName, "trusted"));
+        var other = CreateTaskHostInstallation(Path.Combine(directory.FullName, "other"));
+        var member = linkedMember switch
+        {
+            "process" => (installation.AppHost, other.AppHost),
+            "entry" => (installation.EntryAssembly, other.EntryAssembly),
+            "runtime" => (installation.CoreLibrary, other.CoreLibrary),
+            "muxer" => (installation.Muxer, other.Muxer),
+            _ => throw new ArgumentOutOfRangeException(nameof(linkedMember))
+        };
+        File.Delete(member.Item1);
+        File.CreateSymbolicLink(member.Item1, member.Item2);
+        Action resolve = () => RunVerifier.ResolveDotNetHost("dotnet", installation.AppHost,
+            installation.CoreLibrary, installation.EntryAssembly);
+        Assert.That(resolve, Throws.InvalidOperationException);
+    }
+
+    private static (string Muxer, string AppHost, string CoreLibrary, string EntryAssembly)
+        CreateTaskHostInstallation(string root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        var muxer = Path.Combine(root, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
+        var appHost = Path.Combine(root, "sdk", "10.0.402", OperatingSystem.IsWindows() ? "MSBuild.exe" : "MSBuild");
+        var coreLibrary = Path.Combine(root, "shared", "Microsoft.NETCore.App", "10.0.12", "System.Private.CoreLib.dll");
+        var entryAssembly = Path.Combine(root, "sdk", "10.0.402", "MSBuild.dll");
+        Directory.CreateDirectory(Path.Combine(root, "host", "fxr"));
+        foreach (var file in new[] { muxer, appHost, coreLibrary, entryAssembly })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, "filesystem identity fixture; never executed");
+        }
+        return (muxer, appHost, coreLibrary, entryAssembly);
+    }
+
     private static string CreateTimedProcessAssembly(
         string directory,
         string source = "using System.Threading; Thread.Sleep(3000);")

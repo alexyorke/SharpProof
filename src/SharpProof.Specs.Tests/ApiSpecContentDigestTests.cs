@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 7 pins the reviewed concrete collection getter expansion.
+        // Version 8 pins the stable strong-name identity of contract APIs.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("7"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("8"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "a6030895a3357c77be237ccbb9f9c5f91bebfff3ef4397bede827d2fb0ec9bb2"));
+                "9e661fa8bd365791d02e7e9aab183a049c0a3ebbf8aea4da67fe111e8ecbd5d0"));
         }
     }
 

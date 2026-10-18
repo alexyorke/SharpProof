@@ -1,6 +1,11 @@
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies effects tracked by SharpProof summaries.</summary>
+/// <remarks>
+/// This is a closed bitmask: combine declared members with bitwise OR, without inventing bits or an All value.
+/// Flags are independent; Throws does not imply Allocates. None is an empty declaration and, by itself, is not a complete proof.
+/// These describe modeled behavior, not operating-system permissions or runtime enforcement.
+/// </remarks>
 [Flags]
 public enum SharpProofEffect : long
 {

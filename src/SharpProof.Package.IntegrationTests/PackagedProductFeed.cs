@@ -20,7 +20,7 @@ public sealed class PackagedProductFeedLifecycle
 internal sealed class PackagedProductFeed : IDisposable
 {
     internal const string AttributesPackageId = "SharpProof.Attributes";
-    internal const string PortablePackageId = "SharpProof";
+    internal const string MainPackageId = "SharpProof";
     internal const string VerifierPackageId =
         "SharpProof.Verifier";
     internal const string PackageSourceEnvironmentVariable =
@@ -28,7 +28,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static readonly string[] s_expectedPackageIds = [
         AttributesPackageId,
-        PortablePackageId,
+        MainPackageId,
         VerifierPackageId
     ];
     private static readonly Lazy<Task<PackagedProductFeed>> s_shared =
@@ -138,12 +138,48 @@ internal sealed class PackagedProductFeed : IDisposable
         {
             var sourceDirectory = Path.Combine(temporary.FullName, "feed");
             Directory.CreateDirectory(sourceDirectory);
-            // Keep the package catalog as the topology check, but invoke one
-            // solution-level pack so the SDK can schedule the shared project
-            // closure once instead of starting three sequential pack graphs.
+            // Build the closure once, then extract the exact embedded symbols
+            // before packing those same assemblies without another compilation.
             _ = ReadPackageProjects(repositoryRoot);
-            var result = await RunDotNetAsync(
+            var build = await RunProcessAsync(
                 repositoryRoot,
+                "dotnet",
+                "build",
+                "SharpProof.slnx",
+                "-c",
+                "Release",
+                "--nologo",
+                "/nodeReuse:false",
+                "-p:GeneratePackageOnBuild=false",
+                "-p:RunAnalyzersDuringBuild=false");
+            if (build.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    "Building SharpProof.slnx for packing failed." +
+                    Environment.NewLine + build.Output);
+            }
+
+            var symbols = await RunProcessAsync(
+                repositoryRoot,
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(repositoryRoot, "eng", "scripts", "Export-SharpProofEmbeddedSymbols.ps1"),
+                "-RepositoryRoot",
+                repositoryRoot,
+                "-Configuration",
+                "Release");
+            if (symbols.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    "Exporting the built embedded symbols failed." +
+                    Environment.NewLine + symbols.Output);
+            }
+
+            var result = await RunProcessAsync(
+                repositoryRoot,
+                "dotnet",
                 "pack",
                 "SharpProof.slnx",
                 "-c",
@@ -152,6 +188,8 @@ internal sealed class PackagedProductFeed : IDisposable
                 "/nodeReuse:false",
                 "-p:GeneratePackageOnBuild=false",
                 "-p:RunAnalyzersDuringBuild=false",
+                "--no-build",
+                "--no-restore",
                 "--output",
                 sourceDirectory);
             if (result.ExitCode != 0)
@@ -160,6 +198,7 @@ internal sealed class PackagedProductFeed : IDisposable
                     "Packing SharpProof.slnx failed." +
                     Environment.NewLine + result.Output);
             }
+
             return CreateValidated(
                 sourceDirectory,
                 ownedDirectory: temporary);
@@ -178,8 +217,8 @@ internal sealed class PackagedProductFeed : IDisposable
         System.ArgumentNullException.ThrowIfNull(source);
         var packages = ReadPackages(source, ".nupkg");
         var symbolPackages = ReadPackages(source, ".snupkg");
-        ValidatePackages(packages, "package");
-        ValidatePackages(symbolPackages, "symbol package");
+        ValidatePackages(packages, "package", s_expectedPackageIds);
+        ValidatePackages(symbolPackages, "symbol package", [AttributesPackageId, VerifierPackageId]);
         if (!string.Equals(
                 packages[0].Version,
                 symbolPackages[0].Version,
@@ -221,16 +260,18 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static void ValidatePackages(
         PackagedPackage[] packages,
-        string kind)
+        string kind,
+        string[] expectedIds)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedIds);
         System.ArgumentNullException.ThrowIfNull(kind);
         if (!packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id))
-                .SequenceEqual(s_expectedPackageIds, StringComparer.Ordinal))
+                .SequenceEqual(expectedIds, StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
                 "The package source must contain exactly one " + kind +
                 " for " +
-                string.Join(", ", s_expectedPackageIds) + ". Found: " +
+                string.Join(", ", expectedIds) + ". Found: " +
                 string.Join(
                     ", ",
                     packages.Select(static package =>
@@ -284,9 +325,8 @@ internal sealed class PackagedProductFeed : IDisposable
             .ToArray();
         var expectedProjects = new[] {
             "src/SharpProof.Attributes/SharpProof.Attributes.csproj",
-            "src/SharpProof.Package/SharpProof.Package.csproj",
-            "src/SharpProof.Verifier/" +
-                "SharpProof.Verifier.csproj"
+            "src/SharpProof.Verifier/SharpProof.Verifier.csproj",
+            "src/SharpProof.Package/SharpProof.Package.csproj"
         };
         if (!projects.SequenceEqual(
                 expectedProjects,
@@ -300,15 +340,17 @@ internal sealed class PackagedProductFeed : IDisposable
         return projects;
     }
 
-    private static async Task<PackageProcessResult> RunDotNetAsync(
+    private static async Task<PackageProcessResult> RunProcessAsync(
         string workingDirectory,
+        string executable,
         params string[] arguments)
     {
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(executable);
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var startInfo = ProcessRunner.CreateStartInfo(
             workingDirectory,
-            "dotnet",
+            executable,
             arguments);
         startInfo.Environment["SharedCompilationId"] =
             s_sharedCompilationServerId;

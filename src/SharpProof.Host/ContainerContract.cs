@@ -48,9 +48,10 @@ public static class ContainerContract
     {
         if (isWindows)
         {
-            if (osArchitecture != Architecture.X64)
+            if (osArchitecture != processArchitecture || osArchitecture is not (Architecture.X64 or Architecture.Arm64))
             {
-                throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 OS.");
+                throw new PlatformNotSupportedException(
+                    "SharpProof native Windows verification requires matching x64 or ARM64 host and process architecture.");
             }
             return ValidateWindowsRequired(processArchitecture);
         }
@@ -170,17 +171,19 @@ public static class ContainerContract
 
     internal static ContainerContractInfo ValidateWindowsRequired(Architecture architecture)
     {
-        if (architecture != Architecture.X64)
+        var rid = architecture switch
         {
-            throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 process.");
-        }
+            Architecture.X64 => "win-x64",
+            Architecture.Arm64 => "win-arm64",
+            _ => throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 or ARM64 process.")
+        };
         using var document = ReadEmbeddedToolchain();
         var toolchain = document.RootElement;
         var z3 = toolchain.GetProperty("z3");
-        var windows = z3.GetProperty("windows");
+        var windows = z3.GetProperty(architecture == Architecture.Arm64 ? "windowsArm64" : "windows");
         return new ContainerContractInfo(
             RequireInteger(toolchain, "containerContractVersion"),
-            "win-x64",
+            rid,
             RequireString(toolchain.GetProperty("dotnet"), "minimumSdkVersion"),
             RequireString(z3, "version"),
             RequireInteger64(windows, "libraryBytes"),
@@ -354,10 +357,16 @@ public static class ContainerContract
         System.ArgumentNullException.ThrowIfNull(nativeRoot);
         System.ArgumentNullException.ThrowIfNull(assemblyLocation);
         System.ArgumentNullException.ThrowIfNull(contract);
-        return isWindows
-            ? PublicationLease.CanonicalMember(Path.Combine(Path.GetDirectoryName(assemblyLocation)!,
-                "..", "native", "win-x64", "libz3.dll"))
-            : Path.GetFullPath(Path.Combine(nativeRoot, "z3", contract.Z3Version, "linux-x64", "libz3.so"));
+        if (isWindows)
+        {
+            if (contract.Platform is not ("win-x64" or "win-arm64"))
+            {
+                throw new InvalidDataException("The Windows native payload requires a validated Windows x64 or ARM64 runtime identifier.");
+            }
+            return PublicationLease.CanonicalMember(Path.Combine(Path.GetDirectoryName(assemblyLocation)!,
+                "..", "native", contract.Platform, "libz3.dll"));
+        }
+        return Path.GetFullPath(Path.Combine(nativeRoot, "z3", contract.Z3Version, "linux-x64", "libz3.so"));
     }
 
     private static string RequireSha256(

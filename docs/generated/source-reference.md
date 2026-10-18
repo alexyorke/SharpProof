@@ -73,6 +73,11 @@ Conditions and expressions are preserved. See the authored guides for interpreta
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies ambient capabilities tracked by effect analysis.</summary>
+/// <remarks>
+/// This is a closed bitmask; combine declared members with bitwise OR. There is no public All member.
+/// Allowing a capability does not grant an operating-system permission. None selects an empty allowance;
+/// it does not establish a proof unless the selected body/call evidence satisfies the configured policy.
+/// </remarks>
 [Flags]
 public enum SharpProofCapability
 {
@@ -115,6 +120,11 @@ public enum SharpProofCapability
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies effects tracked by SharpProof summaries.</summary>
+/// <remarks>
+/// This is a closed bitmask: combine declared members with bitwise OR, without inventing bits or an All value.
+/// Flags are independent; Throws does not imply Allocates. None is an empty declaration and, by itself, is not a complete proof.
+/// These describe modeled behavior, not operating-system permissions or runtime enforcement.
+/// </remarks>
 [Flags]
 public enum SharpProofEffect : long
 {
@@ -163,6 +173,7 @@ public enum SharpProofEffect : long
 <Project>
   <PropertyGroup>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
+    <SharpProofCopyright>Copyright (c) $(SharpProofPublisher)</SharpProofCopyright>
     <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
@@ -207,7 +218,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]

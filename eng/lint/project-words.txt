@@ -1,4 +1,6 @@
 apicompat
+apphost
+authenticode
 binlogs
 bodyless
 buildx
@@ -13,8 +15,12 @@ glibcxx
 katex
 libc
 linq
+llvmorg
 lowerer
+msvc
+msvcp
 multitargeted
+mvid
 nameof
 netstandard
 noncanonical
@@ -41,11 +47,13 @@ satisfiability
 sharpproof
 shfmt
 signedness
+sigstore
 slnx
 spcf
 sshfs
 syft
 tmpfs
+ucrt
 uncancellable
 unevaluable
 unmodeled

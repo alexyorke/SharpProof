@@ -1,6 +1,11 @@
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies ambient capabilities tracked by effect analysis.</summary>
+/// <remarks>
+/// This is a closed bitmask; combine declared members with bitwise OR. There is no public All member.
+/// Allowing a capability does not grant an operating-system permission. None selects an empty allowance;
+/// it does not establish a proof unless the selected body/call evidence satisfies the configured policy.
+/// </remarks>
 [Flags]
 public enum SharpProofCapability
 {

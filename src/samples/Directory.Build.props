@@ -6,9 +6,8 @@
     <SharpProofProfile>advisory</SharpProofProfile>
     <SharpProofFeatures>all</SharpProofFeatures>
   </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Outcomes'">
+  <ItemGroup>
     <PackageReference Include="SharpProof"
-                      Version="$(SharpProofSamplePackageVersion)"
-                      PrivateAssets="all" />
+                      Version="$(SharpProofSamplePackageVersion)" />
   </ItemGroup>
 </Project>

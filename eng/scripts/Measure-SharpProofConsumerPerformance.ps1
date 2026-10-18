@@ -76,11 +76,8 @@ try {
             [IO.Directory]::CreateDirectory($consumer) | Out-Null
             $resultFile = Join-Path $consumer 'result.json'
             $references = '<PackageReference Include="SharpProof.Attributes" Version="' + $version + '" />'
-            if ($variant -eq 'portable') {
-                $references += '<PackageReference Include="SharpProof" Version="' + $version + '" PrivateAssets="all" />'
-            }
-            elseif ($variant -eq 'verified') {
-                $references += '<PackageReference Include="SharpProof.Verifier" Version="' + $version + '" PrivateAssets="all" />'
+            if ($variant -ne 'baseline') {
+                $references = '<PackageReference Include="SharpProof" Version="' + $version + '" />'
             }
             $verificationProfile = if ($variant -eq 'verified') { 'strict' } else { 'advisory' }
             $project = @"
@@ -151,7 +148,7 @@ finally {
         platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
         processorCount           = [Environment]::ProcessorCount
         iterations               = $Iterations
-        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable adds analyzer; verified adds strict verifier. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
+        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
         packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
         measurements             = @($measurements.ToArray())
     }

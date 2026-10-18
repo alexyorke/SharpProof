@@ -520,6 +520,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
 public sealed class MetadataClosedAttributeEvidenceIdentityTests
 {
     [TestCase("normal", true)]
+    [TestCase("full-public-key", true)]
     [TestCase("retargetable", false)]
     [TestCase("winrt", false)]
     [TestCase("reserved", false)]
@@ -539,10 +540,16 @@ public sealed class MetadataClosedAttributeEvidenceIdentityTests
             "retargetable" => AssemblyFlags.Retargetable,
             "winrt" => (AssemblyFlags)0x0200,
             "reserved" => (AssemblyFlags)0x4000,
-            "key-budget" or "empty-public-key" => AssemblyFlags.PublicKey,
+            "full-public-key" or "key-budget" or "empty-public-key" => AssemblyFlags.PublicKey,
             _ => (AssemblyFlags)0
         };
-        var key = mode is "token-budget" or "key-budget" ? new byte[65_536] : [];
+        var key = mode switch
+        {
+            "token-budget" or "key-budget" => new byte[65_536],
+            "empty-public-key" => [],
+            "full-public-key" => expected.PublicKey.ToArray(),
+            _ => expected.PublicKeyToken.ToArray()
+        };
         var handle = metadata.AddAssemblyReference(metadata.GetOrAddString(expected.Name), expected.Version,
             string.IsNullOrEmpty(expected.CultureName) ? default : metadata.GetOrAddString(expected.CultureName),
             metadata.GetOrAddBlob(key), flags, default);

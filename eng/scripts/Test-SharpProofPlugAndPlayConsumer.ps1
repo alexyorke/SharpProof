@@ -1,14 +1,26 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PackageSource,
-    [ValidateSet('SharpProof', 'SharpProof.Verifier')][string]$PackageId = 'SharpProof.Verifier',
+    [ValidateSet('SharpProof', 'SharpProof.Verifier')][string]$PackageId = 'SharpProof',
     [Parameter(Mandatory = $true)][ValidateSet('linux', 'windows', 'macos')][string]$OsFamily,
     [Parameter(Mandatory = $true)][ValidateSet('x64', 'arm64')][string]$Architecture,
+    [ValidateSet('net10.0', 'net48')][string]$TargetFramework = 'net10.0',
+    [string]$MSBuildPath,
     [ValidateRange(30, 600)][int]$CommandTimeoutSeconds = 180
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($TargetFramework -ceq 'net48' -and -not $IsWindows) {
+    throw 'The .NET Framework runtime acceptance test requires native Windows.'
+}
+if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
+    if (-not $IsWindows) { throw 'Visual Studio MSBuild acceptance requires native Windows.' }
+    $MSBuildPath = (Resolve-Path -LiteralPath $MSBuildPath).Path
+    if (-not [IO.Path]::GetFileName($MSBuildPath).Equals('MSBuild.exe', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Visual Studio acceptance must use the actual MSBuild.exe.'
+    }
+}
 $consumerCommandTimeoutSeconds = $CommandTimeoutSeconds
 $actualFamily = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } elseif ($IsLinux) { 'linux' } else { 'unknown' }
 $actualHost = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
@@ -51,14 +63,47 @@ $encoding = [Text.UTF8Encoding]::new($false)
 [IO.Directory]::CreateDirectory($consumer) | Out-Null
 
 function Invoke-ConsumerCommand([string[]]$Arguments, [string]$WorkingDirectory = $consumer) {
+    $commandFile = $dotnet
+    $commandArguments = @($Arguments)
+    if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
+        $commandFile = $MSBuildPath
+        $verb = $Arguments[0]
+        if ($verb -ceq 'run') {
+            # Execute the already-built application, not the modern worker CLR.
+            $commandFile = Join-Path $WorkingDirectory "bin/Release/$TargetFramework/Application.exe"
+            if (-not (Test-Path -LiteralPath $commandFile -PathType Leaf)) { throw 'The downstream executable is missing.' }
+            $commandArguments = @()
+        }
+        elseif ($verb -ceq 'query-host') {
+            $commandArguments = @($Arguments[1], '-nologo', '-verbosity:quiet',
+                '-getProperty:MSBuildRuntimeType,MSBuildVersion,NETCoreSdkVersion,_SharpProofVerifierHostSupported')
+        }
+        else {
+            if ($verb -cnotin @('restore', 'build', 'pack', 'clean')) { throw "Unexpected Visual Studio command: $verb" }
+            $target = if ($verb -ceq 'build' -and $Arguments -ccontains '-t:Rebuild') { 'Rebuild' } else { $verb }
+            $commandArguments = @($Arguments[1], "-t:$target", '-nologo')
+            for ($index = 2; $index -lt $Arguments.Count; $index++) {
+                $argument = $Arguments[$index]
+                switch -CaseSensitive ($argument) {
+                    '-c' { $commandArguments += '-p:Configuration=' + $Arguments[++$index] }
+                    '-o' { $commandArguments += '-p:PackageOutputPath=' + $Arguments[++$index] }
+                    '--configfile' { $commandArguments += '-p:RestoreConfigFile=' + (Join-Path $WorkingDirectory $Arguments[++$index]) }
+                    '--nologo' { }
+                    '--no-restore' { }
+                    '-t:Rebuild' { }
+                    default { $commandArguments += $argument }
+                }
+            }
+        }
+    }
     $start = [Diagnostics.ProcessStartInfo]::new()
-    $start.FileName = $dotnet
+    $start.FileName = $commandFile
     $start.WorkingDirectory = $WorkingDirectory
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
-    foreach ($argument in $Arguments) { [void]$start.ArgumentList.Add($argument) }
+    foreach ($argument in $commandArguments) { [void]$start.ArgumentList.Add($argument) }
     foreach ($key in @($start.Environment.Keys)) {
         if ($key.StartsWith('SHARPPROOF', [StringComparison]::OrdinalIgnoreCase)) { [void]$start.Environment.Remove($key) }
     }
@@ -90,6 +135,8 @@ function Write-ConsumerSource([string]$ReturnedExpression) {
 using SharpProof.Attributes;
 public static class Subject
 {
+    public static System.Type ContractAttributeType => typeof(ZeroAllocationsAttribute);
+
     public static long Identity(long value)
     {
         Contract.Ensures(Contract.Result<long>() == value);
@@ -100,7 +147,7 @@ public static class Subject
 }
 
 function Assert-ConsumerEvidence([string]$Outcome) {
-    $directory = Join-Path $consumer 'obj/Release/net10.0/SharpProof'
+    $directory = Join-Path $consumer "obj/Release/$TargetFramework/SharpProof"
     $requestPath = Join-Path $directory 'request.json'
     $resultPath = Join-Path $directory 'result.json'
     $manifestPath = Join-Path $directory 'compiler-manifest.json'
@@ -150,23 +197,49 @@ function Assert-ConsumerEvidence([string]$Outcome) {
 try {
     [IO.File]::Copy((Join-Path $repository 'global.json'), (Join-Path $consumer 'global.json'))
     $escapedSource = [Security.SecurityElement]::Escape($source)
+    # The old framework needs reference assemblies, not a different verifier.
+    # Mapping keeps all product packages bound exclusively to the exact feed.
+    $frameworkSources = ''
+    $frameworkMapping = ''
+    if ($TargetFramework -ceq 'net48') {
+        $frameworkSources = '<add key="framework-references" value="https://api.nuget.org/v3/index.json" />'
+        $frameworkMapping = '<packageSource key="framework-references"><package pattern="Microsoft.NETFramework.ReferenceAssemblies*" /><package pattern="NETStandard.*" /><package pattern="Microsoft.NETCore.Platforms" /><package pattern="System.*" /></packageSource>'
+    }
     [IO.File]::WriteAllText((Join-Path $consumer 'NuGet.config'), @"
-<configuration><packageSources><clear /><add key="exact-packed-feed" value="$escapedSource" /></packageSources><packageSourceMapping><packageSource key="exact-packed-feed"><package pattern="SharpProof*" /></packageSource></packageSourceMapping></configuration>
+<configuration><packageSources><clear /><add key="exact-packed-feed" value="$escapedSource" />$frameworkSources</packageSources><packageSourceMapping><packageSource key="exact-packed-feed"><package pattern="SharpProof*" /></packageSource>$frameworkMapping</packageSourceMapping></configuration>
 "@, $encoding)
     $escapedVersion = [Security.SecurityElement]::Escape($version)
+    [IO.File]::Copy((Join-Path $PSScriptRoot '../signing/SharpProof.Attributes.snk'), (Join-Path $consumer 'Consumer.snk'))
     [IO.File]::WriteAllText((Join-Path $consumer 'Consumer.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <PropertyGroup><TargetFramework>$TargetFramework</TargetFramework><NuGetAudit>false</NuGetAudit><SignAssembly>true</SignAssembly><PublicSign>false</PublicSign><AssemblyOriginatorKeyFile>Consumer.snk</AssemblyOriginatorKeyFile><WarningsAsErrors>CS8002</WarningsAsErrors></PropertyGroup>
   <ItemGroup><PackageReference Include="$PackageId" Version="$escapedVersion" /></ItemGroup>
 </Project>
 "@, $encoding)
     Write-ConsumerSource 'value'
     $restore = Invoke-ConsumerCommand @('restore', 'Consumer.csproj', '--configfile', 'NuGet.config', '--nologo')
     if ($restore.ExitCode -ne 0) { throw 'Fresh one-package consumer restore failed.' }
+    if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
+        $hostQuery = Invoke-ConsumerCommand @('query-host', 'Consumer.csproj')
+        if ($hostQuery.ExitCode -ne 0) { throw 'Cannot evaluate the Visual Studio compiler host.' }
+        $hostProperties = ($hostQuery.Output | ConvertFrom-Json).Properties
+        if ($hostProperties.MSBuildRuntimeType -cne 'Full' -or
+            [version]$hostProperties.MSBuildVersion -lt [version]'18.0' -or
+            [version]$hostProperties.NETCoreSdkVersion -lt [version]'10.0.100' -or
+            $hostProperties._SharpProofVerifierHostSupported -cne 'true') {
+            throw 'The full-verification test must use qualified Full MSBuild 18+ and SDK 10+, with the verifier active.'
+        }
+        Write-Host "Qualified Full MSBuild $($hostProperties.MSBuildVersion), SDK $($hostProperties.NETCoreSdkVersion)."
+    }
     $buildArguments = @('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo', '/nodeReuse:false', '-p:UseSharedCompilation=false')
     $passing = Invoke-ConsumerCommand $buildArguments
     if ($passing.ExitCode -ne 0) { throw 'Fresh default consumer did not build and prove its contract.' }
     $passingHash = Assert-ConsumerEvidence 'Proven'
+    if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
+        $incremental = Invoke-ConsumerCommand $buildArguments
+        if ($incremental.ExitCode -ne 0) { throw 'The unchanged Visual Studio consumer did not retain a valid proof.' }
+        $null = Assert-ConsumerEvidence 'Proven'
+    }
     Write-ConsumerSource '0'
     $failing = Invoke-ConsumerCommand ($buildArguments + @('-t:Rebuild'))
     if ($failing.ExitCode -eq 0 -or $failing.Output -notmatch '\bSP0051\b') { throw 'False contract did not fail with the refuted-contract diagnostic SP0051.' }
@@ -191,19 +264,27 @@ try {
     [IO.File]::Copy((Join-Path $consumer 'global.json'), (Join-Path $downstream 'global.json'))
     $escapedLibraryFeed = [Security.SecurityElement]::Escape($libraryFeed)
     [IO.File]::WriteAllText((Join-Path $downstream 'NuGet.config'), @"
-<configuration><packageSources><clear /><add key="exact-packed-feed" value="$escapedSource" /><add key="library-feed" value="$escapedLibraryFeed" /></packageSources><packageSourceMapping><packageSource key="exact-packed-feed"><package pattern="SharpProof*" /></packageSource><packageSource key="library-feed"><package pattern="PlugAndPlay.Library" /></packageSource></packageSourceMapping></configuration>
+<configuration><packageSources><clear /><add key="exact-packed-feed" value="$escapedSource" /><add key="library-feed" value="$escapedLibraryFeed" />$frameworkSources</packageSources><packageSourceMapping><packageSource key="exact-packed-feed"><package pattern="SharpProof*" /></packageSource><packageSource key="library-feed"><package pattern="PlugAndPlay.Library" /></packageSource>$frameworkMapping</packageSourceMapping></configuration>
 "@, $encoding)
-    [IO.File]::WriteAllText((Join-Path $downstream 'Application.csproj'), @'
+    [IO.File]::WriteAllText((Join-Path $downstream 'Application.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <PropertyGroup><TargetFramework>$TargetFramework</TargetFramework><OutputType>Exe</OutputType><NuGetAudit>false</NuGetAudit></PropertyGroup>
   <ItemGroup><PackageReference Include="PlugAndPlay.Library" Version="1.0.0" /></ItemGroup>
 </Project>
-'@, $encoding)
+"@, $encoding)
     [IO.File]::WriteAllText((Join-Path $downstream 'Program.cs'), @'
-var result = Subject.Identity(42);
-var attributes = typeof(SharpProof.Attributes.ZeroAllocationsAttribute).Assembly.GetName().Name;
-System.Console.WriteLine($"Subject.Identity={result}; Attributes={attributes}");
-return result == 42 && attributes == "SharpProof.Attributes" ? 0 : 1;
+public static class Program
+{
+    public static int Main()
+    {
+        var result = Subject.Identity(42);
+        var attributes = Subject.ContractAttributeType.Assembly.GetName().Name;
+        var token = System.BitConverter.ToString(Subject.ContractAttributeType.Assembly.GetName().GetPublicKeyToken()).Replace("-", "").ToLowerInvariant();
+        System.Console.WriteLine($"Subject.Identity={result}; Attributes={attributes}; Token={token}");
+        System.Console.WriteLine($"RuntimeCore={typeof(object).Assembly.GetName().Name}; CLR={System.Environment.Version.Major}");
+        return result == 42 && attributes == "SharpProof.Attributes" && token == "75825c3e099f5fac" ? 0 : 1;
+    }
+}
 '@, $encoding)
     $downstreamRestore = Invoke-ConsumerCommand -WorkingDirectory $downstream -Arguments @(
         'restore', 'Application.csproj', '--configfile', 'NuGet.config', '--nologo')
@@ -217,7 +298,7 @@ return result == 42 && attributes == "SharpProof.Attributes" ? 0 : 1;
         'build', 'Application.csproj', '-c', 'Release', '--no-restore', '--nologo',
         '/nodeReuse:false', '-p:UseSharedCompilation=false')
     if ($downstreamBuild.ExitCode -ne 0) { throw 'The downstream one-library-reference application did not build.' }
-    $applicationOutput = Join-Path $downstream 'bin/Release/net10.0'
+    $applicationOutput = Join-Path $downstream "bin/Release/$TargetFramework"
     if (-not (Test-Path -LiteralPath (Join-Path $applicationOutput 'SharpProof.Attributes.dll') -PathType Leaf)) {
         throw 'The downstream application did not receive the attribute runtime assembly.'
     }
@@ -229,7 +310,16 @@ return result == 42 && attributes == "SharpProof.Attributes" ? 0 : 1;
     if ($run.ExitCode -ne 0 -or $run.Output -notmatch 'Subject\.Identity=42; Attributes=SharpProof\.Attributes') {
         throw 'The downstream library and attribute runtime dependencies did not execute successfully.'
     }
-    Write-Host "Plug-and-play $PackageId passed on native $OsFamily/${Architecture}: one reference, no SharpProof settings, complete proof, bound refutation, and downstream library execution."
+    if ($TargetFramework -ceq 'net48' -and $run.Output -notmatch 'RuntimeCore=mscorlib; CLR=4') {
+        throw 'The Framework consumer must execute on the Windows CLR, not the modern .NET worker runtime.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MSBuildPath)) {
+        $clean = Invoke-ConsumerCommand @('clean', 'Consumer.csproj', '-c', 'Release', '--nologo')
+        if ($clean.ExitCode -ne 0 -or (Test-Path -LiteralPath (Join-Path $consumer "obj/Release/$TargetFramework/SharpProof/result.json"))) {
+            throw 'Visual Studio clean must invalidate the published verification result.'
+        }
+    }
+    Write-Host "Plug-and-play $PackageId ($TargetFramework) passed on native $OsFamily/${Architecture}: one reference, no SharpProof settings, complete proof, bound refutation, and downstream library execution."
 }
 finally {
     $resolvedRoot = [IO.Path]::GetFullPath($root)

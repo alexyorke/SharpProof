@@ -1,18 +1,66 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$PackageSource
+    [string]$PackageSource,
+    [ValidateSet('x64', 'arm64')][string]$Architecture = 'x64'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $IsWindows -or
-    [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne
-    [Runtime.InteropServices.Architecture]::X64 -or
-    [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne
-    [Runtime.InteropServices.Architecture]::X64) {
-    throw 'The Windows native payload check requires a Windows x64 OS and process.'
+$actualHost = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+$actualProcess = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+if (-not $IsWindows -or $actualHost -cne $Architecture -or $actualProcess -cne $Architecture) {
+    throw "The Windows payload check requires matching $Architecture OS and process (host=$actualHost; process=$actualProcess)."
+}
+
+function Assert-WindowsPayloadPrerequisites([string]$Library, [string]$PayloadArchitecture) {
+    Add-Type -AssemblyName System.Reflection.Metadata
+    $stream = [IO.File]::OpenRead($Library)
+    $reader = [System.Reflection.PortableExecutable.PEReader]::new($stream)
+    try {
+        $expectedMachine = if ($PayloadArchitecture -eq 'arm64') { 0xaa64 } else { 0x8664 }
+        if ([int]$reader.PEHeaders.CoffHeader.Machine -ne $expectedMachine -or
+            $null -eq $reader.PEHeaders.PEHeader -or [int]$reader.PEHeaders.PEHeader.Magic -ne 0x20b) {
+            throw "The packed DLL does not have the expected native $PayloadArchitecture PE32+ machine."
+        }
+        $modules = [Collections.Generic.List[string]]::new()
+        foreach ($descriptor in @(
+                @{ Directory = $reader.PEHeaders.PEHeader.ImportTableDirectory; Stride = 20; NameOffset = 12; Delay = $false },
+                @{ Directory = $reader.PEHeaders.PEHeader.DelayImportTableDirectory; Stride = 32; NameOffset = 4; Delay = $true }
+            )) {
+            $directory = $descriptor.Directory
+            if ($directory.RelativeVirtualAddress -eq 0) { continue }
+            if ($directory.Size -lt $descriptor.Stride -or $directory.Size -gt 1048576) { throw 'Malformed or oversized PE import directory.' }
+            [byte[]]$table = @($reader.GetSectionData($directory.RelativeVirtualAddress).GetContent(0, $directory.Size))
+            $terminated = $false
+            for ($offset = 0; $offset + $descriptor.Stride -le $table.Length; $offset += $descriptor.Stride) {
+                $zero = $true
+                for ($index = 0; $index -lt $descriptor.Stride; $index++) {
+                    if ($table[$offset + $index] -ne 0) { $zero = $false; break }
+                }
+                if ($zero) { $terminated = $true; break }
+                if ($descriptor.Delay -and [BitConverter]::ToUInt32($table, $offset) -ne 1) { throw 'Unsupported non-RVA PE delay-import descriptor.' }
+                $nameRva = [BitConverter]::ToInt32($table, $offset + $descriptor.NameOffset)
+                if ($nameRva -le 0) { throw 'Malformed PE import module address.' }
+                $block = $reader.GetSectionData($nameRva)
+                [byte[]]$nameBytes = @($block.GetContent(0, [Math]::Min(256, $block.Length)))
+                $end = [Array]::IndexOf($nameBytes, [byte]0)
+                if ($end -le 0) { throw 'PE import module name is not bounded and terminated.' }
+                $module = [Text.Encoding]::ASCII.GetString($nameBytes, 0, $end)
+                if ($module -notmatch '^[a-zA-Z0-9._+\-]+\.dll$') { throw 'PE import module name is malformed.' }
+                $modules.Add($module)
+            }
+            if (-not $terminated) { throw 'PE import directory has no complete terminating descriptor.' }
+        }
+        $imports = @($modules | Sort-Object -Unique)
+        $externalCpp = @($imports | Where-Object { $_ -match '^(vcruntime|msvcp|libc\+\+|libstdc\+\+|libgcc).*\.dll$' })
+        if ($externalCpp.Count) { throw "The $PayloadArchitecture payload requires an external C++ runtime: $($externalCpp -join ', ')." }
+        $unexpectedImports = @($imports | Where-Object { $_ -notmatch '^(KERNEL32|api-ms-win-crt-[a-zA-Z0-9\-]+)\.dll$' })
+        if ($unexpectedImports.Count) { throw "The $PayloadArchitecture payload imports DLLs outside its Windows system-runtime policy: $($unexpectedImports -join ', ')." }
+        Write-Host "Packed $PayloadArchitecture PE machine and import prerequisites passed ($($imports.Count) imported modules)."
+    }
+    finally { $reader.Dispose(); $stream.Dispose() }
 }
 
 $source = (Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
@@ -26,8 +74,8 @@ if ($packages.Count -ne 1) {
 
 $catalogPath = Join-Path $PSScriptRoot '../container/toolchain.json'
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
-$expected = $catalog.z3.windows
-$entryPath = 'tools/native/win-x64/libz3.dll'
+$expected = if ($Architecture -eq 'arm64') { $catalog.z3.windowsArm64 } else { $catalog.z3.windows }
+$entryPath = "tools/native/win-$Architecture/libz3.dll"
 $archive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
 try {
     $entry = $archive.GetEntry($entryPath)
@@ -61,6 +109,7 @@ try {
         }
         finally { $inputStream.Dispose() }
 
+        Assert-WindowsPayloadPrerequisites -Library $library -PayloadArchitecture $Architecture
         $handle = [Runtime.InteropServices.NativeLibrary]::Load($library)
         try {
             $export = [Runtime.InteropServices.NativeLibrary]::GetExport(
