@@ -11,15 +11,15 @@ pressure() {
   fi
 }
 
-echo "epoch,cpu_pct,iowait_pct,steal_pct,mem_used_mb,mem_total_mb,swap_used_mb,load1,cpu_psi,mem_psi,io_psi,containers" >"${out}"
-read -r _ u n s i w q sq st _ </proc/stat
+echo "epoch,cpu_pct,iowait_pct,steal_pct,mem_used_mb,mem_total_mb,swap_used_mb,load1,cpu_psi,mem_psi,io_psi,containers" > "${out}"
+read -r _ u n s i w q sq st _ < /proc/stat
 prev_total=$((u + n + s + i + w + q + sq + st))
 prev_idle=$((i + w))
 prev_wait=${w}
 prev_steal=${st}
 while :; do
   sleep "${interval}"
-  read -r _ u n s i w q sq st _ </proc/stat
+  read -r _ u n s i w q sq st _ < /proc/stat
   total=$((u + n + s + i + w + q + sq + st))
   dt=$((total - prev_total))
   if ((dt <= 0)); then continue; fi
@@ -35,10 +35,10 @@ while :; do
     /^SwapTotal:/ { st = $2 } /^SwapFree:/ { sf = $2 }
     END { print int(t / 1024), int(a / 1024), int(st / 1024), int(sf / 1024) }' /proc/meminfo)
   load1="$(cut -d' ' -f1 /proc/loadavg)"
-  containers="$(timeout 4 docker stats --no-stream --format '{{.Name}}={{.CPUPerc}}|{{.MemUsage}}' 2>/dev/null |
+  containers="$(timeout 4 docker stats --no-stream --format '{{.Name}}={{.CPUPerc}}|{{.MemUsage}}' 2> /dev/null |
     tr -d ' ' | tr '\n' ';' | tr ',' ' ')"
   printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"%s"\n' \
     "$(date +%s)" "${cpu}" "${iowait}" "${steal}" "$((mem_total - mem_avail))" "${mem_total}" \
     "$((swap_total - swap_free))" "${load1}" "$(pressure cpu)" "$(pressure memory)" "$(pressure io)" \
-    "${containers}" >>"${out}"
+    "${containers}" >> "${out}"
 done
