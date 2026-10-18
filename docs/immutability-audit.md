@@ -1809,3 +1809,17 @@ Worker dependency build found CA1868 on Contains-before-Add. It is corrected to 
 builder Add Boolean guard, preserving insertion and push order. The bounded worker/fuzz
 rerun is pending. Evidence: immutability-companion-builders-tests.log,
 immutability-dataflow-builders-tests.log, immutability-worker-observation-longfuzz-tests.log.
+## Fuzz/corpus construction follow-up inventory
+
+IMM-M023: StructuralShrinkCandidates.GetCandidates uses rebound candidate/seen roots;
+NativeCorpusVerifier.VerifyCallPreconditionsAsync uses a rebound method map and outcome
+list; NativeEffectOracleGate allocates a Boolean array solely to count selected modes;
+NativeStaticWriteWitnessOracle builds a read-only owner array. Coordinator inspected
+callbacks and consumers. Use scoped builders and frozen publication, retain identity
+comparer/deduplication and method-ID overwrite semantics, preserve oracle order and native
+reflection argument arrays. Boolean mode counting can use scalar arithmetic. Status: open.
+
+The corrected Worker transitive build has zero warnings/errors; the checksum construction
+test passes. The two Explicit LongFuzz tests were not selected by the name-only filter;
+a category-qualified bounded run is still required. This run is not evidence of their
+execution. Evidence: immutability-worker-observation-longfuzz-tests2.log.
