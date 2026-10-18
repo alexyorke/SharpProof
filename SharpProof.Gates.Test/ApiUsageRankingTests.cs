@@ -12,6 +12,7 @@ using SharpProof.Frontend;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;
+
 [TestFixture]
 public sealed class ApiUsageRankingTests
 {

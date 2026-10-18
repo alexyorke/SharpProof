@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using SharpProof.Specs;
 
 namespace SharpProof.Specs.Test;
+
 public sealed partial class ApiSpecRuntimeOracleTests
 {
     private static object? s_collectionSink;
