@@ -1833,3 +1833,17 @@ invalid/default wire rejection, legacy constructor adapters and params IrTerm[]/
 results required by IR APIs. DecodeMember can use the existing GetOrCreateMemberSnapshot
 with immutable parameter types; preserve its preceding wire guard and scope validation.
 Do not normalize default decoder input to empty. Status: open before edits.
+## Script campaign and TCB construction inventory
+
+IMM-M025: Get-SharpProofTcbPaths owns path/visited/pipeline/compile/inventory collections;
+Invoke-SharpProofFuzzCampaign owns run records; Measure-SharpProofConsumerPerformance
+owns measurements and median maps. Coordinator inspected constructors and publication.
+Use immutable builders and frozen snapshots, preserve Ordinal path duplicate rejection,
+first-seen pipeline order through a sidecar, rotating-before-retained fuzz runs, case-insensitive
+median keys and finally-block report publication. Preserve process argument buffers,
+ordered JSON records and the existing string[] TCB consumer boundary. Status: open.
+
+Current regenerated syntax inventories cover 1,865 C# files (3,338 candidates) and
+84 PowerShell files (1,133 candidates, zero parse errors). Fifty-two newly added C#
+builder rows are coordinator-verified by exact changed line; 3,089 C# and 1,017 script
+candidates remain open. Counts are syntax coverage, not confirmed violation counts.
