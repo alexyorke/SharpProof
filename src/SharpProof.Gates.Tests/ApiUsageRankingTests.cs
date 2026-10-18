@@ -419,9 +419,10 @@ public sealed class ApiUsageRankingTests
         var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
             public static class ConcreteListProbe {
                 public static void Target(System.Collections.Generic.List<int> data,
-                    System.Collections.Generic.IList<int> unknown, System.Collections.Generic.List<decimal> opaque) {
-                    data.Add(23); unknown.Add(23); opaque.Add(1M);
-                    _ = data[0]; _ = unknown[0]; _ = opaque[0]; data[0]++;
+                    System.Collections.Generic.IList<int> unknown, System.Collections.Generic.List<decimal> opaque, decimal item,
+                    System.Collections.Generic.List<int[][]> unsupported) {
+                    data.Add(23); unknown.Add(23); opaque.Add(item); unsupported.Add(null);
+                    _ = data[0]; _ = unknown[0]; _ = opaque[0]; data[0]++; _ = unsupported[0];
                 }
             }
             """, TestContext.CurrentContext.CancellationToken);
@@ -430,10 +431,14 @@ public sealed class ApiUsageRankingTests
         var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
         Assert.That(known.Contains(calls[0].SpanStart), Is.True);
         Assert.That(known.Contains(calls[1].SpanStart), Is.False);
-        Assert.That(known.Contains(calls[2].SpanStart), Is.False);
+        Assert.That(known.Contains(calls[2].SpanStart), Is.True);
+        Assert.That(known.Contains(calls[3].SpanStart), Is.False);
         var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
         Assert.That(known.Contains(indexers[0].SpanStart), Is.True);
-        Assert.That(indexers.Skip(1).Any(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)), Is.False);
+        Assert.That(known.Contains(indexers[1].SpanStart), Is.False);
+        Assert.That(known.Contains(indexers[2].SpanStart), Is.True);
+        Assert.That(known.Contains(indexers[3].SpanStart), Is.False);
+        Assert.That(known.Contains(indexers[4].SpanStart), Is.False);
     }
 
     private static HashSet<int> KnownIntrinsicSites(SemanticModel model, SyntaxNode region)
