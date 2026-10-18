@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Analyzer.Configuration;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -31,7 +31,7 @@ public sealed class AnalyzerSessionCancellationTests
         using var cancellation = new CancellationTokenSource();
         var session = new AnalyzerSession(
             compilation,
-            AnalyzerConfiguration.AdvisoryAll,
+            CompilerConfiguration.AdvisoryAll,
             cancellation.Token);
 
         cancellation.Cancel();

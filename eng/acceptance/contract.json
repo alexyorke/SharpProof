@@ -95,7 +95,8 @@
       "SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj",
       "SharpProof.Contracts/SharpProof.Contracts.csproj",
       "SharpProof.Dataflow/SharpProof.Dataflow.csproj",
-      "SharpProof.Worker/SharpProof.Worker.csproj"
+      "SharpProof.Worker/SharpProof.Worker.csproj",
+      "SharpProof.Compiler.Semantics/SharpProof.Compiler.Semantics.csproj"
     ],
     "components": [
       {
@@ -103,7 +104,7 @@
         "paths": [
           "SharpProof.Analyzer/SharpProofAnalyzer.cs",
           "SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs",
-          "SharpProof.Analyzer.Core/ContractRuntimePolicy.cs",
+          "SharpProof.Compiler.Semantics/ContractRuntimePolicy.cs",
           "SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs",
           "SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs",
           "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
@@ -316,7 +317,7 @@
         "name": "projectionCatalog",
         "paths": [
           "SharpProof.Verify/VerificationProjections.generated.cs",
-          "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
+          "SharpProof.Compiler.Semantics/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
           "SharpProof.Effects/EffectProjections.generated.cs",
@@ -362,7 +363,7 @@
         "paths": [
           "SharpProof.Ir/IrIdentifierAliases.cs",
           "SharpProof.Ir/ScopedIrId.cs",
-          "SharpProof.Ir/ArgumentNullGuard.cs",
+          "eng/shared/ArgumentNullGuard.cs",
           "SharpProof.Ir/IrModel.generated.cs",
           "SharpProof.Ir/IrProgram.cs"
         ]
@@ -380,7 +381,7 @@
           "SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs",
           "SharpProof.Analyzer.Core/AnalyzerSession.cs",
           "SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
-          "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+          "SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
           "SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs",
           "SharpProof.Analyzer.Core/Advisory/AdvisoryScalarIntervalTransfer.cs",
           "SharpProof.Contracts/ContractSelectionInventory.cs",
@@ -423,7 +424,7 @@
       {
         "name": "policy",
         "paths": [
-          "SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs",
+          "SharpProof.Compiler.Semantics/CompilerConfiguration.cs",
           "SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs",
           "SharpProof.Analyzer.Core/SharpProofControlAttributePolicy.cs",
           "SharpProof.Effects/TrustedBoundaryPolicy.cs",
@@ -466,7 +467,7 @@
       {
         "name": "canonicalIdentityEncoding",
         "paths": [
-          "SharpProof.Analyzer.Core/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
+          "SharpProof.Compiler.Semantics/CompilerExceptionTypeIdentity.cs",
           "SharpProof.Frontend/CompilerIdentityBridge.cs",
           "SharpProof.Ir/CanonicalHashWriter.cs"
         ]
@@ -639,8 +640,7 @@
       },
       {
         "name": "partialTypeSourceClosure",
-        "paths": [
-        ],
+        "paths": [],
         "rationale": "These files complete partial types that already have trusted declarations in other source files."
       },
       {
@@ -684,7 +684,7 @@
           "SharpProof.Frontend/SyntaxSite.cs",
           "SharpProof.Ir/AtomicFile.cs",
           "SharpProof.Ir/GlobalUsings.cs",
-          "SharpProof.Ir/HashEncoding.cs",
+          "eng/shared/HashEncoding.cs",
           "SharpProof.Ir/IrBlockOrder.cs",
           "SharpProof.Ir/IrExceptionKindFacts.cs",
           "SharpProof.Ir/IrFactory.cs",
@@ -694,17 +694,38 @@
           "SharpProof.Ir/IrSubstitution.cs",
           "SharpProof.Ir/IrTermServices.cs",
           "SharpProof.Ir/IrTraversal.cs",
-          "SharpProof.Ir/Utf16WellFormedness.cs",
+          "eng/shared/Utf16WellFormedness.cs",
           "SharpProof.Smt/GlobalUsings.cs",
           "SharpProof.Smt/IrSmtBackendOptions.cs",
           "SharpProof.Smt/Z3ExpressionOwner.cs",
-          "SharpProof.Specs/Polyfills/IsExternalInit.cs",
-          "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
-          "SharpProof.Specs/Polyfills/NullableAttributes.cs",
+          "eng/shared/Polyfills/IsExternalInit.cs",
+          "eng/shared/Polyfills/NotNullAttribute.cs",
+          "eng/shared/Polyfills/NullableAttributes.cs",
           "SharpProof.Worker/GlobalUsings.cs",
-          "SharpProof.Worker/MethodResourceBudget.cs"
+          "SharpProof.Worker/MethodResourceBudget.cs",
+          "SharpProof.CompilerCollector/CompilerCollectorDiagnosticDescriptors.cs",
+          "SharpProof.CompilerCollector/CompilerSemanticUsings.cs"
         ],
         "rationale": "All evaluated Compile sources in the IR, SMT, Effects, Frontend, CompilerArtifact, CompilerCollector, Contracts, Dataflow, and Worker projects are trusted pipeline code. The inventory check requires every such source to remain explicitly classified here or in another TCB component."
+      },
+      {
+        "name": "compilerSemantics",
+        "paths": [
+          "SharpProof.Compiler.Semantics/CallableSubset.cs",
+          "SharpProof.Compiler.Semantics/CompilerConfigurationOptionRegistry.cs",
+          "SharpProof.Compiler.Semantics/CompilerConfigurationValidation.cs",
+          "SharpProof.Compiler.Semantics/CompilerSemanticModels.generated.cs",
+          "SharpProof.Compiler.Semantics/CompilerSemanticSession.cs",
+          "SharpProof.Compiler.Semantics/EffectClaimConstraint.cs",
+          "SharpProof.Compiler.Semantics/EffectClaimDeclarations.cs",
+          "SharpProof.Compiler.Semantics/EffectContractArguments.cs",
+          "SharpProof.Compiler.Semantics/EffectEvaluationProducerTupleCatalog.generated.cs",
+          "SharpProof.Compiler.Semantics/GlobalUsings.cs",
+          "SharpProof.Compiler.Semantics/PrimaryConstructorCallableInventory.cs",
+          "SharpProof.Compiler.Semantics/SharpProof.Compiler.Semantics.csproj",
+          "SharpProof.Compiler.Semantics/TotalBodyLowering.cs"
+        ],
+        "rationale": "Shared compiler-bound semantics used by the analyzer and final-compilation collector, independent of diagnostic policy."
       }
     ]
   },

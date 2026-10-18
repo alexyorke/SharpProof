@@ -220,8 +220,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Contracts": "[1.0.0-preview.1, )",
-          "SharpProof.Effects": "[1.0.0-preview.1, )",
+          "SharpProof.Compiler.Semantics": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -230,6 +229,13 @@
       },
       "sharpproof.codefixes": {
         "type": "Project"
+      },
+      "sharpproof.compiler.semantics": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Contracts": "[1.0.0-preview.1, )",
+          "SharpProof.Effects": "[1.0.0-preview.1, )"
+        }
       },
       "sharpproof.contracts": {
         "type": "Project",

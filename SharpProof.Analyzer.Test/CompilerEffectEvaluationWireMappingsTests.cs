@@ -2,13 +2,13 @@ using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 using CoreEffectEvaluationCertainty =
-    SharpProof.Analyzer.EffectEvaluationCertainty;
+    SharpProof.Compiler.Semantics.EffectEvaluationCertainty;
 using CoreEffectEvaluationContractKind =
-    SharpProof.Analyzer.EffectEvaluationContractKind;
+    SharpProof.Compiler.Semantics.EffectEvaluationContractKind;
 using CoreEffectEvaluationOutcome =
-    SharpProof.Analyzer.EffectEvaluationOutcome;
+    SharpProof.Compiler.Semantics.EffectEvaluationOutcome;
 using CoreEffectEvaluationReason =
-    SharpProof.Analyzer.EffectEvaluationReason;
+    SharpProof.Compiler.Semantics.EffectEvaluationReason;
 
 namespace SharpProof.Analyzer.Test;
 

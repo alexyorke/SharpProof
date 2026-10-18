@@ -4,7 +4,7 @@
 // </auto-generated>
 #nullable enable
 
-namespace SharpProof.Analyzer;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class EffectEvaluationProducerTupleCatalog
 {
