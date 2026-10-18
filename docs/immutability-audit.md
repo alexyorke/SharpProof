@@ -2177,3 +2177,18 @@ assignment overwrites and RHS evaluation before insertion. Heap.Stores, Edge/Exi
 state and fact snapshots remain persistent immutable values; historical returns retain
 their exact heap contents. IrSnapshotReads' immutable selector memo contract remains
 unchanged in this bounded batch. Status: open before edits.
+## Loop cutting and component construction inventory
+
+IMM-M041: Coordinator traced both PassiveLoopCutter files, including DFS/SCC walks,
+loop discovery, cell analysis and encoded block queue. Convert private collection fields
+and scoped maps/sets/vectors to immutable builders, preserving strict Add with AddUnique.
+Retain DFS stacks/FIFO queue as immutable roots and all Spend/cancellation locations.
+
+Reachable discovery, loop-header insertion and each loop's node insertion affect
+validation, instruction/fact order and work-budget sequencing. Preserve them with
+explicit array sidecars; membership sets remain separate. Component nodes are already
+unique after the global visited.Add gate, so an array builder preserves their original
+insertion enumeration directly. Freeze copies before substitution, cells before storage,
+and graph maps/sets before Encoding/Loop publication. Preserve nullable cell state as
+heap-forgotten. Use existing CallSnapshot for immutable call arguments; Havoc has only
+params-array APIs, so retain those explicit boundary adapters. Status: open before edits.
