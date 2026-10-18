@@ -21,7 +21,7 @@ language lowering is missing.
 
 The source-use universe is all 200 selected original OSS targets, 28 original
 synthetic targets and 10 sample files: 641 resolved sites, zero unresolved sites,
-114 API/access/status rows. Every one is listed below, including partial models
+115 API/access/status rows. Every one is listed below, including partial models
 that still have gaps. Dependency-only methods, metamorphic duplicates, repository
 implementation code, dynamic/reflection calls and unexecuted workloads do not
 contribute to this ranking. The CI JSON has source hashes and exact locations;
@@ -42,7 +42,7 @@ access kind and value domains satisfy the production guard.
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance remains supported. |
-| D: Dictionary | Fresh default-comparer integer-key state with scalar/reference values is verified; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
+| D: Dictionary | Fresh integer-key empty state is independent of value type; contents support scalar/reference values; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Count/getter/Add have partial effects; constructors, stores, range operations and count/content relationships remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
@@ -98,8 +98,9 @@ The 40 ranked index reads span 13 source files. Representative declarations in
 those files use `TVertex/int`, `int/TVertex`, `T/int`, `T/long`, nested graph/trie
 types, and `uint/BigInteger`; these need type, value-storage and comparer/callback
 models beyond the verified integer-key state and supported scalar/reference values. All ranked dictionary index reads,
-Add/ContainsKey calls and the index write still show unmodeled dispatch; the eight parameterless corpus constructions have an
-unsupported key/value domain. Missing/duplicate-key paths retain opaque fallback
+Add/ContainsKey calls and the index write still show unmodeled dispatch. Four parameterless
+corpus constructions now have partial empty-state support; four generic-key constructions
+still have an unsupported key domain. Missing/duplicate-key paths retain opaque fallback
 and have explicit Unknown controls; their original proof probes remain preserved
 under `artifacts/api-coverage/open-gap-probes/`. Incoming or escaped references,
 custom comparers, reference/unbound key types, capacities and constructor overloads,
@@ -136,8 +137,9 @@ The five dictionary registrations use the more accurate evidence label
 partial and 55,630 unmodeled; no declaration is fully modeled. SDK, reference pack,
 assembly checksums and catalog digest are unchanged. The usage ranking still has
 all 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one write awaiting
-actual receiver/domain evidence; all eight parameterless corpus constructions
-still lack supported domains. These sites remain actionable gaps.
+actual receiver/domain evidence. At the reference-value snapshot, all eight parameterless
+corpus constructions lacked supported domains; the empty-state extension below closes
+the value-domain gap for four of them. The four generic-key constructions remain open.
 
 This closes reference-value storage/identity within the owned integer-key slice.
 Reference or unsupported keys, unconstrained generic/structure values, arrays of
@@ -155,6 +157,40 @@ frontend tests, 640 contract tests, 659 selected worker tests, 80 selected IR te
 checks, and 30 selected Gates tests including usage ranking. The filtered collection
 certifies changed-code coverage; it does not certify full aggregate coverage.
 Complete exact-head CI remains required before merging. No coverage floor changed.
+
+## Verified empty dictionary state across value domains
+
+Parameterless framework construction with primitive integer keys establishes empty
+Count and membership even when the value type is an opaque structure or an open
+type parameter. These operations do not interpret, compare, hash or construct a
+stored value. Native controls prove zero Count and absent-key membership and refute
+an incorrect Count claim. CLR/IR comparisons cover decimal, DateTime, Guid and
+BigInteger values; an additional CLR probe uses a value constructor that throws
+and verifies that empty dictionary creation and membership never invoke it.
+
+Content operations retain their value-domain guard. Add, index reads and index
+writes with opaque values still take conservative fallback, and their unknown
+writes remove empty-state facts. Capacity/comparer constructors remain outside
+this state slice. An empty collection initializer is removed by the compiler CFG;
+its default-comparer receiver fact does not grant empty contents after a nonempty,
+unsupported initializer write. Receiver publication and alias/closure exclusions
+remain unchanged.
+
+This moves four actual corpus constructions into partial support:
+BellmanFordShortestPaths line 134, BipartiteColoring line 102,
+BreadthFirstShortestPaths line 90 and DijkstraShortestPaths line 93, in the pinned
+`Algorithms/Graphs` sources embedded in the corpus manifest. Each constructs
+`Dictionary<int, TVertex>` (or `Dictionary<int, T>`), whose value parameter has only
+an IComparable constraint. The paired four generic-key dictionaries remain
+unsupported. All 40 dictionary reads, 22 Add calls, 22 ContainsKey calls and one
+write still need receiver/content or comparer evidence. Constructor support does
+not prove the surrounding graph algorithms or every operation on their fields.
+
+The ranked universe is still 641 sites with zero unresolved sites, now in 115
+API/access/status rows. The complete declaration universe and all 43 partial facet
+registrations stay unchanged. Constructor, Count and ContainsKey evidence now also
+executes the generic-value empty-state probe; Add/indexer evidence retains its
+scalar/reference scope. No SDK, reference assembly, catalog or inventory pin changed.
 
 ## Cross-cutting gaps previously identified
 
@@ -294,7 +330,8 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | unmodeled | S |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | unmodeled | S |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | unmodeled | C |
-| M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | unmodeled-domain | D |
+| M:System.Collections.Generic.Dictionary`2.#ctor | call | 4 | partially-modeled | D |
+| M:System.Collections.Generic.Dictionary`2.#ctor | call | 4 | unmodeled-domain | D |
 | M:System.Action`1.Invoke(`0) | call | 7 | unmodeled | F |
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | unmodeled | T |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | partially-modeled | T |

@@ -251,8 +251,9 @@ model evidence does not turn that Unknown into a proof.
 
 Parameterless framework `Dictionary<TKey,TValue>` construction now establishes
 empty shared state for proven local, unescaped receivers with primitive integer
-keys and scalar or reference values. Count, successful Add, present-key index reads, ContainsKey
-and simple index assignments observe that shared state through aliases. Key equality
+keys. Empty Count and membership do not require interpreting the value type.
+Successful Add, present-key index reads and simple index assignments retain the
+scalar/reference value domain and observe shared state through aliases. Key equality
 preserves the full integer width; argument evaluation captures values before later
 mutations. Arbitrary incoming dictionaries, custom comparer construction, ref or
 closure escape, published references and unsupported type domains keep fallback.
@@ -268,12 +269,18 @@ or callback guarantee. The complete boundaries and remaining corpus sites are in
 
 Reference values retain identity, stored nulls and alias updates. Supported class,
 interface, delegate and array domains include reference-constrained type parameters;
-unconstrained generic values and arrays of arrays remain outside the model. Pure
+unconstrained generic value contents and arrays of arrays remain outside the content model. Pure
 ReferenceEquals clauses retain reference identity when converting these values to
 object. Publishing a fetched value does not publish its dictionary owner; capturing
 or publishing the owner still removes its ownership fact. CLR/IR comparisons and
 native proof/refutation controls cover the new behavior. See the
 [reference-value evidence and remaining boundaries](gaps.md#verified-reference-dictionary-values).
+
+Empty-state support also applies to opaque structure and unconstrained generic
+value types, without invoking their value constructors. This covers four actual
+integer-key corpus constructions. Opaque value writes still invalidate empty-state
+facts; generic/reference keys and custom/incoming comparer state remain open. See
+[empty-state evidence and remaining gaps](gaps.md#verified-empty-dictionary-state-across-value-domains).
 
 ### Highest remaining priorities
 
