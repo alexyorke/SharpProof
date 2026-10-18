@@ -4,8 +4,19 @@
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
+  - package-ecosystem: "npm"
+    directory: "/eng/lint"
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: "weekly"
+    groups:
+      repository-lint:
+        patterns: ["*"]
   - package-ecosystem: "nuget" # See documentation for possible values
     directory: "/" # Location of package manifests
+    cooldown:
+      default-days: 7
     schedule:
       interval: "daily"
     groups:
@@ -39,6 +50,8 @@ updates:
           - "version-update:semver-major"
   - package-ecosystem: "github-actions"
     directory: "/"
+    cooldown:
+      default-days: 7
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
