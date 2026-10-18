@@ -67,12 +67,15 @@ access kind and value domains satisfy the production guard.
   escapes, closure-captured mutable state, custom derived interfaces and reference
   covariance need their own sound models. Rebinding must preserve identity
   snapshots; opaque writers must invalidate content knowledge.
-- Generic helpers returning scalar T still need result representation specialization
-  from concrete array evidence. Immutable generic local IList/ICollection parameters
-  now retain known scalar-array elements through Roslyn's cloned type parameters:
-  Count branches and full Swap postconditions have native proofs/refutations, plus
-  compiled CLR/IR normal/fault agreement. Other parameter declarations and other
-  compilations cannot borrow this evidence; generic return signatures remain open.
+- Immutable scalar-array-backed IList<T> helpers now specialize returns of the
+  same T, including method, local-function, containing-type and nested generic
+  contexts. Native proofs/refutations and compiled CLR/IR boundary checks cover
+  the supported scalar types. Direct T[] and scalar T parameter signatures,
+  unrelated result type parameters and mutable/captured or otherwise unproven
+  receiver representations remain open; closed scalar type arguments alone do
+  not supply the missing evidence. Generic local IList/ICollection Count branches
+  and full Swap postconditions retain source declaration/ordinal/assembly ownership,
+  with native proofs/refutations and compiled CLR/IR normal/fault agreement.
 - Count >= 0 is weaker than a collection representation invariant. List/dictionary/
   queue/stack count/content relations and repeated getter consistency remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
