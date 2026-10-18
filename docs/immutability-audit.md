@@ -1752,3 +1752,13 @@ Use scoped builders and return frozen arrays/maps. Preserve null nontermination 
 initialized empty compile-failure results, JSON element cloning, Ordinal keys, tuple order,
 and inner int[] reflection/SUT arguments. Adapt count assertions and unwrap nullable
 immutable results before LINQ. Status: open, recorded before implementation.
+## Script scoped construction follow-up inventory
+
+IMM-M019: Assert-SharpProofJsonProperties duplicate-name set, Get-SharpProofDevCheckPlan
+command list, Invoke-SharpProofDevCheck build list, Invoke-SharpProofDoctor check list,
+Invoke-SharpProofLint check/summary lists, and Sync-SharpProofDocumentation lines use
+mutable construction collections. Coordinator traced callers and output boundaries.
+Use comparer-preserving immutable builders, freeze before JSON/filter/text publication,
+and retain required object[] process/scheduler adapters and ordered output records.
+These run in the canonical PowerShell runtime. The Windows PowerShell bootstrap
+eng/build.ps1 is a separate compatibility boundary. Status: open before edits.
