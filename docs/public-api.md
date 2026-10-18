@@ -85,7 +85,7 @@ public static class AmountContracts
 
 The companion declares the target's contract; this example does not prove
 that an arbitrary implementation of `IAmount` satisfies it. See the
-[ContractFor sample](../samples/ContractFor/ServiceContracts.cs) for a consumer
+[ContractFor sample](../src/samples/ContractFor/ServiceContracts.cs) for a consumer
 call and [diagnostics](diagnostic-examples.md#contractfor-diagnostics) for
 validation failures.
 
@@ -115,7 +115,7 @@ type's entire range.
 The portable validator accepts `sbyte`, `byte`, `short`, `ushort`, `char`,
 `int`, `uint`, and `long`. Total worker binding also admits `ulong`; that
 does not remove the portable analyzer's SP0024 for an unsupported `ulong`
-closed attribute. See [ClosedContractAttributeValidator.cs](../SharpProof.Contracts/ClosedContractAttributeValidator.cs)
+closed attribute. See [ClosedContractAttributeValidator.cs](../src/SharpProof.Contracts/ClosedContractAttributeValidator.cs)
 and [coverage and limits](coverage-and-limits.md) for the separate boundaries.
 
 `NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters

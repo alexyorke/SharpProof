@@ -1,0 +1,38 @@
+<Project>
+  <PropertyGroup>
+    <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
+    <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
+    <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
+    <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
+    <Version>$(SharpProofPackageVersion)</Version>
+    <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
+    <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
+    <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
+    <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
+    <!-- Arcade features and repository dependency versions are centralized here. -->
+    <VersionPrefix>$(SharpProofVersionPrefix)</VersionPrefix>
+    <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
+    <PreReleaseVersionIteration>1</PreReleaseVersionIteration>
+    <UsingToolXliff>false</UsingToolXliff>
+    <UsingToolPdbConverter>false</UsingToolPdbConverter>
+    <ExcludeMicrosoftNetTestSdk>true</ExcludeMicrosoftNetTestSdk>
+    <TestRunnerName>SharpProofNUnit</TestRunnerName>
+    <MicrosoftCodeAnalysisAnalyzersVersion>4.14.0</MicrosoftCodeAnalysisAnalyzersVersion>
+    <MicrosoftCodeAnalysisBannedApiAnalyzersVersion>5.6.0</MicrosoftCodeAnalysisBannedApiAnalyzersVersion>
+    <MicrosoftCodeAnalysisCommonVersion>4.14.0</MicrosoftCodeAnalysisCommonVersion>
+    <MicrosoftCodeAnalysisCSharpVersion>4.14.0</MicrosoftCodeAnalysisCSharpVersion>
+    <MicrosoftCodeAnalysisCSharpWorkspacesVersion>4.14.0</MicrosoftCodeAnalysisCSharpWorkspacesVersion>
+    <MicrosoftCodeAnalysisVisualBasicVersion>4.14.0</MicrosoftCodeAnalysisVisualBasicVersion>
+    <MicrosoftCodeAnalysisPublicApiAnalyzersVersion>5.6.0</MicrosoftCodeAnalysisPublicApiAnalyzersVersion>
+    <MicrosoftBuildFrameworkVersion>17.7.2</MicrosoftBuildFrameworkVersion>
+    <MicrosoftBuildUtilitiesCoreVersion>17.7.2</MicrosoftBuildUtilitiesCoreVersion>
+    <MicrosoftNETTestSdkVersion>18.8.1</MicrosoftNETTestSdkVersion>
+    <MicrosoftNETFrameworkReferenceAssembliesnet472Version>1.0.3</MicrosoftNETFrameworkReferenceAssembliesnet472Version>
+    <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>
+    <NUnitVersion>4.6.1</NUnitVersion>
+    <NUnit3TestAdapterVersion>6.2.0</NUnit3TestAdapterVersion>
+    <SystemCollectionsImmutableVersion>9.0.18</SystemCollectionsImmutableVersion>
+    <SystemCompositionAttributedModelVersion>9.0.0</SystemCompositionAttributedModelVersion>
+    <SystemTextJsonVersion>10.0.10</SystemTextJsonVersion>
+  </PropertyGroup>
+</Project>

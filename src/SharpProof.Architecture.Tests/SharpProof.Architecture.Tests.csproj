@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SharpProof.ArchitectureTest</AssemblyName>
+    <RootNamespace>SharpProof.ArchitectureTest</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <Target Name="_WriteArchitectureInventory" BeforeTargets="Build">
+    <ItemGroup>
+      <_ArchitectureProject Include="$(MSBuildProjectDirectory)/../*/*.csproj" />
+    </ItemGroup>
+    <MSBuild Projects="@(_ArchitectureProject)" Targets="_SharpProofGetArchitectureItems" BuildInParallel="false">
+      <Output TaskParameter="TargetOutputs" ItemName="_ArchitectureItem" />
+    </MSBuild>
+    <MakeDir Directories="$(TargetDir)" />
+    <WriteLinesToFile File="$(TargetDir)architecture-items.tsv"
+                      Lines="@(_ArchitectureItem->'%(ProjectName)|%(Kind)|%(Identity)')"
+                      Overwrite="true" Encoding="UTF-8" />
+  </Target>
+</Project>

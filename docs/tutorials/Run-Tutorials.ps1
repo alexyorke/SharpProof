@@ -42,12 +42,12 @@ try {
     if (@($untrackedCode | Where-Object { $_ -notlike 'docs/tutorials/*' }).Count) {
         throw 'Commit non-tutorial untracked source before running the tutorial snapshot.'
     }
-    [xml]$release = Get-Content (Join-Path $sourceRoot 'SharpProof.Release.props') -Raw
+    [xml]$release = Get-Content (Join-Path $sourceRoot 'eng/Versions.props') -Raw
     $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).Replace(
         '$(SharpProofVersionPrefix)', [string]$release.Project.PropertyGroup.SharpProofVersionPrefix)
     $feed = Join-Path $scratch 'feed'
     [void][IO.Directory]::CreateDirectory($feed)
-    $manifest = Get-Content (Join-Path $sourceRoot 'scripts/package-projects.json') -Raw | ConvertFrom-Json
+    $manifest = Get-Content (Join-Path $sourceRoot 'eng/scripts/package-projects.json') -Raw | ConvertFrom-Json
     Write-Host "Building tutorial feed: $version"
     foreach ($project in $manifest.projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension($project)
@@ -56,7 +56,7 @@ try {
             -LogPath (Join-Path $evidenceRoot "pack-$name.log")
         if ($exitCode -ne 0) { throw "Packing $name failed; see the evidence directory." }
     }
-    $nugetConfig = Join-Path $scratch 'NuGet.Config'
+    $nugetConfig = Join-Path $scratch 'NuGet.config'
     $escapedFeed = [Security.SecurityElement]::Escape($feed)
     [IO.File]::WriteAllText($nugetConfig, @"
 <configuration>

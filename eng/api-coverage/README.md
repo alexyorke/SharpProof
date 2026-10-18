@@ -31,7 +31,7 @@ Run the same required gate as CI:
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj \
+  -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
   -TestFilter FullyQualifiedName~DotnetApiInventoryTests
 ```
 
@@ -78,7 +78,7 @@ matrices appear in the CI job summary. To reproduce the catalog gate separately:
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj \
+  -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj \
   -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
 ```
 
@@ -93,7 +93,7 @@ Generate a candidate; this does **not** change the reviewed baseline:
 
 ```sh
 docker compose run --rm -e SHARPPROOF_API_INVENTORY_CANDIDATE=1 tooling test \
-  -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj \
+  -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
   -TestFilter FullyQualifiedName~DotnetApiInventoryTests
 ```
 
@@ -120,7 +120,7 @@ both with the inventory artifact and the Markdown report in its job summary. Rep
 
 ```sh
 docker compose run --rm tooling test \
-  -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj \
+  -Target src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj \
   -TestFilter FullyQualifiedName~ApiUsageRankingTests
 ```
 

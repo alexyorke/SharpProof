@@ -42,8 +42,8 @@ The response summary distinguishes cache hits, misses, writes, disabled reuse, r
 
 ## Implementation references
 
-- [PassiveCallableVcBuilder.cs](../SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs)
-- [PassiveLoopCutter.cs](../SharpProof.Worker/Vc/PassiveLoopCutter.cs)
-- [NativeEffectClaims.cs](../SharpProof.Worker/NativeEffectClaims.cs)
-- [VerificationCache.cs](../SharpProof.Worker/VerificationCache.cs)
-- [ProtocolJson.cs](../SharpProof.Worker.Protocol/ProtocolJson.cs)
+- [PassiveCallableVcBuilder.cs](../src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs)
+- [PassiveLoopCutter.cs](../src/SharpProof.Worker/Vc/PassiveLoopCutter.cs)
+- [NativeEffectClaims.cs](../src/SharpProof.Worker/NativeEffectClaims.cs)
+- [VerificationCache.cs](../src/SharpProof.Worker/VerificationCache.cs)
+- [ProtocolJson.cs](../src/SharpProof.Worker.Protocol/ProtocolJson.cs)

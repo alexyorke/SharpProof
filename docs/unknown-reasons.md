@@ -2,7 +2,7 @@
 
 Unknown is explicit evidence that a selected claim was not decided. It is not a diagnostic severity, a run status, or proof by silence.
 
-The wire enums and validation rules are in [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [ProtocolJson.cs](../SharpProof.Worker.Protocol/ProtocolJson.cs). Consumers must use the actual typed fields instead of parsing display text.
+The wire enums and validation rules are in [ProtocolModel.generated.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [ProtocolJson.cs](../src/SharpProof.Worker.Protocol/ProtocolJson.cs). Consumers must use the actual typed fields instead of parsing display text.
 
 ## Worker claim reasons
 
@@ -59,7 +59,7 @@ Vacuity is `None`, `ContradictoryPreconditions`, or `NoModeledNormalReturn`. A n
 
 The frontend keeps its own typed reasons for unsupported operation/type/member/call/control-flow/mutation forms, invalid/error operations, user-defined/lifted operators, overflow/conversion limitations, unknown operation kinds, and expression depth.
 
-See [FrontendSubset.cs](../SharpProof.Frontend/FrontendSubset.cs). An abstention applies to the path and operation producing it; its existence does not mean every use of that language feature is unsupported across all pipelines.
+See [FrontendSubset.cs](../src/SharpProof.Frontend/FrontendSubset.cs). An abstention applies to the path and operation producing it; its existence does not mean every use of that language feature is unsupported across all pipelines.
 
 Solver results and IR evaluation also preserve typed failures. Projection to a worker reason must retain incomplete evidence rather than guess a successful interpretation.
 

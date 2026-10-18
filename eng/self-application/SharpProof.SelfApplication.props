@@ -15,8 +15,8 @@
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <_SharpProofSelfRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))</_SharpProofSelfRepositoryRoot>
-    <_SharpProofSelfAnalyzerDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.Analyzer', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfAnalyzerDirectory>
-    <_SharpProofSelfGeneratorDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.ContractForGenerator', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfGeneratorDirectory>
+    <_SharpProofSelfAnalyzerDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'artifacts', 'bin', 'SharpProof.Analyzer', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfAnalyzerDirectory>
+    <_SharpProofSelfGeneratorDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'artifacts', 'bin', 'SharpProof.ContractForGenerator', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfGeneratorDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="
