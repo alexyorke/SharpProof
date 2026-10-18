@@ -1741,3 +1741,14 @@ have method-owned substitution/allowed-variable/ordered-clause accumulation. Use
 preserve overwrite versus duplicate rejection, and freeze substitutions before lowerer use
 and clauses before publication. Retained binder pre-state caches remain immutable roots.
 Coordinator inspected callsites and failure paths before edits. Status: open.
+## Worker observation-return follow-up inventory
+
+IMM-M018: Coordinator traced nine helper return shapes in BulkMetadataDefaultWorkBoundaryTests
+(DivisionInstructions, MetadataInstructions), FixedChecksumAnchorConstructionBoundaryTests.Controls,
+LongFuzz/CompositionalLongFuzzTests.BuildCycle, LongFuzz/ControlFlowLongFuzzTests.Run,
+NativeMetadataShadowRequiresTests.Execute, ScalarPatternFlowTests.Execute,
+TotalClaimResultTests.Checks, and WorkerVcShadowSourceGateTests.QualificationBaseline.
+Use scoped builders and return frozen arrays/maps. Preserve null nontermination versus
+initialized empty compile-failure results, JSON element cloning, Ordinal keys, tuple order,
+and inner int[] reflection/SUT arguments. Adapt count assertions and unwrap nullable
+immutable results before LINQ. Status: open, recorded before implementation.
