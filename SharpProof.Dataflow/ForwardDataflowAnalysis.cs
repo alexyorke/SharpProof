@@ -8,9 +8,12 @@ internal enum DataflowAnalysisFailure
 }
 
 public sealed class ForwardDataflowAnalysisOptions(
-    int widenAfter = 2,
-    int maxIterations = 10_000)
+    int widenAfter = ForwardDataflowAnalysisOptions.DefaultWidenAfter,
+    int maxIterations = ForwardDataflowAnalysisOptions.DefaultMaximumIterations)
 {
+    public const int DefaultWidenAfter = 2;
+    public const int DefaultMaximumIterations = 10_000;
+
     public int WidenAfter
     {
         get;

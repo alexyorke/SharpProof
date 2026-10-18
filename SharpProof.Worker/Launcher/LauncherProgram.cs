@@ -115,7 +115,7 @@ internal static class Program
                 .ConfigureAwait(false);
             // The response may itself report cancellation; publish it after the
             // run token is canceled so the caller receives the typed result.
-            using var resultPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var resultPublication = new CancellationTokenSource(TimeSpan.FromMilliseconds(WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds));
 #pragma warning disable SPINT003
             await AtomicFile.WriteUtf8Async(
                     arguments.ResultPath,
@@ -133,14 +133,14 @@ internal static class Program
         {
             var failure = ClassifyLauncherFailure(exception);
             Log.Error(failure.ConsoleMessage);
-            using var failurePublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var failurePublication = new CancellationTokenSource(TimeSpan.FromMilliseconds(WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds));
 #pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
                 failure.Code, failure.Message, failurePublication.Token).ConfigureAwait(false);
 #pragma warning restore SPINT003
         }
-        using var promotionPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var promotionPublication = new CancellationTokenSource(TimeSpan.FromMilliseconds(WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds));
 #pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
         await PromotePreManifestProjectTimeoutAsync(
                 arguments.ResultPath,
@@ -156,7 +156,7 @@ internal static class Program
             out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
-            using var malformedPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var malformedPublication = new CancellationTokenSource(TimeSpan.FromMilliseconds(WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds));
 #pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, WorkerRunStatus.Failed,

@@ -20,7 +20,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Execute(program, initialValues, maximumSteps, cancellation.Token);
     }
 
@@ -52,7 +52,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         replayOptions = RepositoryParameterGuard.NotNull(replayOptions, nameof(replayOptions));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Execute(program, initialValues, maximumSteps, replayOptions, cancellation.Token);
     }
 

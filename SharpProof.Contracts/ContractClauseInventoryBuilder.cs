@@ -31,7 +31,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation? implementationBody = null)
     {
         callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Create(callable, implementationBody, alreadyNormalized: false,
             cancellationToken: cancellation.Token);
     }

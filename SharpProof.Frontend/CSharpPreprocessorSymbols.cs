@@ -139,7 +139,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             invocation.Syntax.SyntaxTree,
             static tree =>
             {
-                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
                 tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
                 return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
             });

@@ -490,7 +490,7 @@ SOFTWARE.
                 GateProcess.KillTree(process);
 
                 // Reap the killed process even when the caller canceled.
-                var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(GateProcess.CleanupTimeoutSeconds));
                 try
                 {
 #pragma warning disable SPINT003

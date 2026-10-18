@@ -87,14 +87,14 @@ internal static class NativeCorpusVerifier
             IncompleteCallableCount = response.CallableResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete)),
             IncompleteCallables = response.CallableResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete))
                 .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout))
-                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId), StringComparer.Ordinal).Take(8)
-                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { CallableId = result.CallableId[..Math.Min(512, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() })),
+                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId), StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
+                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { CallableId = result.CallableId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() })),
             ClaimCount = response.ClaimResults.Length,
             ClaimsWithReasonCount = response.ClaimResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None)),
             ClaimsWithReasons = response.ClaimResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None))
                 .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout))
-                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal).Take(8)
-                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { ClaimId = result.ClaimId[..Math.Min(512, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() }))
+                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
+                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { ClaimId = result.ClaimId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() }))
         });
     }
 

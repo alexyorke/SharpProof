@@ -10,7 +10,7 @@ internal static class CompilerLoweredArtifact
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
         preparation = RepositoryParameterGuard.NotNull(preparation, nameof(preparation));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Encode(preparation, cancellation.Token);
     }
 

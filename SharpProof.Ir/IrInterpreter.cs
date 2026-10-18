@@ -165,7 +165,7 @@ public sealed class IrInterpreter(IrFactory factory)
     {
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         return Evaluate(term, variables, cancellation.Token);
     }
 

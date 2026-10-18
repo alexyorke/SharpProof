@@ -5,11 +5,11 @@ internal static class CompilerConfigurationOptionRegistry
     internal static CompilerConfigurationOption Profile { get; } =
         new(
             SharpProofConfigurationCatalog.ProfileKey,
-            ["advisory", "strict", SharpProofConfigurationCatalog.ProfileOff],
+            [SharpProofConfigurationCatalog.ProfileAdvisory, SharpProofConfigurationCatalog.ProfileStrict, SharpProofConfigurationCatalog.ProfileOff],
             SharpProofConfigurationCatalog.ProfileBuildPropertyName);
 
     internal static CompilerConfigurationOption Features { get; } =
-        new("sharpproof_features", ["effects", "contracts", "all"], "SharpProofFeatures");
+        new(SharpProofConfigurationCatalog.FeaturesKey, [SharpProofConfigurationCatalog.FeaturesEffects, SharpProofConfigurationCatalog.FeaturesContracts, SharpProofConfigurationCatalog.FeaturesAll], SharpProofConfigurationCatalog.FeaturesBuildPropertyName);
 
     public static ImmutableArray<CompilerConfigurationOption> All
     {

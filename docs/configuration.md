@@ -1,5 +1,7 @@
 # Consumer configuration
 
+Maintainers: see [configuration ownership](configuration-ownership.md) for runtime and automation setting authorities.
+
 The standard SDK-style consumer needs one `SharpProof.Verifier` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 
 The implementation authority is [the consumer contract](../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.

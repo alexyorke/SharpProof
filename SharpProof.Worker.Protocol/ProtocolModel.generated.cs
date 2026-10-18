@@ -28,6 +28,8 @@ public static class WorkerLauncherDefaults
 {
     public const int TerminationGraceMilliseconds = 1000;
     public const int MaximumTerminationGraceMilliseconds = 300000;
+    // Result publication must remain bounded after the run token is canceled.
+    public const int ResultPublicationTimeoutMilliseconds = 30_000;
 }
 
 public sealed class WorkerVerifyRequest
@@ -81,11 +83,12 @@ public enum WorkerAssumptionPolicy
 public sealed class WorkerBudgets
 {
     public const int MaximumParallelism = 4;
-    public const uint DefaultQueryRlimit = 3000000U;
+    public const uint DefaultQueryRlimit = SharpProof.Configuration.SolverDefaults.QueryRlimit;
     public const uint DefaultMethodRlimit = 20000000U;
     public const int DefaultMethodWallTimeMilliseconds = 10000;
     public const int DefaultProjectWallTimeMilliseconds = 300000;
     public const int DefaultMaximumExpressionDepth = 64;
+    public const int MaximumAllowedExpressionDepth = 256;
     [JsonRequired]
     public uint QueryRlimit { get; set; } = DefaultQueryRlimit;
     [JsonRequired]
@@ -102,9 +105,10 @@ public sealed class WorkerBudgets
 
 public sealed class WorkerCacheOptions
 {
+    public const bool DefaultEnabled = true;
     public const long DefaultMaximumBytes = 536870912L;
     [JsonRequired]
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = DefaultEnabled;
     [JsonRequired]
     public string? Directory { get; set; }
     [JsonRequired]
@@ -719,7 +723,7 @@ internal static class WorkerProtocolMetadata
         new("method_wall", static value => value.MethodWallTimeMilliseconds > 0),
         new("project_wall", static value => value.ProjectWallTimeMilliseconds > 0),
         new("parallelism", static value => value.MaxParallelism is >= 1 and <= WorkerBudgets.MaximumParallelism),
-        new("expression_depth", static value => value.MaximumExpressionDepth is >= 1 and <= 256),
+        new("expression_depth", static value => value.MaximumExpressionDepth is >= 1 and <= WorkerBudgets.MaximumAllowedExpressionDepth),
         new("wall_order", static value => value.MethodWallTimeMilliseconds <= value.ProjectWallTimeMilliseconds),
     ];
     internal static bool IsSourceLocationValid(WorkerSourceLocation value) =>

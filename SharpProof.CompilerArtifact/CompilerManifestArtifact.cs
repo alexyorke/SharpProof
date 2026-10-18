@@ -330,7 +330,7 @@ internal static class CompilerManifestArtifactJson
             SpecificationPackSchemaVersion:
                 CompilerSpecificationPackVersions.Current,
             Compilation: not null,
-            MaximumExpressionDepth: >= 1 and <= 256
+            MaximumExpressionDepth: >= 1 and <= WorkerBudgets.MaximumAllowedExpressionDepth
         } &&
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
