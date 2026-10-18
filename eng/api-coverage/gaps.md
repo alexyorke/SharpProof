@@ -110,10 +110,17 @@ access kind and value domains satisfy the production guard.
   Commit `b898a640f` sweeps the entire 0-4096 construction allowance for real
   precondition and exception-filter imports, compares successful IR results with CLR
   execution, and covers both budget exits exposed by aggregate CI coverage.
-  Replay of wrong contracts after opaque default-getter initialization remains
-  open: 18 preserved cases still abstain because the normal-return choice consumes
-  an approximation. A fix must model a valid initialized-cache witness, singleton
-  identity and conservative cold/fault paths rather than bypass replay validation.
+  Commit `40cd4a402` closes the 18 preserved wrong-contract replay cases for
+  the nine primitive integer default comparers. Replay observes only the fixed
+  framework getters, confirms a successful return and retains their actual
+  singleton identities. Explicit object upcasts preserve that identity. All 39
+  targeted worker controls pass, including distinct char/ushort singleton values,
+  unavailable observations and unrelated opaque reads that must remain Unknown;
+  469 IR, 1,868 frontend and 56 verification tests pass, with two additional
+  framework ownership controls rejecting source-defined lookalikes. Symbolic
+  initialization, allocation, cache writes and faults remain conservative.
+  Object.ReferenceEquals API lowering remains open, with two preserved failing
+  probes; successful built-in reference equality does not close that API gap.
 - Catalog and audited-intrinsic evidence gates require executed behavioral probes
   and wrong-claim controls for modeled requirements. They do not automatically map
   every repository test to every possible supported behavior. New facets need an
