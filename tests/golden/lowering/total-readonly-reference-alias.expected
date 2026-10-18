@@ -15,23 +15,23 @@ block: b0 entry
 block: b1 cfg:0
   i6 op0 Goto b2 source=none
 block: b2 cfg:1
-  i7 op1 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v4 source=total-readonly-reference-alias.cs:167+4
-  i8 op2 Assign v8:int[width=32,signed=True] = 5 source=total-readonly-reference-alias.cs:180+1
-  i9 op3 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b5 : b6 source=total-readonly-reference-alias.cs:167+14
+  i7 op1 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v4 source=total-readonly-reference-alias.cs:tokens["cell"]#2
+  i8 op2 Assign v8:int[width=32,signed=True] = 5 source=total-readonly-reference-alias.cs:tokens["5"]#1
+  i9 op3 Branch (v7 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b5 : b6 source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
 block: b3 cfg:2
   i16 op0 Return void source=none
 block: b4 exceptional:exit
   i4 op0 ExceptionalExit source=none
 block: b5 throw
-  i10 op3 Throw NullReference -> b4 source=total-readonly-reference-alias.cs:167+14
+  i10 op3 Throw NullReference -> b4 source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
 block: b6 normal
-  i11 op4 Assign v9:int[width=32,signed=True] = v8 source=total-readonly-reference-alias.cs:167+14
-  i12 op5 Write Parameter (("object"#t3)v7).m0 = v8 source=total-readonly-reference-alias.cs:167+14
-  i17 op5 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-readonly-reference-alias.cs:167+14
-  i18 op5 Assign v1:int[width=32,signed=True] = v11 source=total-readonly-reference-alias.cs:167+14
-  i13 op7 Assign v10:int[width=32,signed=True] = v1 source=total-readonly-reference-alias.cs:198+5
-  i14 op6 Assign v6:int[width=32,signed=True] = v10 source=total-readonly-reference-alias.cs:198+5
-  i15 op6 Return v6 source=total-readonly-reference-alias.cs:198+5
+  i11 op4 Assign v9:int[width=32,signed=True] = v8 source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
+  i12 op5 Write Parameter (("object"#t3)v7).m0 = v8 source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
+  i17 op5 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
+  i18 op5 Assign v1:int[width=32,signed=True] = v11 source=total-readonly-reference-alias.cs:tokens["cell",".","Value","=","5"]#1
+  i13 op7 Assign v10:int[width=32,signed=True] = v1 source=total-readonly-reference-alias.cs:tokens["value"]#2
+  i14 op6 Assign v6:int[width=32,signed=True] = v10 source=total-readonly-reference-alias.cs:tokens["value"]#2
+  i15 op6 Return v6 source=total-readonly-reference-alias.cs:tokens["value"]#2
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v3
 term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v4

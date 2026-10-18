@@ -15,43 +15,43 @@ block: b2 finally:dispatch
 block: b3 cfg:0
   i4 op0 Goto b4 source=none
 block: b4 cfg:1
-  i5 op2 Assign v6:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:129+1
-  i6 op1 Assign v3:int[width=32,signed=True] = v6 source=total-region-nested-finally.cs:129+1
-  i12 op1 Goto b11 source=total-region-nested-finally.cs:129+1
+  i5 op2 Assign v6:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:tokens["x"]#2
+  i6 op1 Assign v3:int[width=32,signed=True] = v6 source=total-region-nested-finally.cs:tokens["x"]#2
+  i12 op1 Goto b11 source=total-region-nested-finally.cs:tokens["x"]#2
 block: b5 cfg:2
-  i13 op3 Assign v7:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:148+1
-  i14 op4 Assign v8:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:152+2
-  i15 op5 Assign v9:int[width=32,signed=True] = (v7 * v8) source=total-region-nested-finally.cs:148+6
-  i16 op6 Assign v10:int[width=32,signed=True] = 1 source=total-region-nested-finally.cs:157+1
-  i17 op7 Assign v11:int[width=32,signed=True] = (v9 + v10) source=total-region-nested-finally.cs:148+10
-  i18 op8 Assign v1:int[width=32,signed=True] = v11 source=total-region-nested-finally.cs:144+14
-  i19 op8 Write Local source=total-region-nested-finally.cs:144+14
+  i13 op3 Assign v7:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:tokens["x"]#4
+  i14 op4 Assign v8:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:tokens["10"]#1
+  i15 op5 Assign v9:int[width=32,signed=True] = (v7 * v8) source=total-region-nested-finally.cs:tokens["x","*","10"]#1
+  i16 op6 Assign v10:int[width=32,signed=True] = 1 source=total-region-nested-finally.cs:tokens["1"]#1
+  i17 op7 Assign v11:int[width=32,signed=True] = (v9 + v10) source=total-region-nested-finally.cs:tokens["x","*","10","+","1"]#1
+  i18 op8 Assign v1:int[width=32,signed=True] = v11 source=total-region-nested-finally.cs:tokens["x","=","x","*","10","+","1"]#1
+  i19 op8 Write Local source=total-region-nested-finally.cs:tokens["x","=","x","*","10","+","1"]#1
   i20 op0 Goto b1 source=none
 block: b6 cfg:3
-  i21 op9 Assign v12:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:186+1
-  i22 op10 Assign v13:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:190+2
-  i23 op11 Assign v14:int[width=32,signed=True] = (v12 * v13) source=total-region-nested-finally.cs:186+6
-  i24 op12 Assign v15:int[width=32,signed=True] = 2 source=total-region-nested-finally.cs:195+1
-  i25 op13 Assign v16:int[width=32,signed=True] = (v14 + v15) source=total-region-nested-finally.cs:186+10
-  i26 op14 Assign v1:int[width=32,signed=True] = v16 source=total-region-nested-finally.cs:182+14
-  i27 op14 Write Local source=total-region-nested-finally.cs:182+14
+  i21 op9 Assign v12:int[width=32,signed=True] = v1 source=total-region-nested-finally.cs:tokens["x"]#6
+  i22 op10 Assign v13:int[width=32,signed=True] = 10 source=total-region-nested-finally.cs:tokens["10"]#2
+  i23 op11 Assign v14:int[width=32,signed=True] = (v12 * v13) source=total-region-nested-finally.cs:tokens["x","*","10"]#2
+  i24 op12 Assign v15:int[width=32,signed=True] = 2 source=total-region-nested-finally.cs:tokens["2"]#1
+  i25 op13 Assign v16:int[width=32,signed=True] = (v14 + v15) source=total-region-nested-finally.cs:tokens["x","*","10","+","2"]#1
+  i26 op14 Assign v1:int[width=32,signed=True] = v16 source=total-region-nested-finally.cs:tokens["x","=","x","*","10","+","2"]#1
+  i27 op14 Write Local source=total-region-nested-finally.cs:tokens["x","=","x","*","10","+","2"]#1
   i28 op0 Goto b2 source=none
 block: b7 cfg:4
   i29 op0 Return void source=none
 block: b8 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b9 return:captured
-  i7 op1 Return v3 source=total-region-nested-finally.cs:129+1
+  i7 op1 Return v3 source=total-region-nested-finally.cs:tokens["x"]#2
 block: b10 finally:entry
-  i8 op1 Assign v5:int[width=32,signed=True] = 0 source=total-region-nested-finally.cs:129+1
-  i9 op1 Goto b6 source=total-region-nested-finally.cs:129+1
+  i8 op1 Assign v5:int[width=32,signed=True] = 0 source=total-region-nested-finally.cs:tokens["x"]#2
+  i9 op1 Goto b6 source=total-region-nested-finally.cs:tokens["x"]#2
 block: b11 finally:entry
-  i10 op1 Assign v4:int[width=32,signed=True] = 0 source=total-region-nested-finally.cs:129+1
-  i11 op1 Goto b5 source=total-region-nested-finally.cs:129+1
+  i10 op1 Assign v4:int[width=32,signed=True] = 0 source=total-region-nested-finally.cs:tokens["x"]#2
+  i11 op1 Goto b5 source=total-region-nested-finally.cs:tokens["x"]#2
 block: b12 finally:continue
-  i30 op1 Goto b10 source=total-region-nested-finally.cs:129+1
+  i30 op1 Goto b10 source=total-region-nested-finally.cs:tokens["x"]#2
 block: b13 finally:continue
-  i32 op1 Goto b9 source=total-region-nested-finally.cs:129+1
+  i32 op1 Goto b9 source=total-region-nested-finally.cs:tokens["x"]#2
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v1
 term: ir2 Variable type=t1:int width=32 signed=True value=v6

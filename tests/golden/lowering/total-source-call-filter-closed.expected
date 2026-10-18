@@ -9,39 +9,39 @@ block: b0 entry
   i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
   i3 op0 Goto b3 source=none
 block: b1 filter:accepted
-  i93 op8 Goto b24 source=total-source-call-filter-closed.cs:377+10
+  i93 op8 Goto b24 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b2 filter:rejected
-  i94 op8 Goto b21 source=total-source-call-filter-closed.cs:377+10
+  i94 op8 Goto b21 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b3 cfg:0
   i4 op0 Goto b4 source=none
 block: b4 cfg:1
-  i5 op2 Assign v11:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:153+9
-  i6 op3 Assign v12:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:160+1
-  i75 op2 Assign v7:int[width=32,signed=True] = v12 source=total-source-call-filter-closed.cs:153+9
-  i76 op2 Goto b11 source=total-source-call-filter-closed.cs:153+9
+  i5 op2 Assign v11:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["Callee","(","x",")"]#1
+  i6 op3 Assign v12:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:tokens["x"]#2
+  i75 op2 Assign v7:int[width=32,signed=True] = v12 source=total-source-call-filter-closed.cs:tokens["Callee","(","x",")"]#1
+  i76 op2 Goto b11 source=total-source-call-filter-closed.cs:tokens["Callee","(","x",")"]#1
 block: b5 cfg:2
-  i79 op21 Assign v22:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:217+3
-  i80 op22 Assign v23:int[width=32,signed=True] = (v22 + 1) source=total-source-call-filter-closed.cs:217+3
-  i81 op23 Assign v1:int[width=32,signed=True] = v23 source=total-source-call-filter-closed.cs:217+3
-  i82 op23 Write Local source=total-source-call-filter-closed.cs:217+3
-  i83 op24 Assign v24:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:223+1
-  i84 op25 Assign v25:bool[width=0,signed=False] = (v23 > v24) source=total-source-call-filter-closed.cs:217+7
-  i85 op20 Branch v25 ? b1 : b2 source=total-source-call-filter-closed.cs:217+7
+  i79 op21 Assign v22:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:tokens["++","x"]#1
+  i80 op22 Assign v23:int[width=32,signed=True] = (v22 + 1) source=total-source-call-filter-closed.cs:tokens["++","x"]#1
+  i81 op23 Assign v1:int[width=32,signed=True] = v23 source=total-source-call-filter-closed.cs:tokens["++","x"]#1
+  i82 op23 Write Local source=total-source-call-filter-closed.cs:tokens["++","x"]#1
+  i83 op24 Assign v24:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["0"]#1
+  i84 op25 Assign v25:bool[width=0,signed=False] = (v23 > v24) source=total-source-call-filter-closed.cs:tokens["++","x",">","0"]#1
+  i85 op20 Branch v25 ? b1 : b2 source=total-source-call-filter-closed.cs:tokens["++","x",">","0"]#1
 block: b6 cfg:3
-  i86 op27 Assign v26:int[width=32,signed=True] = 7 source=total-source-call-filter-closed.cs:235+1
-  i87 op26 Assign v3:int[width=32,signed=True] = v26 source=total-source-call-filter-closed.cs:235+1
-  i88 op26 Return v3 source=total-source-call-filter-closed.cs:235+1
+  i86 op27 Assign v26:int[width=32,signed=True] = 7 source=total-source-call-filter-closed.cs:tokens["7"]#1
+  i87 op26 Assign v3:int[width=32,signed=True] = v26 source=total-source-call-filter-closed.cs:tokens["7"]#1
+  i88 op26 Return v3 source=total-source-call-filter-closed.cs:tokens["7"]#1
 block: b7 cfg:4
-  i89 op29 Assign v27:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:290+1
-  i90 op28 Assign v3:int[width=32,signed=True] = v27 source=total-source-call-filter-closed.cs:290+1
-  i91 op28 Return v3 source=total-source-call-filter-closed.cs:290+1
+  i89 op29 Assign v27:int[width=32,signed=True] = v1 source=total-source-call-filter-closed.cs:tokens["x"]#4
+  i90 op28 Assign v3:int[width=32,signed=True] = v27 source=total-source-call-filter-closed.cs:tokens["x"]#4
+  i91 op28 Return v3 source=total-source-call-filter-closed.cs:tokens["x"]#4
 block: b8 cfg:5
   i92 op0 Return void source=none
 block: b9 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b10 call:continued
-  i77 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-filter-closed.cs:153+9
-  i78 op1 Return v3 source=total-source-call-filter-closed.cs:153+9
+  i77 op1 Assign v3:int[width=32,signed=True] = v11 source=total-source-call-filter-closed.cs:tokens["Callee","(","x",")"]#1
+  i78 op1 Return v3 source=total-source-call-filter-closed.cs:tokens["Callee","(","x",")"]#1
 block: b11 entry
   i7 op4 Assign v8:int[width=32,signed=True] = v7 source=none
   i8 op4 Assign v9:int[width=32,signed=True] = v7 source=none
@@ -51,106 +51,106 @@ block: b12 finally:dispatch
 block: b13 cfg:0
   i11 op4 Goto b14 source=none
 block: b14 cfg:1
-  i12 op6 Assign v14:int[width=32,signed=True] = 10 source=total-source-call-filter-closed.cs:377+2
-  i13 op7 Assign v15:int[width=32,signed=True] = v8 source=total-source-call-filter-closed.cs:382+5
-  i14 op8 Branch (v15 == 0) ? b18 : b19 source=total-source-call-filter-closed.cs:377+10
+  i12 op6 Assign v14:int[width=32,signed=True] = 10 source=total-source-call-filter-closed.cs:tokens["10"]#1
+  i13 op7 Assign v15:int[width=32,signed=True] = v8 source=total-source-call-filter-closed.cs:tokens["value"]#2
+  i14 op8 Branch (v15 == 0) ? b18 : b19 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b15 cfg:2
-  i43 op11 Assign v17:int[width=32,signed=True] = v8 source=total-source-call-filter-closed.cs:432+5
-  i44 op12 Assign v18:int[width=32,signed=True] = 256 source=total-source-call-filter-closed.cs:440+3
-  i45 op13 Branch ((((v17 >= 0) && (v18 >= 0)) && ((v17 + v18) < 0)) || (((v17 < 0) && (v18 < 0)) && ((v17 + v18) >= 0))) ? b33 : b34 source=total-source-call-filter-closed.cs:432+11
+  i43 op11 Assign v17:int[width=32,signed=True] = v8 source=total-source-call-filter-closed.cs:tokens["value"]#4
+  i44 op12 Assign v18:int[width=32,signed=True] = 256 source=total-source-call-filter-closed.cs:tokens["256"]#1
+  i45 op13 Branch ((((v17 >= 0) && (v18 >= 0)) && ((v17 + v18) < 0)) || (((v17 < 0) && (v18 < 0)) && ((v17 + v18) >= 0))) ? b33 : b34 source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
 block: b16 cfg:3
   i66 op4 Goto b10 source=none
 block: b17 exceptional:exit
   i9 op4 ExceptionalExit source=none
 block: b18 throw
-  i27 op8 Throw DivideByZero -> b25 source=total-source-call-filter-closed.cs:377+10
+  i27 op8 Throw DivideByZero -> b25 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b19 normal
-  i28 op9 Branch ((v14 == -2147483648) && (v15 == -1)) ? b26 : b27 source=total-source-call-filter-closed.cs:377+10
+  i28 op9 Branch ((v14 == -2147483648) && (v15 == -1)) ? b26 : b27 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b20 finally:entry
-  i15 op8 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i16 op8 Assign v13:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i17 op8 Goto b15 source=total-source-call-filter-closed.cs:377+10
+  i15 op8 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i16 op8 Assign v13:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i17 op8 Goto b15 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b21 exception:searched
-  i18 op8 Throw DivideByZero -> b20 source=total-source-call-filter-closed.cs:377+10
+  i18 op8 Throw DivideByZero -> b20 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b22 catch:entry
-  i19 op8 Assign v5:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i20 op8 Goto b6 source=total-source-call-filter-closed.cs:377+10
+  i19 op8 Assign v5:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i20 op8 Goto b6 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b23 finally:entry
-  i21 op8 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i22 op8 Assign v13:int[width=32,signed=True] = 1 source=total-source-call-filter-closed.cs:377+10
-  i23 op8 Goto b15 source=total-source-call-filter-closed.cs:377+10
+  i21 op8 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i22 op8 Assign v13:int[width=32,signed=True] = 1 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i23 op8 Goto b15 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b24 exception:searched
-  i24 op8 Throw DivideByZero -> b23 source=total-source-call-filter-closed.cs:377+10
+  i24 op8 Throw DivideByZero -> b23 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b25 filter:entry
-  i25 op8 Assign v4:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i26 op8 Goto b5 source=total-source-call-filter-closed.cs:377+10
+  i25 op8 Assign v4:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i26 op8 Goto b5 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b26 throw
-  i35 op9 Throw Overflow -> b30 source=total-source-call-filter-closed.cs:377+10
+  i35 op9 Throw Overflow -> b30 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b27 normal
-  i36 op10 Assign v16:int[width=32,signed=True] = (v14 / v15) source=total-source-call-filter-closed.cs:377+10
-  i37 op5 Assign v10:int[width=32,signed=True] = v16 source=total-source-call-filter-closed.cs:377+10
-  i42 op5 Goto b32 source=total-source-call-filter-closed.cs:377+10
+  i36 op10 Assign v16:int[width=32,signed=True] = (v14 / v15) source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i37 op5 Assign v10:int[width=32,signed=True] = v16 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i42 op5 Goto b32 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b28 catch:entry
-  i29 op9 Assign v6:int[width=32,signed=True] = 1 source=total-source-call-filter-closed.cs:377+10
-  i30 op9 Goto b7 source=total-source-call-filter-closed.cs:377+10
+  i29 op9 Assign v6:int[width=32,signed=True] = 1 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i30 op9 Goto b7 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b29 finally:entry
-  i31 op9 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:377+10
-  i32 op9 Assign v13:int[width=32,signed=True] = 2 source=total-source-call-filter-closed.cs:377+10
-  i33 op9 Goto b15 source=total-source-call-filter-closed.cs:377+10
+  i31 op9 Assign v10:int[width=32,signed=True] = 0 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i32 op9 Assign v13:int[width=32,signed=True] = 2 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i33 op9 Goto b15 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b30 exception:searched
-  i34 op9 Throw Overflow -> b29 source=total-source-call-filter-closed.cs:377+10
+  i34 op9 Throw Overflow -> b29 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b31 return:captured
-  i38 op5 Assign v11:int[width=32,signed=True] = v10 source=total-source-call-filter-closed.cs:377+10
-  i39 op5 Goto b10 source=total-source-call-filter-closed.cs:377+10
+  i38 op5 Assign v11:int[width=32,signed=True] = v10 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i39 op5 Goto b10 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b32 finally:entry
-  i40 op5 Assign v13:int[width=32,signed=True] = 3 source=total-source-call-filter-closed.cs:377+10
-  i41 op5 Goto b15 source=total-source-call-filter-closed.cs:377+10
+  i40 op5 Assign v13:int[width=32,signed=True] = 3 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
+  i41 op5 Goto b15 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b33 throw
-  i49 op13 Throw Overflow -> b36 source=total-source-call-filter-closed.cs:432+11
+  i49 op13 Throw Overflow -> b36 source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
 block: b34 normal
-  i50 op14 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-source-call-filter-closed.cs:432+11
-  i51 op15 Branch (v19 < 0) ? b37 : b38 source=total-source-call-filter-closed.cs:425+19
+  i50 op14 Assign v19:int[width=32,signed=True] = (v17 + v18) source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
+  i51 op15 Branch (v19 < 0) ? b37 : b38 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b35 catch:entry
-  i46 op13 Assign v6:int[width=32,signed=True] = 2 source=total-source-call-filter-closed.cs:432+11
-  i47 op13 Goto b7 source=total-source-call-filter-closed.cs:432+11
+  i46 op13 Assign v6:int[width=32,signed=True] = 2 source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
+  i47 op13 Goto b7 source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
 block: b36 exception:searched
-  i48 op13 Throw Overflow -> b35 source=total-source-call-filter-closed.cs:432+11
+  i48 op13 Throw Overflow -> b35 source=total-source-call-filter-closed.cs:tokens["value","+","256"]#1
 block: b37 throw
-  i55 op15 Throw Overflow -> b40 source=total-source-call-filter-closed.cs:425+19
+  i55 op15 Throw Overflow -> b40 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b38 normal
-  i56 op16 Branch (v19 > 255) ? b41 : b42 source=total-source-call-filter-closed.cs:425+19
+  i56 op16 Branch (v19 > 255) ? b41 : b42 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b39 catch:entry
-  i52 op15 Assign v6:int[width=32,signed=True] = 3 source=total-source-call-filter-closed.cs:425+19
-  i53 op15 Goto b7 source=total-source-call-filter-closed.cs:425+19
+  i52 op15 Assign v6:int[width=32,signed=True] = 3 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i53 op15 Goto b7 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b40 exception:searched
-  i54 op15 Throw Overflow -> b39 source=total-source-call-filter-closed.cs:425+19
+  i54 op15 Throw Overflow -> b39 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b41 throw
-  i60 op16 Throw Overflow -> b44 source=total-source-call-filter-closed.cs:425+19
+  i60 op16 Throw Overflow -> b44 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b42 normal
-  i61 op17 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-source-call-filter-closed.cs:425+19
-  i62 op18 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-source-call-filter-closed.cs:425+19
-  i63 op19 Assign v8:int[width=32,signed=True] = v21 source=total-source-call-filter-closed.cs:409+36
-  i64 op19 Write Local source=total-source-call-filter-closed.cs:409+36
+  i61 op17 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i62 op18 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i63 op19 Assign v8:int[width=32,signed=True] = v21 source=total-source-call-filter-closed.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
+  i64 op19 Write Local source=total-source-call-filter-closed.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
   i65 op4 Goto b12 source=none
 block: b43 catch:entry
-  i57 op16 Assign v6:int[width=32,signed=True] = 4 source=total-source-call-filter-closed.cs:425+19
-  i58 op16 Goto b7 source=total-source-call-filter-closed.cs:425+19
+  i57 op16 Assign v6:int[width=32,signed=True] = 4 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i58 op16 Goto b7 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b44 exception:searched
-  i59 op16 Throw Overflow -> b43 source=total-source-call-filter-closed.cs:425+19
+  i59 op16 Throw Overflow -> b43 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b45 finally:continue
-  i67 op8 Throw DivideByZero -> b9 source=total-source-call-filter-closed.cs:377+10
+  i67 op8 Throw DivideByZero -> b9 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b46 finally:dispatch
   i70 op4 Branch (v13 == 1) ? b47 : b48 source=none
 block: b47 finally:continue
-  i69 op8 Throw DivideByZero -> b22 source=total-source-call-filter-closed.cs:377+10
+  i69 op8 Throw DivideByZero -> b22 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b48 finally:dispatch
   i72 op4 Branch (v13 == 2) ? b49 : b50 source=none
 block: b49 finally:continue
-  i71 op9 Throw Overflow -> b28 source=total-source-call-filter-closed.cs:377+10
+  i71 op9 Throw Overflow -> b28 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 block: b50 finally:dispatch
   i74 op4 Goto b51 source=none
 block: b51 finally:continue
-  i73 op5 Goto b31 source=total-source-call-filter-closed.cs:377+10
+  i73 op5 Goto b31 source=total-source-call-filter-closed.cs:tokens["10","/","value"]#1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v11
 term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
