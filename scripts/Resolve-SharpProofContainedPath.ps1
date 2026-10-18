@@ -23,7 +23,8 @@ function Resolve-SharpProofPhysicalPath {
             $target = $item.ResolveLinkTarget($true)
             if ($null -eq $target -or -not $target.Exists) { throw "Path contains an unresolved link: $next" }
             $current = [IO.Path]::GetFullPath($target.FullName)
-        } else { $current = [IO.Path]::GetFullPath($item.FullName) }
+        }
+        else { $current = [IO.Path]::GetFullPath($item.FullName) }
         if ($index -lt $components.Count - 1 -and -not [IO.Directory]::Exists($current)) {
             throw "Path traverses a non-directory component: $current"
         }
@@ -84,7 +85,7 @@ function Resolve-SharpProofContainedPath {
     $rootForContainment = if (
         [IO.Directory]::Exists($artifactsRoot) -and
         ([string]::Equals($canonicalPath, $artifactsRoot, $pathComparison) -or
-            $canonicalPath.StartsWith($artifactsPrefix, $pathComparison))) {
+        $canonicalPath.StartsWith($artifactsPrefix, $pathComparison))) {
         $artifactsRoot
     }
     else {

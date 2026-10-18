@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ($Documents.Count -eq 0) { return }
 $dotnetItem = Get-Item -LiteralPath (Get-Command dotnet -CommandType Application |
-    Select-Object -First 1).Source
+        Select-Object -First 1).Source
 $dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
 $dotnetPath = if ($null -eq $dotnetTarget) { $dotnetItem.FullName } else { $dotnetTarget.FullName }
 $sdkVersion = ([string](& $dotnetPath --version)).Trim()
@@ -29,7 +29,7 @@ $temporaryPath = Join-Path ([IO.Path]::GetTempPath()) ('SharpProofDeclarations.'
 [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
 try {
     $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
-        Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
+            Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
     foreach ($name in @('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
         $assemblyPath = Join-Path $roslynPath $name
         $references += '-reference:' + $assemblyPath
