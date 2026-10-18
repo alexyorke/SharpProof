@@ -19,7 +19,7 @@ if ($packageProjects.Count -ne 3) {
     throw 'Developer-check plan requires exactly three package projects.'
 }
 
-$commands = [Collections.Generic.List[object]]::new()
+$commands = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 function Add-Command {
     param(
         [Parameter(Mandatory)][string]$Id,
@@ -52,5 +52,5 @@ foreach ($project in $packageProjects) {
     schemaVersion = 1
     command       = 'check'
     configuration = $Configuration
-    commands      = @($commands)
+    commands      = @($commands.ToImmutable())
 } | ConvertTo-Json -Depth 5

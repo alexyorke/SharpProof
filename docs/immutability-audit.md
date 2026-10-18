@@ -1847,3 +1847,25 @@ Current regenerated syntax inventories cover 1,865 C# files (3,338 candidates) a
 84 PowerShell files (1,133 candidates, zero parse errors). Fifty-two newly added C#
 builder rows are coordinator-verified by exact changed line; 3,089 C# and 1,017 script
 candidates remain open. Counts are syntax coverage, not confirmed violation counts.
+## Verified construction checkpoint
+
+IMM-M020 through IMM-M024 are implemented. The main coordinator reviewed actual
+builder/decoder changes and agent hypotheses; no agent wrote code or audit files.
+Checks now pass: 174 Worker/portable tests, 104 Gates corpus/oracle tests, 121 Fuzz
+shrinker tests, and two explicitly selected LongFuzz tests with two cases each and
+zero hits. The earlier nullable diagnostic-property compile error is corrected with
+an explicitly nullable ImmutableArray<object>, preserving null versus array JSON.
+The initially name-only LongFuzz selection and failed transitive builds remain in
+logs as failures/selection gaps, not successes. Current literal preservation covers
+2,737 raw/interpolated tokens across 564 changed C# files, all unchanged.
+Evidence: immutability-worker-return-portable-snapshots-tests2.log,
+immutability-gates-builders-tests.log, immutability-fuzz-shrink-builders-tests.log,
+immutability-worker-observation-longfuzz-tests4.log, immutability-master-literals.log,
+and immutability-observation-longfuzz-check/stats-{compositional,control-flow}.json.
+
+IMM-M025 passes canonical parsing and direct TCB checks for order, Ordinal equality,
+duplicate paths/projects, and first-error precedence. Campaign and performance
+runtime publication remain to be verified against clean committed source/packages.
+Evidence: immutability-tcb-builders-check.log. No performance improvement is claimed.
+Further production/test/script candidate groups remain open; this is a checkpoint,
+not completion of the comprehensive audit.

@@ -67,7 +67,7 @@ public sealed class CompositionalLongFuzzTests
     private static readonly ImmutableArray<int> s_inputs =
         [int.MinValue, int.MinValue + 1, -4, -3, -2, -1, 0, 1, 2, 3, 4, 7, 255, 256,
             int.MaxValue - 1, int.MaxValue];
-    private static readonly ImmutableArray<(int Operation, int Scope)> s_cycle = BuildCycle().ToImmutableArray();
+    private static readonly ImmutableArray<(int Operation, int Scope)> s_cycle = BuildCycle();
 
     [Test]
     public async Task GeneratedCompositionsAgreeWithClr()
@@ -99,9 +99,9 @@ public sealed class CompositionalLongFuzzTests
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    private static (int Operation, int Scope)[] BuildCycle()
+    private static ImmutableArray<(int Operation, int Scope)> BuildCycle()
     {
-        var slots = new List<(int Operation, int Scope)>();
+        var slots = ImmutableArray.CreateBuilder<(int Operation, int Scope)>();
         for (var operation = 0; operation < s_operations.Length; operation++)
         {
             for (var scope = 0; scope < s_scopes.Length; scope++)
@@ -119,7 +119,7 @@ public sealed class CompositionalLongFuzzTests
                 }
             }
         }
-        return [.. slots];
+        return slots.ToImmutable();
     }
 
     private static Operation Vary(Operation operation, int cycle)

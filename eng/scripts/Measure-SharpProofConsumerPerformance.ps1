@@ -31,7 +31,7 @@ $runDirectory = Join-Path $output ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmss'
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $workspace = Join-Path $temporaryParent ('SharpProof.ConsumerPerformance.' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($workspace) | Out-Null
-$measurements = [Collections.Generic.List[object]]::new()
+$measurements = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $ordinal = 0
 $originalLocation = Get-Location
 $completed = $false
@@ -69,7 +69,7 @@ try {
     $cache = Join-Path $workspace 'packages'
     foreach ($iteration in 1..$Iterations) {
         # Rotate the order to reduce systematic first-run/compiler warmup bias.
-        $variants = @('baseline', 'portable', 'verified')
+        $variants = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('baseline', 'portable', 'verified'))
         for ($offset = 0; $offset -lt 3; $offset++) {
             $variant = $variants[($offset + $iteration - 1) % 3]
             $consumer = Join-Path $workspace "$iteration-$variant"
@@ -133,6 +133,7 @@ try {
 }
 finally {
     Set-Location $originalLocation
+    $measurementSnapshot = $measurements.ToImmutable()
     $report = [ordered]@{
         schemaVersion            = 2
         completed                = $completed
@@ -150,7 +151,7 @@ finally {
         iterations               = $Iterations
         scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
         packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
-        measurements             = @($measurements.ToArray())
+        measurements             = @($measurementSnapshot)
     }
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM
@@ -159,16 +160,17 @@ finally {
     Remove-Item -LiteralPath $resolvedWorkspace -Recurse -Force
 }
 if ($MaximumBuildMilliseconds -gt 0) {
-    $overBudget = @($measurements | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds })
+    $overBudget = @($measurementSnapshot | Where-Object { $_.scenario -ne 'restore' -and $_.elapsedMilliseconds -gt $MaximumBuildMilliseconds })
     if ($overBudget.Count -gt 0) { throw "$($overBudget.Count) consumer measurements exceeded the explicit $MaximumBuildMilliseconds ms budget. See $reportPath" }
 }
 foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edit')) {
-    $medians = @{}
+    $medianBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, double]([StringComparer]::OrdinalIgnoreCase)
     foreach ($variant in @('baseline', 'portable', 'verified')) {
-        $times = @($measurements | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object)
+        $times = @($measurementSnapshot | Where-Object { $_.scenario -eq $scenario -and $_.variant -eq $variant } | ForEach-Object elapsedMilliseconds | Sort-Object)
         $middle = [int][Math]::Floor($times.Count / 2)
         $median = if ($times.Count % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
-        $medians[$variant] = $median
+        $medianBuilder[$variant] = $median
     }
-    Write-Host ("{0}: baseline={1}ms portable={2}ms ({3:+0.##;-0.##;0}ms) verified={4}ms ({5:+0.##;-0.##;0}ms)" -f $scenario, $medians.baseline, $medians.portable, ($medians.portable - $medians.baseline), $medians.verified, ($medians.verified - $medians.baseline))
+    $medians = $medianBuilder.ToImmutable()
+    Write-Host ("{0}: baseline={1}ms portable={2}ms ({3:+0.##;-0.##;0}ms) verified={4}ms ({5:+0.##;-0.##;0}ms)" -f $scenario, $medians['baseline'], $medians['portable'], ($medians['portable'] - $medians['baseline']), $medians['verified'], ($medians['verified'] - $medians['baseline']))
 }

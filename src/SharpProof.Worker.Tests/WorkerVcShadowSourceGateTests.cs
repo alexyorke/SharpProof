@@ -261,7 +261,7 @@ public sealed class WorkerVcShadowSourceGateTests
         await TestContext.Out.WriteLineAsync($"entry-worker universe: sources={sourceCount} callables={callableCount} enrolled={enrolledCount} old-known={oldKnown} native-known={nativeKnown} unknown={unknownCount} disagreements={disagreements} degradations={degradations}");
     }
 
-    internal static ShadowSourceCase[] QualificationCases()
+    internal static ImmutableArray<ShadowSourceCase> QualificationCases()
     {
         // Reachable-source, synchronization projection, metadata Requires and direct IR replay cases qualify through
         // dedicated drivers. They are outside the frozen Phase 2 callable
@@ -276,7 +276,7 @@ public sealed class WorkerVcShadowSourceGateTests
                 !source.StartsWith("// golden-scenario: shadow-call-ancestry-tampered-predicate\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: write-operand-approximation\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: mixed-snapshot-owners\n", StringComparison.Ordinal);
-        }).ToArray();
+        }).ToImmutableArray();
         Assert.That(goldenNames, Has.Length.EqualTo(64));
         var cases = Universe.Concat(goldenNames.Select(name =>
         {
@@ -286,7 +286,7 @@ public sealed class WorkerVcShadowSourceGateTests
             var boundary = source.IndexOf(marker, StringComparison.Ordinal);
             return boundary < 0 ? new ShadowSourceCase("golden:" + name, source, [])
                 : new ShadowSourceCase("golden:" + name, source[..boundary], [], LibrarySource: source[(boundary + marker.Length)..]);
-        })).ToArray();
+        })).ToImmutableArray();
         Assert.That(cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(cases.Length));
         Assert.That(Universe, Has.Length.EqualTo(54));
         return cases;
@@ -362,14 +362,14 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(proofLosses, Is.Empty, string.Join(", ", proofLosses));
     }
 
-    private static Dictionary<string, JsonElement> QualificationBaseline(string section, string id)
+    private static ImmutableDictionary<string, JsonElement> QualificationBaseline(string section, string id)
     {
         System.ArgumentNullException.ThrowIfNull(id);
         System.ArgumentNullException.ThrowIfNull(section);
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(),
             "tests", "qualification", "phase2-native-authority-baseline.json")));
         Assert.That(document.RootElement.GetProperty("commit").GetString(), Is.EqualTo("86fa6ea9039a0883e1a8f2baf492738b8224fba6"));
-        return document.RootElement.GetProperty(section).EnumerateArray().ToDictionary(
+        return document.RootElement.GetProperty(section).EnumerateArray().ToImmutableDictionary(
             item => ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (item.GetProperty("Fixture").GetString() + ":" + item.GetProperty(id).GetString() +
                 (section == "postconditions" ? ":" + item.GetProperty("Ordinal").GetRawText() : ""))),
             item => ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (item.Clone())), StringComparer.Ordinal);
@@ -404,7 +404,7 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(checks, Is.Empty);
     }
 
-    private static WorkerClaimResult[] AssertNativeResults(WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase,
+    private static ImmutableArray<WorkerClaimResult> AssertNativeResults(WorkerVerifyResponse response, ShadowTestProject project, ShadowSourceCase sourceCase,
         IReadOnlyDictionary<string, TotalCallableClaimCheck> checks)
     {
         System.ArgumentNullException.ThrowIfNull(checks);
@@ -413,12 +413,12 @@ public sealed class WorkerVcShadowSourceGateTests
         Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         Assert.That(response.Errors, Is.Empty, sourceCase.Name);
         var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
+            .ToImmutableDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
         if (sourceCase.TotalPresent)
         { Assert.That(checks.Keys, Is.EquivalentTo(ordinals.Keys), sourceCase.Name); }
         else
         { Assert.That(checks, Is.Empty, sourceCase.Name); }
-        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EquivalentTo(ordinals.Keys), sourceCase.Name);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(sourceCase.Outcomes), sourceCase.Name);
         if (sourceCase.Reasons.IsDefault)

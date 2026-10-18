@@ -72,7 +72,7 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         Assert.That(inventory.Owners.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Declaration is MethodDeclarationSyntax)), Is.True);
     }
 
-    private static string[] GraphDescription(ControlFlowGraph graph)
+    private static ImmutableArray<string> GraphDescription(ControlFlowGraph graph)
     {
         System.ArgumentNullException.ThrowIfNull(graph);
         return graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (string.Join("|",
@@ -83,6 +83,6 @@ public sealed class CompilerOwnedMethodBodyGraphTests
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ($"{operation.Kind}:{operation.Syntax.SpanStart}:{operation.Syntax.Span.Length}"))),
             block.BranchValue == null ? string.Empty :
                 $"{block.BranchValue.Kind}:{block.BranchValue.Syntax.SpanStart}:{block.BranchValue.Syntax.Span.Length}")))
-            .ToArray();
+            .ToImmutableArray();
     }
 }

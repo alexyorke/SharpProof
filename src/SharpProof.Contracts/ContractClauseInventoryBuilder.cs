@@ -125,15 +125,15 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         CancellationToken cancellationToken)
     {
         callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
-        var found = ImmutableList<(
+        var found = ImmutableArray.CreateBuilder<(
             ContractClauseClassification Classification,
             ContractClausePlacement Placement,
             IInvocationOperation Invocation,
-            int TreeOrdinal)>.Empty;
-        var directClauseCache = ImmutableDictionary<(
+            int TreeOrdinal)>();
+        var directClauseCache = ImmutableDictionary.CreateBuilder<(
             SyntaxTree Tree,
             int Start,
-            int Length), bool>.Empty;
+            int Length), bool>();
         IOperation? resolvedBody = null;
         var hasRejectedContractApiUsage = false;
         foreach (var body in GetBodies(
@@ -177,27 +177,27 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                     invocation,
                     model,
                     cancellationToken);
-                found = found.Add((classification, Classify(
+                found.Add((classification, Classify(
                     invocation,
                     model,
                     body,
                     ownedByCallable,
-                    ref directClauseCache,
+                    directClauseCache,
                     cancellationToken), invocation,
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var ordinals = ImmutableList.Create(0, 0, 0);
+        var ordinals = ImmutableArray.Create(0, 0, 0).ToBuilder();
         var sourceOrdinal = 0;
-        var clauses = found
+        var clauses = found.ToImmutable()
             .OrderBy(static clause => clause.TreeOrdinal)
             .ThenBy(static clause => clause.Invocation.Syntax.SpanStart)
             .ThenBy(static clause => clause.Invocation.Syntax.Span.Length)
             .Select(clause =>
             {
                 var ordinal = ordinals[clause.Classification.OrdinalIndex];
-                ordinals = ordinals.SetItem(clause.Classification.OrdinalIndex, ordinal + 1);
+                ordinals[clause.Classification.OrdinalIndex] = ordinal + 1;
                 return new ContractClauseOccurrence(
                     clause.Classification.Kind, clause.Placement, ordinal,
                     sourceOrdinal++, clause.Invocation);
@@ -234,7 +234,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         SyntaxNode body,
         bool ownedByCallable,
-        ref ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>
+        ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>.Builder
             directClauseCache,
         CancellationToken cancellationToken)
     {
@@ -252,7 +252,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 invocation,
                 model,
                 body,
-                ref directClauseCache,
+                directClauseCache,
                 out var placement,
                 cancellationToken))
         {
@@ -286,7 +286,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IInvocationOperation invocation,
         SemanticModel model,
         SyntaxNode body,
-        ref ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>
+        ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>.Builder
             directClauseCache,
         out ContractClausePlacement placement,
         CancellationToken cancellationToken)
@@ -313,7 +313,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             if (!IsDirectClause(
                     model,
                     prior,
-                    ref directClauseCache,
+                    directClauseCache,
                     cancellationToken))
             {
                 placement = ContractClausePlacement.Late;
@@ -352,7 +352,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private bool IsDirectClause(
         SemanticModel model,
         StatementSyntax statement,
-        ref ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>
+        ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), bool>.Builder
             directClauseCache,
         CancellationToken cancellationToken)
     {
@@ -376,7 +376,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 expression.Expression,
                 cancellationToken) is IInvocationOperation invocation &&
             _api?.GetClauseKind(invocation.TargetMethod).HasValue == true;
-        directClauseCache = directClauseCache.AddUnique(key, isDirect);
+        directClauseCache.AddUnique(key, isDirect);
         return isDirect;
     }
 

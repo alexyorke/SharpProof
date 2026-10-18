@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -53,16 +54,17 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             Assert.That(context.HasScalarSignature, Is.True);
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-            var regions = new List<ControlFlowRegion>();
-            var pending = new Stack<ControlFlowRegion>();
-            pending.Push(graph.Root);
-            while (pending.Count != 0)
+            var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+            var pending = ImmutableStack<ControlFlowRegion>.Empty;
+            pending = pending.Push(graph.Root);
+            while (!pending.IsEmpty)
             {
-                var region = pending.Pop();
-                regions.Add(region);
+                pending = pending.Pop(out var region);
+                regionsBuilder.Add(region);
                 foreach (var child in region.NestedRegions)
-                { pending.Push(child); }
+                { pending = pending.Push(child); }
             }
+            var regions = regionsBuilder.ToImmutable();
             Assert.That(regions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.True);
             Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
                 .Any(edge => edge != null && !edge.FinallyRegions.IsEmpty), Is.True);

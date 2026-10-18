@@ -153,11 +153,11 @@ public sealed partial class ContractBinder
         {
             return Fail(materialized.Failure);
         }
-        var clauses = materialized.Clauses.ToImmutableList();
+        var clauses = materialized.Clauses.ToBuilder();
         void AppendClause(BoundTotalContractClause clause)
         {
             clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
-            clauses = clauses.Add(clause);
+            clauses.Add(clause);
         }
         var attributeFailure = BindTotalAttributes(context, requiresOnly, AppendClause);
         if (attributeFailure != ContractBindingFailure.None)
@@ -175,7 +175,7 @@ public sealed partial class ContractBinder
                     _factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value), clause.SourceOperation, atEntry: resolution.UsesCompanion);
             }
         }
-        return new(clauses.ToImmutableArray(), ContractBindingFailure.None, context.Origin);
+        return new(clauses.ToImmutable(), ContractBindingFailure.None, context.Origin);
 
         TotalContractBindingResult Fail(ContractBindingFailure failure)
         {

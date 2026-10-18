@@ -7,7 +7,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$checks = [Collections.Generic.List[object]]::new()
+$checks = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 function Add-Check([string]$Name, [string]$Status, [string]$Message, [string]$Action = '') {
     $checks.Add([ordered]@{ name = $Name; status = $Status; message = $Message; action = $Action })
 }
@@ -147,6 +147,7 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
     }
 }
 else { Add-Check 'project' 'warning' 'No consumer project selected.' 'Pass -Target path/to/consumer.csproj to inspect effective configuration.' }
+$checkSnapshot = $checks.ToImmutable()
 $report = [ordered]@{
     schemaVersion    = 1
     host             = [ordered]@{ os = [Runtime.InteropServices.RuntimeInformation]::OSDescription; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); sdk = $sdk }
@@ -154,17 +155,17 @@ $report = [ordered]@{
     packages         = $packages
     resolvedPackages = $resolvedPackages
     configuration    = $configuration
-    checks           = @($checks.ToArray())
+    checks           = @($checkSnapshot)
 }
 if ($Format -eq 'Json') { $report | ConvertTo-Json -Depth 12 }
 else {
     Write-Output "SharpProof doctor - $($report.host.os) / $($report.host.architecture)"
     foreach ($package in $packages) { Write-Output "Evaluated direct reference: $($package.id) $($package.version)" }
     foreach ($package in $resolvedPackages) { Write-Output "Existing restored package: $($package.id) $($package.version)" }
-    foreach ($check in $checks) {
+    foreach ($check in $checkSnapshot) {
         Write-Output "[$($check.status)] $($check.name): $($check.message)"
         if ($check.action) { Write-Output "  Next: $($check.action)" }
     }
     if ($configuration) { $configuration | Format-List | Out-String | Write-Output }
 }
-if (@($checks | Where-Object { $_.status -eq 'error' }).Count) { exit 1 }
+if (@($checkSnapshot | Where-Object { $_.status -eq 'error' }).Count) { exit 1 }

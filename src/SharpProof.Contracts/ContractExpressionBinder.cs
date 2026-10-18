@@ -83,7 +83,7 @@ internal sealed class ContractExpressionBinder
             return (true, null);
         }
 
-        var substitutions = ImmutableDictionary<IrVarId, IrTerm>.Empty;
+        var substitutions = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
         foreach (var variable in value.Variables)
         {
             if (!_preState.TryGetValue(variable, out var preState))
@@ -98,13 +98,13 @@ internal sealed class ContractExpressionBinder
                 _preStateOrder = _preStateOrder.Add(new(variable, preState));
                 _preStateValues = _preStateValues.Add(preState);
             }
-            substitutions = substitutions.SetItem(variable, _factory.Variable(preState));
+            substitutions[variable] = _factory.Variable(preState);
         }
         return (true, IrSubstitution.Substitute(
             _factory,
             value.Term ?? throw new InvalidOperationException(
                 "A successful old() binding must carry a term."),
-            substitutions));
+            substitutions.ToImmutable()));
     }
 
     internal ExpressionBindingResult Bind(IOperation operation)

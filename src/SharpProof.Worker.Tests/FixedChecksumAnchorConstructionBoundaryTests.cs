@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -629,7 +630,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 Assert.That(actual, Is.EqualTo(expected));
                 Assert.That(actual, Is.InRange(0, inputs[0]));
             }
-            Assert.That(controls, Has.Count.EqualTo(20));
+            Assert.That(controls, Has.Length.EqualTo(20));
             var baseline = controls[4];
             var changed = controls[5];
             Assert.That(baseline[0], Is.EqualTo(64));
@@ -757,9 +758,9 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
-    private static List<int[]> Controls()
+    private static ImmutableArray<int[]> Controls()
     {
-        var values = new List<int[]>();
+        var values = ImmutableArray.CreateBuilder<int[]>();
         for (var index = 0; index < 5; index++)
         {
             var count = index switch { 0 => 0, 1 => 1, 2 => 16, 3 => 32, _ => 64 };
@@ -774,7 +775,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             inputs[ordinal] = -3;
             values.Add(inputs);
         }
-        return values;
+        return values.ToImmutable();
     }
 
     private static uint ReferenceChecksum(int[] inputs)

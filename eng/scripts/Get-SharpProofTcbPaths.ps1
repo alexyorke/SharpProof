@@ -16,9 +16,9 @@ function Get-SharpProofTcbPaths {
         throw 'The acceptance contract must declare the trusted computing base.'
     }
 
-    $paths = [Collections.Generic.List[string]]::new()
-    $seen = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
+    $paths = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $seen = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer(
+        [StringComparer]::Ordinal).ToBuilder()
     $addPath = {
         param(
             [Parameter(Mandatory = $true)]
@@ -68,8 +68,9 @@ function Get-SharpProofTcbPaths {
         if ($null -eq $ProductionInventory.projects) {
             throw 'The production inventory authority has no projects.'
         }
-        $pipelineProjectPaths = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::Ordinal)
+        $pipelineProjectPaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer(
+            [StringComparer]::Ordinal).ToBuilder()
+        $pipelineProjectOrder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
         foreach ($projectPath in @(
                 $Contract.trustedComputingBase.pipelineCompileProjects)) {
             $canonicalProjectPath = [string]$projectPath
@@ -88,29 +89,29 @@ function Get-SharpProofTcbPaths {
             if (-not $pipelineProjectPaths.Add($canonicalProjectPath)) {
                 throw "Trusted pipeline project is duplicated: '$canonicalProjectPath'."
             }
+            [void]$pipelineProjectOrder.Add($canonicalProjectPath)
         }
         if ($pipelineProjectPaths.Count -eq 0) {
             throw 'The trusted computing base must declare its production pipeline projects.'
         }
 
-        $compilePaths = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::Ordinal)
-        $inventoryProjects = [Collections.Generic.Dictionary[string, object]]::new(
+        $compilePaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer(
+            [StringComparer]::Ordinal).ToBuilder()
+        $inventoryProjects = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
             [StringComparer]::Ordinal)
         foreach ($project in @($ProductionInventory.projects)) {
             $inventoryProjectPath = [string]$project.projectPath
             if ([string]::IsNullOrWhiteSpace($inventoryProjectPath) -or
-                -not $inventoryProjects.TryAdd(
-                    $inventoryProjectPath,
-                    $project)) {
+                $inventoryProjects.ContainsKey($inventoryProjectPath)) {
                 throw "Production inventory project path is blank or duplicated: '$inventoryProjectPath'."
             }
+            $inventoryProjects.Add($inventoryProjectPath, $project)
             foreach ($file in @($project.compile)) {
                 [void]$compilePaths.Add([string]$file.path)
             }
         }
 
-        foreach ($projectPath in $pipelineProjectPaths) {
+        foreach ($projectPath in $pipelineProjectOrder.ToImmutable()) {
             if (-not $inventoryProjects.ContainsKey($projectPath)) {
                 throw (
                     "Trusted pipeline project is not in the production " +
@@ -132,7 +133,7 @@ function Get-SharpProofTcbPaths {
             }
         }
 
-        foreach ($path in $paths) {
+        foreach ($path in $paths.ToImmutable()) {
             if ($path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase) -and
                 -not $compilePaths.Contains($path)) {
                 # This existing release authority is compiled by Add-Type in
@@ -153,5 +154,5 @@ function Get-SharpProofTcbPaths {
         }
     }
 
-    return $paths.ToArray()
+    return [string[]]@($paths.ToImmutable())
 }

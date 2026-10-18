@@ -183,7 +183,7 @@ try {
         }
     }
 
-    $runs = [Collections.Generic.List[object]]::new()
+    $runs = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $runs.Add((Invoke-FuzzRun `
                 -Name "rotating-$RotatingSeed" `
                 -Cases $schedule.RotatingCases `
@@ -201,7 +201,8 @@ try {
     if ($completedCommit -cne $sourceCommit) {
         throw 'Fuzz source changed during the campaign.'
     }
-    $failedRuns = @($runs | Where-Object {
+    $runSnapshot = $runs.ToImmutable()
+    $failedRuns = @($runSnapshot | Where-Object {
             $_.exitCode -ne 0 -or -not $_.validationPassed
         })
     $campaignPassed = $failedRuns.Count -eq 0
@@ -215,9 +216,9 @@ try {
         retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
         retainedSeeds          = $schedule.RetainedSeeds
         requestedCases         = $schedule.RequestedCases
-        totalCases             = [int](@($runs |
+        totalCases             = [int](@($runSnapshot |
                     Measure-Object -Property observedCases -Sum).Sum)
-        runs                   = @($runs)
+        runs                   = @($runSnapshot)
         passed                 = $campaignPassed
     }
     Complete-SharpProofFuzzEvidence `

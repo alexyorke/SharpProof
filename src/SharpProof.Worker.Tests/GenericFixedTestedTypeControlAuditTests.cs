@@ -276,14 +276,14 @@ public sealed class GenericFixedTestedTypeControlAuditTests
         };
     }
 
-    private static IlInstruction[] ReadIl(byte[] bytes)
+    private static ImmutableArray<IlInstruction> ReadIl(byte[] bytes)
     {
         System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
             .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-            .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-        var instructions = new List<IlInstruction>();
+            .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)
         {
             var offset = position;
@@ -305,7 +305,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.AsSpan(position, operandSize))));
             position += operandSize;
         }
-        return [.. instructions];
+        return instructions.ToImmutable();
     }
 
     private static Task Save(string directory, string name, object value)

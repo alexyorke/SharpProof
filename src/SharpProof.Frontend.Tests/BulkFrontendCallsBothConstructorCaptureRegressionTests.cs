@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -94,19 +95,19 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                 Assert.That(start.FallThroughSuccessor?.Semantics, Is.Not.EqualTo(ControlFlowBranchSemantics.Throw));
                 Assert.That(start.ConditionKind != ControlFlowConditionKind.None || start.Operations.OfType<IFlowCaptureOperation>().Any(), Is.True,
                     "Each fixed constructor arm must begin with actual capture or conditional work before its terminal throw.");
-                var pending = new Stack<BasicBlock>();
-                var visited = new HashSet<BasicBlock>();
-                pending.Push(start);
-                while (pending.Count != 0)
+                var pending = ImmutableStack<BasicBlock>.Empty;
+                var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+                pending = pending.Push(start);
+                while (!pending.IsEmpty)
                 {
-                    var block = pending.Pop();
+                    pending = pending.Pop(out var block);
                     if (!visited.Add(block))
                     { continue; }
                     Assert.That(visited.Count, Is.LessThanOrEqualTo(graph.Blocks.Length));
                     foreach (var successor in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
                     {
                         if (successor?.Destination is { } destination)
-                        { pending.Push(destination); }
+                        { pending = pending.Push(destination); }
                     }
                 }
                 var arm = trueArm ? outer.WhenTrue : outer.WhenFalse;

@@ -299,7 +299,7 @@ public sealed class StackTypeCalculusCoverageTests
     [Test]
     public void ActualTypeFactoriesHaveTheirDeclaredValueEquivalenceClasses()
     {
-        var values = new HashSet<TotalIlStackType>();
+        var values = ImmutableHashSet.CreateBuilder<TotalIlStackType>();
         foreach (var type in Methods.Keys)
         {
             if (TotalIlStackType.TryFromTypeSymbol(Type(type), out var shape))

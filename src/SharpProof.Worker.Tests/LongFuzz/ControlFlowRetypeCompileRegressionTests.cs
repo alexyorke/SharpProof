@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -119,7 +120,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         }
     }
 
-    private static Diagnostic[] CompileForType(string body, string type)
+    private static ImmutableArray<Diagnostic> CompileForType(string body, string type)
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(type);
@@ -131,7 +132,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
             $"public static {type} Target(int x) {{ ", runtime)!;
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
         return compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
     }
 
     private static object? Invoke(Type type, string name, params object[] arguments)

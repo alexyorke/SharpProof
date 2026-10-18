@@ -21,7 +21,7 @@ if (Test-Path -LiteralPath (Join-Path $repositoryRoot 'eng/arcade-source.json'))
     & (Join-Path $PSScriptRoot 'Test-SharpProofRepositoryLayout.ps1')
 }
 $sourceFiles = @($sourceFiles | Where-Object { -not $_.StartsWith('eng/common/', [StringComparison]::Ordinal) })
-$checks = [Collections.Generic.List[object]]::new()
+$checks = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
 function Invoke-LintNative([string]$Executable, [string[]]$Arguments) {
     & $Executable @Arguments
@@ -80,13 +80,15 @@ Invoke-LintCheck 'ToolDependencies' {
 Invoke-LintCheck 'Compatibility' { & (Join-Path $PSScriptRoot 'Test-SharpProofPackageCompatibility.ps1') }
 Invoke-LintCheck 'GateRegressions' { & (Join-Path $PSScriptRoot 'Test-SharpProofLint.ps1') }
 
-$checks | ConvertTo-Json | Set-Content (Join-Path $reportRoot 'results.json')
-$summary = @('# Repository quality checks', '', '| Check | Result |', '| --- | --- |')
-foreach ($check in $checks) {
+$checkSnapshot = $checks.ToImmutable()
+$checkSnapshot | ConvertTo-Json | Set-Content (Join-Path $reportRoot 'results.json')
+$summary = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$summary.AddRange([string[]]@('# Repository quality checks', '', '| Check | Result |', '| --- | --- |'))
+foreach ($check in $checkSnapshot) {
     $result = if ($check.passed) { 'PASS' } else { 'FAIL' }
-    $summary += "| $($check.check) | $result |"
+    $summary.Add("| $($check.check) | $result |")
 }
-$summary | Set-Content (Join-Path $reportRoot 'summary.md')
-if ($checks.Count -eq 0 -or @($checks | Where-Object { -not $_.passed }).Count -gt 0) {
+$summary.ToImmutable() | Set-Content (Join-Path $reportRoot 'summary.md')
+if ($checkSnapshot.Length -eq 0 -or @($checkSnapshot | Where-Object { -not $_.passed }).Count -gt 0) {
     throw 'Repository quality checks failed. See artifacts/lint for individual reports.'
 }

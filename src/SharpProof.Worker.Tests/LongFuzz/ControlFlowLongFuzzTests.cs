@@ -327,8 +327,8 @@ public sealed class ControlFlowLongFuzzTests
             session.Count("retype-error");
             return;
         }
-        var runs = Run(runtimeCompilation);
-        if (runs is null)
+        var optionalRuns = Run(runtimeCompilation);
+        if (optionalRuns is not { } runs)
         {
             session.Count("nonterminating");
             return;
@@ -383,7 +383,7 @@ public sealed class ControlFlowLongFuzzTests
         }
         var source = Source(VerifiedState, header, Verified(methodBody));
         var claim = header.Trim();
-        var runtime = truthViolation ?? "no violation on " + runs.Count + " inputs";
+        var runtime = truthViolation ?? "no violation on " + runs.Length + " inputs";
         WorkerClaimResult claimResult;
         try
         {
@@ -521,7 +521,7 @@ public sealed class ControlFlowLongFuzzTests
     private sealed record RunResult(int X, Type? ExceptionType, int Result, int State, int StateWrites, int LockEntries);
 
     // Returns null when an input does not terminate within the loop fuel.
-    private static List<RunResult>? Run(CSharpCompilation compilation)
+    private static ImmutableArray<RunResult>? Run(CSharpCompilation compilation)
     {
         using var stream = new MemoryStream();
         if (!compilation.Emit(stream).Success)
@@ -539,7 +539,7 @@ public sealed class ControlFlowLongFuzzTests
             var writes = type.GetField("StateWrites")!;
             var locks = type.GetField("LockEntries")!;
             var exhausted = type.GetNestedType("R")!.GetField("Exhausted")!;
-            var results = new List<RunResult>();
+            var results = ImmutableArray.CreateBuilder<RunResult>();
             foreach (var x in s_inputs)
             {
                 Type? exceptionType = null;
@@ -579,7 +579,7 @@ public sealed class ControlFlowLongFuzzTests
                 results.Add(new RunResult(x, exceptionType, result, (int)state.GetValue(null)!,
                     (int)writes.GetValue(null)!, lockCount));
             }
-            return results;
+            return results.ToImmutable();
         }
         finally
         {

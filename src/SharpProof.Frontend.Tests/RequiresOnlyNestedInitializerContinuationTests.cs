@@ -85,8 +85,8 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         {
             Assert.That(additions[0].Block, Is.Not.SameAs(additions[1].Block));
             Assert.That(additions[0].Operation.Syntax.Span, Is.Not.EqualTo(additions[1].Operation.Syntax.Span));
-            var fall = Reachable(conditionals[0].FallThroughSuccessor!.Destination!).ToHashSet();
-            var conditional = Reachable(conditionals[0].ConditionalSuccessor!.Destination!).ToHashSet();
+            var fall = Reachable(conditionals[0].FallThroughSuccessor!.Destination!).ToImmutableHashSet();
+            var conditional = Reachable(conditionals[0].ConditionalSuccessor!.Destination!).ToImmutableHashSet();
             Assert.That(additions.Count(addition => fall.Contains(addition.Block)), Is.EqualTo(1));
             Assert.That(additions.Count(addition => conditional.Contains(addition.Block)), Is.EqualTo(1));
             Assert.That(additions.Any(addition => fall.Contains(addition.Block) && conditional.Contains(addition.Block)), Is.False);
@@ -141,18 +141,19 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
     private static IEnumerable<BasicBlock> Reachable(BasicBlock first)
     {
         System.ArgumentNullException.ThrowIfNull(first);
-        var visited = new HashSet<BasicBlock>();
-        var pending = new Stack<BasicBlock>();
-        pending.Push(first);
-        while (pending.TryPop(out var block))
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        var pending = ImmutableStack<BasicBlock>.Empty;
+        pending = pending.Push(first);
+        while (!pending.IsEmpty)
         {
+            pending = pending.Pop(out var block);
             if (!visited.Add(block))
             { continue; }
             yield return block;
             if (block.FallThroughSuccessor?.Destination is { } fall)
-            { pending.Push(fall); }
+            { pending = pending.Push(fall); }
             if (block.ConditionalSuccessor?.Destination is { } conditional)
-            { pending.Push(conditional); }
+            { pending = pending.Push(conditional); }
         }
     }
 

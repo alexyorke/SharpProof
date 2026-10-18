@@ -83,7 +83,7 @@ Invoke-SharpProofTimedPhase -Name 'restore' -Timings $timings -Action {
     }
 }
 Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
-    $builds = [Collections.Generic.List[object]]::new()
+    $builds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $builds.Add([pscustomobject]@{
             Name      = 'solution-' +
             ([string]$solutionBuildCommand.configuration).ToLowerInvariant()
@@ -104,7 +104,7 @@ Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
             })
     }
     Invoke-SharpProofParallelDotnetBuilds `
-        -Builds @($builds) `
+        -Builds @($builds.ToImmutable()) `
         -RepositoryRoot $repositoryRoot `
         -Parallelism $buildParallelism `
         -TimeoutSeconds $TimeoutSeconds

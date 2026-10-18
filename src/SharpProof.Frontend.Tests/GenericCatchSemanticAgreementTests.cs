@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -54,17 +55,19 @@ public sealed class GenericCatchSemanticAgreementTests
             Assert.That(SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.TypeArguments.Single(),
                 subject.Compilation.GetTypeByMetadataName("System.DivideByZeroException")), Is.True);
         }
-        var regions = new Stack<ControlFlowRegion>();
-        regions.Push(helperGraph.Root);
-        var catches = new List<ControlFlowRegion>();
-        while (regions.TryPop(out var region))
+        var regions = ImmutableStack<ControlFlowRegion>.Empty;
+        regions = regions.Push(helperGraph.Root);
+        var catchesBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        while (!regions.IsEmpty)
         {
+            regions = regions.Pop(out var region);
             if (region.Kind == ControlFlowRegionKind.Catch)
-            { catches.Add(region); }
+            { catchesBuilder.Add(region); }
             foreach (var child in region.NestedRegions)
-            { regions.Push(child); }
+            { regions = regions.Push(child); }
         }
-        Assert.That(catches, Has.Count.EqualTo(1));
+        var catches = catchesBuilder.ToImmutable();
+        Assert.That(catches, Has.Length.EqualTo(1));
         Assert.That(SymbolEqualityComparer.Default.Equals(catches[0].ExceptionType, catchType), Is.True);
         var catchAdmitted = CSharpOperationSemantics.TryCatchKinds(subject.Compilation, catchType, out var kinds);
         TestContext.WriteLine($"actual catch generic={generic}; type={catchType.TypeKind}; admitted={catchAdmitted}; kinds={(kinds.IsDefault ? -1 : kinds.Length)}");

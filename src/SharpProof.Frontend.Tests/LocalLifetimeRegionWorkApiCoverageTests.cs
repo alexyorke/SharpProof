@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -23,17 +24,19 @@ public sealed class LocalLifetimeRegionWorkApiCoverageTests
         Assert.That(subject.Context.HasScalarSignature, Is.True);
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-        var regions = new List<ControlFlowRegion>();
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(subject.Graph.Root);
-        while (pending.TryPop(out var region))
+        var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(subject.Graph.Root);
+        while (!pending.IsEmpty)
         {
-            regions.Add(region);
+            pending = pending.Pop(out var region);
+            regionsBuilder.Add(region);
             foreach (var child in region.NestedRegions)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
+        var regions = regionsBuilder.ToImmutable();
         var scopes = regions.Where(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (!region.Locals.IsEmpty)).ToArray();
-        TestContext.WriteLine($"Region scan leaves={leaves}; actualScopes={scopes.Length}; totalRegions={regions.Count}; blocks={subject.Graph.Blocks.Length}; membersSha256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(members)))}");
+        TestContext.WriteLine($"Region scan leaves={leaves}; actualScopes={scopes.Length}; totalRegions={regions.Length}; blocks={subject.Graph.Blocks.Length}; membersSha256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(members)))}");
         Assert.That(scopes, Has.Length.EqualTo(2 * leaves - 1));
         foreach (var region in scopes)
         {
@@ -47,7 +50,7 @@ public sealed class LocalLifetimeRegionWorkApiCoverageTests
         }
         Assert.That(regions.All(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind is ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)), Is.True);
         Assert.That(subject.Graph.Blocks.Length, Is.LessThanOrEqualTo(RoslynTotalProgramLowerer.MaximumRegionSteps));
-        Assert.That(regions.Count > RoslynTotalProgramLowerer.MaximumRegionSteps, Is.EqualTo(exceedsLimit));
+        Assert.That(regions.Length > RoslynTotalProgramLowerer.MaximumRegionSteps, Is.EqualTo(exceedsLimit));
         var lowered = subject.Lower();
         TestContext.WriteLine($"Region scan exact={lowered.IsExact}; abstention={lowered.Classification.Abstention}; limited={lowered.ConstructionLimitExceeded}");
         Assert.That(lowered.IsExact, Is.EqualTo(!exceedsLimit));

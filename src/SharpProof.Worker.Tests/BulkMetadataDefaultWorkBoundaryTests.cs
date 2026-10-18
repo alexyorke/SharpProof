@@ -76,9 +76,9 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
             string.Concat(Enumerable.Repeat("x=x+1;", additions)) + "x=-x;x=-x;return x; } } }";
     }
 
-    private static List<(string Code, long Operand)> DivisionInstructions(int negations)
+    private static ImmutableArray<(string Code, long Operand)> DivisionInstructions(int negations)
     {
-        var expected = new List<(string Code, long Operand)>();
+        var expected = ImmutableArray.CreateBuilder<(string Code, long Operand)>();
         for (var index = 0; index < negations; index++)
         {
             expected.Add(("Ldarg", 0));
@@ -91,12 +91,12 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         expected.Add(("Ldarg", 1));
         expected.Add(("Div", 0));
         expected.Add(("Ret", 0));
-        return expected;
+        return expected.ToImmutable();
     }
 
-    private static List<(string Code, long Operand)> MetadataInstructions(int additions)
+    private static ImmutableArray<(string Code, long Operand)> MetadataInstructions(int additions)
     {
-        var expected = new List<(string Code, long Operand)>();
+        var expected = ImmutableArray.CreateBuilder<(string Code, long Operand)>();
         for (var index = 0; index < additions; index++)
         {
             expected.Add(("Ldarg", 0));
@@ -112,7 +112,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         }
         expected.Add(("Ldarg", 0));
         expected.Add(("Ret", 0));
-        return expected;
+        return expected.ToImmutable();
     }
 
     private static void AssertCallerShape(CSharpCompilation compilation, bool discarded)
@@ -186,11 +186,12 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         return body;
     }
 
-    private static void AssertInstructions(TotalIlBody body, List<(string Code, long Operand)> expected, int count)
+    private static void AssertInstructions(TotalIlBody body, ImmutableArray<(string Code, long Operand)> expected, int count)
     {
         System.ArgumentNullException.ThrowIfNull(body);
-        System.ArgumentNullException.ThrowIfNull(expected);
-        Assert.That(expected, Has.Count.EqualTo(count));
+        if (expected.IsDefault)
+        { throw new System.ArgumentException("Array must be initialized.", nameof(expected)); }
+        Assert.That(expected, Has.Length.EqualTo(count));
         Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Code, instruction.Operand))), Is.EqualTo(expected));
         Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
     }

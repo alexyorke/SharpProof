@@ -109,7 +109,7 @@ public sealed class ScalarPatternFlowTests
         return claim.Outcome;
     }
 
-    private static List<(int X, string? Exception, int State)> Execute(string source)
+    private static ImmutableArray<(int X, string? Exception, int State)> Execute(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]));
@@ -121,7 +121,7 @@ public sealed class ScalarPatternFlowTests
         var type = Assembly.Load(stream.ToArray()).GetType("C")!;
         var method = type.GetMethod("Target")!;
         var state = type.GetField("State")!;
-        var runs = new List<(int X, string? Exception, int State)>();
+        var runs = ImmutableArray.CreateBuilder<(int X, string? Exception, int State)>();
         foreach (var x in Inputs)
         {
             state.SetValue(null, 0);
@@ -132,6 +132,6 @@ public sealed class ScalarPatternFlowTests
             { exception = invocation.InnerException!.GetType().Name; }
             runs.Add((x, exception, (int)state.GetValue(null)!));
         }
-        return runs;
+        return runs.ToImmutable();
     }
 }

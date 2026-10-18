@@ -286,7 +286,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 MetadataToken = log.OriginalDefinition.MetadataToken,
                 Attributes = DescribeAttributes(log),
                 Overridden = log.OverriddenMethod?.ToDisplayString(),
-                InheritedAttributes = log.OverriddenMethod == null ? null : DescribeAttributes(log.OverriddenMethod)
+                InheritedAttributes = log.OverriddenMethod == null ? (ImmutableArray<object>?)null : DescribeAttributes(log.OverriddenMethod)
             },
             SourceLogWasConditional = originalSourceLog?.IsConditional,
             ActualPolicyElided = actualElided,
@@ -398,7 +398,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         }
     }
 
-    private static object[] DescribeAttributes(IMethodSymbol method)
+    private static ImmutableArray<object> DescribeAttributes(IMethodSymbol method)
     {
         System.ArgumentNullException.ThrowIfNull(method);
         return method.GetAttributes().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : ((object)new
@@ -415,17 +415,17 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 parameter.IsOptional,
                 parameter.HasExplicitDefaultValue,
                 DefaultValue = parameter.HasExplicitDefaultValue ? parameter.ExplicitDefaultValue : null
-            })).ToArray(),
+            })).ToImmutableArray(),
             Arguments = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (new
             {
                 Kind = argument.Kind.ToString(),
                 Type = argument.Type?.ToDisplayString(),
                 argument.Value
-            }))).ToArray(),
+            }))).ToImmutableArray(),
             SuppliedArguments = attribute.ApplicationSyntaxReference == null ? (int?)null :
                 ((AttributeSyntax)attribute.ApplicationSyntaxReference.GetSyntax()).ArgumentList!.Arguments
                     .Count(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.NameEquals == null))
-        })).ToArray();
+        })).ToImmutableArray();
     }
 
     private static CSharpCompilation CreateCompilation(string prefix, string source,
@@ -684,7 +684,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             metadata.GetGuid(metadata.GetModuleDefinition().Mvid));
     }
 
-    private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
+    private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
@@ -694,7 +694,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        })).ToArray();
+        })).ToImmutableArray();
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };

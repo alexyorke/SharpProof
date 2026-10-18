@@ -66,7 +66,7 @@ internal static class NativeStaticWriteWitnessOracle
             !SymbolEqualityComparer.Default.Equals(fieldReference.Field.ContainingAssembly, compilation.Assembly))
         { return Gap("UnsupportedWriteTarget"); }
         var fieldSymbol = fieldReference.Field;
-        foreach (var owner in new[] { method.ContainingType, fieldSymbol.ContainingType })
+        foreach (var owner in ImmutableArray.Create(method.ContainingType, fieldSymbol.ContainingType))
         {
             for (var current = owner; current != null; current = current.ContainingType)
             {

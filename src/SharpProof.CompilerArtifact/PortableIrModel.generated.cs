@@ -494,7 +494,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> Variable,
         Func<int, IrMemberId> Member,
         Func<int, OperationId> Operation,
-        Func<int[], int, IrTerm[]> Terms,
+        Func<ImmutableArray<int>, int, IrTerm[]> Terms,
         Func<int, IrOpaquePurity> OpaquePurity,
         Func<int, IrUnaryOperator> UnaryOperator,
         Func<int, IrBinaryOperator> BinaryOperator,
@@ -512,7 +512,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrMemberId> Member,
         Func<int, IrTerm?> OptionalTerm,
         Func<int, IrTerm> Term,
-        Func<int[], IrTerm[]> Terms);
+        Func<ImmutableArray<int>, IrTerm[]> Terms);
 
     private readonly record struct InstructionEncodingContext(
         Func<IrTypeId, int> TypeIndex,
@@ -542,8 +542,8 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> HavocKind,
         Func<int, IrBlockId> BlockAt,
         Func<PortableIrLocation?, IrLocation> Location,
-        Func<int[], IrTerm[]> Terms,
-        Func<int[], IrVarId[]> Variables,
+        Func<ImmutableArray<int>, IrTerm[]> Terms,
+        Func<ImmutableArray<int>, IrVarId[]> Variables,
         Func<Exception> Invalid);
 
     private static readonly ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> TermProjections =
@@ -791,7 +791,7 @@ internal static class PortableIrGraphCodecProjections
                     return context.Builder.MemberLocation(
                         context.Member(row.A),
                         context.OptionalTerm(row.B),
-                        context.Terms(row.Items.ToArray()));
+                        context.Terms(row.Items));
                 }));
         result.Add(IrLocationKind.Sequence, new(
                 PortableIrSlotCatalog.Locations[(int)IrLocationKind.Sequence],
@@ -834,7 +834,7 @@ internal static class PortableIrGraphCodecProjections
                 },
                 static (row, context) =>
                 {
-                    return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items.ToArray()).ToImmutableArray());
+                    return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items).ToImmutableArray());
                 }));
         result.Add(IrInstructionKind.Lock, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Lock],
@@ -862,11 +862,11 @@ internal static class PortableIrGraphCodecProjections
                 {
                     return row.Location != null
                         ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && context.Location(row.Location) is IrMemberLocation { Receiver: { } receiver, Arguments.Length: <= 1 } field
-                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items.ToArray())[0], field.Arguments.IsEmpty ? null : field.Arguments[0])
+                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0], field.Arguments.IsEmpty ? null : field.Arguments[0])
                             : throw context.Invalid()
                         : context.OptionalTerm(row.B) is { } stored
                         ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index
-                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items.ToArray())[0])
+                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0])
                             : throw context.Invalid()
                         : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
                 }));
@@ -958,7 +958,7 @@ internal static class PortableIrGraphCodecProjections
                         context.OptionalVariable(row.A),
                         context.Member(row.B),
                         context.OptionalTerm(row.C),
-                        context.Terms(row.Items.ToArray()));
+                        context.Terms(row.Items));
                 }));
         result.Add(IrInstructionKind.Assume, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assume],
@@ -1023,7 +1023,7 @@ internal static class PortableIrGraphCodecProjections
                         context.Operation(row.Operation),
                         context.HavocKind(row.A),
                         row.Origin,
-                        context.Variables(row.Items.ToArray()));
+                        context.Variables(row.Items));
                 }));
         result.Add(IrInstructionKind.Branch, new(
                 PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Branch],
@@ -1181,7 +1181,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrVarId> variable,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<int[], int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, IrTerm[]> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<int, IrUnaryOperator> unaryOperator,
         Func<int, IrBinaryOperator> binaryOperator,
@@ -1229,7 +1229,7 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrMemberId> member,
         Func<int, IrTerm?> optionalTerm,
         Func<int, IrTerm> term,
-        Func<int[], IrTerm[]> terms)
+        Func<ImmutableArray<int>, IrTerm[]> terms)
     {
         var projection = GetProjection(LocationProjections, row.Kind);
         var context = new LocationDecodingContext(
@@ -1289,8 +1289,8 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrHavocKind> havocKind,
         Func<int, IrBlockId> blockAt,
         Func<PortableIrLocation?, IrLocation> location,
-        Func<int[], IrTerm[]> terms,
-        Func<int[], IrVarId[]> variables,
+        Func<ImmutableArray<int>, IrTerm[]> terms,
+        Func<ImmutableArray<int>, IrVarId[]> variables,
         Func<Exception> invalid)
     {
         var projection = GetProjection(InstructionProjections, row.Kind);
@@ -1327,13 +1327,13 @@ internal static class PortableIrGraphCodecProjections
         Func<int, int, IrTerm?> optionalTerm,
         Func<int, IrMemberId> member,
         Func<int, OperationId> operation,
-        Func<int[], int, IrTerm[]> terms,
+        Func<ImmutableArray<int>, int, IrTerm[]> terms,
         Func<int, IrOpaquePurity> opaquePurity,
         Func<Exception> invalid)
     {
         var purity = opaquePurity(row.C);
         var receiver = optionalTerm(row.B, depth);
-        var arguments = terms(row.Items.ToArray(), depth);
+        var arguments = terms(row.Items, depth);
         return purity switch
         {
             IrOpaquePurity.Pure when row.D == -1 =>

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -89,19 +90,19 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             var falseEdge = dispatch.ConditionKind == ControlFlowConditionKind.WhenTrue
                 ? dispatch.FallThroughSuccessor : dispatch.ConditionalSuccessor;
             Assert.That(falseEdge?.Destination, Is.Not.Null);
-            var pending = new Stack<BasicBlock>();
-            var visited = new HashSet<BasicBlock>();
-            pending.Push(falseEdge!.Destination!);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<BasicBlock>.Empty;
+            var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+            pending = pending.Push(falseEdge!.Destination!);
+            while (!pending.IsEmpty)
             {
-                var block = pending.Pop();
+                pending = pending.Pop(out var block);
                 if (!visited.Add(block))
                 { continue; }
                 Assert.That(visited.Count, Is.LessThanOrEqualTo(graph.Blocks.Length));
                 foreach (var edge in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
                 {
                     if (edge?.Destination is { } destination)
-                    { pending.Push(destination); }
+                    { pending = pending.Push(destination); }
                 }
             }
             var captures = visited.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>()

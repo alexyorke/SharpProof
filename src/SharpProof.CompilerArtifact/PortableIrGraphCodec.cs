@@ -842,10 +842,10 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             var name = row.Name ?? throw Bad("Portable IR member metadata is invalid.");
             Require(!row.ParameterTypes.IsDefault, "Portable IR member parameters cannot be null.");
-            var member = _factory.GetOrCreateMember(
+            var member = _factory.GetOrCreateMemberSnapshot(
                 Item(row.Identity, _identities, "identity"),
                 Type(row.DeclaringType), name,
-                Type(row.ReturnType), row.IsStatic, [.. row.ParameterTypes.Select(Type)]);
+                Type(row.ReturnType), row.IsStatic, row.ParameterTypes.Select(Type).ToImmutableArray());
             Require(!_distinctMembers.Contains(member), "Portable IR member equality partitions collapse.");
             _distinctMembers = _distinctMembers.Add(member);
             return member;
@@ -877,7 +877,7 @@ internal static partial class PortableIrGraphCodec
                 Member,
                 Operation,
                 (indices, currentDepth) =>
-                    indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(selectedIndex => DecodeTerm(selectedIndex, currentDepth + 1))]),
+                    indices.IsDefault ? throw Bad("Portable IR projection indices cannot be null.") : ([.. indices.Select(selectedIndex => DecodeTerm(selectedIndex, currentDepth + 1))]),
                 value => Wire(value, OpaquePurities),
                 value => Wire(value, UnaryOperators),
                 value => Wire(value, BinaryOperators),
@@ -954,8 +954,8 @@ internal static partial class PortableIrGraphCodec
                 value => Wire(value, HavocKinds),
                 index => Block(index, blocks),
                 value => Location(builder, value),
-                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Term)]),
-                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Variable)]),
+                indices => indices.IsDefault ? throw Bad("Portable IR projection indices cannot be null.") : ([.. indices.Select(Term)]),
+                indices => indices.IsDefault ? throw Bad("Portable IR projection indices cannot be null.") : ([.. indices.Select(Variable)]),
                 static () => Bad("Portable IR instruction metadata is invalid."));
         }
 
@@ -972,7 +972,7 @@ internal static partial class PortableIrGraphCodec
                 Member,
                 index => OptionalTerm(index),
                 Term,
-                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Term)]));
+                indices => indices.IsDefault ? throw Bad("Portable IR projection indices cannot be null.") : ([.. indices.Select(Term)]));
             Require(
                 location.Type == Type(row.Type),
                 "Portable IR location type metadata is inconsistent.");

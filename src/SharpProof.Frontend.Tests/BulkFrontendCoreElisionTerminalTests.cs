@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -162,17 +163,18 @@ public sealed class BulkFrontendCoreElisionTerminalTests
         System.ArgumentNullException.ThrowIfNull(owningInvocations);
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
-        var regions = new List<ControlFlowRegion>();
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
+        var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(graph.Root);
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
-            regions.Add(region);
+            pending = pending.Pop(out var region);
+            regionsBuilder.Add(region);
             foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
+            { pending = pending.Push(nested); }
         }
-        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToDictionary(item => item.region, item => item.id);
+        var regions = regionsBuilder.ToImmutable();
+        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToImmutableDictionary(item => item.region, item => item.id);
         var evidence = new
         {
             Source = source,

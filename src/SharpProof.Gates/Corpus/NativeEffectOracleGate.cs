@@ -71,7 +71,9 @@ internal static class NativeEffectOracleGate
         var wall = Stopwatch.StartNew();
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(root);
-        if (new[] { allocations, purity, capabilities, summary }.Count(selected => selected) > 1)
+        var selectedModeCount = (allocations ? 1 : 0) + (purity ? 1 : 0) +
+            (capabilities ? 1 : 0) + (summary ? 1 : 0);
+        if (selectedModeCount > 1)
         { throw new ArgumentException("An oracle run must select exactly one effect contract.", nameof(purity)); }
         if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
             methodIds.Length > universeMethodCount)

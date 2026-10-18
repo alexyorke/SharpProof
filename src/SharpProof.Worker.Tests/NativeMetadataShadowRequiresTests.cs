@@ -97,7 +97,7 @@ public sealed class NativeMetadataShadowRequiresTests
         Assert.That(batch.Gaps, Is.Empty);
         var detached = Decode(batch.Callers.Single().Body, references);
         var (execution, observed) = Execute(detached.Body, "int", input);
-        Assert.That(observed, Has.Count.EqualTo(observations));
+        Assert.That(observed, Has.Length.EqualTo(observations));
         Assert.That(execution.Status, Is.EqualTo(returns ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
         if (returns)
         { Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(7))); }
@@ -202,7 +202,7 @@ public sealed class NativeMetadataShadowRequiresTests
         return CompilerDecodedShadowBody.Decode(body.CallableId, detached, TestContext.CurrentContext.CancellationToken, references);
     }
 
-    private static (IrProgramExecutionResult Execution, List<bool> Observations) Execute(
+    private static (IrProgramExecutionResult Execution, ImmutableArray<bool> Observations) Execute(
         CompilerTotalCallablePreparation body, string type, string? input)
     {
         System.ArgumentNullException.ThrowIfNull(body);
@@ -211,8 +211,8 @@ public sealed class NativeMetadataShadowRequiresTests
         var entry = body.Parameters.Single().Entry;
         var value = type == "string" ? input == null ? factory.CreateNullValue(factory.StringType) : factory.CreateStringValue(input) :
             factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, long.Parse(input!, CultureInfo.InvariantCulture));
-        var observations = new List<bool>();
-        var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToHashSet();
+        var observations = ImmutableArray.CreateBuilder<bool>();
+        var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
         var options = new IrProgramReplayOptions(static _ => null)
         {
             AssignmentObserver = (instruction, assigned, _) =>
@@ -220,7 +220,7 @@ public sealed class NativeMetadataShadowRequiresTests
         };
         var execution = new IrProgramInterpreter(factory).Execute(body.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value), 10000, options);
         Assert.That(execution.ConsumedApproximation, Is.False);
-        return (execution, observations);
+        return (execution, observations.ToImmutable());
     }
 
     private static async Task AssertOutcome(CompilerDecodedShadowBody detached, bool proven)

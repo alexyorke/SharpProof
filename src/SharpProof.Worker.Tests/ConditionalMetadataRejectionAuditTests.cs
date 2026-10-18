@@ -754,7 +754,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
             metadata.GetGuid(metadata.GetModuleDefinition().Mvid));
     }
 
-    private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
+    private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
@@ -764,7 +764,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        })).ToArray();
+        })).ToImmutableArray();
     }
 
     private static Task Save(string directory, string name, object value)
