@@ -175,6 +175,7 @@ internal static class Program
         passed++;
         Console.WriteLine("PASS PolymorphicRuntime");
         passed += await CallChecks.Run();
+        passed += await SyntaxChecks.Run();
         passed += CoreChecks.Run();
         if (failures.Count != 0) throw new InvalidOperationException(string.Join("\n", failures));
         Console.WriteLine($"{passed} checks passed.");

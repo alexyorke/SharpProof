@@ -94,7 +94,13 @@ public static class Inference
                     after?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
                     return new(symbol.Name, "Rejected", "Generalization changes a selected method overload.");
             }
-            var signature = $"{returnName} {symbol.Name}<{string.Join(", ", variables.Values)}>({string.Join(", ", method.Parameters().Select((p, i) => parameterNames[i] + " " + p.Identifier.Text))})";
+            var originalCreations = method.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
+            var changedCreations = changedMethod.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
+            for (var i = 0; i < originalCreations.Length; i++)
+                if (model.GetSymbolInfo(originalCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) !=
+                    changedModel.GetSymbolInfo(changedCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                    return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
+            var signature = $"{returnName} {method.Identifier.Text}<{string.Join(", ", variables.Values)}>({string.Join(", ", method.Parameters().Select((p, i) => parameterNames[i] + " " + p.Identifier.Text))})";
             return new(symbol.Name, "Suggestion", "Review as an API change; the candidate compiles in the current compilation.", signature);
         }
 
@@ -122,6 +128,13 @@ public static class Inference
                             if (variable.Initializer is null) throw new InferenceException("Uninitialized local.");
                             environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, Expression(variable.Initializer.Value));
                         }
+                        break;
+                    case ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment }
+                        when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                             assignment.Left.DescendantNodesAndSelf().OfType<DeclarationExpressionSyntax>().Any():
+                        if (model.GetTypeInfo(assignment.Right, cancellationToken).Type is not INamedTypeSymbol { IsTupleType: true })
+                            throw new InferenceException("Only tuple-based deconstruction declarations are supported.");
+                        BindDeconstruction(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type!);
                         break;
                     case LocalFunctionStatementSyntax:
                         // C# already supplies an explicit (possibly generic) scheme.
@@ -195,7 +208,27 @@ public static class Inference
                     foreach (var parameter in lambdaParameters) environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
                     return HmType.Function(inputs, output);
                 case InvocationExpressionSyntax invocation:
+                    if (model.GetOperation(invocation, cancellationToken) is INameOfOperation) return new("string");
                     return MethodCall(invocation);
+                case BaseObjectCreationExpressionSyntax creation:
+                    var constructed = model.GetOperation(creation, cancellationToken) as IObjectCreationOperation
+                        ?? throw new InferenceException("Unsupported object construction.");
+                    if (creation.Initializer is not null || constructed.Constructor is null || constructed.Constructor.Parameters.Any(p => p.RefKind != RefKind.None))
+                        throw new InferenceException("Object initializers and ref constructors are unsupported.");
+                    BindArguments(constructed.Arguments, constructed.Constructor.Parameters.Select(p => CSharpTypes.Rigid(p.Type)).ToArray());
+                    return CSharpTypes.Rigid(constructed.Type!);
+                case InterpolatedStringExpressionSyntax interpolated:
+                    // Keep original hole types to preserve overloads and formatting;
+                    // custom interpolation-handler conversions remain unsupported.
+                    var converted = model.GetTypeInfo(interpolated, cancellationToken).ConvertedType;
+                    if (converted?.SpecialType != SpecialType.System_String)
+                        throw new InferenceException("Only string-targeted interpolation is supported.");
+                    foreach (var hole in interpolated.Contents.OfType<InterpolationSyntax>())
+                    {
+                        Anchor(hole.Expression);
+                        if (hole.AlignmentClause is not null) HmType.Unify(Expression(hole.AlignmentClause.Value), new("int"));
+                    }
+                    return new("string");
                 case BinaryExpressionSyntax binary: return Binary(binary);
                 case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
                     if (model.GetSymbolInfo(unary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
@@ -234,6 +267,47 @@ public static class Inference
         private void Anchor(ExpressionSyntax expression) => HmType.Unify(Expression(expression),
             CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type
                 ?? throw new InferenceException("Untyped expression.")));
+
+        private void BindDeconstruction(ExpressionSyntax target, HmType value, ITypeSymbol original)
+        {
+            switch (target)
+            {
+                case DeclarationExpressionSyntax declaration:
+                    if (!declaration.Type.IsVar) HmType.Unify(value, CSharpTypes.Rigid(model.GetTypeInfo(declaration.Type, cancellationToken).Type!));
+                    BindDesignation(declaration.Designation, value, original);
+                    break;
+                case TupleExpressionSyntax tuple:
+                    var source = original as INamedTypeSymbol;
+                    if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Arguments.Count)
+                        throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
+                    var elements = tuple.Arguments.Select(_ => HmType.Variable()).ToArray();
+                    HmType.Unify(value, new("Tuple", elements));
+                    for (var i = 0; i < elements.Length; i++) BindDeconstruction(tuple.Arguments[i].Expression, elements[i], source.TupleElements[i].Type);
+                    break;
+                default: throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");
+            }
+        }
+
+        private void BindDesignation(VariableDesignationSyntax designation, HmType value, ITypeSymbol original)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (designation)
+            {
+                case SingleVariableDesignationSyntax variable:
+                    environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, value);
+                    break;
+                case DiscardDesignationSyntax: break;
+                case ParenthesizedVariableDesignationSyntax tuple:
+                    var source = original as INamedTypeSymbol;
+                    if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Variables.Count)
+                        throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
+                    var elements = tuple.Variables.Select(_ => HmType.Variable()).ToArray();
+                    HmType.Unify(value, new("Tuple", elements));
+                    for (var i = 0; i < elements.Length; i++) BindDesignation(tuple.Variables[i], elements[i], source.TupleElements[i].Type);
+                    break;
+                default: throw new InferenceException("Unsupported deconstruction designation.");
+            }
+        }
 
         private void AnchorInitializer(InitializerExpressionSyntax initializer, ITypeSymbol element)
         {
@@ -325,8 +399,11 @@ public static class Inference
         }
 
         private void BindArguments(IInvocationOperation operation, HmType[] parameters)
+            => BindArguments(operation.Arguments, parameters);
+
+        private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters)
         {
-            foreach (var argument in operation.Arguments)
+            foreach (var argument in arguments)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var parameter = argument.Parameter ?? throw new InferenceException("Unbound argument.");

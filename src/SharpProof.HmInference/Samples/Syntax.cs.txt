@@ -1,0 +1,17 @@
+static class SyntaxSamples
+{
+    public static int Deconstruct((int number, bool flag) pair)
+    {
+        var (number, flag) = pair;
+        return number;
+    }
+    public static string Nested((int, (bool, string)) pair)
+    {
+        var (_, (_, text)) = pair;
+        return text;
+    }
+    public static System.Text.StringBuilder Construct(int size, bool ignored) => new(capacity: size);
+    public static string Format(int value, bool ignored) => $"value={value:D4}";
+    public static string ParameterName(int value) => nameof(value);
+    public static string MemberName(string text) => nameof(text.Length);
+}
