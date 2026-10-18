@@ -28,11 +28,12 @@ public sealed partial class DotnetApiInventoryTests
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 8/16/32/64 bit and UTF-16 code units; exact promoted differences; named argument reordering; compiled IR versus runtime", () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false), () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));
             }
 
-            if (row.Evidence.Contains("intrinsic=fresh-default-scalar-dictionary-state", StringComparison.Ordinal))
+            if (row.Evidence.Contains("intrinsic=fresh-default-integer-key-dictionary-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
-                    "compiled empty/default Int32 dictionary, alias Add, two keys, existing-key update, Count and present/missing membership; normal framework return selection; all nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests",
-                    () => CheckDictionaryStateIntrinsic(compilation, false), () => CheckDictionaryStateIntrinsic(compilation, true));
+                    "compiled empty/default Int32-key dictionaries with scalar and reference values, alias Add, two keys, existing-key update, stored identity/null, Count and present/missing membership; normal framework return selection; all nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests",
+                    () => CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true),
+                    () => CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true));
             }
 
             if (row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal))

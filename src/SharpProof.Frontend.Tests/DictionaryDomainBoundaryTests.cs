@@ -60,7 +60,56 @@ public sealed class DictionaryDomainBoundaryTests
             "var data = new System.Collections.Generic.Dictionary<int, int>(); " + body + " return data.Count;");
         context.TrackDefaultDictionaries(graph);
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        Assert.That(context.IsDefaultScalarDictionary(property.Instance!), Is.EqualTo(expected));
+        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(expected));
+    }
+
+    [TestCase("publish(data[17]);", true)]
+    [TestCase("var value = data[17]; publish(value);", true)]
+    [TestCase("var value = data[17]; System.Action callback = () => publish(value);", true)]
+    [TestCase("publish(new object[] { data[17] });", true)]
+    [TestCase("var alias = data; publish(alias[17]);", true)]
+    [TestCase("publish(data);", false)]
+    [TestCase("data[17] = data;", false)]
+    [TestCase("var alias = data; data[17] = alias;", false)]
+    [TestCase("System.Action callback = () => publish(data[17]);", false)]
+    [TestCase("var alias = data; System.Action callback = () => publish(alias[17]);", false)]
+    [TestCase("var holder = new object[] { data }; publish(holder);", false)]
+    public void ReferenceValuePublicationDoesNotPublishOwnerButCapturesStillDo(string body, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (model, syntax, graph, context) = Prepare("System.Action<object> publish",
+            "var data = new System.Collections.Generic.Dictionary<int, object>(); data[17] = null; " + body + " return data.Count;");
+        context.TrackDefaultDictionaries(graph);
+        var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsDefaultIntegerKeyDictionary(property.Instance!), Is.EqualTo(expected));
+    }
+
+    [TestCase("int", "T", "", false)]
+    [TestCase("int", "T", "where T : class", true)]
+    [TestCase("int", "T", "where T : struct", false)]
+    [TestCase("int", "T", "where T : unmanaged", false)]
+    [TestCase("int", "T", "where T : notnull", false)]
+    [TestCase("int", "T", "where T : System.IDisposable", false)]
+    [TestCase("int", "T", "where T : class, System.IDisposable", true)]
+    [TestCase("int", "T", "where T : System.Exception", true)]
+    [TestCase("string", "object", "", false)]
+    [TestCase("int", "decimal", "", false)]
+    [TestCase("int", "object[][]", "", false)]
+    [TestCase("int", "object[]", "", true)]
+    [TestCase("int", "int[,]", "", true)]
+    public void DictionaryValueDomainsRequireScalarOrReferenceEvidence(string key, string value, string constraints, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(constraints);
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static void Target<T>() " + constraints +
+            " { var data = new System.Collections.Generic.Dictionary<" + key + ", " + value + ">(); } }");
+        var compilation = CSharpCompilation.Create("DictionaryValueDomains", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
+        var constructor = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(creation).Symbol!;
+        Assert.That(CSharpOperationSemantics.IsIntegerKeyDictionaryMember(constructor), Is.EqualTo(expected));
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)
