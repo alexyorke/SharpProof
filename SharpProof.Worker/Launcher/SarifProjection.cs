@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using SharpProof.Ir;
 using System.Text.Json;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
@@ -16,7 +18,7 @@ internal static class SarifProjection
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
         var projectDirectoryUri = DirectoryUri(projectDirectory);
-        WorkerProtocolJson.Canonicalize(response);
+        response = WorkerProtocolJson.CanonicalizeCopy(response);
         var manifest = response.Manifest ?? throw new InvalidDataException(
             "The worker response has no manifest.");
         var summary = response.Summary;
@@ -25,29 +27,31 @@ internal static class SarifProjection
         var claimResults = response.ClaimResults;
         var callableResults = response.CallableResults;
         var errors = response.Errors;
-        var claims = manifest.Claims.ToDictionary(
-            static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
-        var callables = manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
+        var claims = ImmutableDictionaryCapture.Create(manifest.Claims,
+            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId,
+            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim, StringComparer.Ordinal);
+        var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
+            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable, StringComparer.Ordinal);
         var results = claimResults
             .Select(result => ClaimResult(
                 request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory))
-            .ToList();
-        results.AddRange(callableResults
+            .ToImmutableList();
+        results = results.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete))
             .Select(result => IncompleteResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
-        results.AddRange(callableResults
+        results = results.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(IsPolicyAssumption)))
             .Select(result => AssumptionResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         var notifications = errors.Select(
-            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))).ToList();
+            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))).ToImmutableList();
 
         if (runStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
         {
-            notifications.Add(Notification(
+            notifications = notifications.Add(Notification(
                 "worker." + runStatus,
                 "SharpProof worker run " + runStatus +
                     " (" + failureReason + ")."));
@@ -90,7 +94,7 @@ internal static class SarifProjection
     }
 
     private static TEntry RequireEntry<TEntry>(
-        Dictionary<string, TEntry> entries, string id, string kind)
+        ImmutableDictionary<string, TEntry> entries, string id, string kind)
         where TEntry : class
     {
         System.ArgumentNullException.ThrowIfNull(kind);

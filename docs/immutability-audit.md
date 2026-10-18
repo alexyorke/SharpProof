@@ -759,94 +759,94 @@ mutable-budget test remains excluded where mutation is the behavior under test.
 | MODEL-222 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:153` | `Origin`: `IrHavocOrigin` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
 | MODEL-223 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:161` | `Name`: `string?` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
 | MODEL-224 | `SharpProof.CompilerArtifact/PortableIrModel.generated.cs:162` | `Instructions`: `PortableIrInstruction[]` | Implemented; record/init and immutable arrays; 706 affected Worker checks passed |
-| MODEL-225 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:36` | `ProtocolVersion`: `string` | Open; coordinated migration |
-| MODEL-226 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:38` | `CompilerManifest`: `WorkerFileReference` | Open; coordinated migration |
-| MODEL-227 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:40` | `Budgets`: `WorkerBudgets` | Open; coordinated migration |
+| MODEL-225 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:36` | `ProtocolVersion`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-226 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:38` | `CompilerManifest`: `WorkerFileReference` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-227 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:40` | `Budgets`: `WorkerBudgets` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-228 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:42` | `Cache`: `WorkerCacheOptions` | Init-only; retained mutable members remain under review |
-| MODEL-229 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:44` | `VerifyPolicy`: `WorkerVerifyPolicy` | Open; coordinated migration |
-| MODEL-230 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:46` | `AssumptionPolicy`: `WorkerAssumptionPolicy` | Open; coordinated migration |
-| MODEL-231 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:52` | `Path`: `string` | Open; coordinated migration |
-| MODEL-232 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:54` | `Sha256`: `string` | Open; coordinated migration |
+| MODEL-229 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:44` | `VerifyPolicy`: `WorkerVerifyPolicy` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-230 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:46` | `AssumptionPolicy`: `WorkerAssumptionPolicy` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-231 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:52` | `Path`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-232 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:54` | `Sha256`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-233 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:90` | `QueryRlimit`: `uint` | Preserve; explicit mutable-budget snapshot-isolation contract |
 | MODEL-234 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:92` | `MethodRlimit`: `uint` | Preserve; explicit mutable-budget snapshot-isolation contract |
 | MODEL-235 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:94` | `MethodWallTimeMilliseconds`: `int` | Preserve; explicit mutable-budget snapshot-isolation contract |
 | MODEL-236 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:96` | `ProjectWallTimeMilliseconds`: `int` | Preserve; explicit mutable-budget snapshot-isolation contract |
 | MODEL-237 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:98` | `MaxParallelism`: `int` | Preserve; explicit mutable-budget snapshot-isolation contract |
 | MODEL-238 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:100` | `MaximumExpressionDepth`: `int` | Preserve; explicit mutable-budget snapshot-isolation contract |
-| MODEL-239 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:107` | `Enabled`: `bool` | Open; coordinated migration |
-| MODEL-240 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:109` | `Directory`: `string?` | Open; coordinated migration |
-| MODEL-241 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:111` | `MaximumBytes`: `long` | Open; coordinated migration |
-| MODEL-242 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:158` | `Path`: `string` | Open; coordinated migration |
-| MODEL-243 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:160` | `Start`: `int` | Open; coordinated migration |
-| MODEL-244 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:162` | `Length`: `int` | Open; coordinated migration |
+| MODEL-239 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:107` | `Enabled`: `bool` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-240 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:109` | `Directory`: `string?` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-241 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:111` | `MaximumBytes`: `long` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-242 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:158` | `Path`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-243 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:160` | `Start`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-244 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:162` | `Length`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-245 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:164` | `Line`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-246 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:166` | `Column`: `int` | Open; coordinated migration |
-| MODEL-247 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:172` | `CallableId`: `string` | Open; coordinated migration |
-| MODEL-248 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:174` | `SelectedFeatures`: `WorkerSelectedFeature[]` | Open; coordinated migration |
-| MODEL-249 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:176` | `SelectionReasons`: `WorkerSelectionReason[]` | Open; coordinated migration |
-| MODEL-250 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:178` | `Location`: `WorkerSourceLocation` | Open; coordinated migration |
-| MODEL-251 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:180` | `ClaimIds`: `string[]` | Open; coordinated migration |
-| MODEL-252 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:182` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; coordinated migration |
-| MODEL-253 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:188` | `ClaimId`: `string` | Open; coordinated migration |
-| MODEL-254 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:190` | `CallableId`: `string` | Open; coordinated migration |
-| MODEL-255 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:192` | `Ordinal`: `int` | Open; coordinated migration |
-| MODEL-256 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:194` | `Kind`: `WorkerClaimKind` | Open; coordinated migration |
-| MODEL-257 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:196` | `Evidence`: `WorkerClaimEvidence` | Open; coordinated migration |
-| MODEL-258 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:198` | `EffectContractKind`: `WorkerEffectContractKind` | Open; coordinated migration |
-| MODEL-259 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:200` | `Location`: `WorkerSourceLocation` | Open; coordinated migration |
-| MODEL-260 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:206` | `SchemaVersion`: `int` | Open; coordinated migration |
-| MODEL-261 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:208` | `Hash`: `string` | Open; coordinated migration |
-| MODEL-262 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:210` | `Callables`: `WorkerCallableManifestEntry[]` | Open; coordinated migration |
-| MODEL-263 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:212` | `Claims`: `WorkerClaimManifestEntry[]` | Open; coordinated migration |
-| MODEL-264 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:368` | `Id`: `string` | Open; coordinated migration |
-| MODEL-265 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:370` | `Kind`: `WorkerAssumptionKind` | Open; coordinated migration |
-| MODEL-266 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:372` | `Used`: `bool` | Open; coordinated migration |
-| MODEL-267 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:378` | `CallableId`: `string` | Open; coordinated migration |
-| MODEL-268 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:380` | `Coverage`: `WorkerCallableCoverage` | Open; coordinated migration |
-| MODEL-269 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:382` | `Reason`: `WorkerCallableCoverageReason` | Open; coordinated migration |
-| MODEL-270 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:384` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; coordinated migration |
-| MODEL-271 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:390` | `ClaimId`: `string` | Open; coordinated migration |
-| MODEL-272 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:392` | `Outcome`: `WorkerClaimOutcome` | Open; coordinated migration |
-| MODEL-273 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:394` | `Reason`: `WorkerClaimReason` | Open; coordinated migration |
-| MODEL-274 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:396` | `EffectCertainty`: `WorkerEffectEvidenceCertainty` | Open; coordinated migration |
-| MODEL-275 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:398` | `EffectWitness`: `WorkerEffectViolationWitness?` | Open; coordinated migration |
-| MODEL-276 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:400` | `Vacuity`: `WorkerVacuityKind` | Open; coordinated migration |
-| MODEL-277 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:402` | `ProofCore`: `string[]` | Open; coordinated migration |
-| MODEL-278 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:404` | `Model`: `WorkerModelValue[]` | Open; coordinated migration |
-| MODEL-279 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:406` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; coordinated migration |
-| MODEL-280 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:412` | `Kind`: `string` | Open; coordinated migration |
+| MODEL-246 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:166` | `Column`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-247 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:172` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-248 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:174` | `SelectedFeatures`: `WorkerSelectedFeature[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-249 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:176` | `SelectionReasons`: `WorkerSelectionReason[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-250 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:178` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-251 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:180` | `ClaimIds`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-252 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:182` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-253 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:188` | `ClaimId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-254 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:190` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-255 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:192` | `Ordinal`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-256 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:194` | `Kind`: `WorkerClaimKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-257 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:196` | `Evidence`: `WorkerClaimEvidence` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-258 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:198` | `EffectContractKind`: `WorkerEffectContractKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-259 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:200` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-260 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:206` | `SchemaVersion`: `int` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-261 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:208` | `Hash`: `string` | Preserve; public in-place SealManifest digest contract |
+| MODEL-262 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:210` | `Callables`: `WorkerCallableManifestEntry[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-263 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:212` | `Claims`: `WorkerClaimManifestEntry[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-264 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:368` | `Id`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-265 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:370` | `Kind`: `WorkerAssumptionKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-266 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:372` | `Used`: `bool` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-267 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:378` | `CallableId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-268 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:380` | `Coverage`: `WorkerCallableCoverage` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-269 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:382` | `Reason`: `WorkerCallableCoverageReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-270 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:384` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-271 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:390` | `ClaimId`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-272 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:392` | `Outcome`: `WorkerClaimOutcome` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-273 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:394` | `Reason`: `WorkerClaimReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-274 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:396` | `EffectCertainty`: `WorkerEffectEvidenceCertainty` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-275 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:398` | `EffectWitness`: `WorkerEffectViolationWitness?` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-276 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:400` | `Vacuity`: `WorkerVacuityKind` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-277 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:402` | `ProofCore`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-278 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:404` | `Model`: `WorkerModelValue[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-279 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:406` | `Assumptions`: `WorkerAssumptionEvidence[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-280 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:412` | `Kind`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-281 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:414` | `Detail`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-282 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:416` | `Effects`: `WorkerEffectSet` | Open; coordinated migration |
-| MODEL-283 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:418` | `Capabilities`: `WorkerEffectCapabilitySet` | Open; coordinated migration |
-| MODEL-284 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:420` | `ExactExceptionTypeHierarchy`: `string[]` | Open; coordinated migration |
-| MODEL-285 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:422` | `Location`: `WorkerSourceLocation` | Open; coordinated migration |
-| MODEL-286 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:428` | `Variable`: `string` | Open; coordinated migration |
-| MODEL-287 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:430` | `Kind`: `string` | Open; coordinated migration |
-| MODEL-288 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:432` | `Value`: `string` | Open; coordinated migration |
-| MODEL-289 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:449` | `ProtocolVersion`: `string` | Open; coordinated migration |
+| MODEL-282 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:416` | `Effects`: `WorkerEffectSet` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-283 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:418` | `Capabilities`: `WorkerEffectCapabilitySet` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-284 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:420` | `ExactExceptionTypeHierarchy`: `string[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-285 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:422` | `Location`: `WorkerSourceLocation` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-286 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:428` | `Variable`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-287 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:430` | `Kind`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-288 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:432` | `Value`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-289 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:449` | `ProtocolVersion`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-290 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:451` | `ManifestSchemaVersion`: `int` | Init-only; retained mutable members remain under review |
 | MODEL-291 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:453` | `CacheSchemaVersion`: `int` | Init-only; retained mutable members remain under review |
-| MODEL-292 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:455` | `WorkerVersion`: `string` | Open; coordinated migration |
+| MODEL-292 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:455` | `WorkerVersion`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
 | MODEL-293 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:457` | `ApiSpecVersion`: `string` | Init-only; retained mutable members remain under review |
 | MODEL-294 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:459` | `WorkerBinarySha256`: `string` | Init-only; retained mutable members remain under review |
 | MODEL-295 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:461` | `ApiSpecContentSha256`: `string` | Init-only; retained mutable members remain under review |
-| MODEL-296 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:467` | `CacheHit`: `bool` | Open; coordinated migration |
-| MODEL-297 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:469` | `CacheStatus`: `WorkerCacheStatus` | Open; coordinated migration |
-| MODEL-298 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:471` | `Versions`: `WorkerVersionSummary` | Open; coordinated migration |
-| MODEL-299 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:473` | `Budgets`: `WorkerBudgets` | Open; coordinated migration |
-| MODEL-300 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:475` | `ElapsedMilliseconds`: `long` | Open; coordinated migration |
-| MODEL-301 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:481` | `Code`: `string` | Open; coordinated migration |
-| MODEL-302 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:483` | `Message`: `string` | Open; coordinated migration |
-| MODEL-303 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:489` | `ProtocolVersion`: `string` | Open; coordinated migration |
-| MODEL-304 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:491` | `RequestHash`: `string` | Open; coordinated migration |
-| MODEL-305 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:493` | `InputHash`: `string` | Open; coordinated migration |
-| MODEL-306 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:495` | `Manifest`: `WorkerClaimManifest` | Open; coordinated migration |
-| MODEL-307 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:497` | `RunStatus`: `WorkerRunStatus` | Open; coordinated migration |
-| MODEL-308 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:499` | `FailureReason`: `WorkerRunFailureReason` | Open; coordinated migration |
-| MODEL-309 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:501` | `CallableResults`: `WorkerCallableResult[]` | Open; coordinated migration |
-| MODEL-310 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:503` | `ClaimResults`: `WorkerClaimResult[]` | Open; coordinated migration |
-| MODEL-311 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:505` | `Summary`: `WorkerVerificationSummary` | Open; coordinated migration |
-| MODEL-312 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:507` | `Errors`: `WorkerProtocolError[]` | Open; coordinated migration |
+| MODEL-296 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:467` | `CacheHit`: `bool` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-297 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:469` | `CacheStatus`: `WorkerCacheStatus` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-298 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:471` | `Versions`: `WorkerVersionSummary` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-299 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:473` | `Budgets`: `WorkerBudgets` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-300 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:475` | `ElapsedMilliseconds`: `long` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-301 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:481` | `Code`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-302 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:483` | `Message`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-303 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:489` | `ProtocolVersion`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-304 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:491` | `RequestHash`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-305 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:493` | `InputHash`: `string` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-306 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:495` | `Manifest`: `WorkerClaimManifest` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-307 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:497` | `RunStatus`: `WorkerRunStatus` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-308 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:499` | `FailureReason`: `WorkerRunFailureReason` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-309 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:501` | `CallableResults`: `WorkerCallableResult[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-310 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:503` | `ClaimResults`: `WorkerClaimResult[]` | Open; immutable array migration; setter preserves public canonicalization |
+| MODEL-311 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:505` | `Summary`: `WorkerVerificationSummary` | Implemented; record/init scalars; 566 affected Worker and 336 Package checks passed |
+| MODEL-312 | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:507` | `Errors`: `WorkerProtocolError[]` | Open; immutable array migration; setter preserves public canonicalization |
 
 ### Remaining analyzer local-state candidates
 
@@ -940,9 +940,9 @@ refactor. Concurrent callback caches retain an explicit concurrency contract.
   tokens unchanged across 226 changed C# files**. Subsequent edits changed only
   method-body style and the nonliteral replacement-validation implementation.
   Golden, sample, template and vendored sources have no changes.
-- Of the 312 inventoried model properties, 231 are now init-only, six budget
-  properties and the in-place Seal digest retain explicit mutable contracts, and
-  74 protocol properties remain open for coordinated review/migration. Init-only collection
+- Of the 312 inventoried model properties, 290 are now init-only, six budget
+  properties and two in-place seal digests retain explicit mutable contracts, and
+  14 protocol collection properties remain open for coordinated migration. Init-only collection
   properties still require deep immutability review; the inventory does not
   silently count retained arrays as immutable.
 - The 35 sites in the strict analyzer local-state appendix are implemented; targeted analyzer tests passed (1,085).
@@ -993,7 +993,7 @@ is itself under test require an explicit boundary justification.
 | FOLLOW-022 | CorpusFileTransaction retained updates across awaits, duplicate/path sets and entries; AllocationIlOracle map/stack/visited/branch arrays; CompilerClrTypeMatcher and NativeExceptionWitnessOracle name stacks | Open |
 | FOLLOW-023 | CorpusGate sets/counters; NativeAllocationWitnessOracle and NativeStaticWriteWitnessOracle initial/alias maps; NativeCorpusVerifier lookup/outcomes; OpenSourceCorpusCatalog map/sets; OpenSourceCorpusImporter dedupe; OpenSourceCorpusRunner diagnostics and indexed assignment counters | Open; do not blanket-exempt algorithm counters |
 | FOLLOW-024 | Host TrustedChildEnvironment and Fuzz FiniteDomainSmtFuzzing/FrontendFuzzing/TotalProgramFuzzing retained snapshots | Unchecked detail; agent shell unavailable during final re-read; boundary-level lead only |
-| FOLLOW-025 | Protocol 74 open model properties plus remaining init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
+| FOLLOW-025 | Protocol 14 open collection properties plus remaining init-only collection deep immutability | Open; preserve malformed/missing/null wire behavior and explicit public Canonicalize/SealManifest mutation contracts |
 
 Follow-up coverage: IR/Dataflow 45 production files / 9,163 lines; SMT 13 files /
 2,043 lines; Contracts 25 files / 5,124 lines; S-Z/lowercase test/support 344 files.
@@ -1170,11 +1170,11 @@ review candidates; the comprehensive stopping condition is still open.
 - Universe: all 58 tracked .ps1/.psm1 files outside artifacts and pinned eng/common,
   including executable documentation and container scripts. Canonical PowerShell
   AST parsing passed all 58; no parse failures.
-- docs/immutability-powershell-residuals.tsv records 915 deduplicated syntax sites:
-  140 generic collection constructors, 208 mutation calls, 74 compound assignments,
+- docs/immutability-powershell-residuals.tsv records 912 deduplicated syntax sites:
+  140 generic collection constructors, 205 mutation calls, 74 compound assignments,
   35 increments, 49 indexed assignments and 409 assignments containing literal
   collections. Literal detection includes nested RHS syntax, so these are review
-  candidates rather than 915 confirmed violations. Framework/native adapters and
+  candidates rather than 912 confirmed violations. Framework/native adapters and
   explicit mutable subjects require evidence-backed classification.
 - Stable content-based IDs avoid shifting every row when a candidate is removed.
   Coverage, source path, line/column, owner, syntax detail and review status are
@@ -1186,3 +1186,44 @@ review candidates; the comprehensive stopping condition is still open.
 - Completion requires classifying every recorded candidate and resolving each
   confirmed unnecessary mutation. This script inventory closes the coverage gap;
   it does not close the remaining implementation work.
+PowerShell count reconciliation: the scanner initially printed 915 observations
+before deduplication; the stored table has 912 distinct rows (205 mutation calls).
+Reporting now counts the distinct stored rows, matching the review universe.
+
+### Protocol scalar and ownership checkpoint
+
+- Converted 59 remaining protocol scalar properties to init and their owners to
+  records. Fourteen wire collection properties remain for the next phase.
+  Both public in-place canonicalization APIs, SealManifest, compiler Seal and the
+  six budget setters retain their explicitly tested mutation contracts.
+- Response assembly, serialization, cache reads, SARIF and publication now copy
+  owners before canonicalization or path/hash rebinding. Already-canonical
+  admitted manifest identity is retained after comparing all sorted collections;
+  unsorted owners are copied rather than rewriting producer data.
+- Fixture scalar corruptions use returned record copies. Compound operators,
+  six manifest-hash callbacks, 18 SetUnknown callers, alias propagation and
+  foreach replacement semantics were checked. A peer review found one SARIF
+  manifest alias that an existing certainty assertion did not detect; its owner
+  is rebound and exported claim kind/evidence/contract metadata is now asserted.
+- The solution builds with zero warnings/errors. All 566 affected Worker checks
+  and all 336 Package checks pass (one existing package skip). Follow-up cache,
+  ownership and SARIF checks pass: 145 Worker plus 25 Package cases. Evidence:
+  artifacts/immutability-protocol-scalars-worker-tests2.log,
+  artifacts/immutability-protocol-scalars-package-tests.log,
+  artifacts/immutability-protocol-copy-cache-tests2.log and
+  artifacts/immutability-protocol-copy-sarif-tests2.log.
+- Canonical full formatting passed with zero changes. Literal preservation
+  verified 2,042 original raw/interpolated tokens across 388 changed C# files.
+  The refreshed inventory parses 1,809 tracked/new non-vendored C# files and
+  records 3,822 syntax candidates, including 12 program-subject exclusions.
+  Evidence: artifacts/immutability-protocol-scalars-format.log and
+  artifacts/immutability-protocol-scalars-preservation.log.
+- The C# candidate IDs now use content/location hashes, matching the stable-ID
+  strategy for scripts. Shared fixture replacement helpers moved to eng/testing
+  and compile into the two consuming test projects. No project was added/moved.
+  The baseline layout command remains unavailable; architecture checks passed
+  in the earlier full ordinary run.
+PowerShell follow-up traced 12 ProcessStartInfo.ArgumentList adapters and seven
+already-immutable dictionary chains; their exact IDs are classified in the TSV.
+The remaining 893 script candidates are open. Rescanning preserves verified
+statuses only when the content/location identity matches.

@@ -570,7 +570,7 @@ public sealed class LauncherArgumentTests
         };
         if (mismatch == "input")
         {
-            response.InputHash = new('b', 64);
+            { response = response with { InputHash = new('b', 64) }; }
         }
         else if (mismatch == "budgets")
         {
@@ -578,7 +578,7 @@ public sealed class LauncherArgumentTests
         }
         else
         {
-            response.Summary.Versions.WorkerVersion = "fabricated";
+            { response = response with { Summary = response.Summary with { Versions = response.Summary.Versions with { WorkerVersion = "fabricated" } } }; }
         }
 
         using var temporary = new TempDirectory(
@@ -792,7 +792,7 @@ public sealed class LauncherArgumentTests
         WorkerClaimReason timeoutReason)
     {
         var request = CreateValidRequest();
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var methodId = timeoutReason == WorkerClaimReason.ProjectTimeout
             ? "C.ProjectTimeout"
             : "C.MethodTimeout";
@@ -1114,41 +1114,50 @@ public sealed class LauncherArgumentTests
         manifest.Callables[0].SelectionReasons = [
             WorkerSelectionReason.ExplicitAnnotation
         ];
-        claim.Kind = WorkerClaimKind.Effect;
-        claim.Evidence = WorkerClaimEvidence.Attribute;
-        claim.EffectContractKind = WorkerEffectContractKind.DoesNotThrow;
+        { var originalFixtureRow42902 = claim; claim = claim with { Kind = WorkerClaimKind.Effect }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow42902, claim) }; }
+        { var originalFixtureRow42947 = claim; claim = claim with { Evidence = WorkerClaimEvidence.Attribute }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow42947, claim) }; }
+        { var originalFixtureRow43003 = claim; claim = claim with { EffectContractKind = WorkerEffectContractKind.DoesNotThrow }; manifest = manifest with { Claims = manifest.Claims.ReplaceReference(originalFixtureRow43003, claim) }; }
         WorkerProtocolJson.SealManifest(manifest);
-        response.ClaimResults[0].Vacuity = WorkerVacuityKind.None;
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+        response = response with { Manifest = manifest };
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.None }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; }
 
         using var certainty = JsonDocument.Parse(
             SarifProjection.Serialize(
                 request, response, SarifProjectDirectory));
         JsonAssert.Equal(ResultEvidence(certainty), "effectCertainty", "CompleteMayEffectSummary");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.kind", "Effect");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.evidence", "Attribute");
+        JsonAssert.Equal(certainty.RootElement, "runs[0].results[0].properties.claim.effectContractKind", "DoesNotThrow");
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.DefiniteViolation;
-        response.ClaimResults[0].EffectWitness =
-            new WorkerEffectViolationWitness
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.DefiniteViolation }) }; }
+        {
+            response = response with
             {
-                Kind = "explicit-throw",
-                Detail = "T:System.InvalidOperationException",
-                Effects = WorkerEffectSet.Throws,
-                ExactExceptionTypeHierarchy = [
+                ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+                {
+                    EffectWitness = new WorkerEffectViolationWitness
+                    {
+                        Kind = "explicit-throw",
+                        Detail = "T:System.InvalidOperationException",
+                        Effects = WorkerEffectSet.Throws,
+                        ExactExceptionTypeHierarchy = [
                     "System.Private.CoreLib:T:System.InvalidOperationException",
                     "System.Private.CoreLib:T:System.Exception"
                 ],
-                Location = new WorkerSourceLocation
-                {
-                    Path = "witness.cs",
-                    Start = 20,
-                    Length = 5,
-                    Line = 9,
-                    Column = 7
-                }
+                        Location = new WorkerSourceLocation
+                        {
+                            Path = "witness.cs",
+                            Start = 20,
+                            Length = 5,
+                            Line = 9,
+                            Column = 7
+                        }
+                    }
+                })
             };
+        }
         using var refuted = JsonDocument.Parse(
             SarifProjection.Serialize(
                 request, response, SarifProjectDirectory));

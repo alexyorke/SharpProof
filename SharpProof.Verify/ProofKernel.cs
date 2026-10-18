@@ -87,9 +87,8 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        var justifications = ImmutableArray.CreateBuilder<ProofJustification>(
-            result.UnsatCore.Length);
-        var seen = new HashSet<int>();
+        var justifications = ImmutableList<ProofJustification>.Empty;
+        var seen = ImmutableHashSet<int>.Empty;
         foreach (var index in result.UnsatCore)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -98,14 +97,15 @@ public sealed class ProofKernel(ISmtBackend backend)
                 return Unknown(AbstentionReason.MalformedBackendResult);
             }
 
-            if (!seen.Add(index))
+            if (seen.Contains(index))
             {
                 continue;
             }
 
-            justifications.Add(query.Assumptions[index].Justification);
+            seen = seen.Add(index);
+            justifications = justifications.Add(query.Assumptions[index].Justification);
         }
-        return new ProvenOutcome(justifications.ToImmutable());
+        return new ProvenOutcome(justifications.ToImmutableArray());
     }
     private static ProofOutcome ReplayCounterexample(
         VerificationQuery query,

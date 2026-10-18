@@ -79,16 +79,16 @@ public sealed class CompilerReportingTests
         switch (coordinate)
         {
             case "start":
-                second.Location.Start++;
+                second = second with { Location = second.Location with { Start = second.Location.Start + 1 } };
                 break;
             case "line":
                 { second = second with { Location = second.Location with { Line = second.Location.Line + 1 } }; }
                 break;
             case "column":
-                second.Location.Column++;
+                second = second with { Location = second.Location with { Column = second.Location.Column + 1 } };
                 break;
             case "path":
-                second.Location.Path += ".other";
+                { second = second with { Location = second.Location with { Path = second.Location.Path + (".other") } }; }
                 break;
             case "message":
                 { second = second with { Message = second.Message + " other" }; }
@@ -120,7 +120,7 @@ public sealed class CompilerReportingTests
         // Rebinding replaces the producer's previous association.
         CompilerSourceCoordinates.RememberTree(location, 0);
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
-        location.Column++;
+        location = location with { Column = location.Column + 1 };
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(-1));
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerSourceCoordinates.Bind(location, compilation, out _, out _, out _, out _)));
@@ -132,13 +132,13 @@ public sealed class CompilerReportingTests
         var tree = Tree("physical.cs");
         tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { CharacterOffset = 2 }) };
         var location = Location();
-        location.Column = 3;
+        { location = location with { Column = 3 }; }
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [tree], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
         using (Assert.EnterMultipleScope())
         {
-            location.Start = 1;
-            location.Column = 2;
+            { location = location with { Start = 1 }; }
+            { location = location with { Column = 2 }; }
             Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
             Assert.That(CompilerSourceCoordinates.FindUniqueTree(null, [tree], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(-1));
         }
@@ -183,7 +183,7 @@ public sealed class CompilerReportingTests
         Assert.Throws<OperationCanceledException>((Action)(() =>
             CompilerSourceCoordinates.FindUniqueTree(Location(), [tree], canceled.Token)));
         var location = Location();
-        location.Start = tree.TextLength + 1;
+        { location = location with { Start = tree.TextLength + 1 }; }
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         tree = tree with { LineMap = tree.LineMap.SetItem(0, tree.LineMap[0] with { MappedColumn = int.MaxValue }) };
         Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(Location(), tree, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);

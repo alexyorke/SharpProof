@@ -30,11 +30,11 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var first = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
 
-        request.CompilerManifest.Sha256 = new string('f', 64);
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = new string('f', 64) } }; }
         var mismatched = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(mismatched.FailureReason, Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
 
-        request.CompilerManifest.Sha256 = snapshot.ArtifactDigest;
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = snapshot.ArtifactDigest } }; }
         request.Budgets.MethodRlimit++;
         File.Delete(request.CompilerManifest.Path);
         var changedBudget = await worker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
@@ -172,7 +172,7 @@ public sealed partial class WorkerTests
             WorkerProtocolJson.DeserializeRequest(
                 """{"protocolVersion":"1","unknown":true}""")));
 
-        request.ProtocolVersion = WorkerProtocolVersions.Current;
+        { request = request with { ProtocolVersion = WorkerProtocolVersions.Current }; }
         request.Budgets.QueryRlimit = 2;
         request.Budgets.MethodRlimit = 1;
         validation = WorkerProtocolJson.Validate(request);
@@ -294,7 +294,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -340,7 +340,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: true);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -557,7 +557,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -654,7 +654,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -695,7 +695,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -1043,7 +1043,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -1166,7 +1166,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -1420,8 +1420,7 @@ public sealed partial class WorkerTests
         json = root.ToJsonString(WorkerProtocolJson.Options) + "\n";
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
 
         var deserializeException = CaptureJson(() =>
             CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken));
@@ -1520,8 +1519,7 @@ public sealed partial class WorkerTests
             StringComparison.Ordinal);
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         using var worker = new SharpProofWorker(
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
@@ -1578,8 +1576,7 @@ public sealed partial class WorkerTests
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        request.CompilerManifest.Sha256 =
-            WorkerProtocolJson.ComputeSha256(bytes);
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -4503,7 +4500,7 @@ public sealed partial class WorkerTests
                 null!),
             Is.False);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4511,7 +4508,7 @@ public sealed partial class WorkerTests
                 manifest),
             Is.True);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Unknown }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4519,9 +4516,8 @@ public sealed partial class WorkerTests
                 manifest),
             Is.False);
 
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
-        response.ClaimResults[0].Reason =
-            WorkerClaimReason.InfrastructureFailure;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Proven }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Reason = WorkerClaimReason.InfrastructureFailure }) }; }
         Assert.That(
             VerificationCache.IsCacheable(
                 response,
@@ -4529,7 +4525,7 @@ public sealed partial class WorkerTests
                 manifest),
             Is.False);
 
-        response.ClaimResults[0].Reason = WorkerClaimReason.None;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Reason = WorkerClaimReason.None }) }; }
         response.Errors = [
             new WorkerProtocolError {
                 Code = "worker.error",
@@ -4620,7 +4616,7 @@ public sealed partial class WorkerTests
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -4649,7 +4645,7 @@ public sealed partial class WorkerTests
         await File.WriteAllTextAsync(unrelatedPath, "not a cache entry");
 
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
         await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -4668,7 +4664,7 @@ public sealed partial class WorkerTests
         await File.WriteAllTextAsync(legacyPath, legacyContents);
 
         var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1;
+        { request = request with { Cache = request.Cache with { MaximumBytes = 1 } }; }
         using var worker = new SharpProofWorker(new SpuriousModelBackend());
         await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 

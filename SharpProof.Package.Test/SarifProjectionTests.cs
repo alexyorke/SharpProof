@@ -88,17 +88,22 @@ public sealed class SarifProjectionTests
         };
         if (outcome == WorkerClaimOutcome.Refuted)
         {
-            result.EffectWitness = new WorkerEffectViolationWitness
             {
-                Kind = "write",
-                Detail = "observable state",
-                Location = new WorkerSourceLocation
+                result = result with
                 {
-                    Path = "Witness.cs",
-                    Line = 7,
-                    Column = 8
-                }
-            };
+                    EffectWitness = new WorkerEffectViolationWitness
+                    {
+                        Kind = "write",
+                        Detail = "observable state",
+                        Location = new WorkerSourceLocation
+                        {
+                            Path = "Witness.cs",
+                            Line = 7,
+                            Column = 8
+                        }
+                    }
+                };
+            }
         }
         using var document = JsonDocument.Parse(SarifProjection.Serialize(
             new WorkerVerifyRequest { VerifyPolicy = policy },

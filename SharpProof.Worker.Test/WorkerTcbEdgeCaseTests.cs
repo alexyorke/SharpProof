@@ -349,8 +349,8 @@ public sealed class WorkerTcbEdgeCaseTests
             0,
             WorkerClaimReason.UnsupportedExpression);
 
-        first.Assumptions[0].Id = "mutated";
-        first.Assumptions[0].Used = true;
+        { first = first with { Assumptions = first.Assumptions.ReplaceAt(0, first.Assumptions[0] with { Id = "mutated" }) }; }
+        { first = first with { Assumptions = first.Assumptions.ReplaceAt(0, first.Assumptions[0] with { Used = true }) }; }
 
         using (Assert.EnterMultipleScope())
         {

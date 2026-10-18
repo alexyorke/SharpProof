@@ -85,7 +85,7 @@ public sealed class ProtocolBoundaryContractTests
         var hash = WorkerProtocolJson.ComputeManifestHash(manifest);
         manifest.Callables[0].Assumptions = manifest.Callables[0].Assumptions.Reverse().ToArray();
         Assert.That(WorkerProtocolJson.ComputeManifestHash(manifest), Is.EqualTo(hash));
-        manifest.Callables[0].Assumptions[0].Kind = (WorkerAssumptionKind)int.MaxValue;
+        { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { Assumptions = manifest.Callables[0].Assumptions.ReplaceAt(0, manifest.Callables[0].Assumptions[0] with { Kind = (WorkerAssumptionKind)int.MaxValue }) }) }; }
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => WorkerProtocolJson.ComputeManifestHash(manifest)));
     }
 
@@ -113,10 +113,10 @@ public sealed class ProtocolBoundaryContractTests
     {
         var request = Request();
         var response = Response();
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var versions = response.Summary.Versions;
-        response.Summary = null!;
+        { response = response with { Summary = null! }; }
         Assert.That(WorkerProtocolJson.ValidateForRequest(response, response.RequestHash,
             response.InputHash, response.Manifest, request, versions).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
             Does.Contain("response.summary"));
@@ -130,11 +130,11 @@ public sealed class ProtocolBoundaryContractTests
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         if (callable)
         {
-            response.CallableResults[0].Coverage = (WorkerCallableCoverage)int.MaxValue;
+            { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = (WorkerCallableCoverage)int.MaxValue }) }; }
         }
         else
         {
-            response.ClaimResults[0].Outcome = (WorkerClaimOutcome)int.MaxValue;
+            { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = (WorkerClaimOutcome)int.MaxValue }) }; }
         }
         var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToArray();
         Assert.That(codes, Does.Contain(callable ? "response.callable_coverage" : "response.claim_outcome"));

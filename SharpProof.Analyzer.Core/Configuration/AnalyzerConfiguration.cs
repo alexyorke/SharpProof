@@ -100,7 +100,7 @@ internal sealed class AnalyzerConfiguration
             parseValues: true,
             profileAliases: profileAliases,
             featuresAliases: featuresAliases)
-            .ToList();
+            .ToImmutableList();
         if (!invalid.Any(static value =>
                 value.Key == AnalyzerConfigurationOptionRegistry.Profile.Key) &&
             options.TryGetValue(
@@ -118,7 +118,7 @@ internal sealed class AnalyzerConfiguration
                 msBuildProfile) &&
             !Is(analyzerProfile, msBuildProfile))
         {
-            invalid.Add(new InvalidAnalyzerConfigurationValue(
+            invalid = invalid.Add(new InvalidAnalyzerConfigurationValue(
                 AnalyzerConfigurationOptionRegistry.Profile.Key,
                 analyzerProfile.Trim() + " / " + msBuildProfile.Trim(),
                 "profile must match the MSBuild SharpProofProfile property, which controls package and verifier behavior"));

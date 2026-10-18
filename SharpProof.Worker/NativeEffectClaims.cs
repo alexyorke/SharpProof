@@ -78,15 +78,15 @@ internal static class NativeEffectClaims
         {
             var record = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Proven,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
-            record.ProofCore = ["native-effect:" + claimId];
-            record.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedRequires(target, check.Core));
+            record = record with { ProofCore = ["native-effect:" + claimId] };
+            record = record with { Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedRequires(target, check.Core)) };
             return record;
         }
         if (check.Outcome is RefutedOutcome && check.Reason == WorkerClaimReason.None && Witness(target, check) is { } witness)
         {
             var record = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Refuted,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation);
-            record.EffectWitness = witness;
+            record = record with { EffectWitness = witness };
             return record;
         }
         return Unknown(target, claimId, check.Outcome is RefutedOutcome ? WorkerClaimReason.CounterexampleNotReplayable : check.Reason);

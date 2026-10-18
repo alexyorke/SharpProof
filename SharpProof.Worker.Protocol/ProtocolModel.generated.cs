@@ -30,28 +30,28 @@ public static class WorkerLauncherDefaults
     public const int MaximumTerminationGraceMilliseconds = 300000;
 }
 
-public sealed class WorkerVerifyRequest
+public sealed record WorkerVerifyRequest
 {
     [JsonRequired]
-    public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
     [JsonRequired]
-    public WorkerFileReference CompilerManifest { get; set; } = new();
+    public WorkerFileReference CompilerManifest { get; init; } = new();
     [JsonRequired]
-    public WorkerBudgets Budgets { get; set; } = new();
+    public WorkerBudgets Budgets { get; init; } = new();
     [JsonRequired]
     public WorkerCacheOptions Cache { get; init; } = new();
     [JsonRequired]
-    public WorkerVerifyPolicy VerifyPolicy { get; set; } = WorkerVerifyPolicy.Advisory;
+    public WorkerVerifyPolicy VerifyPolicy { get; init; } = WorkerVerifyPolicy.Advisory;
     [JsonRequired]
-    public WorkerAssumptionPolicy AssumptionPolicy { get; set; } = WorkerAssumptionPolicy.Allow;
+    public WorkerAssumptionPolicy AssumptionPolicy { get; init; } = WorkerAssumptionPolicy.Allow;
 }
 
-public sealed class WorkerFileReference
+public sealed record WorkerFileReference
 {
     [JsonRequired]
-    public string Path { get; set; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
     [JsonRequired]
-    public string Sha256 { get; set; } = string.Empty;
+    public string Sha256 { get; init; } = string.Empty;
 }
 
 public enum WorkerFeatureSet
@@ -100,15 +100,15 @@ public sealed class WorkerBudgets
     public int MaximumExpressionDepth { get; set; } = DefaultMaximumExpressionDepth;
 }
 
-public sealed class WorkerCacheOptions
+public sealed record WorkerCacheOptions
 {
     public const long DefaultMaximumBytes = 536870912L;
     [JsonRequired]
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; init; } = true;
     [JsonRequired]
-    public string? Directory { get; set; }
+    public string? Directory { get; init; }
     [JsonRequired]
-    public long MaximumBytes { get; set; } = DefaultMaximumBytes;
+    public long MaximumBytes { get; init; } = DefaultMaximumBytes;
 }
 
 public enum WorkerSelectedFeature
@@ -155,55 +155,55 @@ public enum WorkerEffectContractKind
 public sealed record WorkerSourceLocation
 {
     [JsonRequired]
-    public string Path { get; set; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
     [JsonRequired]
-    public int Start { get; set; }
+    public int Start { get; init; }
     [JsonRequired]
-    public int Length { get; set; }
+    public int Length { get; init; }
     [JsonRequired]
     public int Line { get; init; }
     [JsonRequired]
-    public int Column { get; set; }
+    public int Column { get; init; }
 }
 
 public sealed record WorkerCallableManifestEntry
 {
     [JsonRequired]
-    public string CallableId { get; set; } = string.Empty;
+    public string CallableId { get; init; } = string.Empty;
     [JsonRequired]
     public WorkerSelectedFeature[] SelectedFeatures { get; set; } = [];
     [JsonRequired]
     public WorkerSelectionReason[] SelectionReasons { get; set; } = [];
     [JsonRequired]
-    public WorkerSourceLocation Location { get; set; } = new();
+    public WorkerSourceLocation Location { get; init; } = new();
     [JsonRequired]
     public string[] ClaimIds { get; set; } = [];
     [JsonRequired]
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerClaimManifestEntry
+public sealed record WorkerClaimManifestEntry
 {
     [JsonRequired]
-    public string ClaimId { get; set; } = string.Empty;
+    public string ClaimId { get; init; } = string.Empty;
     [JsonRequired]
-    public string CallableId { get; set; } = string.Empty;
+    public string CallableId { get; init; } = string.Empty;
     [JsonRequired]
-    public int Ordinal { get; set; }
+    public int Ordinal { get; init; }
     [JsonRequired]
-    public WorkerClaimKind Kind { get; set; }
+    public WorkerClaimKind Kind { get; init; }
     [JsonRequired]
-    public WorkerClaimEvidence Evidence { get; set; }
+    public WorkerClaimEvidence Evidence { get; init; }
     [JsonRequired]
-    public WorkerEffectContractKind EffectContractKind { get; set; }
+    public WorkerEffectContractKind EffectContractKind { get; init; }
     [JsonRequired]
-    public WorkerSourceLocation Location { get; set; } = new();
+    public WorkerSourceLocation Location { get; init; } = new();
 }
 
 public sealed record WorkerClaimManifest
 {
     [JsonRequired]
-    public int SchemaVersion { get; set; } = WorkerManifestVersions.Current;
+    public int SchemaVersion { get; init; } = WorkerManifestVersions.Current;
     [JsonRequired]
     public string Hash { get; set; } = string.Empty;
     [JsonRequired]
@@ -362,42 +362,42 @@ public enum WorkerAssumptionKind
     NormalCompletion = 6
 }
 
-public sealed class WorkerAssumptionEvidence
+public sealed record WorkerAssumptionEvidence
 {
     [JsonRequired]
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerAssumptionKind Kind { get; set; }
+    public WorkerAssumptionKind Kind { get; init; }
     [JsonRequired]
-    public bool Used { get; set; }
+    public bool Used { get; init; }
 }
 
-public sealed class WorkerCallableResult
+public sealed record WorkerCallableResult
 {
     [JsonRequired]
-    public string CallableId { get; set; } = string.Empty;
+    public string CallableId { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerCallableCoverage Coverage { get; set; }
+    public WorkerCallableCoverage Coverage { get; init; }
     [JsonRequired]
-    public WorkerCallableCoverageReason Reason { get; set; }
+    public WorkerCallableCoverageReason Reason { get; init; }
     [JsonRequired]
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerClaimResult
+public sealed record WorkerClaimResult
 {
     [JsonRequired]
-    public string ClaimId { get; set; } = string.Empty;
+    public string ClaimId { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerClaimOutcome Outcome { get; set; }
+    public WorkerClaimOutcome Outcome { get; init; }
     [JsonRequired]
-    public WorkerClaimReason Reason { get; set; }
+    public WorkerClaimReason Reason { get; init; }
     [JsonRequired]
-    public WorkerEffectEvidenceCertainty EffectCertainty { get; set; }
+    public WorkerEffectEvidenceCertainty EffectCertainty { get; init; }
     [JsonRequired]
-    public WorkerEffectViolationWitness? EffectWitness { get; set; }
+    public WorkerEffectViolationWitness? EffectWitness { get; init; }
     [JsonRequired]
-    public WorkerVacuityKind Vacuity { get; set; }
+    public WorkerVacuityKind Vacuity { get; init; }
     [JsonRequired]
     public string[] ProofCore { get; set; } = [];
     [JsonRequired]
@@ -406,30 +406,30 @@ public sealed class WorkerClaimResult
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerEffectViolationWitness
+public sealed record WorkerEffectViolationWitness
 {
     [JsonRequired]
-    public string Kind { get; set; } = string.Empty;
+    public string Kind { get; init; } = string.Empty;
     [JsonRequired]
     public string Detail { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerEffectSet Effects { get; set; }
+    public WorkerEffectSet Effects { get; init; }
     [JsonRequired]
-    public WorkerEffectCapabilitySet Capabilities { get; set; }
+    public WorkerEffectCapabilitySet Capabilities { get; init; }
     [JsonRequired]
     public string[] ExactExceptionTypeHierarchy { get; set; } = [];
     [JsonRequired]
-    public WorkerSourceLocation Location { get; set; } = new();
+    public WorkerSourceLocation Location { get; init; } = new();
 }
 
-public sealed class WorkerModelValue
+public sealed record WorkerModelValue
 {
     [JsonRequired]
-    public string Variable { get; set; } = string.Empty;
+    public string Variable { get; init; } = string.Empty;
     [JsonRequired]
-    public string Kind { get; set; } = string.Empty;
+    public string Kind { get; init; } = string.Empty;
     [JsonRequired]
-    public string Value { get; set; } = string.Empty;
+    public string Value { get; init; } = string.Empty;
 }
 
 public enum WorkerCacheStatus
@@ -446,13 +446,13 @@ public enum WorkerCacheStatus
 public sealed record WorkerVersionSummary
 {
     [JsonRequired]
-    public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
     [JsonRequired]
     public int ManifestSchemaVersion { get; init; } = WorkerManifestVersions.Current;
     [JsonRequired]
     public int CacheSchemaVersion { get; init; } = WorkerCacheVersions.Current;
     [JsonRequired]
-    public string WorkerVersion { get; set; } = string.Empty;
+    public string WorkerVersion { get; init; } = string.Empty;
     [JsonRequired]
     public string ApiSpecVersion { get; init; } = string.Empty;
     [JsonRequired]
@@ -461,48 +461,48 @@ public sealed record WorkerVersionSummary
     public string ApiSpecContentSha256 { get; init; } = WorkerProtocolVersions.EmptySha256;
 }
 
-public sealed class WorkerVerificationSummary
+public sealed record WorkerVerificationSummary
 {
     [JsonRequired]
-    public bool CacheHit { get; set; }
+    public bool CacheHit { get; init; }
     [JsonRequired]
-    public WorkerCacheStatus CacheStatus { get; set; }
+    public WorkerCacheStatus CacheStatus { get; init; }
     [JsonRequired]
-    public WorkerVersionSummary Versions { get; set; } = new();
+    public WorkerVersionSummary Versions { get; init; } = new();
     [JsonRequired]
-    public WorkerBudgets Budgets { get; set; } = new();
+    public WorkerBudgets Budgets { get; init; } = new();
     [JsonRequired]
-    public long ElapsedMilliseconds { get; set; }
+    public long ElapsedMilliseconds { get; init; }
 }
 
-public sealed class WorkerProtocolError
+public sealed record WorkerProtocolError
 {
     [JsonRequired]
-    public string Code { get; set; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
     [JsonRequired]
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
 }
 
-public sealed class WorkerVerifyResponse
+public sealed record WorkerVerifyResponse
 {
     [JsonRequired]
-    public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
     [JsonRequired]
-    public string RequestHash { get; set; } = WorkerProtocolVersions.EmptySha256;
+    public string RequestHash { get; init; } = WorkerProtocolVersions.EmptySha256;
     [JsonRequired]
-    public string InputHash { get; set; } = string.Empty;
+    public string InputHash { get; init; } = string.Empty;
     [JsonRequired]
-    public WorkerClaimManifest Manifest { get; set; } = new();
+    public WorkerClaimManifest Manifest { get; init; } = new();
     [JsonRequired]
-    public WorkerRunStatus RunStatus { get; set; }
+    public WorkerRunStatus RunStatus { get; init; }
     [JsonRequired]
-    public WorkerRunFailureReason FailureReason { get; set; }
+    public WorkerRunFailureReason FailureReason { get; init; }
     [JsonRequired]
     public WorkerCallableResult[] CallableResults { get; set; } = [];
     [JsonRequired]
     public WorkerClaimResult[] ClaimResults { get; set; } = [];
     [JsonRequired]
-    public WorkerVerificationSummary Summary { get; set; } = new();
+    public WorkerVerificationSummary Summary { get; init; } = new();
     [JsonRequired]
     public WorkerProtocolError[] Errors { get; set; } = [];
 }

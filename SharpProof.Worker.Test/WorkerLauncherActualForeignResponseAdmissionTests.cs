@@ -52,8 +52,11 @@ public sealed partial class WorkerTests
         Assert.That(await File.ReadAllBytesAsync(positive.PublishCompilerManifestPath!), Is.EqualTo(artifactBytes));
         var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(positive.PublishResultPath!))
             ?? throw new AssertionException("Matching actual response was not published.");
-        Assert.That(WorkerProtocolJson.ValidateForRequest(published, WorkerProtocolJson.ComputeRequestHash(request),
-            snapshot.InputHash, snapshot.CompilerManifest.Manifest, request, Launcher.Program.ExpectedVersions()).IsValid, Is.True);
+        var publishedRequest = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(positive.PublishRequestPath!))
+            ?? throw new AssertionException("Matching actual request was not published.");
+        Assert.That(WorkerProtocolJson.SerializeRequest(request), Is.EqualTo(originalRequestJson));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(published, WorkerProtocolJson.ComputeRequestHash(publishedRequest),
+            snapshot.InputHash, snapshot.CompilerManifest.Manifest, publishedRequest, Launcher.Program.ExpectedVersions()).IsValid, Is.True);
         var negativeRequest = WorkerProtocolJson.DeserializeRequest(originalRequestJson)
             ?? throw new AssertionException("The original actual request did not deserialize.");
         var negative = Arguments("rejected");

@@ -70,8 +70,15 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
         Assert.That(claim.EffectWitness, Is.Not.Null);
         Assert.That(claim.EffectWitness!.Effects, Is.EqualTo(contract == WorkerEffectContractKind.DoesNotThrow
             ? WorkerEffectSet.Throws : WorkerEffectSet.Allocates));
-        claim.EffectWitness = CreateWitness(contract == WorkerEffectContractKind.DoesNotThrow
-            ? WorkerEffectSet.Allocates : WorkerEffectSet.Throws, claim.EffectWitness.Location);
+        {
+            var originalFixtureRow4428 = claim;
+            claim = claim with
+            {
+                EffectWitness = CreateWitness(contract == WorkerEffectContractKind.DoesNotThrow
+            ? WorkerEffectSet.Allocates : WorkerEffectSet.Throws, claim.EffectWitness.Location)
+            };
+            response = response with { ClaimResults = response.ClaimResults.ReplaceReference(originalFixtureRow4428, claim) };
+        }
         var json = WorkerProtocolJson.SerializeResponse(response);
         using var directory = new TempDirectory("wave8-native-witness-");
         var path = Path.Combine(directory.FullName, "response.json");

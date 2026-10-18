@@ -20,13 +20,18 @@ internal static class WorkerResultAssembler
         {
             throw new System.IO.InvalidDataException("The worker response summary is missing.");
         }
-        response.RequestHash = requestHash;
-        response.Summary.CacheStatus = cacheStatus;
-        response.Summary.CacheHit = cacheStatus == WorkerCacheStatus.Hit;
-        response.Summary.Budgets = CloneBudgets(budgets);
-        response.Summary.Versions = versions;
-        response.Summary.ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds);
-        return response;
+        return response with
+        {
+            RequestHash = requestHash,
+            Summary = response.Summary with
+            {
+                CacheStatus = cacheStatus,
+                CacheHit = cacheStatus == WorkerCacheStatus.Hit,
+                Budgets = CloneBudgets(budgets),
+                Versions = versions,
+                ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds)
+            }
+        };
     }
 
     internal static WorkerVerifyResponse Create(
@@ -61,8 +66,7 @@ internal static class WorkerResultAssembler
             },
             Errors = errors?.ToArray() ?? []
         };
-        WorkerProtocolJson.Canonicalize(response);
-        return response;
+        return WorkerProtocolJson.CanonicalizeCopy(response);
     }
 
     // Cache envelopes must retain their stored shapes until admission validates them.

@@ -39,8 +39,8 @@ internal static class CallableReplayValidator
     {
         if (!EntryConstraintsHold(factory, context.EntryConstraints, model, cancellationToken))
         { return AbstentionReason.CounterexampleReplayFailed; }
-        var final = model.ToBuilder();
-        var approximationVariables = new HashSet<IrVarId>();
+        var final = model;
+        var approximationVariables = ImmutableHashSet<IrVarId>.Empty;
         IrHeap? heap = null;
         if (!context.IsTrivial)
         {
@@ -49,11 +49,11 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+            var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                initial[binding.Key] = GetRequiredValue(model, binding.Value);
+                initial = initial.SetItem(binding.Key, GetRequiredValue(model, binding.Value));
             }
             var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
                 request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
@@ -68,7 +68,7 @@ internal static class CallableReplayValidator
                 replayOptions.ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider;
             }
             var execution = new IrProgramInterpreter(factory).Execute(
-                program, initial.ToImmutable(), context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
+                program, initial, context.MaximumSteps, context.CallHost, replayOptions, cancellationToken);
             if (execution.ConsumedApproximation)
             {
                 return AbstentionReason.CounterexampleNotReplayable;
@@ -85,11 +85,11 @@ internal static class CallableReplayValidator
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                final[binding.Value] = GetRequiredValue(execution.Values, binding.Key);
-                approximationVariables.Remove(binding.Value);
+                final = final.SetItem(binding.Value, GetRequiredValue(execution.Values, binding.Key));
+                approximationVariables = approximationVariables.Remove(binding.Value);
                 if (execution.ApproximationVariables.Contains(binding.Key))
                 {
-                    approximationVariables.Add(binding.Value);
+                    approximationVariables = approximationVariables.Add(binding.Value);
                 }
             }
             if (context.ResultVariables.Length > 1 ||
@@ -102,8 +102,8 @@ internal static class CallableReplayValidator
             }
             if (context.ResultVariables.Length == 1)
             {
-                final[context.ResultVariables[0]] = execution.ReturnValue!;
-                approximationVariables.Remove(context.ResultVariables[0]);
+                final = final.SetItem(context.ResultVariables[0], execution.ReturnValue!);
+                approximationVariables = approximationVariables.Remove(context.ResultVariables[0]);
             }
         }
         else if (context.Program != null || !context.ParameterBindings.IsEmpty ||
@@ -119,8 +119,8 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            final[binding.Key] = value;
-            approximationVariables.Remove(binding.Key);
+            final = final.SetItem(binding.Key, value);
+            approximationVariables = approximationVariables.Remove(binding.Key);
         }
         foreach (var domain in context.IntegerDomains)
         {
@@ -143,7 +143,7 @@ internal static class CallableReplayValidator
         }
         var interpreter = new IrInterpreter(factory);
         // An Old read sees the objects as the callable entered.
-        var snapshots = context.PreStateBindings.Keys.ToArray();
+        var snapshots = context.PreStateBindings.Keys.ToImmutableHashSet();
         if (factory.Semantics == IrExecutionSemantics.Total)
         {
             if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)

@@ -26,7 +26,7 @@ public sealed partial class WorkerTests
         WorkerVerifyResponse unavailable;
         try
         {
-            request.Cache.MaximumBytes = entryBytes - 1;
+            { request = request with { Cache = request.Cache with { MaximumBytes = entryBytes - 1 } }; }
             File.SetUnixFileMode(project.CacheDirectory,
                 UnixFileMode.UserRead | UnixFileMode.UserExecute);
             Assert.Throws<UnauthorizedAccessException>(new Action(() => File.Delete(cachePath)));
@@ -35,7 +35,7 @@ public sealed partial class WorkerTests
         finally
         {
             File.SetUnixFileMode(project.CacheDirectory, originalMode);
-            request.Cache.MaximumBytes = originalCapacity;
+            { request = request with { Cache = request.Cache with { MaximumBytes = originalCapacity } }; }
         }
         var cached = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())

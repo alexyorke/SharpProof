@@ -21,7 +21,7 @@ public sealed class Wave8ProtocolInvalidEffectContractTests
         Assert.That(claim.EffectWitness!.Effects, Is.EqualTo(WorkerEffectSet.Throws));
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        response.Manifest.Claims.Single().EffectContractKind = kind;
+        { response = response with { Manifest = response.Manifest with { Claims = response.Manifest.Claims.ReplaceReference(response.Manifest.Claims.Single(), response.Manifest.Claims.Single() with { EffectContractKind = kind }) } }; }
         var validation = WorkerProtocolJson.Validate(response);
         using (Assert.EnterMultipleScope())
         {

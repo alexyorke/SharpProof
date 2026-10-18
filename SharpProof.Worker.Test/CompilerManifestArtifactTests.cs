@@ -1142,9 +1142,18 @@ public sealed class CompilerManifestArtifactTests
                 item.MappedColumn <= mappedColumn &&
                 mappedColumn - item.MappedColumn <= item.SourceLength));
             Assert.That(entry, Is.Not.Null);
-            diagnostic.Location.Path = entry!.MappedPath;
-            diagnostic.Location.Start = entry.SourceStart +
-                mappedColumn - entry.MappedColumn;
+            { diagnostic = diagnostic with { Location = diagnostic.Location with { Path = entry!.MappedPath } }; artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.ReplaceAt(index, diagnostic) }; }
+            {
+                diagnostic = diagnostic with
+                {
+                    Location = diagnostic.Location with
+                    {
+                        Start = entry.SourceStart +
+                mappedColumn - entry.MappedColumn
+                    }
+                };
+                artifact = artifact with { CompilerDiagnostics = artifact.CompilerDiagnostics.ReplaceAt(index, diagnostic) };
+            }
             {
                 artifact = artifact with
                 {

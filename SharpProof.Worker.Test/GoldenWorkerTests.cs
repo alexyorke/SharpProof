@@ -1145,9 +1145,9 @@ public sealed class GoldenWorkerTests
         if (scenario == "publication-private-binding")
         {
             var substitutedRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(request))!;
-            substitutedRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+            { substitutedRequest = substitutedRequest with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
             var substitutedResponse = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
-            substitutedResponse.RequestHash = WorkerProtocolJson.ComputeRequestHash(substitutedRequest);
+            { substitutedResponse = substitutedResponse with { RequestHash = WorkerProtocolJson.ComputeRequestHash(substitutedRequest) }; }
             var preparedBinding = WorkerProtocolJson.ValidateForRequest(substitutedResponse, WorkerProtocolJson.ComputeRequestHash(request),
                 snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
             output.AppendLine(CultureInfo.InvariantCulture, $"prepared-request-bound: {preparedBinding.IsValid}");

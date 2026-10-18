@@ -67,7 +67,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             // Validate stored evidence before normalization can repair malformed fields.
-            WorkerProtocolJson.Canonicalize(response);
+            response = WorkerProtocolJson.CanonicalizeCopy(response);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             return response;
         }

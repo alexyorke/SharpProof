@@ -98,17 +98,18 @@ internal sealed class VerificationPublication
         {
             throw new InvalidDataException("The private result is not bound to its invocation request.");
         }
-        var preparedManifestPath = request.CompilerManifest.Path;
-        request.CompilerManifest.Path = invocationRequest.CompilerManifest.Path;
-        var matchesInvocation = WorkerProtocolJson.SerializeRequest(request) == WorkerProtocolJson.SerializeRequest(invocationRequest);
-        request.CompilerManifest.Path = preparedManifestPath;
+        var invocationRequestShape = request with
+        {
+            CompilerManifest = request.CompilerManifest with { Path = invocationRequest.CompilerManifest.Path }
+        };
+        var matchesInvocation = WorkerProtocolJson.SerializeRequest(invocationRequestShape) == WorkerProtocolJson.SerializeRequest(invocationRequest);
         if (!matchesInvocation || !WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
                 invocationResponse.InputHash, invocationResponse.Manifest, request, invocationResponse.Summary.Versions).IsValid)
         {
             throw new InvalidDataException("The prepared publication does not belong to this invocation request.");
         }
-        request.CompilerManifest.Path = manifestPaths.Stable;
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        request = request with { CompilerManifest = request.CompilerManifest with { Path = manifestPaths.Stable } };
+        response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) };
         using var lease = PublicationLease.Acquire(_paths.Values.Select(path => path.Stable), cancellationToken);
         PublicationFile.Copy(manifestPaths.Prepared, manifestPaths.Stable, cancellationToken);
         PublicationFile.WriteUtf8(requestPaths.Stable, WorkerProtocolJson.SerializeRequest(request), cancellationToken);

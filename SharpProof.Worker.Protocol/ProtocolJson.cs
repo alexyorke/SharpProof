@@ -161,10 +161,69 @@ public static partial class WorkerProtocolJson
     public static string SerializeResponse(WorkerVerifyResponse response)
     {
         ArgumentNullGuard.NotNull(response, nameof(response));
-        Canonicalize(response);
-        return SerializeCanonicalResponse(response);
+        return SerializeCanonicalResponse(CanonicalizeCopy(response));
     }
 
+    internal static WorkerVerifyResponse CanonicalizeCopy(WorkerVerifyResponse response)
+    {
+        response = RepositoryParameterGuard.NotNull(response, nameof(response));
+        var manifest = response.Manifest;
+        response = CopyCanonicalizationOwners(response);
+        Canonicalize(response);
+        if (manifest is not null && response.Manifest is not null && SameManifestCollections(manifest, response.Manifest))
+        { response = response with { Manifest = manifest }; }
+        return response;
+    }
+    // Retain the admitted manifest's identity when it is already canonical.
+    // The other copied result owners still isolate sorting from their producers.
+    private static bool SameManifestCollections(WorkerClaimManifest original, WorkerClaimManifest canonical)
+    {
+        original = RepositoryParameterGuard.NotNull(original, nameof(original));
+        canonical = RepositoryParameterGuard.NotNull(canonical, nameof(canonical));
+        if (original.Callables is null || canonical.Callables is null ||
+            !SameArrayOrder(original.Claims, canonical.Claims) ||
+            original.Callables.Length != canonical.Callables.Length)
+        { return false; }
+        for (var index = 0; index < original.Callables.Length; index++)
+        {
+            var source = original.Callables[index];
+            var sorted = canonical.Callables[index];
+            if (source is null || sorted is null || source.CallableId != sorted.CallableId ||
+                !ReferenceEquals(source.Location, sorted.Location) ||
+                !SameArrayOrder(source.SelectedFeatures, sorted.SelectedFeatures) ||
+                !SameArrayOrder(source.SelectionReasons, sorted.SelectionReasons) ||
+                !SameArrayOrder(source.ClaimIds, sorted.ClaimIds) ||
+                !SameArrayOrder(source.Assumptions, sorted.Assumptions))
+            { return false; }
+        }
+        return true;
+    }
+
+    private static bool SameArrayOrder<T>(T[]? original, T[]? canonical)
+    {
+        return original is not null && canonical is not null && original.SequenceEqual(canonical);
+    }
+    // Public Canonicalize remains an in-place API. Serialization copies each
+    // owner whose collections canonicalization replaces before using that API.
+    private static WorkerVerifyResponse CopyCanonicalizationOwners(WorkerVerifyResponse response)
+    {
+        response = RepositoryParameterGuard.NotNull(response, nameof(response));
+        return response with
+        {
+            Manifest = response.Manifest is null ? null! : response.Manifest with
+            {
+                Callables = response.Manifest.Callables?.Select(static (WorkerCallableManifestEntry /* SPINT001: all values valid - malformed null entries retain their wire shape */ entry) =>
+                    entry is null ? null! : entry with { }).ToArray()!
+            },
+            CallableResults = response.CallableResults?.Select(static (WorkerCallableResult /* SPINT001: all values valid - malformed null entries retain their wire shape */ result) =>
+                result is null ? null! : result with { }).ToArray()!,
+            ClaimResults = response.ClaimResults?.Select(static (WorkerClaimResult /* SPINT001: all values valid - malformed null entries retain their wire shape */ result) =>
+                result is null ? null! : result with
+                {
+                    EffectWitness = result.EffectWitness is null ? null : result.EffectWitness with { }
+                }).ToArray()!
+        };
+    }
     internal static string SerializeCanonicalResponse(WorkerVerifyResponse response)
     {
         ArgumentNullGuard.NotNull(response, nameof(response));

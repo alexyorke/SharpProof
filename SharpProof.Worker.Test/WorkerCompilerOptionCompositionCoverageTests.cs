@@ -34,7 +34,7 @@ public sealed partial class WorkerTests
         var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(differentOptions, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var path = Path.Combine(project.DirectoryPath, "different-compiler-options.json");
         await File.WriteAllBytesAsync(path, bytes);
-        request.CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
+        { request = request with { CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
         var rejected = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
@@ -45,7 +45,7 @@ public sealed partial class WorkerTests
             Assert.That(rejected.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(rejected).IsValid, Is.True);
         }
-        request.CompilerManifest = originalReference;
+        { request = request with { CompilerManifest = originalReference }; }
         var restored = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(restored, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(restored).IsValid, Is.True);

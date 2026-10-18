@@ -67,18 +67,24 @@ internal static class EffectClaimResultAssembler
             evidence.Certainty,
             projectAssumptions: evidence.Certainty !=
                 WorkerEffectEvidenceCertainty.TrustedCompleteBoundary);
-        result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
+        result = result with
+        {
+            ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
-            : [];
+            : []
+        };
         if (evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
         {
-            result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(
+            result = result with
+            {
+                Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(
                 target,
                 target.Entry.Assumptions
                     .Where(static assumption =>
                         assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
                     .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
-                    .ToHashSet(StringComparer.Ordinal));
+                    .ToHashSet(StringComparer.Ordinal))
+            };
         }
         return result;
     }

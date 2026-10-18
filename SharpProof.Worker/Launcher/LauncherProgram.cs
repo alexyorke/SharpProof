@@ -510,8 +510,8 @@ internal static class Program
             arguments.TerminationGraceMilliseconds));
         using var lease = await PublicationLease.AcquireAsync(members, publicationDeadline.Token).ConfigureAwait(false);
 
-        request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        request = request with { CompilerManifest = request.CompilerManifest with { Path = arguments.PublishCompilerManifestPath! } };
+        response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) };
         if (!WorkerProtocolJson.ValidateForRequest(
                 response, response.RequestHash, expectedInputHash,
                 artifact.Manifest, request,

@@ -22,6 +22,45 @@ public sealed class ProtocolJsonTests
         "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy"
     ];
 
+    [Test]
+    public void SerializationCanonicalizesCopiesWithoutRewritingProducerOwners()
+    {
+        var manifest = CreateTwoCallableManifest();
+        manifest.Callables = manifest.Callables.Reverse().ToArray();
+        var response = CreateResponse(manifest);
+        response = response with
+        {
+            ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+            {
+                ProofCore = ["z", "a"],
+                EffectWitness = new WorkerEffectViolationWitness
+                {
+                    ExactExceptionTypeHierarchy = ["z", "a"]
+                }
+            })
+        };
+        var callables = manifest.Callables;
+        var claim = response.ClaimResults[0];
+        var core = claim.ProofCore;
+        var witness = claim.EffectWitness!;
+        var hierarchy = witness.ExactExceptionTypeHierarchy;
+        var before = JsonSerializer.Serialize(response, WorkerProtocolJson.SharedOptions);
+
+        var json = WorkerProtocolJson.SerializeResponse(response);
+        using var canonical = JsonDocument.Parse(json);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(JsonSerializer.Serialize(response, WorkerProtocolJson.SharedOptions), Is.EqualTo(before));
+            Assert.That(manifest.Callables, Is.SameAs(callables));
+            Assert.That(response.ClaimResults[0], Is.SameAs(claim));
+            Assert.That(claim.ProofCore, Is.SameAs(core));
+            Assert.That(claim.EffectWitness, Is.SameAs(witness));
+            Assert.That(witness.ExactExceptionTypeHierarchy, Is.SameAs(hierarchy));
+            Assert.That(canonical.RootElement.GetProperty("claimResults")[0].GetProperty("proofCore")[0].GetString(), Is.EqualTo("a"));
+            Assert.That(canonical.RootElement.GetProperty("claimResults")[0].GetProperty("effectWitness").GetProperty("exactExceptionTypeHierarchy")[0].GetString(), Is.EqualTo("a"));
+        }
+    }
     private static IEnumerable<TestCaseData> ProtocolScalingCases()
     {
         yield return new TestCaseData(
@@ -64,10 +103,10 @@ public sealed class ProtocolJsonTests
     public void NullCallableIdentitiesProduceValidationErrors(bool nullResultIdentity)
     {
         var response = CreateResponse(CreateManifest());
-        response.Manifest.Callables[0].CallableId = null!;
+        { response = response with { Manifest = response.Manifest with { Callables = response.Manifest.Callables.ReplaceAt(0, response.Manifest.Callables[0] with { CallableId = null! }) } }; }
         if (nullResultIdentity)
         {
-            response.CallableResults[0].CallableId = null!;
+            { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { CallableId = null! }) }; }
         }
         var validation = WorkerProtocolJson.Validate(response);
         Assert.That(validation.IsValid, Is.False);
@@ -82,7 +121,7 @@ public sealed class ProtocolJsonTests
             'x',
             WorkerProtocolJson.MaximumJsonBytes);
         var request = CreateRequest();
-        request.CompilerManifest.Path = oversizedValue;
+        { request = request with { CompilerManifest = request.CompilerManifest with { Path = oversizedValue } }; }
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].ProofCore = [oversizedValue];
 
@@ -342,9 +381,9 @@ public sealed class ProtocolJsonTests
                     string.Empty,
                     StringComparison.Ordinal))));
 
-        request.VerifyPolicy = WorkerVerifyPolicy.Unspecified;
-        request.AssumptionPolicy = (WorkerAssumptionPolicy)999;
-        request.CompilerManifest.Sha256 = InputHash.ToUpperInvariant();
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.Unspecified }; }
+        { request = request with { AssumptionPolicy = (WorkerAssumptionPolicy)999 }; }
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = InputHash.ToUpperInvariant() } }; }
         AssertErrorCode(
             WorkerProtocolJson.Validate(request),
             "policy.verify",
@@ -451,7 +490,7 @@ public sealed class ProtocolJsonTests
                 "\"features\":1",
                 StringComparison.Ordinal), cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
-        roundTrip.Manifest.Claims[0].Location.Column++;
+        roundTrip = roundTrip with { Manifest = roundTrip.Manifest with { Claims = roundTrip.Manifest.Claims.ReplaceAt(0, roundTrip.Manifest.Claims[0] with { Location = roundTrip.Manifest.Claims[0].Location with { Column = roundTrip.Manifest.Claims[0].Location.Column + 1 } }) } };
         Assert.That(WorkerProtocolJson.ManifestsEqual(
             roundTrip.Manifest, manifest), Is.False);
         Assert.Throws<JsonException>((Action)(() =>
@@ -472,7 +511,7 @@ public sealed class ProtocolJsonTests
         Assert.That(manifest.Hash, Is.EqualTo(hash));
         Assert.That(manifest.Hash, Does.Match("^[0-9a-f]{64}$"));
 
-        manifest.Claims[0].Location.Column++;
+        manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Location = manifest.Claims[0].Location with { Column = manifest.Claims[0].Location.Column + 1 } }) };
         Assert.That(
             WorkerProtocolJson.ComputeManifestHash(manifest),
             Is.Not.EqualTo(hash));
@@ -525,22 +564,17 @@ public sealed class ProtocolJsonTests
         var hashes = new HashSet<string>(StringComparer.Ordinal) {
             CreateManifest().Hash,
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Callables[0].SelectedFeatures =
-                    [WorkerSelectedFeature.Effects]; }),
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { SelectedFeatures = [WorkerSelectedFeature.Effects] }) }; return manifest;}),
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Callables[0].SelectionReasons =
-                    [WorkerSelectionReason.ExplicitAnnotation]; }),
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { SelectionReasons = [WorkerSelectionReason.ExplicitAnnotation] }) }; return manifest;}),
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Callables[0].Assumptions[0].Kind =
-                    WorkerAssumptionKind.Precondition; }),
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { Assumptions = manifest.Callables[0].Assumptions.ReplaceAt(0, manifest.Callables[0].Assumptions[0] with { Kind = WorkerAssumptionKind.Precondition }) }) }; return manifest;}),
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Claims[0].Kind = WorkerClaimKind.Effect; }),
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Kind = WorkerClaimKind.Effect }) }; return manifest;}),
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Claims[0].Evidence =
-                    WorkerClaimEvidence.CompanionClause; }),
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Evidence = WorkerClaimEvidence.CompanionClause }) }; return manifest;}),
             ManifestHashAfter(static manifest =>
-                { System.ArgumentNullException.ThrowIfNull(manifest); manifest.Claims[0].EffectContractKind =
-                    WorkerEffectContractKind.DoesNotThrow; })
+                { System.ArgumentNullException.ThrowIfNull(manifest); manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { EffectContractKind = WorkerEffectContractKind.DoesNotThrow }) }; return manifest;})
         };
 
         Assert.That(hashes, Has.Count.EqualTo(7));
@@ -578,10 +612,9 @@ public sealed class ProtocolJsonTests
         manifest.Callables[0].SelectionReasons = [
             WorkerSelectionReason.ExplicitAnnotation
         ];
-        manifest.Claims[0].Kind = WorkerClaimKind.Effect;
-        manifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
-        manifest.Claims[0].EffectContractKind =
-            WorkerEffectContractKind.DoesNotThrow;
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Kind = WorkerClaimKind.Effect }) }; }
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Evidence = WorkerClaimEvidence.Attribute }) }; }
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { EffectContractKind = WorkerEffectContractKind.DoesNotThrow }) }; }
         WorkerProtocolJson.SealManifest(manifest);
 
         using (Assert.EnterMultipleScope())
@@ -590,14 +623,14 @@ public sealed class ProtocolJsonTests
                 Is.True);
             Assert.That(manifest.Hash, Is.Not.EqualTo(postconditionHash));
         }
-        manifest.Claims[0].Evidence = WorkerClaimEvidence.DirectClause;
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Evidence = WorkerClaimEvidence.DirectClause }) }; }
         WorkerProtocolJson.SealManifest(manifest);
         AssertErrorCode(
             WorkerProtocolJson.ValidateManifest(manifest),
             "manifest.claim_shape");
 
-        manifest.Claims[0].Kind = WorkerClaimKind.Postcondition;
-        manifest.Claims[0].Evidence = WorkerClaimEvidence.DirectClause;
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Kind = WorkerClaimKind.Postcondition }) }; }
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Evidence = WorkerClaimEvidence.DirectClause }) }; }
         WorkerProtocolJson.SealManifest(manifest);
         AssertErrorCode(
             WorkerProtocolJson.ValidateManifest(manifest),
@@ -611,57 +644,46 @@ public sealed class ProtocolJsonTests
         var response = CreateResponse(manifest);
 
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.DefiniteViolation;
-        response.ClaimResults[0].EffectWitness =
-            CreateEffectWitness(manifest.Claims[0].Location);
-        response.Summary = CreateSummary(response);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.DefiniteViolation }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectWitness = CreateEffectWitness(manifest.Claims[0].Location) }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-        response.ClaimResults[0].EffectWitness!.Effects =
-            WorkerEffectSet.Allocates;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectWitness = response.ClaimResults[0].EffectWitness! with { Effects = WorkerEffectSet.Allocates } }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_witness");
-        response.ClaimResults[0].EffectWitness = null;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectWitness = null }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_witness");
-        response.ClaimResults[0].EffectWitness =
-            CreateEffectWitness(manifest.Claims[0].Location);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectWitness = CreateEffectWitness(manifest.Claims[0].Location) }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_certainty");
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
-        response.ClaimResults[0].EffectWitness = null;
-        response.Summary = CreateSummary(response);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Proven }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectWitness = null }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_certainty");
 
-        SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary;
-        response.CallableResults[0].Coverage =
-            WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        response.ClaimResults[0].Reason =
-            WorkerClaimReason.EffectContractNotEstablished;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Reason = WorkerClaimReason.EffectContractNotEstablished }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_certainty");
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-        response.Summary = CreateSummary(response);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -720,18 +742,26 @@ public sealed class ProtocolJsonTests
         WorkerEffectEvidenceCertainty certainty)
     {
         var response = CreateResponse(CreateEffectManifest());
-        SetUnknown(response, reason);
-        response.ClaimResults[0].EffectCertainty = certainty;
-        response.CallableResults[0].Coverage =
-            WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
+        response = SetUnknown(response, reason);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = certainty }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
         if (certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
         {
-            response.ClaimResults[0].Assumptions.Single(static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)).Used = true;
+            {
+                response = response with
+                {
+                    ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+                    {
+                        Assumptions = response.ClaimResults[0].Assumptions.ReplaceReference(response.ClaimResults[0].Assumptions.Single(static assumption =>
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)), response.ClaimResults[0].Assumptions.Single(static assumption =>
+                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)) with
+                { Used = true })
+                    })
+                };
+            }
         }
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
 
         var validation = WorkerProtocolJson.Validate(response);
 
@@ -744,28 +774,23 @@ public sealed class ProtocolJsonTests
     public void VacuityEvidenceIsClosedAndRequiresProofCore()
     {
         var response = CreateResponse(CreateManifest());
-        response.ClaimResults[0].Vacuity =
-            WorkerVacuityKind.ContradictoryPreconditions;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions }) }; }
         response.ClaimResults[0].ProofCore = ["requires:0"];
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        response = SetUnknown(response, WorkerClaimReason.UnsupportedBody);
         response.ClaimResults[0].ProofCore = [];
-        response.CallableResults[0].Coverage =
-            WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.vacuity");
 
         var effectManifest = CreateEffectManifest();
         response = CreateResponse(effectManifest);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.VacuousEntry;
-        response.ClaimResults[0].Vacuity =
-            WorkerVacuityKind.ContradictoryPreconditions;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.VacuousEntry }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions }) }; }
         response.ClaimResults[0].ProofCore = ["requires:0"];
         Assert.That(
             WorkerProtocolJson.Validate(response).IsValid,
@@ -779,8 +804,7 @@ public sealed class ProtocolJsonTests
         response.ClaimResults[0].ProofCore = [
             "body:normal-completion"
         ];
-        response.ClaimResults[0].Vacuity =
-            WorkerVacuityKind.NoModeledNormalReturn;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.NoModeledNormalReturn }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.vacuity");
@@ -791,20 +815,18 @@ public sealed class ProtocolJsonTests
     {
         var manifest = CreateEffectManifest();
         var response = CreateResponse(manifest);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.VacuousEntry;
-        response.ClaimResults[0].Vacuity = WorkerVacuityKind.None;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.VacuousEntry }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.None }) }; }
         response.ClaimResults[0].ProofCore = [];
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_evidence");
 
-        response.ClaimResults[0].Vacuity =
-            WorkerVacuityKind.ContradictoryPreconditions;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions }) }; }
         response.ClaimResults[0].ProofCore = ["requires:0"];
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -812,12 +834,10 @@ public sealed class ProtocolJsonTests
     public void EffectEvidenceTupleRejectsNonVacuousContradiction()
     {
         var response = CreateResponse(CreateEffectManifest());
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-        response.ClaimResults[0].Vacuity =
-            WorkerVacuityKind.ContradictoryPreconditions;
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary }) }; }
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Vacuity = WorkerVacuityKind.ContradictoryPreconditions }) }; }
         response.ClaimResults[0].ProofCore = ["requires:0"];
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
@@ -828,22 +848,24 @@ public sealed class ProtocolJsonTests
     public void TrustedEffectEvidenceRequiresUsedTrustedBoundary()
     {
         var response = CreateResponse(CreateEffectManifest());
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
-        response.Summary = CreateSummary(response);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.TrustedCompleteBoundary }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.effect_evidence");
 
-        foreach (var assumption in response.ClaimResults
-                     .SelectMany(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions))
-                     .Where(static value =>
-                         value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind == WorkerAssumptionKind.TrustedBoundary)))
+        response = response with
         {
-            assumption.Used = true;
-        }
-        response.Summary = CreateSummary(response);
+            ClaimResults = [.. response.ClaimResults.Select(static result =>
+                result is null ? throw new ArgumentNullException(nameof(result)) : result with
+                {
+                    Assumptions = [.. result.Assumptions.Select(static value =>
+                        value is null ? throw new ArgumentNullException(nameof(value)) :
+                            value.Kind == WorkerAssumptionKind.TrustedBoundary ? value with { Used = true } : value)]
+                })]
+        };
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -859,9 +881,8 @@ public sealed class ProtocolJsonTests
         ];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
-        response.Summary = CreateSummary(response);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.TrustedCompleteBoundary }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
@@ -872,8 +893,8 @@ public sealed class ProtocolJsonTests
     public void CallableAssumptionUsageMustRemainClaimAuthoritative()
     {
         var response = CreateResponse(CreateManifest());
-        response.CallableResults[0].Assumptions[0].Used = true;
-        response.Summary = CreateSummary(response);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Assumptions = response.CallableResults[0].Assumptions.ReplaceAt(0, response.CallableResults[0].Assumptions[0] with { Used = true }) }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
@@ -884,8 +905,7 @@ public sealed class ProtocolJsonTests
     public void AssumptionIdentityIsGlobalAcrossCallables()
     {
         var manifest = CreateTwoCallableManifest();
-        manifest.Callables[1].Assumptions[0].Id =
-            manifest.Callables[0].Assumptions[0].Id;
+        { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(1, manifest.Callables[1] with { Assumptions = manifest.Callables[1].Assumptions.ReplaceAt(0, manifest.Callables[1].Assumptions[0] with { Id = manifest.Callables[0].Assumptions[0].Id }) }) }; }
         WorkerProtocolJson.SealManifest(manifest);
 
         AssertErrorCode(
@@ -897,10 +917,8 @@ public sealed class ProtocolJsonTests
     public void AssumptionIdentityRejectsKindMutationAcrossCallables()
     {
         var manifest = CreateTwoCallableManifest();
-        manifest.Callables[1].Assumptions[0].Id =
-            manifest.Callables[0].Assumptions[0].Id;
-        manifest.Callables[1].Assumptions[0].Kind =
-            WorkerAssumptionKind.TrustedBoundary;
+        { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(1, manifest.Callables[1] with { Assumptions = manifest.Callables[1].Assumptions.ReplaceAt(0, manifest.Callables[1].Assumptions[0] with { Id = manifest.Callables[0].Assumptions[0].Id }) }) }; }
+        { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(1, manifest.Callables[1] with { Assumptions = manifest.Callables[1].Assumptions.ReplaceAt(0, manifest.Callables[1].Assumptions[0] with { Kind = WorkerAssumptionKind.TrustedBoundary }) }) }; }
         WorkerProtocolJson.SealManifest(manifest);
 
         AssertErrorCode(
@@ -912,8 +930,7 @@ public sealed class ProtocolJsonTests
     public void ManifestAssumptionKindMustRemainProducerClosed()
     {
         var manifest = CreateManifest();
-        manifest.Callables[0].Assumptions[0].Kind =
-            WorkerAssumptionKind.ApiSpecification;
+        { manifest = manifest with { Callables = manifest.Callables.ReplaceAt(0, manifest.Callables[0] with { Assumptions = manifest.Callables[0].Assumptions.ReplaceAt(0, manifest.Callables[0].Assumptions[0] with { Kind = WorkerAssumptionKind.ApiSpecification }) }) }; }
         WorkerProtocolJson.SealManifest(manifest);
 
         AssertContainsErrorCode(
@@ -927,14 +944,14 @@ public sealed class ProtocolJsonTests
         var expected = CreateManifest();
         var response = CreateResponse(expected);
         var request = CreateRequest();
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
         Assert.That(
             WorkerProtocolJson.Validate(response, InputHash, expected).IsValid,
             Is.True);
         Assert.That(WorkerProtocolJson.ValidateForRequest(
             response, response.RequestHash, InputHash, expected,
             request, CreateExpectedVersions()).IsValid, Is.True);
-        request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown }; }
         AssertErrorCode(WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
                 InputHash, expected, request,
@@ -957,7 +974,7 @@ public sealed class ProtocolJsonTests
 
         response = CreateResponse(expected);
         var other = CreateManifest();
-        other.Claims[0].Location.Start++;
+        other = other with { Claims = other.Claims.ReplaceAt(0, other.Claims[0] with { Location = other.Claims[0].Location with { Start = other.Claims[0].Location.Start + 1 } }) };
         WorkerProtocolJson.SealManifest(other);
         AssertErrorCode(
             WorkerProtocolJson.Validate(response, InputHash, other),
@@ -1003,11 +1020,19 @@ public sealed class ProtocolJsonTests
     public void RequestBoundValidationRejectsCrossSwappedRuntimeDigests()
     {
         var response = CreateResponse(CreateManifest());
-        response.Summary.Versions = response.Summary.Versions with
         {
-            WorkerBinarySha256 = response.Summary.Versions.ApiSpecContentSha256,
-            ApiSpecContentSha256 = response.Summary.Versions.WorkerBinarySha256
-        };
+            response = response with
+            {
+                Summary = response.Summary with
+                {
+                    Versions = response.Summary.Versions with
+                    {
+                        WorkerBinarySha256 = response.Summary.Versions.ApiSpecContentSha256,
+                        ApiSpecContentSha256 = response.Summary.Versions.WorkerBinarySha256
+                    }
+                }
+            };
+        }
 
         AssertErrorCode(ValidateForRequest(response), "response.versions_mismatch");
     }
@@ -1023,7 +1048,7 @@ public sealed class ProtocolJsonTests
         System.ArgumentNullException.ThrowIfNull(propertyName);
         var request = CreateRequest();
         var response = CreateResponse(CreateManifest());
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
         var property = typeof(WorkerBudgets).GetProperty(propertyName)!;
         var value = Convert.ToInt64(
             property.GetValue(response.Summary.Budgets),
@@ -1215,16 +1240,15 @@ public sealed class ProtocolJsonTests
     public void UnknownClaimsRequireIncompleteCallableCoverage()
     {
         var response = CreateResponse(CreateManifest());
-        SetUnknown(response, WorkerClaimReason.UnsupportedBody);
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.unknown_coverage");
 
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -1232,18 +1256,17 @@ public sealed class ProtocolJsonTests
     public void FatalClaimReasonsRequireFailedRun()
     {
         var response = CreateResponse(CreateManifest());
-        SetUnknown(response, WorkerClaimReason.BackendUnavailable);
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.BackendUnavailable);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.run_projection");
 
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = WorkerRunFailureReason.BackendUnavailable;
+        { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+        { response = response with { FailureReason = WorkerRunFailureReason.BackendUnavailable }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -1251,35 +1274,32 @@ public sealed class ProtocolJsonTests
     public void CallableFailureAndTimeoutReasonsConstrainRunStatus()
     {
         var response = CreateResponse(CreateManifest());
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.InfrastructureFailure;
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.InfrastructureFailure }) }; }
 
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.run_projection");
 
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.MethodTimeout;
-        SetUnknown(response, WorkerClaimReason.MethodTimeout);
-        response.Summary = CreateSummary(response);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.MethodTimeout }) }; }
+        response = SetUnknown(response, WorkerClaimReason.MethodTimeout);
+        { response = response with { Summary = CreateSummary(response) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.run_projection");
 
-        response.RunStatus = WorkerRunStatus.TimedOut;
+        { response = response with { RunStatus = WorkerRunStatus.TimedOut }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        response.RunStatus = WorkerRunStatus.Complete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.Canceled;
-        SetUnknown(response, WorkerClaimReason.Canceled);
-        response.Summary = CreateSummary(response);
+        { response = response with { RunStatus = WorkerRunStatus.Complete }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.Canceled }) }; }
+        response = SetUnknown(response, WorkerClaimReason.Canceled);
+        { response = response with { Summary = CreateSummary(response) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "response.run_projection");
 
-        response.RunStatus = WorkerRunStatus.Canceled;
+        { response = response with { RunStatus = WorkerRunStatus.Canceled }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 
@@ -1289,7 +1309,7 @@ public sealed class ProtocolJsonTests
         WorkerRunStatus status)
     {
         var response = CreateResponse(CreateManifest());
-        response.RunStatus = status;
+        { response = response with { RunStatus = status }; }
 
         AssertErrorCode(ValidateForRequest(response), "response.run_projection");
     }
@@ -1298,8 +1318,8 @@ public sealed class ProtocolJsonTests
     public void AllProvenEvidenceRejectsFabricatedFailureStatus()
     {
         var response = CreateResponse(CreateManifest());
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = WorkerRunFailureReason.BackendUnavailable;
+        { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+        { response = response with { FailureReason = WorkerRunFailureReason.BackendUnavailable }; }
 
         AssertErrorCode(ValidateForRequest(response), "response.run_projection");
     }
@@ -1308,14 +1328,13 @@ public sealed class ProtocolJsonTests
     public void CallableCoverageIsAnExactProjectionOfOwnedClaims()
     {
         var response = CreateResponse(CreateManifest());
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
 
         AssertErrorCode(ValidateForRequest(response), "response.callable_projection");
 
-        SetUnknown(response, WorkerClaimReason.UnsupportedBody);
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
 
         var emptyManifest = CreateManifest();
@@ -1330,11 +1349,10 @@ public sealed class ProtocolJsonTests
     public void SchemaValidIncompleteUnsupportedContractProjectionIsAccepted()
     {
         var response = CreateResponse(CreateManifest());
-        SetUnknown(response, WorkerClaimReason.UnsupportedContract);
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.UnsupportedContract;
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.UnsupportedContract);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.UnsupportedContract }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
@@ -1351,13 +1369,12 @@ public sealed class ProtocolJsonTests
         manifest.Claims = [];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason = reason;
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = reason }) }; }
         if (reason == WorkerCallableCoverageReason.InfrastructureFailure)
         {
-            response.RunStatus = WorkerRunStatus.Failed;
-            response.FailureReason =
-                WorkerRunFailureReason.InfrastructureFailure;
+            { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+            { response = response with { FailureReason = WorkerRunFailureReason.InfrastructureFailure }; }
         }
 
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
@@ -1367,8 +1384,8 @@ public sealed class ProtocolJsonTests
     public void ClaimReasonsAreBoundToClaimKind()
     {
         var response = CreateResponse(CreateManifest());
-        SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
+        { response = response with { Summary = CreateSummary(response) }; }
         AssertContainsErrorCode(ValidateForRequest(response), "response.claim_reason");
 
         var effectManifest = CreateManifest();
@@ -1376,19 +1393,16 @@ public sealed class ProtocolJsonTests
         effectManifest.Callables[0].SelectionReasons = [
             WorkerSelectionReason.ExplicitAnnotation
         ];
-        effectManifest.Claims[0].Kind = WorkerClaimKind.Effect;
-        effectManifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
-        effectManifest.Claims[0].EffectContractKind =
-            WorkerEffectContractKind.EnforcePure;
+        { effectManifest = effectManifest with { Claims = effectManifest.Claims.ReplaceAt(0, effectManifest.Claims[0] with { Kind = WorkerClaimKind.Effect }) }; }
+        { effectManifest = effectManifest with { Claims = effectManifest.Claims.ReplaceAt(0, effectManifest.Claims[0] with { Evidence = WorkerClaimEvidence.Attribute }) }; }
+        { effectManifest = effectManifest with { Claims = effectManifest.Claims.ReplaceAt(0, effectManifest.Claims[0] with { EffectContractKind = WorkerEffectContractKind.EnforcePure }) }; }
         WorkerProtocolJson.SealManifest(effectManifest);
         response = CreateResponse(effectManifest);
-        SetUnknown(response, WorkerClaimReason.DeepPostcondition);
-        response.ClaimResults[0].EffectCertainty =
-            WorkerEffectEvidenceCertainty.Unavailable;
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.DeepPostcondition);
+        { response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { EffectCertainty = WorkerEffectEvidenceCertainty.Unavailable }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         AssertContainsErrorCode(ValidateForRequest(response), "response.claim_reason");
     }
 
@@ -1403,8 +1417,8 @@ public sealed class ProtocolJsonTests
     {
         System.ArgumentNullException.ThrowIfNull(code);
         var response = CreateResponse(CreateManifest());
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = reason;
+        { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+        { response = response with { FailureReason = reason }; }
         response.Errors = [new WorkerProtocolError { Code = code, Message = "failure" }];
 
         AssertContainsErrorCode(ValidateForRequest(response), "response.run_projection");
@@ -1416,60 +1430,54 @@ public sealed class ProtocolJsonTests
         var complete = CreateResponse(CreateManifest());
         Assert.That(ValidateForRequest(complete).IsValid, Is.True);
 
-        complete.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
-        complete.Summary = CreateSummary(complete);
-        complete.Summary.CacheStatus = WorkerCacheStatus.Written;
+        { complete = complete with { ClaimResults = complete.ClaimResults.ReplaceAt(0, complete.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
+        { complete = complete with { Summary = CreateSummary(complete) }; }
+        { complete = complete with { Summary = complete.Summary with { CacheStatus = WorkerCacheStatus.Written } }; }
         Assert.That(ValidateForRequest(complete).IsValid, Is.True);
 
         var unknown = CreateResponse(CreateManifest());
-        SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
-        unknown.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        unknown.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        unknown.Summary = CreateSummary(unknown);
+        unknown = SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
+        { unknown = unknown with { CallableResults = unknown.CallableResults.ReplaceAt(0, unknown.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { unknown = unknown with { CallableResults = unknown.CallableResults.ReplaceAt(0, unknown.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { unknown = unknown with { Summary = CreateSummary(unknown) }; }
         Assert.That(ValidateForRequest(unknown).IsValid, Is.True);
 
         var timedOut = CreateResponse(CreateManifest());
-        SetUnknown(timedOut, WorkerClaimReason.MethodTimeout);
-        timedOut.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        timedOut.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.MethodTimeout;
-        timedOut.RunStatus = WorkerRunStatus.TimedOut;
-        timedOut.Summary = CreateSummary(timedOut);
+        timedOut = SetUnknown(timedOut, WorkerClaimReason.MethodTimeout);
+        { timedOut = timedOut with { CallableResults = timedOut.CallableResults.ReplaceAt(0, timedOut.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { timedOut = timedOut with { CallableResults = timedOut.CallableResults.ReplaceAt(0, timedOut.CallableResults[0] with { Reason = WorkerCallableCoverageReason.MethodTimeout }) }; }
+        { timedOut = timedOut with { RunStatus = WorkerRunStatus.TimedOut }; }
+        { timedOut = timedOut with { Summary = CreateSummary(timedOut) }; }
         Assert.That(ValidateForRequest(timedOut).IsValid, Is.True);
 
         var canceled = CreateResponse(CreateManifest());
-        SetUnknown(canceled, WorkerClaimReason.Canceled);
-        canceled.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        canceled.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.Canceled;
-        canceled.RunStatus = WorkerRunStatus.Canceled;
-        canceled.Summary = CreateSummary(canceled);
+        canceled = SetUnknown(canceled, WorkerClaimReason.Canceled);
+        { canceled = canceled with { CallableResults = canceled.CallableResults.ReplaceAt(0, canceled.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { canceled = canceled with { CallableResults = canceled.CallableResults.ReplaceAt(0, canceled.CallableResults[0] with { Reason = WorkerCallableCoverageReason.Canceled }) }; }
+        { canceled = canceled with { RunStatus = WorkerRunStatus.Canceled }; }
+        { canceled = canceled with { Summary = CreateSummary(canceled) }; }
         Assert.That(ValidateForRequest(canceled).IsValid, Is.True);
 
         var backend = CreateResponse(CreateManifest());
-        SetUnknown(backend, WorkerClaimReason.BackendUnavailable);
-        backend.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        backend.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        backend.RunStatus = WorkerRunStatus.Failed;
-        backend.FailureReason = WorkerRunFailureReason.BackendUnavailable;
-        backend.Summary = CreateSummary(backend);
+        backend = SetUnknown(backend, WorkerClaimReason.BackendUnavailable);
+        { backend = backend with { CallableResults = backend.CallableResults.ReplaceAt(0, backend.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { backend = backend with { CallableResults = backend.CallableResults.ReplaceAt(0, backend.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { backend = backend with { RunStatus = WorkerRunStatus.Failed }; }
+        { backend = backend with { FailureReason = WorkerRunFailureReason.BackendUnavailable }; }
+        { backend = backend with { Summary = CreateSummary(backend) }; }
         Assert.That(ValidateForRequest(backend).IsValid, Is.True);
 
         var replay = CreateResponse(CreateManifest());
-        SetUnknown(replay, WorkerClaimReason.CounterexampleReplayFailed);
-        replay.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        replay.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        replay.RunStatus = WorkerRunStatus.Failed;
-        replay.FailureReason =
-            WorkerRunFailureReason.CounterexampleReplayFailed;
-        replay.Summary = CreateSummary(replay);
+        replay = SetUnknown(replay, WorkerClaimReason.CounterexampleReplayFailed);
+        { replay = replay with { CallableResults = replay.CallableResults.ReplaceAt(0, replay.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { replay = replay with { CallableResults = replay.CallableResults.ReplaceAt(0, replay.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { replay = replay with { RunStatus = WorkerRunStatus.Failed }; }
+        { replay = replay with { FailureReason = WorkerRunFailureReason.CounterexampleReplayFailed }; }
+        { replay = replay with { Summary = CreateSummary(replay) }; }
         Assert.That(ValidateForRequest(replay).IsValid, Is.True);
 
-        complete.Summary.CacheStatus = WorkerCacheStatus.Hit;
-        complete.Summary.CacheHit = true;
+        { complete = complete with { Summary = complete.Summary with { CacheStatus = WorkerCacheStatus.Hit } }; }
+        { complete = complete with { Summary = complete.Summary with { CacheHit = true } }; }
         Assert.That(ValidateForRequest(complete).IsValid, Is.True);
     }
 
@@ -1477,7 +1485,7 @@ public sealed class ProtocolJsonTests
     public void RequestBoundValidationRejectsUnknownCacheStatus()
     {
         var response = CreateResponse(CreateManifest());
-        response.Summary.CacheStatus = (WorkerCacheStatus)int.MaxValue;
+        { response = response with { Summary = response.Summary with { CacheStatus = (WorkerCacheStatus)int.MaxValue } }; }
         AssertContainsErrorCode(ValidateForRequest(response), "response.cache_request_mismatch");
     }
 
@@ -1485,7 +1493,7 @@ public sealed class ProtocolJsonTests
     public void ResponseValidationRejectsUnknownRunStatus()
     {
         var response = CreateResponse(CreateManifest());
-        response.RunStatus = (WorkerRunStatus)int.MaxValue;
+        { response = response with { RunStatus = (WorkerRunStatus)int.MaxValue }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.False);
         Assert.That(WorkerProtocolMetadata.MatchesRunFailure(response.RunStatus,
             WorkerRunFailureReason.None), Is.False);
@@ -1502,30 +1510,29 @@ public sealed class ProtocolJsonTests
         AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, true);
 
         var inactiveRequest = CreateRequest();
-        inactiveRequest.Cache.Enabled = false;
+        { inactiveRequest = inactiveRequest with { Cache = inactiveRequest.Cache with { Enabled = false } }; }
         AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Disabled, true);
         AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Miss, false);
         AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Unavailable, false);
 
         var provenOnlyRequest = CreateRequest();
-        provenOnlyRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        { provenOnlyRequest = provenOnlyRequest with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Hit, true);
         AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, true);
 
         var refuted = CreateResponse(CreateManifest());
-        refuted.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
-        refuted.Summary = CreateSummary(refuted);
+        { refuted = refuted with { ClaimResults = refuted.ClaimResults.ReplaceAt(0, refuted.ClaimResults[0] with { Outcome = WorkerClaimOutcome.Refuted }) }; }
+        { refuted = refuted with { Summary = CreateSummary(refuted) }; }
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Hit, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Written, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Unavailable, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, true);
 
         var unknown = CreateResponse(CreateManifest());
-        SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
-        unknown.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        unknown.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        unknown.Summary = CreateSummary(unknown);
+        unknown = SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
+        { unknown = unknown with { CallableResults = unknown.CallableResults.ReplaceAt(0, unknown.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { unknown = unknown with { CallableResults = unknown.CallableResults.ReplaceAt(0, unknown.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { unknown = unknown with { Summary = CreateSummary(unknown) }; }
         AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Miss, true);
         AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Unavailable, true);
         AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Hit, true);
@@ -1536,8 +1543,8 @@ public sealed class ProtocolJsonTests
         earlyFailureManifest.Claims = [];
         WorkerProtocolJson.SealManifest(earlyFailureManifest);
         var earlyFailure = CreateResponse(earlyFailureManifest);
-        earlyFailure.RunStatus = WorkerRunStatus.Failed;
-        earlyFailure.FailureReason = WorkerRunFailureReason.InputUnavailable;
+        { earlyFailure = earlyFailure with { RunStatus = WorkerRunStatus.Failed }; }
+        { earlyFailure = earlyFailure with { FailureReason = WorkerRunFailureReason.InputUnavailable }; }
         earlyFailure.Errors = [new WorkerProtocolError {
             Code = "input.unavailable",
             Message = "failure"
@@ -1545,15 +1552,15 @@ public sealed class ProtocolJsonTests
         AssertCacheState(activeRequest, earlyFailure, WorkerCacheStatus.Disabled, true);
 
         var malformed = CreateResponse(earlyFailureManifest);
-        malformed.RunStatus = WorkerRunStatus.Failed;
-        malformed.FailureReason = WorkerRunFailureReason.MalformedResult;
+        { malformed = malformed with { RunStatus = WorkerRunStatus.Failed }; }
+        { malformed = malformed with { FailureReason = WorkerRunFailureReason.MalformedResult }; }
         malformed.Errors = [new WorkerProtocolError {
             Code = "response.claim_set",
             Message = "failure"
         }];
         AssertCacheState(activeRequest, malformed, WorkerCacheStatus.Rejected, true);
-        malformed.FailureReason = WorkerRunFailureReason.InfrastructureFailure;
-        malformed.Errors[0].Code = "worker.infrastructure";
+        { malformed = malformed with { FailureReason = WorkerRunFailureReason.InfrastructureFailure }; }
+        { malformed = malformed with { Errors = malformed.Errors.ReplaceAt(0, malformed.Errors[0] with { Code = "worker.infrastructure" }) }; }
         AssertCacheState(activeRequest, malformed, WorkerCacheStatus.Rejected, false);
     }
 
@@ -1576,16 +1583,15 @@ public sealed class ProtocolJsonTests
         ];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        SetUnknown(response, WorkerClaimReason.UnsupportedExpression, 1);
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
-        response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        response.Summary = CreateSummary(response);
+        response = SetUnknown(response, WorkerClaimReason.UnsupportedExpression, 1);
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Incomplete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.SemanticUnknown }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
 
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
 
-        response.CallableResults[0].Coverage = WorkerCallableCoverage.Complete;
-        response.CallableResults[0].Reason = WorkerCallableCoverageReason.None;
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Coverage = WorkerCallableCoverage.Complete }) }; }
+        { response = response with { CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with { Reason = WorkerCallableCoverageReason.None }) }; }
         AssertContainsErrorCode(ValidateForRequest(response), "response.callable_projection");
     }
 
@@ -1607,8 +1613,8 @@ public sealed class ProtocolJsonTests
         manifest.Claims = [];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = reason;
+        { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+        { response = response with { FailureReason = reason }; }
         response.Errors = [new WorkerProtocolError { Code = code, Message = "failure" }];
 
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
@@ -1622,8 +1628,8 @@ public sealed class ProtocolJsonTests
         manifest.Claims = [];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        response.RunStatus = WorkerRunStatus.Failed;
-        response.FailureReason = WorkerRunFailureReason.InfrastructureFailure;
+        { response = response with { RunStatus = WorkerRunStatus.Failed }; }
+        { response = response with { FailureReason = WorkerRunFailureReason.InfrastructureFailure }; }
         response.Errors = [new WorkerProtocolError {
             Code = "worker.infrastructure",
             Message = "failure"
@@ -1635,17 +1641,17 @@ public sealed class ProtocolJsonTests
             "\n", "\r", "\t", "\u001b", "\u2028", "\u2029"
         })
         {
-            response.Errors[0].Code = "worker" + separator + "infrastructure";
+            { response = response with { Errors = response.Errors.ReplaceAt(0, response.Errors[0] with { Code = "worker" + separator + "infrastructure" }) }; }
             AssertContainsErrorCode(
                 WorkerProtocolJson.Validate(response),
                 "response.errors");
 
-            response.Errors[0].Code = "worker.infrastructure";
-            response.Errors[0].Message = "failure" + separator + "forged";
+            { response = response with { Errors = response.Errors.ReplaceAt(0, response.Errors[0] with { Code = "worker.infrastructure" }) }; }
+            { response = response with { Errors = response.Errors.ReplaceAt(0, response.Errors[0] with { Message = "failure" + separator + "forged" }) }; }
             AssertContainsErrorCode(
                 WorkerProtocolJson.Validate(response),
                 "response.errors");
-            response.Errors[0].Message = "failure";
+            { response = response with { Errors = response.Errors.ReplaceAt(0, response.Errors[0] with { Message = "failure" }) }; }
         }
     }
 
@@ -1661,7 +1667,7 @@ public sealed class ProtocolJsonTests
         manifest.Claims = [];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
-        response.RunStatus = status;
+        { response = response with { RunStatus = status }; }
         response.Errors = [new WorkerProtocolError { Code = code, Message = "interrupted" }];
 
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
@@ -1674,11 +1680,11 @@ public sealed class ProtocolJsonTests
         var used = response.ClaimResults[0].Assumptions.Single(
             static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume));
-        used.Used = true;
-        response.Summary = CreateSummary(response);
+        { var originalFixtureRow72002 = used; used = used with { Used = true }; response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Assumptions = response.ClaimResults[0].Assumptions.ReplaceReference(originalFixtureRow72002, used) }) }; }
+        { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        used.Kind = WorkerAssumptionKind.TrustedBoundary;
+        { var originalFixtureRow72158 = used; used = used with { Kind = WorkerAssumptionKind.TrustedBoundary }; response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Assumptions = response.ClaimResults[0].Assumptions.ReplaceReference(originalFixtureRow72158, used) }) }; }
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
             "summary.assumption_conflict");
@@ -1690,7 +1696,7 @@ public sealed class ProtocolJsonTests
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Assumptions =
             [.. response.ClaimResults[0].Assumptions.Skip(1)];
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
 
         AssertErrorCode(
             WorkerProtocolJson.Validate(response),
@@ -1739,7 +1745,7 @@ public sealed class ProtocolJsonTests
     public void ManifestRequiresDenseOrdinalsAndExactCallableMembership()
     {
         var manifest = CreateManifest();
-        manifest.Claims[0].Ordinal = 2;
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Ordinal = 2 }) }; }
         manifest.Callables[0].ClaimIds = [];
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
@@ -1755,7 +1761,7 @@ public sealed class ProtocolJsonTests
     {
         var manifest = CreateManifest();
         var postcondition = manifest.Claims[0];
-        postcondition.Ordinal = 1;
+        { postcondition = postcondition with { Ordinal = 1 }; manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, postcondition) }; }
         manifest.Claims = [
             new WorkerClaimManifestEntry {
                 ClaimId = "claim.identity.effect.0",
@@ -1807,11 +1813,11 @@ public sealed class ProtocolJsonTests
     public void MissingResponseSubdocumentsAndInvalidExpectedManifestAreRejected()
     {
         var missingManifest = CreateResponse(CreateManifest());
-        missingManifest.Manifest = null!;
+        { missingManifest = missingManifest with { Manifest = null! }; }
         var missingSummary = CreateResponse(CreateManifest());
-        missingSummary.Summary = null!;
+        { missingSummary = missingSummary with { Summary = null! }; }
         var expectedManifest = CreateManifest();
-        expectedManifest.SchemaVersion = int.MaxValue;
+        { expectedManifest = expectedManifest with { SchemaVersion = int.MaxValue }; }
 
         using (Assert.EnterMultipleScope())
         {
@@ -1835,7 +1841,7 @@ public sealed class ProtocolJsonTests
         var request = CreateRequest();
         var expected = CreateManifest();
         var response = CreateResponse(expected);
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
 
         var nullError = Assert.Throws<ArgumentNullException>((Action)(() =>
             WorkerProtocolJson.ValidateForRequest(
@@ -1846,8 +1852,7 @@ public sealed class ProtocolJsonTests
                 request,
                 CreateExpectedVersions())));
 
-        response.Manifest.Claims[0].Kind =
-            (WorkerClaimKind)int.MaxValue;
+        { response = response with { Manifest = response.Manifest with { Claims = response.Manifest.Claims.ReplaceAt(0, response.Manifest.Claims[0] with { Kind = (WorkerClaimKind)int.MaxValue }) } }; }
         var validation = WorkerProtocolJson.ValidateForRequest(
             response,
             response.RequestHash,
@@ -1874,7 +1879,7 @@ public sealed class ProtocolJsonTests
         bool expectedValid)
     {
         var response = CreateResponse(CreateManifest());
-        response.Summary.ElapsedMilliseconds = elapsedMilliseconds;
+        { response = response with { Summary = response.Summary with { ElapsedMilliseconds = elapsedMilliseconds } }; }
 
         var validation = WorkerProtocolJson.Validate(response);
         var elapsedErrors = validation.Errors
@@ -1893,9 +1898,8 @@ public sealed class ProtocolJsonTests
         WorkerRunStatus status)
     {
         var response = CreateResponse(CreateManifest());
-        response.RunStatus = status;
-        response.Summary.ElapsedMilliseconds =
-            WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds + 1;
+        { response = response with { RunStatus = status }; }
+        { response = response with { Summary = response.Summary with { ElapsedMilliseconds = WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds + 1 } }; }
 
         AssertContainsErrorCode(
             WorkerProtocolJson.Validate(response),
@@ -1937,10 +1941,10 @@ public sealed class ProtocolJsonTests
         var response = CreateResponse(manifest);
         var versions = CreateExpectedVersions();
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        response.RequestHash = requestHash;
+        { response = response with { RequestHash = requestHash }; }
         if (invalidRuntime)
         {
-            versions.WorkerVersion = string.Empty;
+            { versions = versions with { WorkerVersion = string.Empty }; }
         }
         else
         {
@@ -1998,14 +2002,22 @@ public sealed class ProtocolJsonTests
             WorkerCallableCoverageReason.ProjectTimeout, WorkerClaimReason.ProjectTimeout,
             errors: [originalError], versions: versions);
         Assert.That(contextual.Errors, Is.EqualTo(new[] { originalError }));
-        roundtrip.RunStatus = WorkerRunStatus.Complete;
+        { roundtrip = roundtrip with { RunStatus = WorkerRunStatus.Complete }; }
         Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
             inputHash, manifest, request, versions).IsValid, Is.False);
         if (hasCallable)
         {
-            roundtrip.RunStatus = status;
-            roundtrip.CallableResults[0].Reason = status == WorkerRunStatus.Canceled
-                ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.Canceled;
+            { roundtrip = roundtrip with { RunStatus = status }; }
+            {
+                roundtrip = roundtrip with
+                {
+                    CallableResults = roundtrip.CallableResults.ReplaceAt(0, roundtrip.CallableResults[0] with
+                    {
+                        Reason = status == WorkerRunStatus.Canceled
+                ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.Canceled
+                    })
+                };
+            }
             Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
                 inputHash, manifest, request, versions).IsValid, Is.False);
         }
@@ -2101,10 +2113,10 @@ public sealed class ProtocolJsonTests
     public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
     {
         var nullIdentity = CreateManifest();
-        nullIdentity.Callables[0].CallableId = null!;
+        { nullIdentity = nullIdentity with { Callables = nullIdentity.Callables.ReplaceAt(0, nullIdentity.Callables[0] with { CallableId = null! }) }; }
         var nullIdentityHash = WorkerProtocolJson.ComputeManifestHash(nullIdentity);
         var unknownEnum = CreateManifest();
-        unknownEnum.Claims[0].Kind = (WorkerClaimKind)int.MaxValue;
+        { unknownEnum = unknownEnum with { Claims = unknownEnum.Claims.ReplaceAt(0, unknownEnum.Claims[0] with { Kind = (WorkerClaimKind)int.MaxValue }) }; }
 
         Assert.Throws<JsonException>((Action)(() =>
             WorkerProtocolJson.ComputeManifestHash(unknownEnum)));
@@ -2178,10 +2190,9 @@ public sealed class ProtocolJsonTests
         manifest.Callables[0].SelectionReasons = [
             WorkerSelectionReason.ExplicitAnnotation
         ];
-        manifest.Claims[0].Kind = WorkerClaimKind.Effect;
-        manifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
-        manifest.Claims[0].EffectContractKind =
-            WorkerEffectContractKind.DoesNotThrow;
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Kind = WorkerClaimKind.Effect }) }; }
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { Evidence = WorkerClaimEvidence.Attribute }) }; }
+        { manifest = manifest with { Claims = manifest.Claims.ReplaceAt(0, manifest.Claims[0] with { EffectContractKind = WorkerEffectContractKind.DoesNotThrow }) }; }
         WorkerProtocolJson.SealManifest(manifest);
         return manifest;
     }
@@ -2408,11 +2419,11 @@ public sealed class ProtocolJsonTests
     }
 
     private static string ManifestHashAfter(
-        Action<WorkerClaimManifest> mutation)
+        Func<WorkerClaimManifest, WorkerClaimManifest> mutation)
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
         var manifest = CreateManifest();
-        mutation(manifest);
+        manifest = mutation(manifest);
         WorkerProtocolJson.SealManifest(manifest);
         return manifest.Hash;
     }
@@ -2519,7 +2530,7 @@ public sealed class ProtocolJsonTests
                             .Assumptions)
                 }))]
         };
-        response.Summary = CreateSummary(response);
+        { response = response with { Summary = CreateSummary(response) }; }
         return response;
     }
 
@@ -2562,8 +2573,14 @@ public sealed class ProtocolJsonTests
     {
         var response = CreateResponse(CreateManifest());
         var claim = response.ClaimResults[0];
-        claim.EffectWitness = CreateEffectWitness(
-            response.Manifest.Claims[0].Location);
+        {
+            claim = claim with
+            {
+                EffectWitness = CreateEffectWitness(
+            response.Manifest.Claims[0].Location)
+            };
+            response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, claim) };
+        }
         claim.Model = [
             new WorkerModelValue
             {
@@ -2605,7 +2622,7 @@ public sealed class ProtocolJsonTests
         return new ArgumentNullException(parameterName);
     }
 
-    private static void SetUnknown(
+    private static WorkerVerifyResponse SetUnknown(
         WorkerVerifyResponse response,
         WorkerClaimReason reason,
         int index = 0)
@@ -2614,8 +2631,7 @@ public sealed class ProtocolJsonTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         System.ArgumentNullException.ThrowIfNull(response);
-        response.ClaimResults[index].Outcome = WorkerClaimOutcome.Unknown;
-        response.ClaimResults[index].Reason = reason;
+        return response with { ClaimResults = response.ClaimResults.ReplaceAt(index, response.ClaimResults[index] with { Outcome = WorkerClaimOutcome.Unknown, Reason = reason }) };
     }
 
     private static WorkerProtocolValidationResult ValidateForRequest(
@@ -2629,7 +2645,7 @@ public sealed class ProtocolJsonTests
         WorkerVerifyResponse response,
         WorkerVerifyRequest request)
     {
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
         return WorkerProtocolJson.ValidateForRequest(
             response,
             response.RequestHash,
@@ -2645,8 +2661,8 @@ public sealed class ProtocolJsonTests
         WorkerCacheStatus status,
         bool expectedValid)
     {
-        response.Summary.CacheStatus = status;
-        response.Summary.CacheHit = status == WorkerCacheStatus.Hit;
+        { response = response with { Summary = response.Summary with { CacheStatus = status } }; }
+        { response = response with { Summary = response.Summary with { CacheHit = status == WorkerCacheStatus.Hit } }; }
         var validation = ValidateForRequest(response, request);
         Assert.That(
             validation.IsValid,

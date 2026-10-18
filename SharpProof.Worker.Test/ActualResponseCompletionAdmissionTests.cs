@@ -119,7 +119,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         Assert.That(profile.MaximumExpressionDepth, Is.EqualTo(64));
         var profileRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(other.Request))
             ?? throw new AssertionException("The actual owned request did not deserialize.");
-        profileRequest.Budgets = profile;
+        { profileRequest = profileRequest with { Budgets = profile }; }
         var profileValidation = WorkerProtocolJson.Validate(profileRequest);
         Assert.That(profileValidation.IsValid, Is.True, string.Join(", ", profileValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(profileRequest);

@@ -17,7 +17,7 @@ public sealed partial class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
+        { request = request with { VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown }; }
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(response, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody);
@@ -34,7 +34,7 @@ public sealed partial class WorkerTests
             Assert.That(WorkerProtocolJson.SerializeResponse(response), Is.EqualTo(originalEvidence));
         }
 
-        request.VerifyPolicy = (WorkerVerifyPolicy)int.MaxValue;
+        { request = request with { VerifyPolicy = (WorkerVerifyPolicy)int.MaxValue }; }
         var exception = Assert.Throws<InvalidOperationException>(new Action(() =>
             Launcher.SarifProjection.Serialize(request, response, project.DirectoryPath)));
         using (Assert.EnterMultipleScope())

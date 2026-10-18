@@ -251,8 +251,8 @@ public sealed class BuildTaskTests
         };
         File.WriteAllText(arguments[2], WorkerProtocolJson.SerializeRequest(boundRequest));
         File.WriteAllText(arguments[4], WorkerProtocolJson.SerializeResponse(response));
-        boundRequest.CompilerManifest.Path = preparedManifest;
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(boundRequest);
+        { boundRequest = boundRequest with { CompilerManifest = boundRequest.CompilerManifest with { Path = preparedManifest } }; }
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(boundRequest) }; }
         File.WriteAllText(arguments[6], WorkerProtocolJson.SerializeRequest(boundRequest));
         File.WriteAllText(arguments[8], WorkerProtocolJson.SerializeResponse(response));
         File.WriteAllText(arguments[12], "{\"version\":\"2.1.0\",\"runs\":[{}]}");
@@ -288,7 +288,7 @@ public sealed class BuildTaskTests
         var privateResponse = WorkerProtocolJson.DeserializeResponse(File.ReadAllText(arguments[4]))!;
         if (change == "policy")
         {
-            request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+            { request = request with { VerifyPolicy = WorkerVerifyPolicy.RequireProven }; }
         }
         else if (change == "budget")
         {
@@ -296,15 +296,15 @@ public sealed class BuildTaskTests
         }
         else if (change == "private-hash")
         {
-            privateResponse.RequestHash = new string('0', 64);
+            { privateResponse = privateResponse with { RequestHash = new string('0', 64) }; }
         }
         else if (change == "private-result-invalid")
         {
-            privateResponse.InputHash = "invalid";
+            { privateResponse = privateResponse with { InputHash = "invalid" }; }
         }
         else if (change == "published-request-invalid")
         {
-            request.CompilerManifest.Sha256 = "invalid";
+            { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = "invalid" } }; }
         }
         else if (change is "sarif-version" or "sarif-runs")
         {
@@ -318,14 +318,14 @@ public sealed class BuildTaskTests
         }
         else if (change == "published-result-version")
         {
-            response.Summary.Versions.WorkerVersion = "different-invocation";
+            { response = response with { Summary = response.Summary with { Versions = response.Summary.Versions with { WorkerVersion = "different-invocation" } } }; }
         }
         else
         {
             response.Summary.Budgets.MethodRlimit++;
             privateResponse.Summary.Budgets.MethodRlimit++;
         }
-        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        { response = response with { RequestHash = WorkerProtocolJson.ComputeRequestHash(request) }; }
         File.WriteAllText(arguments[6], WorkerProtocolJson.SerializeRequest(request));
         File.WriteAllText(arguments[8], WorkerProtocolJson.SerializeResponse(response));
         File.WriteAllText(arguments[4], WorkerProtocolJson.SerializeResponse(privateResponse));
