@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'ToolDependencies', 'Compatibility', 'GateRegressions')]
+    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'Links', 'ToolDependencies', 'Compatibility', 'GateRegressions')]
     [string]$Category = 'All'
 )
 
@@ -63,6 +63,9 @@ Invoke-LintCheck 'Shell' {
 }
 Invoke-LintCheck 'Markdown' { Invoke-LintNative 'node' @('eng/lint/markdownlint.mjs') }
 Invoke-LintCheck 'Spelling' { Invoke-LintNative 'cspell' @('lint', '--config', 'cspell.json', '--no-progress', '--no-cache') }
+Invoke-LintCheck 'Links' {
+    Invoke-LintNative 'sh' @('scripts/Test-SharpProofLinks.sh', (Join-Path $reportRoot 'links.md'))
+}
 Invoke-LintCheck 'ToolDependencies' {
     Invoke-LintNative 'node' @(
         '/usr/local/lib/node_modules/npm/bin/npm-cli.js', 'audit',

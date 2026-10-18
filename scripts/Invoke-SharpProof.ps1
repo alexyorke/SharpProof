@@ -31,6 +31,7 @@ try {
             '--volume', "${pointerPath}:/workspace/SharpProof/.git:ro")
     }
     $service = if ($ToolingArguments[0] -eq 'lint') { 'lint' } else { 'tooling' }
+    if ($service -eq 'lint') { $arguments += '--build' }
     $arguments += @($service) + $ToolingArguments
     & docker @arguments
     $toolingExitCode = $LASTEXITCODE

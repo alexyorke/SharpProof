@@ -1,18 +1,17 @@
 # Repository quality gates
 
-The main CI workflow requires repository quality and link checks on pull requests
-and pushes to master. A failed, skipped, or canceled required job fails the existing
-build-and-test gate. Release publication also requires both workflows. Each has a
-weekly schedule and manual dispatch. Findings are reported; CI never applies fixes.
+The main CI workflow runs the combined repository quality and link checks on pull
+requests and pushes to master. A failed, skipped, or canceled quality job fails the
+existing build-and-test gate. Release publication also requires this job. Quality
+checks and the standalone link audit have weekly schedules and manual dispatch.
+Findings are reported; CI never applies fixes.
 
 ## Run locally
 
-Build the canonical toolchain, then its lint layer:
+Run the same complete check set used by CI with one command:
 
 ```sh
-docker compose build tooling
-docker compose build lint
-docker compose run --rm lint
+docker compose run --rm --build lint
 ```
 
 For host Git worktrees, the wrapper mounts the resolved Git metadata read-only:
@@ -20,6 +19,10 @@ For host Git worktrees, the wrapper mounts the resolved Git metadata read-only:
 ```powershell
 pwsh -File scripts/Invoke-SharpProof.ps1 lint
 ```
+
+Docker Compose builds the canonical toolchain and its lint layer in dependency order,
+so no separate setup commands or prebuilt local images are needed. This requires
+Docker Compose 2.17 or newer. Repeated runs reuse Docker's build cache.
 
 The lint service inherits the canonical Linux amd64 toolchain, container contract,
 resource limits, and private task workspace. The ordinary toolchain does not install
@@ -36,6 +39,7 @@ ApiCompat version are pinned in this directory.
 | ShellCheck | All tracked and unignored shell scripts; all reported findings fail. |
 | markdownlint | Authored Markdown; enabled rule violations fail. |
 | CSpell | Authored Markdown prose; unknown words fail. |
+| Links | External URLs, local paths, and fragments; broken or empty audits fail. |
 | Tool dependencies | Live npm audit of the pinned lint tools; low or higher vulnerabilities fail. |
 | ApiCompat | Public Attributes package against the pinned baseline; incompatible APIs fail. |
 | Gate regressions | Deliberately invalid fixtures must be rejected by each checker. |
@@ -77,7 +81,8 @@ only when intentionally accepting a compatibility change, with normal review.
 
 ## Links
 
-The separate link workflow checks external URLs, local paths, and fragments using
-`lychee.toml`. It fails on broken links and empty input, keeps a report even on
-failure, and exercises missing-file and missing-anchor fixtures on successful runs.
+The combined command checks links using `lychee.toml` and saves its detailed report
+to `artifacts/lint/links.md`. The standalone link workflow runs the same script and
+keeps its own artifact. Both fail on broken links and empty input and exercise
+missing-file and missing-anchor fixtures on successful runs.
 See [documentation maintenance](../../docs/documentation-maintenance.md) for scope.

@@ -80,8 +80,8 @@ services:
     build:
       context: .
       dockerfile: eng/lint/Dockerfile
-      args:
-        TOOLING_IMAGE: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}
+      additional_contexts:
+        canonical_tooling: service:tooling
     command: ["lint"]
 
   tooling:

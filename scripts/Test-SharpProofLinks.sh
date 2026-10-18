@@ -2,7 +2,8 @@
 set -eu
 
 report_path="${1:-/reports/report.md}"
-lychee --config lychee.toml --root-dir /input --no-progress \
+repository_root=$(pwd)
+lychee --config lychee.toml --root-dir "$repository_root" --no-progress \
   --format markdown --output "$report_path" .
 test -s "$report_path"
 if grep -Eq 'Total[[:space:]]*\|[[:space:]]*0[[:space:]]*\|' "$report_path"; then

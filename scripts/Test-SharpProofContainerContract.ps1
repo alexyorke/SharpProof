@@ -307,15 +307,17 @@ function Assert-ComposeAuthority {
             Assert-SingleMatchingLine $serviceLines '^      context:' '      context: .' 'Lint context'
             Assert-SingleMatchingLine $serviceLines '^      dockerfile:' `
                 '      dockerfile: eng/lint/Dockerfile' 'Lint Dockerfile'
-            Assert-SingleMatchingLine $serviceLines '^        TOOLING_IMAGE:' `
-                '        TOOLING_IMAGE: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}' 'Lint base'
+            Assert-SingleMatchingLine $serviceLines '^      additional_contexts:' `
+                '      additional_contexts:' 'Lint build contexts'
+            Assert-SingleMatchingLine $serviceLines '^        canonical_tooling:' `
+                '        canonical_tooling: service:tooling' 'Lint base'
             if (@($serviceLines | Where-Object { $_ -cmatch '^    platform:' }).Count -ne 0) {
                 throw 'Lint must inherit the canonical platform.'
             }
             $lintLines = @(Get-Content (Join-Path $repositoryRoot 'eng/lint/Dockerfile'))
             Assert-SingleMatchingLine $lintLines '^FROM .* AS lint$' `
-                'FROM ${TOOLING_IMAGE} AS lint' 'Lint final stage'
-            if (@($lintLines | Where-Object { $_ -cmatch '^FROM ' })[-1] -cne 'FROM ${TOOLING_IMAGE} AS lint') {
+                'FROM canonical_tooling AS lint' 'Lint final stage'
+            if (@($lintLines | Where-Object { $_ -cmatch '^FROM ' })[-1] -cne 'FROM canonical_tooling AS lint') {
                 throw 'Lint must end in a stage derived from the canonical image.'
             }
             return

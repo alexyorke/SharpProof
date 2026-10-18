@@ -25,10 +25,10 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Build pinned lint tools over the canonical toolchain
-        run: docker compose build lint
-      - name: Require workflow, script, documentation, spelling, and API checks
-        run: docker compose run --rm lint
+      - name: Require all repository quality and link checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: docker compose run --rm --build -e GITHUB_TOKEN lint
       - name: Publish quality summary
         if: always()
         run: |

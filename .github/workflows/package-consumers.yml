@@ -24,10 +24,6 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/quality.yml
 
-  repository-links:
-    if: startsWith(github.ref, 'refs/tags/v')
-    uses: ./.github/workflows/links.yml
-
   security:
     name: Exact-SHA security
     if: startsWith(github.ref, 'refs/tags/v')
@@ -230,7 +226,6 @@ jobs:
       github.repository == 'alexyorke/SharpProof'
     needs:
       - repository-quality
-      - repository-links
       - security
       - package
       - container-verifier

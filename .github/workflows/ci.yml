@@ -23,9 +23,6 @@ jobs:
   repository-quality:
     uses: ./.github/workflows/quality.yml
 
-  repository-links:
-    uses: ./.github/workflows/links.yml
-
   dotnet-api-inventory:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -152,7 +149,7 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, repository-quality, repository-links]
+    needs: [canonical-main, canonical-gates, self-application, dotnet-api-inventory, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
@@ -162,10 +159,9 @@ jobs:
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
           SHARPPROOF_API_INVENTORY_RESULT: ${{ needs.dotnet-api-inventory.result }}
           SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
-          SHARPPROOF_LINKS_RESULT: ${{ needs.repository-links.result }}
         run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success || "$SHARPPROOF_QUALITY_RESULT" != success || "$SHARPPROOF_LINKS_RESULT" != success ]]; then
-            echo "Required CI jobs failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT, $SHARPPROOF_QUALITY_RESULT, $SHARPPROOF_LINKS_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_API_INVENTORY_RESULT" != success || "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
+            echo "Required CI jobs failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_API_INVENTORY_RESULT, $SHARPPROOF_QUALITY_RESULT" >&2
             exit 1
           fi
 

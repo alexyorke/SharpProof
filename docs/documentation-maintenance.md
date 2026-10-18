@@ -39,9 +39,10 @@ GitHub or alter the repository's branches.
 
 ## Link audit after merges
 
-[Repository link check](../.github/workflows/links.yml) is required by the main CI
-on pull requests and every push to `master` (including merges), and by release
-publication. It also runs weekly and supports manual dispatch. It audits the whole
+The combined [repository quality check](../.github/workflows/quality.yml) includes
+the link audit on pull requests, pushes to `master` (including merges), and before
+release publication. The [standalone link check](../.github/workflows/links.yml)
+also runs weekly and supports manual dispatch. Both audit the whole
 checkout, including hidden source directories, using [lychee](https://lychee.cli.rs/).
 [lychee.toml](../lychee.toml) lists the Markdown, HTML, CSS, reStructuredText, and
 plain-text formats scanned. Git metadata and ignored build outputs are excluded.
@@ -55,7 +56,8 @@ following redirects and retrying failures; HTTP errors and timeouts fail the job
 It does not execute JavaScript or validate application-generated navigation, and
 email delivery and unsupported URL schemes are outside its scope.
 
-Failures are grouped by source file in the Actions job summary and in the
+Failures are grouped by source file in `artifacts/lint/links.md` in the combined
+quality artifact, or in the standalone Actions job summary and
 `link-report-<commit>-<attempt>` artifact, retained for 14 days. This job only
 reports: it never fixes links, commits changes, or opens pull requests. Existing
 broken links, illustrative URLs, or sites blocking automated requests can cause

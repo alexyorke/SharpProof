@@ -23,6 +23,17 @@ For a first contribution, reproduce one issue, locate its existing test cohort, 
 
 ## Run validation
 
+Run every repository quality and link check with one command, including image setup:
+
+```sh
+docker compose run --rm --build lint
+```
+
+Reports are saved under `artifacts/lint`; findings return a failing exit code.
+For host Git worktrees, use `pwsh -File scripts/Invoke-SharpProof.ps1 lint`.
+See [quality gates](eng/lint/README.md) for the check scope. Then run the relevant
+.NET tests:
+
 ```text
 docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression
 docker compose run --rm tooling pr

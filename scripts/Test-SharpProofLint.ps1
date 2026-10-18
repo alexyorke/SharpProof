@@ -84,8 +84,8 @@ $$
 
     $compose = Get-Content (Join-Path $repositoryRoot 'compose.yaml') -Raw
     $invalidCompose = Write-Probe 'invalid-compose.yaml' $compose.Replace(
-        '        TOOLING_IMAGE: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}',
-        '        TOOLING_IMAGE: unrelated:latest')
+        '        canonical_tooling: service:tooling',
+        '        canonical_tooling: docker-image://unrelated:latest')
     Assert-NativeRejection 'Lint container authority' 'pwsh' @(
         '-NoLogo', '-NoProfile', '-File', (Join-Path $repositoryRoot 'scripts/Test-SharpProofContainerContract.ps1'),
         '-ComposePath', $invalidCompose, '-AuthorityOnly') 'Lint base'
