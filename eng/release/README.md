@@ -12,7 +12,7 @@
 
 Branch package checks do not run tag-only security or publication dependencies and do not publish. Do not report branch success as release qualification or public feed availability.
 
-Package artifacts are named `nuget-packages-<run-id>-<sha>`. Both container and portable consumers download that artifact into `nupkgs`; publication downloads the same artifact. Consumer jobs do not repack product source. Preserve the artifact's run and SHA when reviewing qualification. Public-feed publication verifies qualified package SHA-512 hashes before pushing and after downloading published packages. Mismatched duplicate versions fail publication.
+Package artifacts are named `nuget-packages-<run-id>-<sha>-<attempt>`. All consumers, provenance, and publication download the immutable artifact ID emitted by the package job into `nupkgs`. Artifacts are never overwritten; partial retries retain the package job's bound artifact identity. Consumer jobs do not repack product source. Preserve the artifact's run and SHA when reviewing qualification. Public-feed publication verifies qualified package SHA-512 hashes before pushing and after downloading published packages. Mismatched duplicate versions fail publication.
 
 [third-party-components.json](third-party-components.json) records package components summarized in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt). [Native SMT packaging](../../docs/native-smt-packaging.md) describes layout and pinned payload checks.
 

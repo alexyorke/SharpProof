@@ -41,7 +41,7 @@ or publishing. Missing, pending, cancelled and failed runs reject the release.
 Tag-only security and every native/portable exact-artifact consumer must also pass.
 
 The package job generates `packages.tsv` and a release-only `packages.lock.json` identity inventory from each packed nuspec and its SHA-512. The inventory describes the release artifacts, not a consumer restore. The SBOM scans unpacked package contents together with that inventory and must contain every qualified package ID/version.
-After qualification, a separate least-privilege job creates an SPDX package-graph
+All consumers, provenance and publication use the immutable artifact ID emitted by the package job; run/commit/attempt artifact names are never overwritten. After qualification, a separate least-privilege job creates an SPDX package-graph
 SBOM and signed provenance/SBOM attestations for the exact downloaded artifacts.
 The publish job verifies provenance against this repository, workflow, tag and SHA
 before requesting NuGet credentials. `release-evidence-<sha>-<attempt>` retains the
