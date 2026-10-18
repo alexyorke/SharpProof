@@ -2216,3 +2216,16 @@ before output. Freeze entering membership and substitution maps before use; pres
 copy overwrites/null conflict markers, cancellation checks and maximum candidate order.
 State's three direct consumers (Generate, PassiveCallableSolver, checksum evidence)
 only use enumeration/Length/projection and accept immutable vectors. Status: open before edits.
+## Callable projection and entry observation inventory
+
+IMM-M044: Coordinator traced TotalCallableVerifier entry labels/IDs, staged requires/
+assumption projections, depth/core vectors and used-ID membership. Use scoped builders
+and freeze at completion/callback setup boundaries, retaining Ordinal label/ID equality,
+strict duplicate checks, canonical assumption order and existing projection stage order.
+Widen CompleteEntry/ProjectEntry lookup parameters to IReadOnlyDictionary so old array/
+dictionary test callers stay compatible while production supplies frozen roots.
+
+The two direct fixture consumers can freeze builder labels/IDs, constraint vectors and
+callback checks; native IR/runtime invocation argument adapters remain. Their read-only
+prime and callable-target vectors can be immutable. Preserve before/after resource
+accounting and rejection assertions. Status: open before edits.
