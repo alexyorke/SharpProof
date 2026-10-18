@@ -8,7 +8,8 @@ public static class C
     {
         try
         {
-            if (flag) throw new System.InvalidOperationException("failed");
+            if (flag)
+                throw new System.InvalidOperationException("failed");
             return 1;
         }
         catch (System.InvalidOperationException)

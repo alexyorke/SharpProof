@@ -109,6 +109,13 @@ jobs:
           -Configuration Release -Fast -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
+      # Repository formatting runs here rather than on its own runner, saving
+      # a runner slot and a tooling image build; build-and-test requires
+      # this job, so the formatting gate is unchanged.
+      - name: Require C#, PowerShell, and shell linting and formatting
+        if: ${{ !cancelled() }}
+        run: docker compose run --rm tooling format-check
+
       - name: Upload Gates cohort and timing evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -205,7 +212,7 @@ jobs:
           SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
         run: |
           if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
-            echo "Canonical jobs, or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
+            echo "Canonical jobs (Gates includes formatting), or self-application and API inventory, failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1
           fi
 

@@ -2,7 +2,8 @@ using SharpProof.Attributes;
 
 namespace SharpProof.Samples.Effects;
 
-public static class EffectExamples {
+public static class EffectExamples
+{
     [EnforcePure]
     [ZeroAllocations]
     [DoesNotThrow]

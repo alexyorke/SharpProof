@@ -11,37 +11,37 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-lazy-division.cs:94+1
-  i6 op3 Assign v5:int[width=32,signed=True] = 0 source=total-lazy-division.cs:99+1
-  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 != v5) source=total-lazy-division.cs:94+6
-  i8 op1 Branch v6 ? b4 : b3 source=total-lazy-division.cs:94+6
+  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-lazy-division.cs:tokens["d"]#2
+  i6 op3 Assign v5:int[width=32,signed=True] = 0 source=total-lazy-division.cs:tokens["0"]#1
+  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 != v5) source=total-lazy-division.cs:tokens["d","!=","0"]#1
+  i8 op1 Branch v6 ? b4 : b3 source=total-lazy-division.cs:tokens["d","!=","0"]#1
 block: b3 cfg:3
-  i9 op5 Assign v7:bool[width=0,signed=False] = false source=total-lazy-division.cs:94+6
-  i10 op6 Assign v8:bool[width=0,signed=False] = v7 source=total-lazy-division.cs:94+6
+  i9 op5 Assign v7:bool[width=0,signed=False] = false source=total-lazy-division.cs:tokens["d","!=","0"]#1
+  i10 op6 Assign v8:bool[width=0,signed=False] = v7 source=total-lazy-division.cs:tokens["d","!=","0"]#1
   i11 op0 Goto b5 source=none
 block: b4 cfg:2
-  i12 op7 Assign v9:int[width=32,signed=True] = 10 source=total-lazy-division.cs:104+2
-  i13 op8 Assign v10:int[width=32,signed=True] = v1 source=total-lazy-division.cs:109+1
-  i14 op9 Branch (v10 == 0) ? b8 : b9 source=total-lazy-division.cs:104+6
+  i12 op7 Assign v9:int[width=32,signed=True] = 10 source=total-lazy-division.cs:tokens["10"]#1
+  i13 op8 Assign v10:int[width=32,signed=True] = v1 source=total-lazy-division.cs:tokens["d"]#3
+  i14 op9 Branch (v10 == 0) ? b8 : b9 source=total-lazy-division.cs:tokens["10","/","d"]#1
 block: b5 cfg:4
-  i23 op16 Assign v14:bool[width=0,signed=False] = v8 source=total-lazy-division.cs:94+20
-  i24 op15 Assign v3:bool[width=0,signed=False] = v14 source=total-lazy-division.cs:94+20
-  i25 op15 Return v3 source=total-lazy-division.cs:94+20
+  i23 op16 Assign v14:bool[width=0,signed=False] = v8 source=total-lazy-division.cs:tokens["d","!=","0","&&","10","/","d",">","0"]#1
+  i24 op15 Assign v3:bool[width=0,signed=False] = v14 source=total-lazy-division.cs:tokens["d","!=","0","&&","10","/","d",">","0"]#1
+  i25 op15 Return v3 source=total-lazy-division.cs:tokens["d","!=","0","&&","10","/","d",">","0"]#1
 block: b6 cfg:5
   i26 op0 Return void source=none
 block: b7 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b8 throw
-  i15 op9 Throw DivideByZero -> b7 source=total-lazy-division.cs:104+6
+  i15 op9 Throw DivideByZero -> b7 source=total-lazy-division.cs:tokens["10","/","d"]#1
 block: b9 normal
-  i16 op10 Branch ((v9 == -2147483648) && (v10 == -1)) ? b10 : b11 source=total-lazy-division.cs:104+6
+  i16 op10 Branch ((v9 == -2147483648) && (v10 == -1)) ? b10 : b11 source=total-lazy-division.cs:tokens["10","/","d"]#1
 block: b10 throw
-  i17 op10 Throw Overflow -> b7 source=total-lazy-division.cs:104+6
+  i17 op10 Throw Overflow -> b7 source=total-lazy-division.cs:tokens["10","/","d"]#1
 block: b11 normal
-  i18 op11 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-lazy-division.cs:104+6
-  i19 op12 Assign v12:int[width=32,signed=True] = 0 source=total-lazy-division.cs:113+1
-  i20 op13 Assign v13:bool[width=0,signed=False] = (v11 > v12) source=total-lazy-division.cs:104+10
-  i21 op14 Assign v8:bool[width=0,signed=False] = v13 source=total-lazy-division.cs:104+10
+  i18 op11 Assign v11:int[width=32,signed=True] = (v9 / v10) source=total-lazy-division.cs:tokens["10","/","d"]#1
+  i19 op12 Assign v12:int[width=32,signed=True] = 0 source=total-lazy-division.cs:tokens["0"]#2
+  i20 op13 Assign v13:bool[width=0,signed=False] = (v11 > v12) source=total-lazy-division.cs:tokens["10","/","d",">","0"]#1
+  i21 op14 Assign v8:bool[width=0,signed=False] = v13 source=total-lazy-division.cs:tokens["10","/","d",">","0"]#1
   i22 op0 Goto b5 source=none
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v1

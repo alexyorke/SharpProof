@@ -19,7 +19,7 @@ function Get-Anchors([string]$Content) {
     foreach ($match in [regex]::Matches($withoutCode, '(?i)\b(?:id|name)=["'']([^"'']+)["'']')) {
         [void]$anchors.Add($match.Groups[1].Value)
     }
-    return ,$anchors
+    return , $anchors
 }
 
 # Restrict discovery to tracked source; ignored artifacts can contain other worktrees.
@@ -39,8 +39,8 @@ foreach ($file in $files) {
         $parts = $target.Split('#', 2)
         $pathPart = [Uri]::UnescapeDataString($parts[0].Split('?')[0])
         $resolved = if (-not $pathPart) { $file }
-            elseif ($pathPart.StartsWith('/')) { Join-Path $RepositoryRoot $pathPart.TrimStart('/') }
-            else { Join-Path (Split-Path $file -Parent) $pathPart }
+        elseif ($pathPart.StartsWith('/')) { Join-Path $RepositoryRoot $pathPart.TrimStart('/') }
+        else { Join-Path (Split-Path $file -Parent) $pathPart }
         if (-not (Test-Path -LiteralPath $resolved)) { throw "Broken Markdown link in ${file}: $target" }
         if ($parts.Count -eq 2 -and $parts[1] -and [IO.Path]::GetExtension($resolved) -eq '.md') {
             $anchors = Get-Anchors ([IO.File]::ReadAllText($resolved))

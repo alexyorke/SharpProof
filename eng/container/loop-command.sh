@@ -39,15 +39,15 @@ esac
 
 lock_directory="/tmp/sharpproof-loop.lock"
 lock_owner="${lock_directory}/owner"
-if ! mkdir "${lock_directory}" 2>/dev/null; then
-  owner_pid="$(cat "${lock_owner}" 2>/dev/null || true)"
-  if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" 2>/dev/null; then
+if ! mkdir "${lock_directory}" 2> /dev/null; then
+  owner_pid="$(cat "${lock_owner}" 2> /dev/null || true)"
+  if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" 2> /dev/null; then
     echo "Another SharpProof loop command owns the private build workspace." >&2
     exit 125
   fi
   rm -f -- "${lock_owner}"
-  if ! rmdir "${lock_directory}" 2>/dev/null ||
-    ! mkdir "${lock_directory}" 2>/dev/null; then
+  if ! rmdir "${lock_directory}" 2> /dev/null ||
+    ! mkdir "${lock_directory}" 2> /dev/null; then
     echo "Another SharpProof loop command owns the private build workspace." >&2
     exit 125
   fi
@@ -55,14 +55,14 @@ fi
 printf '%s\n' "$$" > "${lock_owner}"
 release_lock() {
   rm -f -- "${lock_owner}"
-  rmdir "${lock_directory}" 2>/dev/null || true
+  rmdir "${lock_directory}" 2> /dev/null || true
 }
 trap release_lock EXIT HUP INT TERM
 
 trust_git_directory() {
   local path="$1"
-  if ! git config --global --get-all safe.directory 2>/dev/null |
-      grep -Fxq -- "${path}"; then
+  if ! git config --global --get-all safe.directory 2> /dev/null |
+    grep -Fxq -- "${path}"; then
     git config --global --add safe.directory "${path}"
   fi
 }
@@ -71,7 +71,7 @@ validate_relative_path() {
   local path="$1"
   local inventory="$2"
   case "${path}" in
-    ""|/*|../*|*/../*)
+    "" | /* | ../* | */../*)
       echo "Invalid path in the SharpProof loop ${inventory} inventory." >&2
       exit 125
       ;;
@@ -80,7 +80,7 @@ validate_relative_path() {
 
 trust_git_directory "${source_root}"
 if ! git -C "${source_root}" rev-parse --is-inside-work-tree \
-    >/dev/null 2>&1; then
+  > /dev/null 2>&1; then
   echo "SharpProof loop source must be a Git checkout visible in Docker." >&2
   exit 125
 fi
@@ -142,7 +142,7 @@ fi
 if [[ ! -d "${target_root}/.git" ]]; then
   if [[ -d "${target_root}" ]] &&
     find "${target_root}" -mindepth 1 -maxdepth 1 -print -quit |
-      grep -q .; then
+    grep -q .; then
     echo "SharpProof loop workspace is nonempty but is not a Git checkout." >&2
     exit 125
   fi
@@ -151,7 +151,7 @@ if [[ ! -d "${target_root}/.git" ]]; then
 fi
 
 trust_git_directory "${target_root}"
-if git -C "${target_root}" remote get-url origin >/dev/null 2>&1; then
+if git -C "${target_root}" remote get-url origin > /dev/null 2>&1; then
   git -C "${target_root}" remote set-url origin "${origin_url}"
 else
   git -C "${target_root}" remote add origin "${origin_url}"
@@ -164,7 +164,7 @@ git -C "${target_root}" config core.filemode true
 if [[ -e "${target_root}/artifacts" &&
   ! -L "${target_root}/artifacts" ]]; then
   if find "${target_root}/artifacts" -mindepth 1 -print -quit |
-      grep -q .; then
+    grep -q .; then
     echo "SharpProof loop artifacts path is unexpectedly nonempty." >&2
     exit 125
   fi

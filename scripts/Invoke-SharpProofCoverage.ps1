@@ -36,7 +36,7 @@ $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+        $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 $resolvedResultsDirectory = Resolve-SharpProofContainedPath `
@@ -138,7 +138,7 @@ function New-CoverageSettings {
 
     $path = Join-Path `
         $resolvedResultsDirectory `
-        ("coverage-$Name.runsettings")
+    ("coverage-$Name.runsettings")
     Save-CoverageXml -Document $settings -Path $path
     return $path
 }
@@ -291,8 +291,8 @@ if ($CoveragePhase -in @('all', 'semantic-projects')) {
             'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $fuzzConsoleOriginalIsolation)
         [pscustomobject]@{
             # Retain the legacy label and filename; this timing covers both fixtures.
-            fixture = 'FuzzConsoleCancellationTests'
-            fixtures = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
+            fixture             = 'FuzzConsoleCancellationTests'
+            fixtures            = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
             elapsedMilliseconds = [long]$fuzzConsoleClock.Elapsed.TotalMilliseconds
         } | ConvertTo-Json | Set-Content `
             -LiteralPath (Join-Path $resolvedResultsDirectory 'fuzz-console-timing.json') `
@@ -322,7 +322,7 @@ $coverageModuleIdentities = @(
     $coverageAuthority.modules |
         ForEach-Object {
             [string]$_.project + ':' + [string]$_.assemblyName + ':' +
-                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+            [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
         } |
         Sort-Object)
 $normalizer = Join-Path $PSScriptRoot 'Normalize-SharpProofCoverageReport.ps1'
@@ -332,27 +332,27 @@ $moduleIdentities = $coverageModuleIdentities -join ','
 # including child collector evidence, while using at most four CPU lanes.
 $normalizationParallelism = [Math]::Min(4, (Get-SharpProofSemanticTestParallelism -RepositoryRoot $repositoryRoot))
 $coverageNormalizationBytes = [long](@(
-    $coverageReports | Measure-Object -Property Length -Sum).Sum)
+        $coverageReports | Measure-Object -Property Length -Sum).Sum)
 $coverageNormalizationTimer = [Diagnostics.Stopwatch]::StartNew()
 try {
     $normalizationResults = @($coverageReports | ForEach-Object -Parallel {
-        $reportPath = $_.FullName
-        try {
-            $scriptPath = $using:normalizer
-            & $scriptPath `
-                -Path $reportPath `
-                -RepositoryPrefix $using:repositoryPrefix `
-                -AuthorityCommit $using:authorityCommit `
-                -ModuleIdentities $using:moduleIdentities
-            [pscustomobject]@{ Path = $reportPath; Error = '' }
-        }
-        catch {
-            [pscustomobject]@{
-                Path = $reportPath
-                Error = $_.Exception.Message
+            $reportPath = $_.FullName
+            try {
+                $scriptPath = $using:normalizer
+                & $scriptPath `
+                    -Path $reportPath `
+                    -RepositoryPrefix $using:repositoryPrefix `
+                    -AuthorityCommit $using:authorityCommit `
+                    -ModuleIdentities $using:moduleIdentities
+                [pscustomobject]@{ Path = $reportPath; Error = '' }
             }
-        }
-    } -ThrottleLimit $normalizationParallelism)
+            catch {
+                [pscustomobject]@{
+                    Path  = $reportPath
+                    Error = $_.Exception.Message
+                }
+            }
+        } -ThrottleLimit $normalizationParallelism)
     if ($normalizationResults.Count -ne $coverageReports.Count) {
         throw 'Coverage normalization did not return a result for every report.'
     }

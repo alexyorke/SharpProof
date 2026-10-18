@@ -48,6 +48,9 @@ jobs:
         with:
           download-packages: "false"
 
+      - name: Require repository linting and formatting before packaging or release
+        run: docker compose run --rm tooling format-check
+
       - name: Pack and validate the package graph
         run: docker compose run --rm tooling pack -Configuration Release
 

@@ -7,15 +7,21 @@ public static class Subject
         Contract.Requires(x == 3);
         Contract.Ensures(Contract.Result<int>() == 3 && x == 6);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return x; } finally { try { x++; } finally { x += 2; } }
+        try
+        { return x; }
+        finally { try { x++; } finally { x += 2; } }
     }
     public static int BCaughtNestedBody(int x)
     {
         Contract.Requires(x == 3);
         Contract.Ensures(Contract.Result<int>() == 3 && x == 9);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return x; } finally {
-            try { try { x = 10 / (x - 3); } finally { x = 7; } }
+        try
+        { return x; }
+        finally
+        {
+            try
+            { try { x = 10 / (x - 3); } finally { x = 7; } }
             catch (System.DivideByZeroException) { x = 9; }
         }
     }
@@ -24,8 +30,12 @@ public static class Subject
         Contract.Requires(x == 3);
         Contract.Ensures(Contract.Result<int>() == 3 && x == 9);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { return x; } finally {
-            try { try { x = 10 / (x - 3); } finally { x = 7; } }
+        try
+        { return x; }
+        finally
+        {
+            try
+            { try { x = 10 / (x - 3); } finally { x = 7; } }
             catch (System.DivideByZeroException) when (x == 3) { x = 9; }
         }
     }
@@ -34,7 +44,9 @@ public static class Subject
         Contract.Requires(x == 0);
         Contract.Ensures(Contract.Result<int>() == 3 && x == 3);
         Contract.Ensures(Contract.Result<int>() == 0);
-        try { x++; } finally { try { x++; } finally { x++; } }
+        try
+        { x++; }
+        finally { try { x++; } finally { x++; } }
         return x;
     }
 }

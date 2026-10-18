@@ -12,7 +12,7 @@ function Resolve-SharpProofSourceDocument {
     )
 
     $root = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path.
-        TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
     $prefix = $root + [IO.Path]::DirectorySeparatorChar
     $physicalRoot = Resolve-SharpProofPhysicalPath -Path $root
     $physicalPrefix = $physicalRoot + [IO.Path]::DirectorySeparatorChar
@@ -34,8 +34,8 @@ function Resolve-SharpProofSourceDocument {
             if ([string]::IsNullOrWhiteSpace($suffix) -or
                 [IO.Path]::IsPathRooted($suffix) -or $suffix -match '^[A-Za-z]:' -or
                 @($components | Where-Object {
-                    [string]::IsNullOrWhiteSpace($_) -or $_ -in @('.', '..')
-                }).Count -ne 0) {
+                        [string]::IsNullOrWhiteSpace($_) -or $_ -in @('.', '..')
+                    }).Count -ne 0) {
                 throw "Mapped source document has an invalid repository suffix: '$DocumentPath'."
             }
             $candidate = Join-Path $root $suffix
