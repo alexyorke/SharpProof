@@ -2093,3 +2093,17 @@ Coverage observed-assembly membership and per-receipt definitions can use Ordina
 hash/map builders, freezing before final membership and result checks respectively.
 Keep conflict-before-overwrite checks, same-value duplicate allowance, receipt order
 and required architecture assertions. Status: open before edits.
+## Frontend interpreter input map inventory
+
+IMM-M037: Coordinator inspected 27 ToDictionary interpreter input maps across 19
+Frontend test files (ActualParenthesized, BoundSourceCallImport, BulkScalarHelper,
+CompilerCfgConstruction, CompoundShiftPromotion, ElementGuardInput/NarrowInput,
+DeferredStringConcatenation, ParamsCollection/OptionalAttributeShadowAdmission,
+Pr275SourceSessionModelOwnership, RepeatedRequiresDefault/FilterWork, SourceLoweringNull,
+SourceVariableBinding, SwitchExpressionTerminalElision, TypedLoopLowering,
+CSharpOperationSemantics and BulkVisualBasicScalarDomain coverage). Use strict immutable
+capture retaining default key equality, selector evaluation and value references.
+All consumers accept IReadOnlyDictionary. ElementGuardNarrowInput's first environment
+is deliberately edited between evaluations: use a scoped builder and freeze separately
+for each interpreter call, retaining the shared sequence value identity. No embedded
+source or native mutable input arrays change. Status: open before edits.
