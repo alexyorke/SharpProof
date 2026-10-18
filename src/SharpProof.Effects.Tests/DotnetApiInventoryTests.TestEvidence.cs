@@ -30,10 +30,15 @@ public sealed partial class DotnetApiInventoryTests
 
             if (row.Evidence.Contains("intrinsic=fresh-default-integer-key-dictionary-state", StringComparison.Ordinal))
             {
-                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
-                    "compiled empty/default Int32-key dictionaries with scalar and reference values, alias Add, two keys, existing-key update, stored identity/null, Count and present/missing membership; normal framework return selection; all nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests",
-                    () => CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true),
-                    () => CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true));
+                var opaqueState = row.Id is "M:System.Collections.Generic.Dictionary`2.#ctor" or
+                    "M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)" or "P:System.Collections.Generic.Dictionary`2.Count";
+                var scope = "compiled Int32-key dictionary state with scalar/reference values, aliases, identity/null, Count and membership; nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests" +
+                    (opaqueState ? "; empty generic-value construction/Count/membership versus decimal runtime without value interpretation" : "");
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, scope,
+                    () => CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true) &&
+                        (!opaqueState || CheckDictionaryStateIntrinsic(compilation, false, opaqueValues: true)),
+                    () => CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true) ||
+                        opaqueState && CheckDictionaryStateIntrinsic(compilation, true, opaqueValues: true));
             }
 
             if (row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal))
