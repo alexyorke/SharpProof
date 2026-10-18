@@ -214,6 +214,23 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(checks));
     }
 
+    [Test]
+    public async Task AllocationOracleDoesNotInventConcreteInterfaceInputs()
+    {
+        var document = Document("public static class C { public static int Target(System.Collections.Generic.IList<int> values) { " +
+            "SharpProof.Attributes.Contract.Requires(values != null); return 17; } }");
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document,
+            TestContext.CurrentContext.CancellationToken, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1,
+            allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var row = report.Rows.Single();
+        Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(row.RuntimeOracle, Is.EqualTo("NonConcreteInput"));
+        Assert.That(row.RuntimeChecks, Is.Zero);
+        Assert.That(row.AllocatedBytes, Is.Null);
+        Assert.That(report.RuntimeWitnesses, Is.Zero);
+        Assert.That(report.RuntimeContradictions, Is.Zero);
+    }
     [TestCase(nameof(NoAllocation), false)]
     [TestCase(nameof(FilteredHandlerAllocation), true)]
     public void IlOracleIncludesExceptionFilterHandlers(string name, bool expected)

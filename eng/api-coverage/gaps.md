@@ -66,9 +66,6 @@ access kind and value domains satisfy the production guard.
   cycles, ref escapes, closure-captured mutable state, custom derived interfaces,
   reference covariance and `as` conversions need their own sound models. Rebinding
   must preserve identity snapshots; opaque writers must invalidate content knowledge.
-- Exact OSS0002 Swap<T> has 128 runtime/IR normal/fault cases. Its full SMT swap
-  postcondition reaches verification-condition construction limits. Reducing that
-  cost requires a measured verifier change; runtime agreement is not a proof.
 - Count >= 0 is weaker than a collection representation invariant. List/dictionary/
   queue/stack count/content relations and repeated getter consistency remain open.
 - Default comparer getter initialization can allocate, throw and affect ambient
