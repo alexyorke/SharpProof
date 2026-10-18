@@ -21,17 +21,17 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
 {
-    private static readonly int[] RetainedInputs = [-7, 0, 42];
-    private static readonly int[] OmittedInputs = [0, 1];
+    private static readonly ImmutableArray<int> RetainedInputs = [-7, 0, 42];
+    private static readonly ImmutableArray<int> OmittedInputs = [0, 1];
     private static readonly ImmutableArray<string> ShadowAliases = ["Shadow"];
     private static readonly ImmutableArray<string> PriorAliases = ["Prior"];
     private static readonly ImmutableArray<string> PresentSymbols = ["PRIVATE_PRESENT"];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string ObjectProducer = """
         namespace System.Diagnostics
@@ -640,7 +640,7 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableList<IlInstruction>.Empty;
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -667,11 +667,11 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 token = BitConverter.ToInt32(il, offset);
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
+            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions);
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
     }
 
     private static PeObservation DescribePe(byte[] bytes)
@@ -724,10 +724,10 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, List<IlInstruction> Instructions)
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
 }

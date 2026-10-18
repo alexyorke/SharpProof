@@ -464,7 +464,7 @@ public sealed class CallableSolverSessionTests
 
     private sealed class CoreLabel(string name) : IDisposable
     {
-        private string _guarded_name = name ?? throw new System.ArgumentNullException(nameof(name));
+        private readonly string _guarded_name = name ?? throw new System.ArgumentNullException(nameof(name));
         internal bool IsDisposed { get; private set; }
         public override string ToString() { return _guarded_name; }
         public void Dispose() { IsDisposed = true; }

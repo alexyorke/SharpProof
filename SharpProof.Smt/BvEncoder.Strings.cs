@@ -35,7 +35,7 @@ internal sealed partial class BvEncoder
         if (_textLinked.Add(value.Id))
         {
             var length = owner.Own(context.MkBV2Int((BitVecExpr)EncodeLength(value, meter), false));
-            ReferenceFacts.Add(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
+            AddReferenceFact(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
                 owner.Own(context.MkEq(length, owner.Own(context.MkLength(text)))))));
         }
         return text;
@@ -61,7 +61,7 @@ internal sealed partial class BvEncoder
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume(content.Length + 1L);
-        ReferenceFacts.Add(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
+        AddReferenceFact(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
     }
 
     private void RegisterConcatenation(Expr value, Expr left, Expr right, SmtQueryResourceMeter meter)
@@ -93,11 +93,11 @@ internal sealed partial class BvEncoder
         // its result facts must never restrict the operands' entry lengths.
         // Two nonnegative Int32 lengths cannot overflow the unsigned sum.
         var fits = owner.Own(context.MkBVULE(sum, owner.Own(context.MkBV(int.MaxValue, 32))));
-        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+        AddReferenceFact(owner.Own(context.MkImplies(fits,
             owner.Own(context.MkEq(Text(concatenation.Value, meter),
                 owner.Own(context.MkConcat(Operand(concatenation.Left), Operand(concatenation.Right))))))));
         // The same total in the length sort spares Z3 relating the two.
-        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+        AddReferenceFact(owner.Own(context.MkImplies(fits,
             owner.Own(context.MkEq(EncodeLength(concatenation.Value, meter), sum)))));
     }
 

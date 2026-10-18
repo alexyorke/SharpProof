@@ -10,7 +10,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerCaptureRequestWorkflowTests
 {
-    private static readonly string[] SelectedPackIds = ["dotnet.scalar"];
+    private static readonly ImmutableArray<string> SelectedPackIds = ["dotnet.scalar"];
     private const string RequestKey =
         "build_property._SharpProofCompilerCaptureRequestPath";
 
@@ -309,7 +309,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText,
         ICompilerAdditionalTextSnapshot
     {
-        private CancellationTokenSource _guarded_cancellation = cancellation ?? throw new System.ArgumentNullException(nameof(cancellation));
+        private readonly CancellationTokenSource _guarded_cancellation = cancellation ?? throw new System.ArgumentNullException(nameof(cancellation));
         public override string Path => "input.data";
 
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(_guarded_cancellation.Token);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -8,7 +9,7 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class WorkerTests
 {
-    private static readonly string[] EntryLockContradictoryCore = ["requires:0", "requires:1"];
+    private static readonly ImmutableArray<string> EntryLockContradictoryCore = ["requires:0", "requires:1"];
 
     [TestCase(false, false)]
     [TestCase(false, true)]

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,11 +24,11 @@ internal static class DotnetApiInventory
         public string Evidence { get; init; } = Evidence ?? throw new global::System.ArgumentNullException(nameof(Evidence));
     }
 
-    internal sealed record Delta(string[] Added, string[] Removed, string[] Changed)
+    internal sealed record Delta(ImmutableArray<string> Added, ImmutableArray<string> Removed, ImmutableArray<string> Changed)
     {
-        public string[] Added { get; init; } = Added ?? throw new global::System.ArgumentNullException(nameof(Added));
-        public string[] Removed { get; init; } = Removed ?? throw new global::System.ArgumentNullException(nameof(Removed));
-        public string[] Changed { get; init; } = Changed ?? throw new global::System.ArgumentNullException(nameof(Changed));
+        public ImmutableArray<string> Added { get; init; } = Added.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Added)) : Added;
+        public ImmutableArray<string> Removed { get; init; } = Removed.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Removed)) : Removed;
+        public ImmutableArray<string> Changed { get; init; } = Changed.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Changed)) : Changed;
     }
 
     internal static Row[] Collect(CSharpCompilation compilation)
@@ -143,15 +144,26 @@ internal static class DotnetApiInventory
     {
         global::System.ArgumentNullException.ThrowIfNull(baseline);
         global::System.ArgumentNullException.ThrowIfNull(current);
-        static Dictionary<string, string> Index(IEnumerable<string> lines)
+        static ImmutableDictionary<string, string> Index(IEnumerable<string> lines)
         {
             global::System.ArgumentNullException.ThrowIfNull(lines);
-            return lines.ToDictionary(line => line is null ? throw new global::System.ArgumentNullException(nameof(line)) : (string.Join('\t', line.Split('\t').Take(2))), StringComparer.Ordinal);
+            var index = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+            foreach (var line in lines)
+            {
+                global::System.ArgumentNullException.ThrowIfNull(line);
+                var key = string.Join('\t', line.Split('\t').Take(2));
+                if (index.ContainsKey(key))
+                {
+                    throw new ArgumentException("An item with the same key has already been added. Key: " + key);
+                }
+                index = index.Add(key, line);
+            }
+            return index;
         }
 
         var before = Index(baseline);
         var after = Index(current);
-        return new Delta(after.Keys.Except(before.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), before.Keys.Except(after.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), after.Keys.Intersect(before.Keys, StringComparer.Ordinal).Where(key => key is null ? throw new global::System.ArgumentNullException(nameof(key)) : (!string.Equals(before[key], after[key], StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToArray());
+        return new Delta(after.Keys.Except(before.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToImmutableArray(), before.Keys.Except(after.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToImmutableArray(), after.Keys.Intersect(before.Keys, StringComparer.Ordinal).Where(key => key is null ? throw new global::System.ArgumentNullException(nameof(key)) : (!string.Equals(before[key], after[key], StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToImmutableArray());
     }
 
     internal static string Fingerprint(string path)

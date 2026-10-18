@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -22,8 +23,8 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class TypedFeatureLongFuzzTests
 {
     private const string Harness = "typed-features";
-    private static readonly int[] s_anchors = [int.MinValue, -257, -3, -1, 0, 1, 2, 3, 7, 255, 256, int.MaxValue];
-    private static readonly string[] s_families =
+    private static readonly ImmutableArray<int> s_anchors = [int.MinValue, -257, -3, -1, 0, 1, 2, 3, 7, 255, 256, int.MaxValue];
+    private static readonly ImmutableArray<string> s_families =
     [
         "checked-arithmetic", "bitwise-shifts", "checked-conversion", "lifted-nullable",
         "array-index", "string-from-end", "switch-pattern", "tuple-deconstruction",
@@ -162,7 +163,7 @@ public sealed class TypedFeatureLongFuzzTests
         else if (result.Outcome == WorkerClaimOutcome.Refuted && violation is null)
         {
             session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Warning, seed, claim,
-                result.Outcome.ToString(), result.Reason.ToString(), "no violation on " + runtime.Runs.Count + " inputs",
+                result.Outcome.ToString(), result.Reason.ToString(), "no violation on " + runtime.Runs.Length + " inputs",
                 "The CLR oracle did not observe the reported refutation.", source));
         }
     }
@@ -219,9 +220,9 @@ public sealed class TypedFeatureLongFuzzTests
     }
 
     private sealed record ClrRun(int Input, int Value, string? Exception);
-    private sealed record ClrResult(List<ClrRun> Runs, string? Error)
+    private sealed record ClrResult(ImmutableArray<ClrRun> Runs, string? Error)
     {
-        public List<ClrRun> Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+        public ImmutableArray<ClrRun> Runs { get; init; } = Runs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Runs)) : Runs;
     }
 
     private static ClrResult RunClr(string source, int[] inputs)
@@ -257,7 +258,7 @@ public sealed class TypedFeatureLongFuzzTests
                     runs.Add(new(input, 0, exception.InnerException!.GetType().FullName));
                 }
             }
-            return new(runs, null);
+            return new(runs.ToImmutableArray(), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

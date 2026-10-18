@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerArchitectureTests
 {
-    private static readonly string[] ExpectedAnalyzerReferences = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerReferences = [
         "SharpProof.Analyzer.Core",
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
@@ -22,7 +23,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Worker.Protocol"
     ];
 
-    private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",

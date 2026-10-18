@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -35,12 +36,12 @@ public sealed class CompositionalLongFuzzTests
         public string ClaimMode { get; init; } = ClaimMode ?? throw new System.ArgumentNullException(nameof(ClaimMode));
     }
     private sealed record Observation(int Input, int? Value, string? Exception, int State, int Writes);
-    private sealed record ClrResult(Observation[] Runs, string? Error)
+    private sealed record ClrResult(ImmutableArray<Observation> Runs, string? Error)
     {
-        public Observation[] Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+        public ImmutableArray<Observation> Runs { get; init; } = Runs.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Runs)) : Runs;
     }
 
-    private static readonly Operation[] s_operations =
+    private static readonly ImmutableArray<Operation> s_operations =
     [
         new("checked-add", "checked(y + 1)", int.MaxValue),
         new("shift-divide", "8 / (y & 3) + (y << 1)", 0),
@@ -51,7 +52,7 @@ public sealed class CompositionalLongFuzzTests
 
     // @@ is always an int expression over y. Each scope contains a return,
     // so every operation/scope pair is syntactically valid C#.
-    private static readonly Scope[] s_scopes =
+    private static readonly ImmutableArray<Scope> s_scopes =
     [
         new("pure-finally", "int y = x; try { return @@; } finally { _ = y; }", "Auto"),
         new("state-finally", "int y = x; try { return @@; } finally { Mark(y); }", "EnforcePure"),
@@ -63,10 +64,10 @@ public sealed class CompositionalLongFuzzTests
             "EnforcePure")
     ];
 
-    private static readonly int[] s_inputs =
+    private static readonly ImmutableArray<int> s_inputs =
         [int.MinValue, int.MinValue + 1, -4, -3, -2, -1, 0, 1, 2, 3, 4, 7, 255, 256,
             int.MaxValue - 1, int.MaxValue];
-    private static readonly (int Operation, int Scope)[] s_cycle = BuildCycle();
+    private static readonly ImmutableArray<(int Operation, int Scope)> s_cycle = BuildCycle().ToImmutableArray();
 
     [Test]
     public async Task GeneratedCompositionsAgreeWithClr()
@@ -297,7 +298,7 @@ public sealed class CompositionalLongFuzzTests
     }
 
     private static bool CheckRecovery(LongFuzzSession session, int seed, string pair, string plainBody,
-        int[] inputs, Observation[] recovered, string recoveredSource)
+        int[] inputs, ImmutableArray<Observation> recovered, string recoveredSource)
     {
         System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
         System.ArgumentNullException.ThrowIfNull(pair);
@@ -374,9 +375,12 @@ public sealed class CompositionalLongFuzzTests
             " || Contract.Result<int>() == " + Literal(expected) + ");";
     }
 
-    private static Observation? Witness(string claim, Operation operation, Observation atAnchor, Observation[] runs)
+    private static Observation? Witness(string claim, Operation operation, Observation atAnchor, ImmutableArray<Observation> runs)
     {
-        System.ArgumentNullException.ThrowIfNull(runs, nameof(runs));
+        if (runs.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(runs));
+        }
         System.ArgumentNullException.ThrowIfNull(atAnchor);
         System.ArgumentNullException.ThrowIfNull(operation);
         if (claim == "[DoesNotThrow]")
@@ -460,7 +464,7 @@ public sealed class CompositionalLongFuzzTests
             var state = type.GetField("State")!;
             var writes = type.GetField("Writes")!;
             var method = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = new List<Observation>(inputs.Length);
+            var runs = ImmutableList<Observation>.Empty;
             foreach (var input in inputs)
             {
                 state.SetValue(null, 0);
@@ -475,7 +479,7 @@ public sealed class CompositionalLongFuzzTests
                 {
                     exceptionName = exception.InnerException!.GetType().FullName;
                 }
-                runs.Add(new(input, value, exceptionName, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
+                runs = runs.Add(new(input, value, exceptionName, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
             }
             return new([.. runs], null);
         }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -27,9 +28,9 @@ namespace SharpProof.Worker.Test;
 public sealed class BulkFrontendIlModuleScopeBoundaryTests
 {
     private const int ParameterCount = 128;
-    private static readonly bool[] Inputs = [false, true];
-    private static readonly string[] ExpectedCodes = ["Ldarg", "Ret"];
-    private static readonly bool[] ExpectedPreconditions = [true];
+    private static readonly ImmutableArray<bool> Inputs = [false, true];
+    private static readonly ImmutableArray<string> ExpectedCodes = ["Ldarg", "Ret"];
+    private static readonly ImmutableArray<bool> ExpectedPreconditions = [true];
 
     [TestCase(4096)]
     [TestCase(4097)]

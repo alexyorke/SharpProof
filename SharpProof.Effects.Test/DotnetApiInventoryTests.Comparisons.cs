@@ -6,7 +6,7 @@ namespace SharpProof.Effects.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {
-    private static readonly (string Type, string[] Values)[] IntegerComparisonEdges =
+    private static readonly ImmutableArray<(string Type, ImmutableArray<string> Values)> IntegerComparisonEdges =
     [
         ("sbyte", ["sbyte.MinValue", "(sbyte)-1", "(sbyte)0", "(sbyte)1", "sbyte.MaxValue"]),
         ("byte", ["byte.MinValue", "(byte)1", "byte.MaxValue"]),

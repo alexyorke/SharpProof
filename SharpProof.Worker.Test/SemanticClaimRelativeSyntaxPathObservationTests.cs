@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -302,7 +303,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         }
         finally
         { runtime.Unload(); }
-        return new(compilation, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))), outputs);
+        return new(compilation, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))), outputs.ToImmutableArray());
     }
 
     private static void WriteObservation(object value)
@@ -311,11 +312,11 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         TestContext.Out.WriteLine(Marker + JsonSerializer.Serialize(value));
     }
     private sealed record NodeObservation(int RawKind, int SpanStart, int SpanLength);
-    private sealed record CompiledObservation(Compilation Compilation, string SourceSha256, int[] RuntimeOutputs)
+    private sealed record CompiledObservation(Compilation Compilation, string SourceSha256, ImmutableArray<int> RuntimeOutputs)
     {
         public Compilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
         public string SourceSha256 { get; init; } = SourceSha256 ?? throw new System.ArgumentNullException(nameof(SourceSha256));
-        public int[] RuntimeOutputs { get; init; } = RuntimeOutputs ?? throw new System.ArgumentNullException(nameof(RuntimeOutputs));
+        public ImmutableArray<int> RuntimeOutputs { get; init; } = RuntimeOutputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(RuntimeOutputs)) : RuntimeOutputs;
     }
     private sealed record FingerprintObservation(string? Fingerprint, string? ClaimId, string? FailureType,
         string? FailureMessage, bool? OwnerAdmitted, string Route)

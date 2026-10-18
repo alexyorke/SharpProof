@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -10,15 +11,15 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzSourceCampaignReplayTests
 {
-    private static readonly FuzzOracleStatus[] FrontendStatuses =
+    private static readonly ImmutableArray<FuzzOracleStatus> FrontendStatuses =
         [FuzzOracleStatus.Agreement, FuzzOracleStatus.Mismatch, FuzzOracleStatus.Agreement, FuzzOracleStatus.Agreement];
-    private static readonly FuzzOracleStatus[] FiniteStatuses =
+    private static readonly ImmutableArray<FuzzOracleStatus> FiniteStatuses =
         [FuzzOracleStatus.Abstained, FuzzOracleStatus.Agreement, FuzzOracleStatus.Agreement, FuzzOracleStatus.Agreement];
-    private static readonly FuzzOracleStatus[] PartialStatuses =
+    private static readonly ImmutableArray<FuzzOracleStatus> PartialStatuses =
         [FuzzOracleStatus.Agreement, FuzzOracleStatus.Agreement, FuzzOracleStatus.Mismatch, FuzzOracleStatus.Agreement];
-    private static readonly (int Case, string Oracle)[] FailureKeys =
+    private static readonly ImmutableArray<(int Case, string Oracle)> FailureKeys =
         [(0, "finite-domain-smt"), (1, "frontend"), (2, "partial-term-smt")];
-    private static readonly string[] FaultMethodNames = ["Target", "NormalCompletion"];
+    private static readonly ImmutableArray<string> FaultMethodNames = ["Target", "NormalCompletion"];
 
     private const string HealthyFinite = "public static bool Target(long value) => value >= 0;";
     private const string OpaqueFinite = "public static bool Target(long value) => IsPositive(value + 1); " +

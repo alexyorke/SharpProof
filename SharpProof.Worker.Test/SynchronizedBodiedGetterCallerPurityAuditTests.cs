@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -18,7 +19,7 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, 42];
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, 42];
     private const string SubjectTemplate = """
         using System.Runtime.CompilerServices;
         using SharpProof.Attributes;
@@ -149,13 +150,13 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 getter.IsStatic,
                 getter.ReturnType == typeof(int),
-                getter.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                getter.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 field.IsInitOnly,
                 field.IsStatic,
                 field.FieldType == typeof(int),
                 subject.TypeInitializer != null,
-                executions.Select(static execute => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (execute())).ToArray(),
+                executions.Select(static execute => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (execute())).ToImmutableArray(),
                 Convert.ToHexStringLower(getterIl),
                 subject.Module.ModuleVersionId.ToString("D"));
             await Save(evidenceDirectory, "runtime-observations.json", new
@@ -356,13 +357,13 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
     }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
-        bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount, bool FieldReadonly, bool FieldStatic, bool FieldInt32,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+        bool Synchronized, bool IsStatic, bool ReturnsInt32, ImmutableArray<string?> ParameterTypes, int FieldCount, bool FieldReadonly, bool FieldStatic, bool FieldInt32,
+        bool HasTypeInitializer, ImmutableArray<int> ReturnValues, string IlHex, string ModuleVersionId)
     {
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
         public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
-        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
-        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+        public ImmutableArray<string?> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
+        public ImmutableArray<int> ReturnValues { get; init; } = ReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ReturnValues)) : ReturnValues;
     }
 }

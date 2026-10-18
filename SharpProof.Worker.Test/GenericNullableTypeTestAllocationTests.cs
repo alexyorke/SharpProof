@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -12,7 +13,7 @@ namespace SharpProof.Worker.Test;
 // allocates in Debug.
 public sealed class GenericNullableTypeTestAllocationTests
 {
-    private static readonly (string Members, string Run, bool ReleaseAllocates)[] s_nullable =
+    private static readonly ImmutableArray<(string Members, string Run, bool ReleaseAllocates)> s_nullable =
     [
         ("public static bool Target<T>(T value) { return value is int?; }",
             "Target<int?>(x == 0 ? null : x)", true),
@@ -34,7 +35,7 @@ public sealed class GenericNullableTypeTestAllocationTests
             "Target<S>(new S { A = x })", false)
     ];
 
-    private static readonly (string Members, string Run)[] s_nonNullable =
+    private static readonly ImmutableArray<(string Members, string Run)> s_nonNullable =
     [
         ("public static bool Target<T>(T value) { return value is int; }", "Target<int?>(x == 0 ? null : x)"),
         ("public static bool Target<T>(T value) { if (value is S) return true; return false; }", "Target<S?>(x == 0 ? null : new S { A = x })"),

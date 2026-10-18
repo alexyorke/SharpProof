@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -13,7 +14,7 @@ public sealed class ControlFlowPurityOracleRegressionTests
         const int seed = 3_250_105;
         var fixtureType = typeof(ControlFlowLongFuzzTests);
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
-        var modes = (string[])fixtureType.GetField("s_modes", flags)!.GetValue(null)!;
+        var modes = (ImmutableArray<string>)fixtureType.GetField("s_modes", flags)!.GetValue(null)!;
         var body = fixtureType.GetMethod("Body", flags)!;
         var runCase = fixtureType.GetMethod("RunCase", flags)!;
         var countField = typeof(LongFuzzSession).GetField("_counts", BindingFlags.NonPublic | BindingFlags.Instance)!;

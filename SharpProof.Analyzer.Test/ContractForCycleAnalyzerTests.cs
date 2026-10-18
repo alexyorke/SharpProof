@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,7 +9,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ContractForCycleAnalyzerTests
 {
-    private static readonly string[] DiagnosticIds =
+    private static readonly ImmutableArray<string> DiagnosticIds =
         ["SP0047", "SPCF0009", "SPCF0010"];
     private const string UnsupportedMapBody = """
                     Contract.Ensures(true);

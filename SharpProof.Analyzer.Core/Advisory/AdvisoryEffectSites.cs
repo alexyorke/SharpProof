@@ -36,7 +36,7 @@ internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite>
 // claim.
 internal static class AdvisoryEffectSites
 {
-    private static readonly string[] ReadPrefixes =
+    private static readonly ImmutableArray<string> ReadPrefixes =
         ["FieldReference@", "StaticFieldReference@", "PropertyReference@", "ArrayElementReference@", "Increment@", "Decrement@",
             "CompoundAssignment@"];
 

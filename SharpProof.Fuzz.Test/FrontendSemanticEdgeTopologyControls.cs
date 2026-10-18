@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,8 +11,8 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FrontendSemanticEdgeTopologyControls
 {
-    private static readonly string[] OverloadedNames = ["EdgeTarget0", "EdgeTarget0"];
-    private static readonly int[] OverloadedParameterCounts = [0, 1];
+    private static readonly ImmutableArray<string> OverloadedNames = ["EdgeTarget0", "EdgeTarget0"];
+    private static readonly ImmutableArray<int> OverloadedParameterCounts = [0, 1];
 
     [Test]
     public void ActualSameNamedNamespaceSubjectIsRejected()

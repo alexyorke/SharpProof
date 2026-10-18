@@ -117,29 +117,30 @@ internal static class CompilerManifestArtifactProducer
         diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
-        var result = new CompilerDiagnosticArtifact
+        var sourceTreeOrdinal = -1;
+        var sourceTreePath = string.Empty;
+        var sourceTreeSha256 = string.Empty;
+        var sourceLineMapSha256 = string.Empty;
+        if (source)
+        {
+            CompilerSourceCoordinates.Bind(
+                location,
+                compilation,
+                out sourceTreeOrdinal,
+                out sourceTreePath,
+                out sourceTreeSha256,
+                out sourceLineMapSha256);
+        }
+        return new CompilerDiagnosticArtifact
         {
             Code = "compiler." + diagnostic.Id,
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             IsSource = source,
-            Location = location
+            Location = location,
+            SourceTreeOrdinal = sourceTreeOrdinal,
+            SourceTreePath = sourceTreePath,
+            SourceTreeSha256 = sourceTreeSha256,
+            SourceLineMapSha256 = sourceLineMapSha256
         };
-        if (!source)
-        {
-            return result;
-        }
-
-        CompilerSourceCoordinates.Bind(
-            location,
-            compilation,
-            out var sourceTreeOrdinal,
-            out var sourceTreePath,
-            out var sourceTreeSha256,
-            out var sourceLineMapSha256);
-        result.SourceTreeOrdinal = sourceTreeOrdinal;
-        result.SourceTreePath = sourceTreePath;
-        result.SourceTreeSha256 = sourceTreeSha256;
-        result.SourceLineMapSha256 = sourceLineMapSha256;
-        return result;
     }
 }

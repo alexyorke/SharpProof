@@ -78,13 +78,13 @@ public static class CompilationModelProvider
 
     private sealed class TreeOwnershipIndex
     {
-        private readonly Dictionary<SyntaxTree, Compilation?> _owners;
+        private readonly ImmutableDictionary<SyntaxTree, Compilation?> _owners;
 
         private TreeOwnershipIndex(
             Dictionary<SyntaxTree, Compilation?> owners)
         {
             owners = RepositoryParameterGuard.NotNull(owners, nameof(owners));
-            _owners = owners;
+            _owners = owners.ToImmutableDictionary(ReferenceComparer<SyntaxTree>.Instance);
         }
 
         internal static TreeOwnershipIndex Create(Compilation root)

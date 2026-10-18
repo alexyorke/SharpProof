@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ExternAliasClosedAttributeBindingTests
 {
-    private static readonly int[] Inputs = [-1, 0, 1];
+    private static readonly ImmutableArray<int> Inputs = [-1, 0, 1];
 
     [TestCase(false, false)]
     [TestCase(false, true)]

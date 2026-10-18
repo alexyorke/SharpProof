@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -5,7 +6,7 @@ namespace SharpProof.Host;
 
 internal static class TrustedChildEnvironment
 {
-    private static readonly string[] AllowedVariables =
+    private static readonly ImmutableArray<string> AllowedVariables =
     [
         "PATH",
         "HOME",
@@ -20,7 +21,7 @@ internal static class TrustedChildEnvironment
         "DOTNET_CLI_TELEMETRY_OPTOUT"
     ];
 
-    private static readonly string[] UnsafeRuntimeVariables =
+    private static readonly ImmutableArray<string> UnsafeRuntimeVariables =
     [
         "DOTNET_STARTUP_HOOKS",
         "DOTNET_ADDITIONAL_DEPS",

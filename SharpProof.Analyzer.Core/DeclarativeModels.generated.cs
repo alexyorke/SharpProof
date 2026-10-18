@@ -16,7 +16,7 @@ internal sealed partial record EffectClaimEvaluation(
     EffectClaimConstraint Constraint,
     DiagnosticDescriptor? Diagnostic,
     Location DiagnosticLocation,
-    object[] DiagnosticArguments
+    ImmutableArray<object?> DiagnosticArguments
 );
 
 internal sealed partial record EffectClaimConstraint(

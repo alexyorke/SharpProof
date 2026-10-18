@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerMetadataAliasWorkflowTests
 {
-    private static readonly string[] AlternateAlias = ["alternate"];
+    private static readonly ImmutableArray<string> AlternateAlias = ["alternate"];
 
     [TestCase(false)]
     [TestCase(true)]

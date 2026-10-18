@@ -13,7 +13,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class FrontendLoweringTests
 {
-    private static readonly long[] ElementValues = [4L, 8L, 15L];
+    private static readonly ImmutableArray<long> ElementValues = [4L, 8L, 15L];
 
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
     [TestCase(-7L, false, 3L, ExpectedResult = -2L)]
@@ -125,7 +125,7 @@ public sealed class FrontendLoweringTests
                 checked(values[index] + values.LongLength);
             """);
         Assert.That(
-            element.CompareWithInterpreter(ElementValues, 1),
+            element.CompareWithInterpreter(ElementValues.ToArray(), 1),
             Is.EqualTo(11L));
     }
 

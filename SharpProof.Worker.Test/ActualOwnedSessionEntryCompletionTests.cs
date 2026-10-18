@@ -19,7 +19,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ActualOwnedSessionEntryCompletionTests
 {
-    private static readonly object[] RuntimeControlArguments = [2L, 3L];
+    private static readonly ImmutableArray<object> RuntimeControlArguments = [2L, 3L];
     [Test]
     public async Task EntryCompletionReadsActualOverdrawnRawNativeSession()
     {
@@ -51,7 +51,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         using var runtimeImage = new MemoryStream();
         Assert.That(runtimeCompilation.Emit(runtimeImage).Success, Is.True);
         var runtimeTarget = Assembly.Load(runtimeImage.ToArray()).GetType("Subject")!.GetMethod("Target")!;
-        Assert.That(runtimeTarget.Invoke(null, RuntimeControlArguments), Is.EqualTo(2L));
+        Assert.That(runtimeTarget.Invoke(null, RuntimeControlArguments.ToArray()), Is.EqualTo(2L));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);

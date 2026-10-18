@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrIdentifierTests
 {
-    private static readonly string[] s_identifierPrefixes = [
+    private static readonly ImmutableArray<string> s_identifierPrefixes = [
         "identity",
         "ir",
         "v",

@@ -613,7 +613,7 @@ public sealed class FuzzRunnerTests
 
     private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
     {
-        private BackendCheckResult _guarded_result = result ?? throw new System.ArgumentNullException(nameof(result));
+        private readonly BackendCheckResult _guarded_result = result ?? throw new System.ArgumentNullException(nameof(result));
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)

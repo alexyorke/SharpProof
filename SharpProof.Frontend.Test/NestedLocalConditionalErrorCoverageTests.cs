@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -12,7 +13,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NestedLocalConditionalErrorCoverageTests
 {
-    private static readonly string[] ExpectedErrorIds = ["CS0159"];
+    private static readonly ImmutableArray<string> ExpectedErrorIds = ["CS0159"];
     private const string OuterLabelSource = """
         public static class Subject
         {

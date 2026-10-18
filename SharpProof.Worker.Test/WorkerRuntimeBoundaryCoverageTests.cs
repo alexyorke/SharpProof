@@ -108,7 +108,7 @@ public sealed partial class WorkerTests
 
     private sealed class QueryExceptionBackend(Exception failure) : ISmtBackend
     {
-        private Exception _guarded_failure = failure ?? throw new System.ArgumentNullException(nameof(failure));
+        private readonly Exception _guarded_failure = failure ?? throw new System.ArgumentNullException(nameof(failure));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(query);

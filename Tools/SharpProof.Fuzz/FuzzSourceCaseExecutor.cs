@@ -288,7 +288,7 @@ internal static class FuzzSourceCaseExecutor
         private readonly AssemblyLoadContext _context;
         private readonly SemanticModel _model;
         private readonly Type _runtime;
-        private readonly MethodDeclarationSyntax[] _methods;
+        private readonly ImmutableArray<MethodDeclarationSyntax> _methods;
         internal IrFactory Factory { get; } = new(IrExecutionSemantics.Total);
 
         internal BooleanSourceScope(string members, CancellationToken cancellationToken)
@@ -316,7 +316,7 @@ internal static class FuzzSourceCaseExecutor
             {
                 _model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                     compilation, tree);
-                _methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+                _methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
                 _image.Position = 0;
                 _runtime = _context.LoadFromStream(_image).GetType("SharpProofSourceCampaignBoolean") ??
                     throw new InvalidOperationException("The compiled source does not contain its subject type.");

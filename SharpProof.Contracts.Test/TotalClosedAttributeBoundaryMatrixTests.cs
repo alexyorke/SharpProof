@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -14,7 +15,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TotalClosedAttributeBoundaryMatrixTests
 {
-    private static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
+    private static readonly ImmutableArray<string> Types = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
 
     private static IEnumerable<TestCaseData> NumericCases()
     {

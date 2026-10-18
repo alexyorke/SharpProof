@@ -44,7 +44,7 @@ internal sealed record TotalProgramFuzzResult(TotalProgramFuzzCoverage Coverage,
 // observe the same generated body. This trusted source adapter is tooling-only.
 internal static class TotalProgramDifferentialOracle
 {
-    internal static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
+    internal static readonly ImmutableArray<string> Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
 
     internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken)
     {

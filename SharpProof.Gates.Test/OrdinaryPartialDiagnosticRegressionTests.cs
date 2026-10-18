@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryPartialDiagnosticRegressionTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0002", "SP0045"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0002", "SP0045"];
 
     private const string Source = """
         public static partial class PartialDiagnostics {

@@ -14,7 +14,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ConditionalMethodIdentityPolicyTests
 {
-    private static readonly string[] DuplicateErrors = ["CS0111"];
+    private static readonly ImmutableArray<string> DuplicateErrors = ["CS0111"];
 
     private const string CoreSource = """
         namespace System

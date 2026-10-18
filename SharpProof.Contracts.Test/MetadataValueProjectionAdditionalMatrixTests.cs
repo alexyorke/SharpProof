@@ -10,7 +10,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class MetadataValueProjectionAdditionalMatrixTests
 {
-    private static readonly (SpecialType Type, int Width, bool Signed)[] IntegerDomains =
+    private static readonly ImmutableArray<(SpecialType Type, int Width, bool Signed)> IntegerDomains =
     [
         (SpecialType.System_SByte, 8, true),
         (SpecialType.System_Byte, 8, false),
@@ -23,7 +23,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         (SpecialType.System_Char, 16, false)
     ];
 
-    private static readonly long[][] IntegerBoundarySamples =
+    private static readonly ImmutableArray<ImmutableArray<long>> IntegerBoundarySamples =
     [
         [-128L, -1L, 0L, 1L, 127L],
         [0L, 1L, 2L, 255L],
@@ -36,9 +36,9 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         [0L, 1L, 2L, char.MaxValue]
     ];
 
-    private static readonly int[] LongBoundParameterOrdinals = [0, 1, 2, 3, 4];
-    private static readonly int[] ReferenceParameterOrdinals = [0, 1, 2];
-    private static readonly IrTypeKind[] ReferenceValueKinds =
+    private static readonly ImmutableArray<int> LongBoundParameterOrdinals = [0, 1, 2, 3, 4];
+    private static readonly ImmutableArray<int> ReferenceParameterOrdinals = [0, 1, 2];
+    private static readonly ImmutableArray<IrTypeKind> ReferenceValueKinds =
         [IrTypeKind.String, IrTypeKind.Sequence, IrTypeKind.Reference];
 
     private const string MetadataLibrarySource = """

@@ -11,7 +11,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
 {
-    private static readonly BoundContractKind[] ThreeClauseKinds =
+    private static readonly ImmutableArray<BoundContractKind> ThreeClauseKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Assume,
@@ -19,8 +19,8 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     ];
 
     private const string BoundedDiagnostic = "[condition exceeds the display limit]";
-    private static readonly BoundContractKind[] RequiresOnlyKinds = [BoundContractKind.Requires];
-    private static readonly string[] OrderedDiagnosticTexts =
+    private static readonly ImmutableArray<BoundContractKind> RequiresOnlyKinds = [BoundContractKind.Requires];
+    private static readonly ImmutableArray<string> OrderedDiagnosticTexts =
     [
         BoundedDiagnostic,
         "second",

@@ -362,11 +362,11 @@ internal static class OpenSourceCorpusCatalog
         internal int SourceFileCount { get; } = sourceFileCount;
     }
 
-    internal static HashSet<string> ValidateSourceIds(
+    internal static ImmutableHashSet<string> ValidateSourceIds(
         IEnumerable<OpenSourceCorpusSource> sources)
     {
         System.ArgumentNullException.ThrowIfNull(sources);
-        var sourceIds = new HashSet<string>(StringComparer.Ordinal);
+        var sourceIds = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
             if (source is null)
@@ -381,11 +381,12 @@ internal static class OpenSourceCorpusCatalog
                     "OSS corpus source IDs must not be empty.");
             }
 
-            if (!sourceIds.Add(source.Id))
+            if (sourceIds.Contains(source.Id))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source ID: {source.Id}.");
             }
+            sourceIds = sourceIds.Add(source.Id);
         }
 
         return sourceIds;

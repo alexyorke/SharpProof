@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Buffers.Binary;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -148,7 +149,7 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
             var flags = getter.GetMethodImplementationFlags();
             var instance = Activator.CreateInstance(subject)!;
             var execute = getter.CreateDelegate<Func<int>>(instance);
-            int[] returnValues = [execute(), execute(), execute()];
+            ImmutableArray<int> returnValues = [execute(), execute(), execute()];
             runtimeObservation = new((int)flags, flags.ToString(), getter.MetadataToken, field.MetadataToken, ilFieldToken,
                 field.Name, field.IsInitOnly, field.IsStatic, subject.TypeInitializer != null, returnValues,
                 Convert.ToHexStringLower(il), subject.Module.ModuleVersionId.ToString("D"));
@@ -302,12 +303,12 @@ public sealed class SynchronizedAutoGetterPurityAuditTests
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, int GetterMetadataToken,
         int BackingFieldMetadataToken, int IlFieldToken, string BackingFieldName, bool BackingFieldReadOnly,
-        bool BackingFieldStatic, bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+        bool BackingFieldStatic, bool HasTypeInitializer, ImmutableArray<int> ReturnValues, string IlHex, string ModuleVersionId)
     {
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string BackingFieldName { get; init; } = BackingFieldName ?? throw new System.ArgumentNullException(nameof(BackingFieldName));
         public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
         public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
-        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+        public ImmutableArray<int> ReturnValues { get; init; } = ReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ReturnValues)) : ReturnValues;
     }
 }

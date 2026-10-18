@@ -154,7 +154,7 @@ internal sealed class CompilerTotalCallPreconditionArtifact
     public int ClauseOrdinal { get; set; } = -1;
     public int ClauseSite { get; set; } = -1;
     public int ValueRoot { get; set; } = -1;
-    public int SafeRoot { get; set; } = -1;
+    public int SafeRoot { get; init; } = -1;
 }
 
 internal sealed class CompilerTotalExceptionConstraintArtifact
@@ -174,7 +174,7 @@ internal sealed class CompilerTotalClauseArtifact
 {
     public CompilerContractKind Kind { get; set; }
     public int ValueRoot { get; set; } = -1;
-    public int SafeRoot { get; set; } = -1;
+    public int SafeRoot { get; init; } = -1;
     public int Operation { get; set; } = -1;
     public string? ClaimId { get; set; }
     public string? AssumptionId { get; set; }
@@ -200,7 +200,7 @@ internal sealed class CompilerCallableArtifact
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerTotalCallableArtifact? Total { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CompilerTotalCallableArtifact? TotalEntry { get; set; }
+    public CompilerTotalCallableArtifact? TotalEntry { get; init; }
 }
 
 internal sealed class CompilerEffectClaimArtifact
@@ -275,25 +275,25 @@ internal enum CompilerResolverPolicy
     EvidenceOnly = 0
 }
 
-internal sealed class CompilerDiagnosticArtifact
+internal sealed record CompilerDiagnosticArtifact
 {
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
-    public bool IsSource { get; set; }
+    public bool IsSource { get; init; }
     public WorkerSourceLocation Location { get; set; } = new();
     [JsonIgnore]
-    public int SourceTreeOrdinal { get; set; } = -1;
+    public int SourceTreeOrdinal { get; init; } = -1;
     [JsonIgnore]
-    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreePath { get; init; } = string.Empty;
     [JsonIgnore]
-    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; init; } = string.Empty;
     [JsonIgnore]
-    public string SourceLineMapSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; init; } = string.Empty;
 }
 
-internal sealed class CompilerManifestArtifact
+internal sealed record CompilerManifestArtifact
 {
-    public string Schema { get; set; } = CompilerManifestArtifactVersions.Schema;
+    public string Schema { get; init; } = CompilerManifestArtifactVersions.Schema;
     public int SchemaVersion { get; set; } = CompilerManifestArtifactVersions.Current;
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
@@ -307,22 +307,22 @@ internal sealed class CompilerManifestArtifact
     public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
     public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
     public CompilerCallableArtifact[] Callables { get; set; } = [];
-    public CompilerReachableSourceArtifact? ReachableSource { get; set; }
+    public CompilerReachableSourceArtifact? ReachableSource { get; init; }
 }
 
 // Shadow input for interprocedural effect analysis. An absent or incomplete
 // body never supplies an effect fact or a normal-completion guarantee.
 internal sealed class CompilerReachableSourceArtifact
 {
-    public bool CollectionComplete { get; set; }
+    public bool CollectionComplete { get; init; }
     public CompilerSourceRootArtifact[] Roots { get; set; } = [];
     public CompilerSourceBodyArtifact[] Bodies { get; set; } = [];
-    public CompilerSourceDocumentArtifact[] Documents { get; set; } = [];
+    public CompilerSourceDocumentArtifact[] Documents { get; init; } = [];
 }
 
 internal sealed class CompilerSourceDocumentArtifact
 {
-    public int SourceTreeOrdinal { get; set; }
+    public int SourceTreeOrdinal { get; init; }
     public string Path { get; set; } = string.Empty;
     public int MaximumBodyEnd { get; set; }
 }
@@ -341,7 +341,7 @@ internal sealed class CompilerSourceBodyArtifact
     public bool IsStatic { get; set; }
     public string[] ParameterTypes { get; set; } = [];
     public string? ReturnType { get; set; }
-    public int SourceTreeOrdinal { get; set; }
+    public int SourceTreeOrdinal { get; init; }
     public int Start { get; set; }
     public int Length { get; set; }
     public bool CallsComplete { get; set; }

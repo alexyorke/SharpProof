@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -18,7 +19,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RequiresOnlySwitchArmScopeTests
 {
-    private static readonly int[] expectedClrReturns = [7, 7];
+    private static readonly ImmutableArray<int> expectedClrReturns = [7, 7];
 
     [TestCase(true)]
     [TestCase(false)]

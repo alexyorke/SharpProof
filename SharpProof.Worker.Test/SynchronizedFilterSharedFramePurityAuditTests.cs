@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -17,15 +18,15 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedFilterSharedFramePurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, int.MaxValue];
-    private static readonly bool[] s_expectedReturns = [false, true, false];
-    private static readonly string[] s_expectedFilterOpCodes = ["ldc.i4.1", "ret"];
-    private static readonly Dictionary<ushort, OpCode> s_opCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, int.MaxValue];
+    private static readonly ImmutableArray<bool> s_expectedReturns = [false, true, false];
+    private static readonly ImmutableArray<string> s_expectedFilterOpCodes = ["ldc.i4.1", "ret"];
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private const string SubjectTemplate = """
         using System;
         using System.Runtime.CompilerServices;
@@ -90,10 +91,10 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             var filterIl = DescribeIl(filter, filter);
             var clauses = target.GetMethodBody()!.ExceptionHandlingClauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new ClauseObservation(
                 clause.Flags.ToString(), clause.TryOffset, clause.TryLength, clause.HandlerOffset, clause.HandlerLength,
-                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null))).ToArray();
+                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null))).ToImmutableArray();
             runtimeObservation = new(DescribeMethod(target), DescribeMethod(filter),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
-                subject.TypeInitializer != null, s_inputValues.Select(execute).ToArray(), executeFilter(), targetIl, filterIl, clauses);
+                subject.TypeInitializer != null, s_inputValues.Select(execute).ToImmutableArray(), executeFilter(), targetIl, filterIl, clauses);
             await Save(evidenceDirectory, "runtime-observations.json", new
             {
                 SourceSha256 = sourceHash,
@@ -236,7 +237,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         return new(method.DeclaringType!.FullName + "." + method.Name, method.MetadataToken, method.Module.ModuleVersionId,
             (int)flags, flags.ToString(), (flags & MethodImplAttributes.NoInlining) != 0,
             (flags & MethodImplAttributes.Synchronized) != 0, method.IsStatic, method.ReturnType.FullName,
-            method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray());
+            method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray());
     }
 
     private static IlObservation DescribeIl(MethodInfo method, MethodInfo filter)
@@ -244,7 +245,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         System.ArgumentNullException.ThrowIfNull(filter);
         System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = new List<IlInstruction>();
+        var rows = ImmutableList<IlInstruction>.Empty;
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -283,12 +284,12 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             };
             var resolvesExactFilter = resolved != null && resolved.MetadataToken == filter.MetadataToken &&
                 resolved.Module.ModuleVersionId == filter.Module.ModuleVersionId && resolved.DeclaringType == filter.DeclaringType;
-            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
+            rows = rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand,
                 token, resolvesExactFilter));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows);
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutableArray());
     }
 
     private static string Hash(byte[] value)
@@ -306,11 +307,11 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
     }
 
     private sealed record MethodObservation(string Method, int MetadataToken, Guid ModuleVersionId, int RawImplementationFlags,
-        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, string?[] ParameterTypes)
+        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, ImmutableArray<string?> ParameterTypes)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
-        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+        public ImmutableArray<string?> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
     }
     private sealed record ClauseObservation(string Flags, int TryOffset, int TryLength, int HandlerOffset, int HandlerLength, int? FilterOffset)
     {
@@ -323,22 +324,22 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions)
+        string RawIl, ImmutableArray<IlInstruction> Instructions)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(MethodObservation Target, MethodObservation Filter, int FieldCount,
-        bool HasTypeInitializer, bool[] TargetReturnValues, bool FilterReturnValue, IlObservation TargetIl, IlObservation FilterIl,
-        ClauseObservation[] ExceptionClauses)
+        bool HasTypeInitializer, ImmutableArray<bool> TargetReturnValues, bool FilterReturnValue, IlObservation TargetIl, IlObservation FilterIl,
+        ImmutableArray<ClauseObservation> ExceptionClauses)
     {
         public MethodObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
         public MethodObservation Filter { get; init; } = Filter ?? throw new System.ArgumentNullException(nameof(Filter));
         public IlObservation TargetIl { get; init; } = TargetIl ?? throw new System.ArgumentNullException(nameof(TargetIl));
         public IlObservation FilterIl { get; init; } = FilterIl ?? throw new System.ArgumentNullException(nameof(FilterIl));
-        public bool[] TargetReturnValues { get; init; } = TargetReturnValues ?? throw new System.ArgumentNullException(nameof(TargetReturnValues));
-        public ClauseObservation[] ExceptionClauses { get; init; } = ExceptionClauses ?? throw new System.ArgumentNullException(nameof(ExceptionClauses));
+        public ImmutableArray<bool> TargetReturnValues { get; init; } = TargetReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(TargetReturnValues)) : TargetReturnValues;
+        public ImmutableArray<ClauseObservation> ExceptionClauses { get; init; } = ExceptionClauses.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ExceptionClauses)) : ExceptionClauses;
     }
 }

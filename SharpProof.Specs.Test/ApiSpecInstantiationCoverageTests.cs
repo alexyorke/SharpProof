@@ -574,7 +574,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         IrTerm enumeratedValue,
         IrTerm? lookupValue /* SPINT001: all values valid - the test dictionary deliberately forwards null to exercise caller validation */) : IReadOnlyDictionary<SpecVarId, IrTerm>
     {
-        private IrTerm _guarded_enumeratedValue = enumeratedValue ?? throw new System.ArgumentNullException(nameof(enumeratedValue));
+        private readonly IrTerm _guarded_enumeratedValue = enumeratedValue ?? throw new System.ArgumentNullException(nameof(enumeratedValue));
         public IrTerm this[SpecVarId requestedKey] =>
             requestedKey == key
                 ? lookupValue!

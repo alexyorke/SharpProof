@@ -369,7 +369,7 @@ internal static class OpenSourceCorpusRunner
         ImmutableDictionary<TargetKey, TargetInfo> targets)
         : AnalyzerSessionFactoryBase<string>(StringComparer.Ordinal)
     {
-        private ImmutableDictionary<TargetKey, TargetInfo> _guarded_targets = targets ?? throw new System.ArgumentNullException(nameof(targets));
+        private readonly ImmutableDictionary<TargetKey, TargetInfo> _guarded_targets = targets ?? throw new System.ArgumentNullException(nameof(targets));
         internal ImmutableDictionary<string, AnalyzerSemanticOutcome>
             GetOutcomes()
         {

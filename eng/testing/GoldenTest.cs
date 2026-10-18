@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 
@@ -178,6 +179,20 @@ internal static class GoldenTest
         }
     }
 
+    private static void RequireSame(byte[]? actual, ImmutableArray<byte>? expected, string message)
+    {
+        System.ArgumentNullException.ThrowIfNull(message);
+        if (expected.HasValue && expected.Value.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(expected));
+        }
+        if ((actual == null) != !expected.HasValue ||
+            actual != null && !actual.AsSpan().SequenceEqual(expected.GetValueOrDefault().AsSpan()))
+        {
+            throw new InvalidDataException(message);
+        }
+    }
+
     private static string Decode(byte[] bytes)
     {
         System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
@@ -194,8 +209,10 @@ internal sealed class GoldenCase(string root, string relativePath, byte[] source
 {
     internal string Root { get; } = (root ?? throw new System.ArgumentNullException(nameof(root)));
     internal string RelativePath { get; } = (relativePath ?? throw new System.ArgumentNullException(nameof(relativePath)));
-    internal byte[] SourceBytes { get; } = (sourceBytes ?? throw new System.ArgumentNullException(nameof(sourceBytes)));
-    internal byte[]? ExpectedBytes { get; } = expectedBytes;
+    internal ImmutableArray<byte> SourceBytes { get; } =
+        ImmutableArray.CreateRange(sourceBytes ?? throw new System.ArgumentNullException(nameof(sourceBytes)));
+    internal ImmutableArray<byte>? ExpectedBytes { get; } =
+        expectedBytes is null ? null : ImmutableArray.CreateRange(expectedBytes);
     internal string Source { get; } = (source ?? throw new System.ArgumentNullException(nameof(source)));
     internal string Expected { get; } = (expected ?? throw new System.ArgumentNullException(nameof(expected)));
 }

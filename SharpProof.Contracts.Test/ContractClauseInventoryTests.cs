@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,11 +10,11 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractClauseInventoryTests
 {
-    private static readonly BoundContractKind[] TopLevelInventoryKinds = [
+    private static readonly ImmutableArray<BoundContractKind> TopLevelInventoryKinds = [
         BoundContractKind.Ensures,
         BoundContractKind.Ensures
     ];
-    private static readonly BoundContractKind[] InventoryKinds = [
+    private static readonly ImmutableArray<BoundContractKind> InventoryKinds = [
         BoundContractKind.Requires,
         BoundContractKind.Ensures,
         BoundContractKind.Assume,
@@ -21,7 +22,7 @@ public sealed class ContractClauseInventoryTests
         BoundContractKind.Ensures,
         BoundContractKind.Assume
     ];
-    private static readonly ContractClausePlacement[] InventoryPlacements = [
+    private static readonly ImmutableArray<ContractClausePlacement> InventoryPlacements = [
         ContractClausePlacement.ValidPrologue,
         ContractClausePlacement.ValidPrologue,
         ContractClausePlacement.Conditional,
@@ -29,8 +30,8 @@ public sealed class ContractClauseInventoryTests
         ContractClausePlacement.NestedCallable,
         ContractClausePlacement.Unreachable
     ];
-    private static readonly int[] InventoryOrdinals = [0, 0, 0, 1, 1, 1];
-    private static readonly ContractClausePlacement[] MisplacedPlacements = [
+    private static readonly ImmutableArray<int> InventoryOrdinals = [0, 0, 0, 1, 1, 1];
+    private static readonly ImmutableArray<ContractClausePlacement> MisplacedPlacements = [
         ContractClausePlacement.Misplaced,
         ContractClausePlacement.Late
     ];

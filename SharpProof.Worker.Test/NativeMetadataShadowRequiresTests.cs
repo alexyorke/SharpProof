@@ -17,7 +17,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeMetadataShadowRequiresTests
 {
-    private static readonly bool[] SuccessfulObservation = [true];
+    private static readonly ImmutableArray<bool> SuccessfulObservation = [true];
     [TestCase("Positive", "int", "value + 1", "0", 1, false)]
     [TestCase("Positive", "int", "value + 1", "1", 2, true)]
     [TestCase("InRange(1, 10)", "int", "value + 1", "0", 1, false)]

@@ -21,19 +21,19 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ConditionalMetadataRejectionAuditTests
 {
-    private static readonly int[] RetainedInputs = [-7, 0, 42];
-    private static readonly int[] OmittedInputs = [0, 1];
-    private static readonly int[] TwoByteColumns = [2, 2, 2];
+    private static readonly ImmutableArray<int> RetainedInputs = [-7, 0, 42];
+    private static readonly ImmutableArray<int> OmittedInputs = [0, 1];
+    private static readonly ImmutableArray<int> TwoByteColumns = [2, 2, 2];
     private static readonly ImmutableArray<string> PriorAliases = ["Prior"];
     private static readonly ImmutableArray<string> MarkerAliases = ["Marker"];
     private static readonly ImmutableArray<string> PrivateSymbols = ["PRIVATE_PRESENT"];
     private static readonly ImmutableArray<string> RealPresentSymbols = ["PRIVATE_PRESENT", "OFFICIAL_ABSENT"];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private const string CallerSource = """
@@ -216,7 +216,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         var reader = pe.GetMetadataReader();
         var handle = (MethodDefinitionHandle)MetadataTokens.Handle(logToken);
         var log = reader.GetMethodDefinition(handle);
-        var rows = new List<AttributeRow>();
+        var rows = ImmutableList<AttributeRow>.Empty;
         foreach (var attributeHandle in log.GetCustomAttributes())
         {
             var attribute = reader.GetCustomAttribute(attributeHandle);
@@ -296,16 +296,16 @@ public sealed class ConditionalMetadataRejectionAuditTests
                     valueError = exception.GetType().FullName;
                 }
             }
-            rows.Add(new(MetadataTokens.GetRowNumber(attributeHandle), MetadataTokens.GetToken(attribute.Parent),
+            rows = rows.Add(new(MetadataTokens.GetRowNumber(attributeHandle), MetadataTokens.GetToken(attribute.Parent),
                 constructorKind, constructorToken, constructorName, ownerKind, ownerToken, ownerName, ownerNamespace,
                 visibility, scopeKind, ownerNested, signature, attribute.Value.IsNil, MetadataTokens.GetHeapOffset(attribute.Value),
                 Convert.ToHexStringLower(rawValue), symbol, constructorError, valueError));
         }
-        var tables = Enum.GetValues<TableIndex>().Select(index => index + ":" + reader.GetTableRowCount(index)).ToArray();
+        var tables = Enum.GetValues<TableIndex>().Select(index => index + ":" + reader.GetTableRowCount(index)).ToImmutableArray();
         return new(Hash(bytes), bytes.Length, reader.GetGuid(reader.GetModuleDefinition().Mvid),
             reader.GetString(reader.GetAssemblyDefinition().Name), logToken, reader.GetString(log.Name),
             Convert.ToHexStringLower(reader.GetBlobBytes(log.Signature)),
-            Convert.ToHexStringLower(pe.GetMethodBody(log.RelativeVirtualAddress).GetILBytes()!), tables, rows);
+            Convert.ToHexStringLower(pe.GetMethodBody(log.RelativeVirtualAddress).GetILBytes()!), tables, rows.ToImmutableArray());
     }
 
     private static async Task QualifyImage(string directory, byte[] bytes, int logToken, string scenario, bool mutated)
@@ -318,7 +318,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(image.LogName, Is.EqualTo("Log"));
         Assert.That(image.LogSignature, Is.EqualTo("00010108"));
         Assert.That(image.LogIl, Is.EqualTo("2a"));
-        Assert.That(image.Rows.Count, Is.EqualTo(2));
+        Assert.That(image.Rows.Length, Is.EqualTo(2));
         Assert.That(image.Rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParentToken == logToken)), Is.True);
         var official = image.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Symbol == "OFFICIAL_ABSENT"));
         Assert.That(official.ConstructorKind, Is.EqualTo(nameof(HandleKind.MemberReference)));
@@ -710,7 +710,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableList<IlInstruction>.Empty;
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -737,11 +737,11 @@ public sealed class ConditionalMetadataRejectionAuditTests
                 token = BitConverter.ToInt32(il, offset);
                 resolved = method.Module.ResolveMethod(token.Value)!;
             }
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
+            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)), token,
                 resolved?.MetadataToken, resolved?.Module.ModuleVersionId, resolved?.DeclaringType?.FullName, resolved?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions);
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
     }
 
     private static PeObservation DescribePe(byte[] bytes)
@@ -788,15 +788,15 @@ public sealed class ConditionalMetadataRejectionAuditTests
         public ImmutableArray<string> Symbols { get; init; } = Symbols.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Symbols)) : Symbols;
     }
     private sealed record ImageObservation(string Sha256, int Bytes, Guid Mvid, string AssemblyName,
-        int LogToken, string LogName, string LogSignature, string LogIl, string[] Tables, List<AttributeRow> Rows)
+        int LogToken, string LogName, string LogSignature, string LogIl, ImmutableArray<string> Tables, ImmutableArray<AttributeRow> Rows)
     {
         public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
         public string AssemblyName { get; init; } = AssemblyName ?? throw new System.ArgumentNullException(nameof(AssemblyName));
         public string LogName { get; init; } = LogName ?? throw new System.ArgumentNullException(nameof(LogName));
         public string LogSignature { get; init; } = LogSignature ?? throw new System.ArgumentNullException(nameof(LogSignature));
         public string LogIl { get; init; } = LogIl ?? throw new System.ArgumentNullException(nameof(LogIl));
-        public List<AttributeRow> Rows { get; init; } = Rows ?? throw new System.ArgumentNullException(nameof(Rows));
-        public string[] Tables { get; init; } = Tables ?? throw new System.ArgumentNullException(nameof(Tables));
+        public ImmutableArray<AttributeRow> Rows { get; init; } = Rows.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Rows)) : Rows;
+        public ImmutableArray<string> Tables { get; init; } = Tables.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Tables)) : Tables;
     }
     private sealed record AttributeRow(int RowId, int ParentToken, string ConstructorKind, int? ConstructorToken,
         string ConstructorName, string OwnerKind, int OwnerToken, string OwnerName, string OwnerNamespace,
@@ -824,10 +824,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, List<IlInstruction> Instructions)
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
 }

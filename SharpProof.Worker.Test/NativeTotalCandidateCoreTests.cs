@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
@@ -11,8 +12,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTotalCandidateCoreTests
 {
-    private static readonly int[] TwoOrdinals = [0, 1];
-    private static readonly int[] InitialAndFinalOrdinals = [0, 1, 0, 1];
+    private static readonly ImmutableArray<int> TwoOrdinals = [0, 1];
+    private static readonly ImmutableArray<int> InitialAndFinalOrdinals = [0, 1, 0, 1];
 
     [TestCase("boolean", false)]
     [TestCase("boolean", true)]
@@ -68,7 +69,7 @@ public sealed class NativeTotalCandidateCoreTests
     {
         var candidate = BooleanCandidate(satisfied);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks, Has.Count.EqualTo(2));
+        Assert.That(run.Checks, Has.Length.EqualTo(2));
         var initial = run.Checks[0];
         Assert.That(initial.Enrolled, Is.True);
         Assert.That(initial.Checked, Is.False);
@@ -111,7 +112,7 @@ public sealed class NativeTotalCandidateCoreTests
             [new(factory.Boolean(exceptional), factory.Boolean(true), site)],
             [new(factory.Boolean(false), factory.Boolean(true), site)]);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks, Has.Count.EqualTo(2));
+        Assert.That(run.Checks, Has.Length.EqualTo(2));
         var final = run.Checks[1];
         Assert.That(final.Checked, Is.True);
         Assert.That(final.Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
@@ -141,7 +142,7 @@ public sealed class NativeTotalCandidateCoreTests
         var run = await RunAsync(candidate);
         if (beyond)
         {
-            Assert.That(run.Entries, Has.Count.EqualTo(1));
+            Assert.That(run.Entries, Has.Length.EqualTo(1));
             Assert.That(run.Entries[0].Outcome, Is.Null);
             Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
             Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(TwoOrdinals));
@@ -332,7 +333,7 @@ public sealed class NativeTotalCandidateCoreTests
         var entries = new List<PassiveCallableCheckResult>();
         await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checks.Add, entries.Add,
             TestContext.CurrentContext.CancellationToken, session, resource, () => session.ConsumedResourceCount);
-        return new(checks, entries, session.ConsumedResourceCount);
+        return new(checks.ToImmutableArray(), entries.ToImmutableArray(), session.ConsumedResourceCount);
     }
 
     private static void AssertInitialAndProven(CoreRun run, int count)
@@ -344,7 +345,7 @@ public sealed class NativeTotalCandidateCoreTests
         Assert.That(run.Checks.Skip(count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && check.Checked && check.ProjectAssumptions &&
             check.Evidence.Outcome is ProvenOutcome && check.Evidence.Reason == WorkerClaimReason.None &&
             check.Feasibility == PassiveCallableFeasibilityKind.Feasible && check.Vacuity == WorkerVacuityKind.None)), Is.True);
-        Assert.That(run.Entries, Has.Count.EqualTo(1));
+        Assert.That(run.Entries, Has.Length.EqualTo(1));
         Assert.That(run.Entries[0].Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.None));
     }
@@ -359,9 +360,9 @@ public sealed class NativeTotalCandidateCoreTests
         return preparation;
     }
 
-    private sealed record CoreRun(List<TotalCandidateCheck> Checks, List<PassiveCallableCheckResult> Entries, long Consumed)
+    private sealed record CoreRun(ImmutableArray<TotalCandidateCheck> Checks, ImmutableArray<PassiveCallableCheckResult> Entries, long Consumed)
     {
-        public List<TotalCandidateCheck> Checks { get; init; } = Checks ?? throw new System.ArgumentNullException(nameof(Checks));
-        public List<PassiveCallableCheckResult> Entries { get; init; } = Entries ?? throw new System.ArgumentNullException(nameof(Entries));
+        public ImmutableArray<TotalCandidateCheck> Checks { get; init; } = Checks.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Checks)) : Checks;
+        public ImmutableArray<PassiveCallableCheckResult> Entries { get; init; } = Entries.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Entries)) : Entries;
     }
 }

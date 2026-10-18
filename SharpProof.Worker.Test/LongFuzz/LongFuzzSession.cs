@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -157,8 +158,8 @@ internal sealed class LongFuzzSession
     {
         var stats = new LongFuzzStats(
             Harness, SeedStart, _lastSeed, _cases, Hits, Math.Round(_elapsed.Elapsed.TotalMinutes, 2),
-            new SortedDictionary<string, int>(_hitKinds, StringComparer.Ordinal),
-            new SortedDictionary<string, int>(_counts, StringComparer.Ordinal));
+            _hitKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            _counts.ToImmutableSortedDictionary(StringComparer.Ordinal));
         lock (s_sync)
         {
             File.WriteAllText(Path.Combine(Output, "stats-" + Harness + ".json"), JsonSerializer.Serialize(stats) + "\n");
@@ -264,9 +265,9 @@ internal sealed record LongFuzzHitRecord(
 
 internal sealed record LongFuzzStats(
     string Harness, int SeedStart, int LastSeed, int Cases, int Hits, double ElapsedMinutes,
-    SortedDictionary<string, int> HitKinds, SortedDictionary<string, int> Counts)
+    ImmutableSortedDictionary<string, int> HitKinds, ImmutableSortedDictionary<string, int> Counts)
 {
     public string Harness { get; init; } = Harness ?? throw new System.ArgumentNullException(nameof(Harness));
-    public SortedDictionary<string, int> HitKinds { get; init; } = HitKinds ?? throw new System.ArgumentNullException(nameof(HitKinds));
-    public SortedDictionary<string, int> Counts { get; init; } = Counts ?? throw new System.ArgumentNullException(nameof(Counts));
+    public ImmutableSortedDictionary<string, int> HitKinds { get; init; } = HitKinds ?? throw new System.ArgumentNullException(nameof(HitKinds));
+    public ImmutableSortedDictionary<string, int> Counts { get; init; } = Counts ?? throw new System.ArgumentNullException(nameof(Counts));
 }

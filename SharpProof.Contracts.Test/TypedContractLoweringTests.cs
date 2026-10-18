@@ -528,7 +528,7 @@ public sealed class TypedContractLoweringTests
 
     private sealed class ModelBackend(ImmutableDictionary<IrVarId, IrValue> values) : ISmtBackend
     {
-        private ImmutableDictionary<IrVarId, IrValue> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly ImmutableDictionary<IrVarId, IrValue> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(query);

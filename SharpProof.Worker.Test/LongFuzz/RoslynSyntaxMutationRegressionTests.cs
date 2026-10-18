@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -15,7 +16,7 @@ namespace SharpProof.Worker.Test.LongFuzz;
 [TestFixture]
 public sealed class RoslynSyntaxMutationRegressionTests
 {
-    private static readonly string[] Expressions =
+    private static readonly ImmutableArray<string> Expressions =
     [
         "x >= 0 ? x : -x",
         "x < 0 ? -x : x",

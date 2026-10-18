@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
@@ -30,11 +31,11 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class AnalyzerPipelineLongFuzzTests
 {
     private const string Harness = "analyzer-pipeline";
-    private static readonly int[] s_ints = [0, 1, 2, 3, -1, 5, 100, int.MaxValue, int.MinValue];
-    private static readonly int[]?[] s_arrays = [null, [], [3, -1, 0]];
-    private static readonly string?[] s_strings = [null, "", "ab", "abc"];
+    private static readonly ImmutableArray<int> s_ints = [0, 1, 2, 3, -1, 5, 100, int.MaxValue, int.MinValue];
+    private static readonly ImmutableArray<int[]?> s_arrays = [null, [], [3, -1, 0]];
+    private static readonly ImmutableArray<string?> s_strings = [null, "", "ab", "abc"];
     // A few missing boundaries extend coverage without multiplying the Cartesian grid.
-    private static readonly (int X, int Y, int[]? Array, string? Text)[] s_boundaryInputs =
+    private static readonly ImmutableArray<(int X, int Y, int[]? Array, string? Text)> s_boundaryInputs =
     [
         (0, -2, null, null),
         (6, 0, null, null),
@@ -721,7 +722,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))

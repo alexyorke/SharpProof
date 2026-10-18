@@ -1,6 +1,6 @@
 namespace SharpProof.Smt;
 
-internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner)
+internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false)
 {
     private readonly Dictionary<IrId, Expr> _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : [])));
     private readonly Dictionary<IrVarId, Expr> _variables = [];
@@ -78,19 +78,23 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
     }
 
     // Only a Horn search encodes unknown invariants, as uninterpreted relations.
-    internal Dictionary<IrMemberId, FuncDecl>? Relations { get; set; }
+    internal ImmutableDictionary<IrMemberId, FuncDecl>? Relations { get; private set; } =
+        enableInvariantRelations ? ImmutableDictionary<IrMemberId, FuncDecl>.Empty : null;
+    internal ImmutableList<KeyValuePair<IrMemberId, FuncDecl>> RelationDeclarations { get; private set; } =
+        ImmutableList<KeyValuePair<IrMemberId, FuncDecl>>.Empty;
 
     private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         relation = RepositoryParameterGuard.NotNull(relation, nameof(relation));
-        var relations = Relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToArray();
+        var relations = Relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         if (!relations.TryGetValue(relation.Member, out var declaration))
         {
             declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
                 [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
-            relations.Add(relation.Member, declaration);
+            Relations = relations.Add(relation.Member, declaration);
+            RelationDeclarations = RelationDeclarations.Add(new(relation.Member, declaration));
         }
         return owner.Own(context.MkApp(declaration, arguments));
     }

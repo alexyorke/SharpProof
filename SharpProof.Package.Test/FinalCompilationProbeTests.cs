@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
@@ -320,7 +321,7 @@ public sealed class FinalCompilationProbeTests
 
     private sealed class ProbeArtifact
     {
-        private readonly SyntaxTreeRow[] _syntaxTreeRows;
+        private readonly ImmutableArray<SyntaxTreeRow> _syntaxTreeRows;
 
         private ProbeArtifact(
             string targetFramework,
@@ -338,10 +339,10 @@ public sealed class FinalCompilationProbeTests
             System.ArgumentNullException.ThrowIfNull(targetFramework);
             TargetFramework = targetFramework;
             Options = options;
-            SyntaxTrees = syntaxTrees;
-            _syntaxTreeRows = syntaxTreeRows;
-            PortableReferences = portableReferences;
-            AdditionalFiles = additionalFiles;
+            SyntaxTrees = syntaxTrees.ToImmutableArray();
+            _syntaxTreeRows = syntaxTreeRows.ToImmutableArray();
+            PortableReferences = portableReferences.ToImmutableArray();
+            AdditionalFiles = additionalFiles.ToImmutableArray();
         }
 
         internal string TargetFramework
@@ -352,21 +353,21 @@ public sealed class FinalCompilationProbeTests
         {
             get;
         }
-        internal string[] SyntaxTrees
+        internal ImmutableArray<string> SyntaxTrees
         {
             get;
         }
-        internal string[] PortableReferences
+        internal ImmutableArray<string> PortableReferences
         {
             get;
         }
-        internal string[] AdditionalFiles
+        internal ImmutableArray<string> AdditionalFiles
         {
             get;
         }
-        internal string[] SyntaxTreePaths =>
+        internal ImmutableArray<string> SyntaxTreePaths =>
             [.. _syntaxTreeRows.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))];
-        internal string[] FrameworkReferences =>
+        internal ImmutableArray<string> FrameworkReferences =>
             [.. PortableReferences.Where(static reference =>
                     reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (!reference.Contains(
                         "SharpProof.Attributes.dll",
@@ -512,9 +513,9 @@ public sealed class FinalCompilationProbeTests
     }
 
     private sealed record CompilerManifestArtifact(
-        byte[] Bytes,
+        ImmutableArray<byte> Bytes,
         string ArtifactSha256,
-        string[] ClaimPaths)
+        ImmutableArray<string> ClaimPaths)
     {
         internal static async Task<CompilerManifestArtifact> ReadAsync(
             string path)
@@ -550,14 +551,14 @@ public sealed class FinalCompilationProbeTests
                     path);
             }
             return new CompilerManifestArtifact(
-                bytes,
+                bytes.ToImmutableArray(),
                 compilationSha256!,
-                claimPaths);
+                claimPaths.ToImmutableArray());
         }
 
-        public byte[] Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
+        public ImmutableArray<byte> Bytes { get; init; } = Bytes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Bytes)) : Bytes;
         public string ArtifactSha256 { get; init; } = ArtifactSha256 ?? throw new System.ArgumentNullException(nameof(ArtifactSha256));
-        public string[] ClaimPaths { get; init; } = ClaimPaths ?? throw new System.ArgumentNullException(nameof(ClaimPaths));
+        public ImmutableArray<string> ClaimPaths { get; init; } = ClaimPaths.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(ClaimPaths)) : ClaimPaths;
     }
 
     private sealed class ProbeWorkspace : IDisposable

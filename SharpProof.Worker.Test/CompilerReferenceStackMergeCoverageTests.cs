@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -8,7 +9,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReferenceStackMergeCoverageTests
 {
-    private static readonly bool[] Choices = [false, true];
+    private static readonly ImmutableArray<bool> Choices = [false, true];
 
     [TestCase("int")]
     [TestCase("uint")]

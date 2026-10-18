@@ -13,10 +13,10 @@ namespace SharpProof.Gates.Corpus;
 
 internal sealed record OpenSourceCorpusImportPlan(
     OpenSourceCorpusDocument Document,
-    CorpusFileUpdate[] Updates)
+    ImmutableArray<CorpusFileUpdate> Updates)
 {
     public OpenSourceCorpusDocument Document { get; init; } = Document ?? throw new System.ArgumentNullException(nameof(Document));
-    public CorpusFileUpdate[] Updates { get; init; } = Updates ?? throw new System.ArgumentNullException(nameof(Updates));
+    public ImmutableArray<CorpusFileUpdate> Updates { get; init; } = Updates.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Updates)) : Updates;
 }
 
 internal static class OpenSourceCorpusImporter

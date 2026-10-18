@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -11,7 +12,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
 {
-    private static readonly string[] MissingBodyErrorIds = ["CS0501"];
+    private static readonly ImmutableArray<string> MissingBodyErrorIds = ["CS0501"];
 
     [TestCase(false)]
     [TestCase(true)]

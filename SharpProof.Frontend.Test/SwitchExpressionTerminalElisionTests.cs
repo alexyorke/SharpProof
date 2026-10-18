@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -17,8 +18,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class SwitchExpressionTerminalElisionTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
-    private static readonly (int Value, int Other)[] Inputs = [(0, 0), (0, 1), (1, 0), (2, 1)];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<(int Value, int Other)> Inputs = [(0, 0), (0, 1), (1, 0), (2, 1)];
 
     [TestCase("exhaustive", false, TestName = "SwitchTerminal_Exhaustive_Omitted")]
     [TestCase("exhaustive", true, TestName = "SwitchTerminal_Exhaustive_Enabled")]

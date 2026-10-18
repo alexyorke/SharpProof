@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -8,10 +9,10 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class OperationPurityScopeCoverageTests
 {
-    private static readonly bool[] ExpectedBatchResults = [true, true, false, false, true, false, false];
-    private static readonly string[] ExpectedBatchCalls = ["Read", "Read", "Read", "Unknown"];
-    private static readonly string[] ExpectedReentryCalls = ["Read", "Read", "Read", "Outer", "Read", "Read"];
-    private static readonly string[] ExpectedBothScopeCalls =
+    private static readonly ImmutableArray<bool> ExpectedBatchResults = [true, true, false, false, true, false, false];
+    private static readonly ImmutableArray<string> ExpectedBatchCalls = ["Read", "Read", "Read", "Unknown"];
+    private static readonly ImmutableArray<string> ExpectedReentryCalls = ["Read", "Read", "Read", "Outer", "Read", "Read"];
+    private static readonly ImmutableArray<string> ExpectedBothScopeCalls =
     [
         "Read", "Read", "Read", "Outer", "Read", "Read",
         "Read", "Read", "Outer", "Read", "Read"

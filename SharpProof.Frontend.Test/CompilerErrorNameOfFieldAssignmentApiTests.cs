@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,7 +12,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorNameOfFieldAssignmentApiTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS8081"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS8081"];
 
     [Test]
     public void ActualNameOfRecoveryAssignmentRejectsItsMissingInstanceReceiver()

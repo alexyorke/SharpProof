@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -23,7 +24,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
     private const int WarmupCount = 10_000;
     private const int MeasurementCount = 4_096;
     private const int InputValue = 7;
-    private static readonly string[] ClosedRuntimeTypes = ["System.Int32", "System.Object"];
+    private static readonly ImmutableArray<string> ClosedRuntimeTypes = ["System.Int32", "System.Object"];
 
     [Test]
     public async Task AdmittedOpenTestedTypePatternsRespectMeasuredAllocation()

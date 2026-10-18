@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -1119,7 +1120,7 @@ public sealed class PortableIrGraphCodecTests
         return new CodecFixture(
             factory,
             program,
-            roots,
+            roots.ToImmutableArray(),
             Array.IndexOf(roots, conditional),
             Array.IndexOf(roots, flagTerm));
     }
@@ -1184,12 +1185,12 @@ public sealed class PortableIrGraphCodecTests
     private sealed record CodecFixture(
         IrFactory Factory,
         IrProgram Program,
-        IrTerm[] Roots,
+        ImmutableArray<IrTerm> Roots,
         int ConditionalRoot,
         int FlagRoot)
     {
         public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
         public IrProgram Program { get; init; } = Program ?? throw new System.ArgumentNullException(nameof(Program));
-        public IrTerm[] Roots { get; init; } = Roots ?? throw new System.ArgumentNullException(nameof(Roots));
+        public ImmutableArray<IrTerm> Roots { get; init; } = Roots.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Roots)) : Roots;
     }
 }

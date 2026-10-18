@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorBinaryApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0019"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0019"];
 
     [TestCase("&", BinaryOperatorKind.And)]
     [TestCase("==", BinaryOperatorKind.Equals)]

@@ -8,9 +8,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private readonly ContractApiIdentityResolver _identity =
         ContractApiIdentityResolver.ForCompilation(compilation);
     private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
-    private readonly Dictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
+    private readonly ImmutableDictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
         .Select(static (tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
-        .ToDictionary(static item => item.tree, static item => item.ordinal);
+        .ToImmutableDictionary(static item => item.tree, static item => item.ordinal);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractClauseInventory> _cache =
         new(SymbolEqualityComparer.IncludeNullability);
 

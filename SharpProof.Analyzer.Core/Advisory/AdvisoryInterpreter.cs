@@ -46,7 +46,7 @@ internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> 
 }
 internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrVarId> variables) : IAbstractDomain<CoreIrAdvisoryState>
 {
-    private IrFactory _guarded_factory = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : factory ?? throw new System.ArgumentNullException(nameof(factory));
+    private readonly IrFactory _guarded_factory = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : factory ?? throw new System.ArgumentNullException(nameof(factory));
     internal IntervalValue Range(IrVarId variable)
     {
         RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));

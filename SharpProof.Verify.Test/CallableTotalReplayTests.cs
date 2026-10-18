@@ -214,7 +214,7 @@ public sealed class CallableTotalReplayTests
 
     private sealed class StubBackend(BackendModel model) : ISmtBackend
     {
-        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
+        private readonly BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             System.ArgumentNullException.ThrowIfNull(query);

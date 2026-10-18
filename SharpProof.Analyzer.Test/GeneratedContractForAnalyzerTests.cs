@@ -488,8 +488,8 @@ public sealed class GeneratedContractForAnalyzerTests
         string hintName) :
         IIncrementalGenerator
     {
-        private string _guarded_hintName = hintName ?? throw new System.ArgumentNullException(nameof(hintName));
-        private string _guarded_source = source ?? throw new System.ArgumentNullException(nameof(source));
+        private readonly string _guarded_hintName = hintName ?? throw new System.ArgumentNullException(nameof(hintName));
+        private readonly string _guarded_source = source ?? throw new System.ArgumentNullException(nameof(source));
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             if (context.Equals(default(IncrementalGeneratorInitializationContext)))

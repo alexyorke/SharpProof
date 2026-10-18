@@ -277,7 +277,7 @@ public sealed class IrFactoryInvariantRegressionTests
         bool checkEquality) :
         IEqualityComparer<object>
     {
-        private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
+        private readonly IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         public new bool Equals(object? left, object? right)
         {
             if (checkEquality)

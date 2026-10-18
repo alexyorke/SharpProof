@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
@@ -21,14 +22,14 @@ public sealed class CallerBoxingInterfaceAuditTests
     private const int MeasuredIterations = 128;
     private const int MeasurementRounds = 3;
     private const double WitnessValue = 1.25d;
-    private static readonly string[] TargetNames = ["TargetDouble", "TargetNullable"];
-    private static readonly byte[] IdentityBody = [0x02, 0x2A];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableArray<string> TargetNames = ["TargetDouble", "TargetNullable"];
+    private static readonly ImmutableArray<byte> IdentityBody = [0x02, 0x2A];
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private static volatile IComparable? _escaped;
 
     private const string BoundarySource = """

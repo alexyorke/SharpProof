@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorUnaryApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0023"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0023"];
 
     [Test]
     public void LogicalNotOnIntegerPreservesCompilerErrorAndTypedApiAbstention()

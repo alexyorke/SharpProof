@@ -7,10 +7,10 @@ namespace SharpProof.Ir;
 // from approximation sites.
 internal static class IrSequenceReads
 {
-    internal static HashSet<IrInstructionId> Readers(IrProgram program)
+    internal static ImmutableHashSet<IrInstructionId> Readers(IrProgram program)
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
-        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         var writes = new Dictionary<IrVarId, List<IrInstruction>>();
         foreach (var instruction in instructions)
         {
@@ -28,7 +28,7 @@ internal static class IrSequenceReads
         while (fresh.RemoveWhere(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (writes[variable].Any(writer =>
             writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh))))) != 0)
         { }
-        var readers = new HashSet<IrInstructionId>();
+        var readers = ImmutableHashSet<IrInstructionId>.Empty;
         foreach (var instruction in instructions)
         {
             var pending = new Stack<IrTerm>(IrInstructionFacts.ReadTerms(instruction));
@@ -39,7 +39,7 @@ internal static class IrSequenceReads
                     term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh) ||
                     IrFieldSites.IsFieldRead(program.Factory, term) && !IsLocal(((IrOpaqueTerm)term).Receiver!, fresh))
                 {
-                    readers.Add(instruction.Id);
+                    readers = readers.Add(instruction.Id);
                     break;
                 }
                 IrTraversal.PushChildren(term, pending);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,8 +14,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataZeroArgumentCallDepthApiTests
 {
-    private static readonly string[] LeafInstructions = ["Ret"];
-    private static readonly string[] CallingInstructions = ["Call", "Ret"];
+    private static readonly ImmutableArray<string> LeafInstructions = ["Ret"];
+    private static readonly ImmutableArray<string> CallingInstructions = ["Call", "Ret"];
 
     [TestCase(8, true)]
     [TestCase(256, false)]

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -10,7 +11,7 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzSourceBooleanInputControls
 {
-    private static readonly bool[] FalsePair = [false, false];
+    private static readonly ImmutableArray<bool> FalsePair = [false, false];
     private const string Finite = "public static bool Target(bool left, bool right) => left || right;";
     private const string Partial = Finite +
         " public static bool NormalCompletion(bool left, bool right) => true;";
@@ -18,7 +19,7 @@ public sealed class FuzzSourceBooleanInputControls
     [Test]
     public async Task ActualBooleanInputsPreserveAllFourClrAndInterpreterOutcomes()
     {
-        AssertActualBooleanParameters(Finite, FalsePair, false);
+        AssertActualBooleanParameters(Finite, FalsePair.ToArray(), false);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
             [new(positive, Finite, [false, false], Partial,

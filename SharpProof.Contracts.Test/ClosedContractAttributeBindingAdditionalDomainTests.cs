@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,10 +9,10 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ClosedContractAttributeBindingAdditionalDomainTests
 {
-    private static readonly long[] PredicateInputs = [-1L, 2L, 4L];
-    private static readonly string[] MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
+    private static readonly ImmutableArray<long> PredicateInputs = [-1L, 2L, 4L];
+    private static readonly ImmutableArray<string> MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
 
-    private static readonly string[] MetadataIntegerDiagnostics =
+    private static readonly ImmutableArray<string> MetadataIntegerDiagnostics =
     [
         "[Positive] count",
         "[InRange(1, 3)] count"

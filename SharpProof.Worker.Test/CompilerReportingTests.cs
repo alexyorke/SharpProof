@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -19,7 +20,7 @@ public sealed class CompilerReportingTests
         Assert.That(captured.SyntaxTrees, Has.Length.EqualTo(1));
     }
 
-    private static readonly string[][] CapturedPathCases = [
+    private static readonly ImmutableArray<ImmutableArray<string>> CapturedPathCases = [
         ["Subject.cs", "./Subject.cs"],
         ["Subject.cs", "Subject.cs", "Subject.cs#1"],
         ["Subject.cs#2", "Subject.cs", "Subject.cs"],
@@ -81,7 +82,7 @@ public sealed class CompilerReportingTests
                 second.Location.Start++;
                 break;
             case "line":
-                second.Location.Line++;
+                second.Location = second.Location with { Line = second.Location.Line + 1 };
                 break;
             case "column":
                 second.Location.Column++;
@@ -237,11 +238,11 @@ public sealed class CompilerReportingTests
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical([second, first]), Is.False);
             Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, first), Is.Zero);
         }
-        second.SourceTreeOrdinal = 0;
+        second = second with { SourceTreeOrdinal = 0 };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
-        second.SourceTreePath = first.SourceTreePath;
+        second = second with { SourceTreePath = first.SourceTreePath };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
-        second.SourceTreeSha256 = first.SourceTreeSha256;
+        second = second with { SourceTreeSha256 = first.SourceTreeSha256 };
         Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, second), Is.Negative);
     }
 

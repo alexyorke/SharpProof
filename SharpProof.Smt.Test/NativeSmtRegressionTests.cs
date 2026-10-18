@@ -966,7 +966,7 @@ public sealed class NativeSmtRegressionTests
 
     private sealed class DisposableLabel(string label) : IDisposable
     {
-        private string _guarded_label = label ?? throw new System.ArgumentNullException(nameof(label));
+        private readonly string _guarded_label = label ?? throw new System.ArgumentNullException(nameof(label));
         public override string ToString()
         {
             return _guarded_label;

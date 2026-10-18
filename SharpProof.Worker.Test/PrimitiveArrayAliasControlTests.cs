@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class PrimitiveArrayAliasControlTests
 {
-    private static readonly string[][] Pairs =
+    private static readonly ImmutableArray<ImmutableArray<string>> Pairs =
     [
         ["sbyte", "byte", "-1", "byte.MaxValue"],
         ["byte", "sbyte", "byte.MaxValue", "-1"],

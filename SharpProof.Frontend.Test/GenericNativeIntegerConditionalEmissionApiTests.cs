@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -19,10 +20,10 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class GenericNativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
-    private static readonly byte[] OmittedTargetIl = [0x1d, 0x2a];
-    private static readonly int[] UnderlyingArities = [0, 1];
-    private static readonly int[] NativeArities = [0];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<byte> OmittedTargetIl = [0x1d, 0x2a];
+    private static readonly ImmutableArray<int> UnderlyingArities = [0, 1];
+    private static readonly ImmutableArray<int> NativeArities = [0];
 
     // Genuine matcher rejection controls: native wrappers exclude generic methods,
     // while the underlying type still publishes both own Trace members. These
@@ -187,10 +188,10 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         return [.. calls];
     }
 
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

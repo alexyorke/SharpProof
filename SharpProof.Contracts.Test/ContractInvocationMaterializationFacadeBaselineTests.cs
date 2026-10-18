@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,14 +9,14 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractInvocationMaterializationFacadeBaselineTests
 {
-    private static readonly bool[] BooleanValues = [false, true];
-    private static readonly BoundContractKind[] FullKinds =
+    private static readonly ImmutableArray<bool> BooleanValues = [false, true];
+    private static readonly ImmutableArray<BoundContractKind> FullKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Assume,
         BoundContractKind.Ensures
     ];
-    private static readonly BoundContractKind[] RequiresOnlyKinds = [BoundContractKind.Requires];
+    private static readonly ImmutableArray<BoundContractKind> RequiresOnlyKinds = [BoundContractKind.Requires];
     private const string ContractSource = """
         using SharpProof.Attributes;
         public static class ContractFrames {

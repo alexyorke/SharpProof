@@ -33,19 +33,19 @@ public sealed class PackageLayoutSmokeTests
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
-    private static readonly string[] ExpectedAnalyzerEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerEntryFileNames = [
         "SharpProof.Analyzer.dll"
     ];
 
-    private static readonly string[] ExpectedCodeFixEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCodeFixEntryFileNames = [
         "SharpProof.CodeFixes.dll"
     ];
 
-    private static readonly string[] ExpectedGeneratorEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [
         "SharpProof.ContractForGenerator.dll"
     ];
 
-    private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
+    private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
         "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
@@ -66,11 +66,11 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string>
         ExpectedAllocationReplayWitnessKinds = AllocationWitnessKinds.Managed;
 
-    private static readonly string[] ExpectedCollectorEntryFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCollectorEntryFileNames = [
         "SharpProof.CompilerCollector.dll"
     ];
 
-    private static readonly string[] ExpectedSourceAnalyzerProjectFileNames = [
+    private static readonly ImmutableArray<string> ExpectedSourceAnalyzerProjectFileNames = [
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
         "SharpProof.Analyzer.Core.csproj",
@@ -78,7 +78,7 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.CompilerCollector.csproj"
     ];
 
-    private static readonly string[] ExpectedCollectorDependencyFileNames = [
+    private static readonly ImmutableArray<string> ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
         "SharpProof.CompilerArtifact.dll",
         "SharpProof.Worker.Protocol.dll",
@@ -87,7 +87,7 @@ public sealed class PackageLayoutSmokeTests
         "System.Text.Json.dll"
     ];
 
-    private static readonly string[] ExpectedConditionalAnalyzerEntries = [
+    private static readonly ImmutableArray<string> ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
@@ -115,7 +115,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/shared/netstandard2.0/System.Threading.Tasks.Extensions.dll"
     ];
 
-    private static readonly string[] ExpectedToolEntries = [
+    private static readonly ImmutableArray<string> ExpectedToolEntries = [
         "tools/net10/Microsoft.Z3.dll",
         "tools/net10/SharpProof.BuildTasks.deps.json",
         "tools/net10/SharpProof.BuildTasks.dll",
@@ -133,14 +133,14 @@ public sealed class PackageLayoutSmokeTests
         "tools/net10/SharpProof.Worker.runtimeconfig.json"
     ];
 
-    private static readonly string[] ExpectedNativeZ3Entries = [
+    private static readonly ImmutableArray<string> ExpectedNativeZ3Entries = [
         "tools/native/linux-x64/libz3.so",
         "tools/native/linux-arm64/libz3.so",
         "tools/native/win-x64/libz3.dll",
         "tools/native/osx-arm64/libz3.dylib",
         "tools/native/osx-x64/libz3.dylib"
     ];
-    private static readonly string[] ExpectedDependencyAttributes = [
+    private static readonly ImmutableArray<string> ExpectedDependencyAttributes = [
         "id",
         "version"
     ];
@@ -2485,7 +2485,7 @@ public sealed class PackageLayoutSmokeTests
                 ExpectedCollectorDependencyFileNames.Contains(
                     fileName,
                     StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var entryNames = items.GetProperty("ProjectReference")
             .EnumerateArray()
             .Where(static item =>
@@ -2494,7 +2494,7 @@ public sealed class PackageLayoutSmokeTests
             .Select(static item =>
                 ((item.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (Path.GetFileNameWithoutExtension(
                     item.GetProperty("Identity").GetString()) + ".dll")))
-            .ToArray();
+            .ToImmutableArray();
         return new(entryNames, dependencyNames);
     }
 
@@ -3268,11 +3268,11 @@ public sealed class PackageLayoutSmokeTests
     }
 
     private readonly record struct SourceConsumerAnalyzerItems(
-        string[] EntryFileNames,
-        string[] DependencyFileNames)
+        ImmutableArray<string> EntryFileNames,
+        ImmutableArray<string> DependencyFileNames)
     {
-        public string[] EntryFileNames { get; init; } = EntryFileNames ?? throw new System.ArgumentNullException(nameof(EntryFileNames));
-        public string[] DependencyFileNames { get; init; } = DependencyFileNames ?? throw new System.ArgumentNullException(nameof(DependencyFileNames));
+        public ImmutableArray<string> EntryFileNames { get; init; } = EntryFileNames.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(EntryFileNames)) : EntryFileNames;
+        public ImmutableArray<string> DependencyFileNames { get; init; } = DependencyFileNames.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(DependencyFileNames)) : DependencyFileNames;
     }
 
     private sealed class PackageAnalyzerAssemblyLoader :
@@ -3313,7 +3313,7 @@ public sealed class PackageLayoutSmokeTests
             IReadOnlyDictionary<string, string> dependencies) :
             AssemblyLoadContext(isCollectible: true)
         {
-            private IReadOnlyDictionary<string, string> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
+            private readonly IReadOnlyDictionary<string, string> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
             internal Assembly LoadPackageAssembly(string path)
             {
                 System.ArgumentNullException.ThrowIfNull(path);

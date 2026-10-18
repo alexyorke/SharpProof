@@ -8,7 +8,8 @@ internal sealed class ContractExpressionBinder
     private readonly RoslynOperationLowerer _lowerer;
     private readonly HashSet<IrVarId> _boundVariables = [];
     private readonly HashSet<IrVarId> _receiverVariables = [];
-    private readonly Dictionary<IrVarId, IrVarId> _preState = [];
+    private ImmutableDictionary<IrVarId, IrVarId> _preState = ImmutableDictionary<IrVarId, IrVarId>.Empty;
+    private ImmutableArray<KeyValuePair<IrVarId, IrVarId>> _preStateOrder = [];
     private readonly HashSet<IrVarId> _preStateValues = [];
     private ImmutableArray<FrontendVariableBinding> _variableBindings;
     private IrVarId? _result;
@@ -37,7 +38,8 @@ internal sealed class ContractExpressionBinder
     internal ImmutableArray<IrVarId> ReceiverVariables =>
         [.. _receiverVariables];
 
-    internal IReadOnlyDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
+    internal ImmutableDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
+    internal ImmutableArray<KeyValuePair<IrVarId, IrVarId>> PreStateVariablePairs => _preStateOrder;
 
     internal IrVarId? ResultVariable => _result;
 
@@ -91,7 +93,8 @@ internal sealed class ContractExpressionBinder
                     variable.Value.ToString(
                         System.Globalization.CultureInfo.InvariantCulture),
                     info.Type);
-                _preState.Add(variable, preState);
+                _preState = _preState.Add(variable, preState);
+                _preStateOrder = _preStateOrder.Add(new(variable, preState));
                 _preStateValues.Add(preState);
             }
             substitutions[variable] = _factory.Variable(preState);

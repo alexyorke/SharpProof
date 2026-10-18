@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,7 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerCoreScalarPromotionBudgetTests
 {
     private const int MaximumWork = 4096;
-    private static readonly FrozenCase[] s_cases =
+    private static readonly ImmutableArray<FrozenCase> s_cases =
     [
         new("promotion-8.cs", "CD9BC7DF49869F3F305F813A4A8C41D30D2D23553959BBD960A27E01ABA5E715",
             8, false, ["SP0027"], AnalyzerSemanticOutcome.Refuted),
@@ -40,7 +41,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         Assert.That(factory.Session, Is.Not.Null);
         Assert.That(targetOutcomeCount, Is.EqualTo(1));
         Assert.That(actualOutcome, Is.EqualTo(testCase.ExpectedOutcome));
-        AnalyzerTestHost.AssertIds(diagnostics, testCase.ExpectedDiagnosticIds);
+        AnalyzerTestHost.AssertIds(diagnostics, testCase.ExpectedDiagnosticIds.ToArray());
     }
 
     private static CompilerObservation InspectCompiler(FrozenCase testCase)
@@ -57,7 +58,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
-            .ToArray();
+            .ToImmutableArray();
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -166,12 +167,12 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         string ExpectedSha256,
         int ValueCopies,
         bool MustExceedOperationBudget,
-        string[] ExpectedDiagnosticIds,
+        ImmutableArray<string> ExpectedDiagnosticIds,
         AnalyzerSemanticOutcome ExpectedOutcome)
     {
         public string FileName { get; init; } = FileName ?? throw new System.ArgumentNullException(nameof(FileName));
         public string ExpectedSha256 { get; init; } = ExpectedSha256 ?? throw new System.ArgumentNullException(nameof(ExpectedSha256));
-        public string[] ExpectedDiagnosticIds { get; init; } = ExpectedDiagnosticIds ?? throw new System.ArgumentNullException(nameof(ExpectedDiagnosticIds));
+        public ImmutableArray<string> ExpectedDiagnosticIds { get; init; } = ExpectedDiagnosticIds.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(ExpectedDiagnosticIds)) : ExpectedDiagnosticIds;
     }
 
     private sealed record CompilerObservation(
@@ -179,7 +180,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         CSharpCompilation Compilation,
         string SourceHash,
         int SourceBytes,
-        string[] CompilerErrors,
+        ImmutableArray<string> CompilerErrors,
         int NeedSyntaxNodes,
         string? OperationKind,
         int OwnedOperationNodes,
@@ -193,7 +194,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         public FrozenCase TestCase { get; init; } = TestCase ?? throw new System.ArgumentNullException(nameof(TestCase));
         public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
         public string SourceHash { get; init; } = SourceHash ?? throw new System.ArgumentNullException(nameof(SourceHash));
-        public string[] CompilerErrors { get; init; } = CompilerErrors ?? throw new System.ArgumentNullException(nameof(CompilerErrors));
+        public ImmutableArray<string> CompilerErrors { get; init; } = CompilerErrors.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(CompilerErrors)) : CompilerErrors;
     }
 
 }

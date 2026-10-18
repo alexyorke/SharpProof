@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -31,12 +32,12 @@ public sealed class EmptyIteratorAllocationAuditTests
     private const int MeasuredIterations = 128;
     private const int MeasurementRounds = 3;
     private static object? s_escaped;
-    private static readonly Dictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
-    private static readonly Case[] s_cases =
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+    private static readonly ImmutableArray<Case> s_cases =
     [
         new("own-empty-iterator",
             "using System.Collections.Generic; using SharpProof.Attributes; public static class Subject { [ZeroAllocations] public static IEnumerable<int> Target() { yield break; } }",
@@ -354,7 +355,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             }).ToArray();
             return new(method.Module.ModuleVersionId, metadata.GetGuid(metadata.GetModuleDefinition().Mvid), method.MetadataToken,
                 measured.DelegateMethodToken, measured.DelegateMvid, measured.DelegateHasNoTarget,
-                type.TypeInitializer != null, attributes, iteratorType?.FullName, iteratorType?.MetadataToken,
+                type.TypeInitializer != null, attributes.ToImmutableArray(), iteratorType?.FullName, iteratorType?.MetadataToken,
                 iteratorType?.Module.ModuleVersionId, iteratorType?.DeclaringType == type,
                 iteratorType?.IsInstanceOfType(measured.First), measured.First == null, measured.Second == null,
                 ReferenceEquals(measured.First, measured.Second), measured.First?.GetType().FullName, enumerationHasElement,
@@ -389,7 +390,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         }
         GC.KeepAlive(first);
         GC.KeepAlive(second);
-        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds);
+        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds.ToImmutableArray());
     }
 
     private static T? Null<T>() where T : class
@@ -483,7 +484,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableList<IlInstruction>.Empty;
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -501,7 +502,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 _ => 4
             };
             var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
+            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
                 called?.Module.ModuleVersionId, called?.DeclaringType?.FullName, called?.DeclaringType?.MetadataToken, called?.Name));
             offset += size;
         }
@@ -555,7 +556,7 @@ public sealed class EmptyIteratorAllocationAuditTests
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))
@@ -575,9 +576,9 @@ public sealed class EmptyIteratorAllocationAuditTests
     }
     private sealed record Measurement(int Round, long ControlBeforeBytes, long SubjectBytes, long ControlAfterBytes);
     private sealed record MeasuredCalls(object? First, object? Second, int DelegateMethodToken, Guid DelegateMvid,
-        bool DelegateHasNoTarget, Measurement[] Rounds)
+        bool DelegateHasNoTarget, ImmutableArray<Measurement> Rounds)
     {
-        public Measurement[] Rounds { get; init; } = Rounds ?? throw new System.ArgumentNullException(nameof(Rounds));
+        public ImmutableArray<Measurement> Rounds { get; init; } = Rounds.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Rounds)) : Rounds;
     }
     private sealed record AttributeObservation(int Row, string TypeName, string Assembly, int ConstructorToken, string Blob)
     {
@@ -591,19 +592,19 @@ public sealed class EmptyIteratorAllocationAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, string Bytes, IlInstruction[] Instructions)
+    private sealed record IlObservation(int MethodToken, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public IlInstruction[] Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(Guid LoadedMvid, Guid PeMvid, int MethodToken, int DelegateMethodToken,
-        Guid DelegateMvid, bool DelegateHasNoTarget, bool HasTypeInitializer, AttributeObservation[] Attributes,
+        Guid DelegateMvid, bool DelegateHasNoTarget, bool HasTypeInitializer, ImmutableArray<AttributeObservation> Attributes,
         string? IteratorType, int? IteratorTypeToken, Guid? IteratorMvid, bool IteratorDeclaringTypeMatches,
         bool? ResultMatchesIteratorType, bool FirstIsNull, bool SecondIsNull, bool SameReference, string? ResultType,
-        bool? EnumerationHasElement, Measurement[] Rounds, IlObservation Target)
+        bool? EnumerationHasElement, ImmutableArray<Measurement> Rounds, IlObservation Target)
     {
         public IlObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
-        public AttributeObservation[] Attributes { get; init; } = Attributes ?? throw new System.ArgumentNullException(nameof(Attributes));
-        public Measurement[] Rounds { get; init; } = Rounds ?? throw new System.ArgumentNullException(nameof(Rounds));
+        public ImmutableArray<AttributeObservation> Attributes { get; init; } = Attributes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Attributes)) : Attributes;
+        public ImmutableArray<Measurement> Rounds { get; init; } = Rounds.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Rounds)) : Rounds;
     }
 }

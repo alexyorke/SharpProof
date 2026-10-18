@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,7 +10,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class FrontendBoundaryCoverageTests
 {
-    private static readonly string[] ExpectedDefinedSymbols = ["LOCAL", "RETAINED"];
+    private static readonly ImmutableArray<string> ExpectedDefinedSymbols = ["LOCAL", "RETAINED"];
     [Test]
     public void ProgramAbstentionRequiresIdentityAndReason()
     {

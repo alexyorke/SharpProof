@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -905,7 +906,7 @@ public sealed class ConstructedGenericContractTests
         Assert.That(result.Failure, Is.EqualTo(expectedFailure));
     }
 
-    private static IMethodSymbol[] GetConstructedTargets(
+    private static ImmutableArray<IMethodSymbol> GetConstructedTargets(
         CSharpCompilation compilation,
         string expressionPrefix)
     {
@@ -933,12 +934,12 @@ public sealed class ConstructedGenericContractTests
 
     private sealed record ConstructedMethodFixture(
         CSharpCompilation Compilation,
-        IMethodSymbol[] Targets,
+        ImmutableArray<IMethodSymbol> Targets,
         ContractBinder Binder)
     {
         public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
         public ContractBinder Binder { get; init; } = Binder ?? throw new System.ArgumentNullException(nameof(Binder));
-        public IMethodSymbol[] Targets { get; init; } = Targets ?? throw new System.ArgumentNullException(nameof(Targets));
+        public ImmutableArray<IMethodSymbol> Targets { get; init; } = Targets.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Targets)) : Targets;
     }
 
 }

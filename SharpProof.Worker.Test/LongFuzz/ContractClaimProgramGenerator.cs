@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 
@@ -8,19 +9,19 @@ namespace SharpProof.Worker.Test.LongFuzz;
 // Ensures clause), plus Pre/Post mirrors of the contract for the CLR oracle.
 internal sealed class ContractClaimProgramGenerator(Random random)
 {
-    private Random _guarded_random = random ?? throw new System.ArgumentNullException(nameof(random));
+    private readonly Random _guarded_random = random ?? throw new System.ArgumentNullException(nameof(random));
     internal const string DoesNotThrow = "DoesNotThrow";
     internal const string EnforcePure = "EnforcePure";
     internal const string ZeroAllocations = "ZeroAllocations";
     internal const string Ensures = "Ensures";
 
-    private static readonly string[] s_modes = [DoesNotThrow, EnforcePure, ZeroAllocations, Ensures];
-    private static readonly string[] s_comparisons = ["==", "!=", "<", ">=", ">"];
-    private static readonly int[] s_simpleStatements = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
-    private static readonly int[] s_simpleInts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 25, 28, 29, 30];
-    private static readonly string[] s_compoundOperators = [" += ", " -= ", " *= ", " /= ", " %= ", " &= ", " |= ", " ^= ", " <<= "];
-    private static readonly string[] s_exceptions = ["InvalidOperationException()", "ArgumentException(\"m\")", "System.IO.IOException()"];
-    private static readonly string[] s_extremes = ["int.MaxValue", "int.MinValue", "-1", "0"];
+    private static readonly ImmutableArray<string> s_modes = [DoesNotThrow, EnforcePure, ZeroAllocations, Ensures];
+    private static readonly ImmutableArray<string> s_comparisons = ["==", "!=", "<", ">=", ">"];
+    private static readonly ImmutableArray<int> s_simpleStatements = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+    private static readonly ImmutableArray<int> s_simpleInts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 25, 28, 29, 30];
+    private static readonly ImmutableArray<string> s_compoundOperators = [" += ", " -= ", " *= ", " /= ", " %= ", " &= ", " |= ", " ^= ", " <<= "];
+    private static readonly ImmutableArray<string> s_exceptions = ["InvalidOperationException()", "ArgumentException(\"m\")", "System.IO.IOException()"];
+    private static readonly ImmutableArray<string> s_extremes = ["int.MaxValue", "int.MinValue", "-1", "0"];
     private int _locals;
     private bool _simple;
     private bool _insideFinally;

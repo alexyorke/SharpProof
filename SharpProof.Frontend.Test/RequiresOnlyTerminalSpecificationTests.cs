@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RequiresOnlyTerminalSpecificationTests
 {
-    private static readonly bool[] RuntimeInputs = [false, true];
+    private static readonly ImmutableArray<bool> RuntimeInputs = [false, true];
 
     [TestCase(false)]
     [TestCase(true)]

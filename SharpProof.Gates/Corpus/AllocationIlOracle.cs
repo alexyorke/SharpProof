@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -7,9 +8,9 @@ namespace SharpProof.Gates.Corpus;
 // A potential site is a gap, since source preconditions may exclude its edge.
 internal static class AllocationIlOracle
 {
-    private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes)
+    private static readonly ImmutableDictionary<short, OpCode> Opcodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static).Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!)).ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!)).ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
 
     // The maintained callers supply methods from successful C# compiler emission.
     // Those bodies have complete operands and instruction-aligned branch/EH targets;

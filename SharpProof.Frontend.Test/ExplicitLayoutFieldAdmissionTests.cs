@@ -16,7 +16,7 @@ namespace SharpProof.Frontend.Test;
 [NonParallelizable]
 public sealed class ExplicitLayoutFieldAdmissionTests
 {
-    private static readonly byte[] Int32FieldSignature = [0x06, 0x08];
+    private static readonly ImmutableArray<byte> Int32FieldSignature = [0x06, 0x08];
     private static readonly ImmutableArray<string> BclAliases = ["global", "Bcl"];
 
     private const string AutoSource = """

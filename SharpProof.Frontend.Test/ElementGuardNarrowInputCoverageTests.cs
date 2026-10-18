@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -7,7 +8,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ElementGuardNarrowInputCoverageTests
 {
-    private static readonly IrExceptionKind[] ExpectedFaults = [IrExceptionKind.NullReference, IrExceptionKind.IndexOutOfRange];
+    private static readonly ImmutableArray<IrExceptionKind> ExpectedFaults = [IrExceptionKind.NullReference, IrExceptionKind.IndexOutOfRange];
 
     [Test]
     public void PureGuardWidensActualByteParameterAndPreservesNativeFaults()

@@ -116,13 +116,12 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
             effectClaimIds.Contains(claimId))))];
     }
 
-    internal static HashSet<string> EffectClaimIds(
+    internal static ImmutableHashSet<string> EffectClaimIds(
         CompilerCallablePreparation target)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        return new HashSet<string>(
-            target.EffectClaims.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId)),
-            StringComparer.Ordinal);
+        return target.EffectClaims.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId))
+            .ToImmutableHashSet(StringComparer.Ordinal);
     }
 
     private static WorkerClaimResult CreateUnknown(

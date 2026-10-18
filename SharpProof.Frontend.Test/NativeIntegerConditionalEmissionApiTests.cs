@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -20,7 +21,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
 
     // SP-NATIVE-CONDITIONAL-001. Frozen before production changes at f1195945502a9393621576f4fc305513e9dbf840.
     // Roslyn's TypeDefinitions_FromSource fixture emits the same minimal core-library family:
@@ -256,10 +257,10 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         return [.. calls];
     }
 
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

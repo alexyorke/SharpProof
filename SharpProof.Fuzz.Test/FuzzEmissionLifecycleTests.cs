@@ -14,7 +14,7 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzEmissionLifecycleTests
 {
-    private static readonly string[] ParameterBindingMethodNames = ["Supported", "Extra"];
+    private static readonly ImmutableArray<string> ParameterBindingMethodNames = ["Supported", "Extra"];
 
     [Test]
     public void RealCompilationEmissionReturnsItsSuccessfulReadableImage()

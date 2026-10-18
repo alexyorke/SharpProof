@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,21 +10,21 @@ namespace SharpProof.Frontend.Test;
 internal sealed class GoldenSourceAnchors
 {
     private readonly string _document;
-    private readonly SyntaxToken[] _tokens;
-    private readonly Dictionary<int, int> _starts = [];
-    private readonly Dictionary<int, int> _ends = [];
-    private readonly Dictionary<(int Start, int Length), string> _anchors = [];
+    private readonly ImmutableArray<SyntaxToken> _tokens;
+    private readonly ImmutableDictionary<int, int> _starts = ImmutableDictionary<int, int>.Empty;
+    private readonly ImmutableDictionary<int, int> _ends = ImmutableDictionary<int, int>.Empty;
+    private ImmutableDictionary<(int Start, int Length), string> _anchors = ImmutableDictionary<(int Start, int Length), string>.Empty;
 
     internal GoldenSourceAnchors(SyntaxTree tree)
     {
         ArgumentNullException.ThrowIfNull(tree);
         _document = tree.FilePath;
         _tokens = tree.GetRoot().DescendantTokens()
-            .Where(token => token.Span.Length != 0).ToArray();
+            .Where(token => token.Span.Length != 0).ToImmutableArray();
         for (var index = 0; index < _tokens.Length; index++)
         {
-            _starts.Add(_tokens[index].SpanStart, index);
-            _ends.Add(_tokens[index].Span.End, index);
+            _starts = _starts.Add(_tokens[index].SpanStart, index);
+            _ends = _ends.Add(_tokens[index].Span.End, index);
         }
     }
 
@@ -72,7 +73,7 @@ internal sealed class GoldenSourceAnchors
         }
         var anchor = document + ":tokens[" + string.Join(",", spellings) + "]#" +
             occurrence.ToString(CultureInfo.InvariantCulture);
-        _anchors.Add((start, length), anchor);
+        _anchors = _anchors.Add((start, length), anchor);
         return anchor;
     }
 

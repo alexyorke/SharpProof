@@ -8,7 +8,7 @@ namespace SharpProof.Smt;
 // what the proof kernel then proves over bitvectors.
 public static class HornInvariantSearch
 {
-    public static IReadOnlyDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, IReadOnlyList<VerificationQuery> clauses,
+    public static ImmutableDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, IReadOnlyList<VerificationQuery> clauses,
         IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -16,7 +16,7 @@ public static class HornInvariantSearch
         ArgumentNullGuard.NotNull(states, nameof(states));
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
-        var encoder = new BvEncoder(context, factory, owner) { Relations = [] };
+        var encoder = new BvEncoder(context, factory, owner, enableInvariantRelations: true);
         try
         {
             context.UpdateParamValue("rlimit", rlimit.ToString(CultureInfo.InvariantCulture));
@@ -24,7 +24,7 @@ public static class HornInvariantSearch
             return new Search(context, factory, owner, encoder, states, rlimit, cancellationToken).Run(clauses);
         }
         catch (Exception exception) when (exception is UnsupportedIrEncodingException or SmtResourceLimitException or Z3Exception)
-        { return new Dictionary<IrMemberId, IrTerm>(); }
+        { return ImmutableDictionary<IrMemberId, IrTerm>.Empty; }
         finally
         { encoder.DisposeReferences(); }
     }
@@ -42,10 +42,10 @@ public static class HornInvariantSearch
         private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
         private FuncDecl? _error;
 
-        internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
+        internal ImmutableDictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
         {
             clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-            var proposals = new Dictionary<IrMemberId, IrTerm>();
+            var proposals = ImmutableDictionary<IrMemberId, IrTerm>.Empty;
             _error = context.MkFuncDecl("error", [], context.BoolSort);
             var rules = new List<BoolExpr>();
             foreach (var clause in clauses)
@@ -75,7 +75,7 @@ public static class HornInvariantSearch
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
             { return proposals; }
-            foreach (var relation in encoder.Relations)
+            foreach (var relation in encoder.RelationDeclarations)
             {
                 if (!_relations.TryGetValue(relation.Value.Name.ToString(), out var integer))
                 { continue; }
@@ -90,7 +90,7 @@ public static class HornInvariantSearch
                 { _names[arguments[ordinal].FuncDecl.Name.ToString()] = state[ordinal]; }
                 var cover = Own(fixedpoint.GetCoverDelta(-1, integer));
                 if (Translate(Own(cover.SubstituteVars(arguments))) is { } invariant && invariant.Type == factory.BooleanType)
-                { proposals[relation.Key] = invariant; }
+                { proposals = proposals.SetItem(relation.Key, invariant); }
             }
             return proposals;
         }

@@ -699,7 +699,7 @@ public sealed class CorpusGateTests
     {
         const string data = "case|Proven|Proven|";
         var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n");
-        string[]? parsed = null;
+        ImmutableArray<string>? parsed = null;
         try
         {
             parsed = CorpusSnapshotFormat.Parse(canonical);

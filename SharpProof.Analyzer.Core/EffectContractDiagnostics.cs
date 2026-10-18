@@ -63,7 +63,7 @@ internal static class EffectContractDiagnostics
                 reportDiagnostic(Diagnostic.Create(
                     evaluation.Diagnostic,
                     evaluation.DiagnosticLocation,
-                    evaluation.DiagnosticArguments));
+                    evaluation.DiagnosticArguments.ToArray()));
             }
 
             // Declare establishes only trusted boundaries, and advisory body
@@ -185,20 +185,20 @@ internal static class EffectContractDiagnostics
             evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
             subject = RepositoryParameterGuard.NotNull(subject, nameof(subject));
             var described = "'" + subject + "' " + detail;
-            var (rule, arguments) = evaluation.Kind switch
+            (DiagnosticDescriptor Rule, ImmutableArray<object?> Arguments) diagnostic = evaluation.Kind switch
             {
-                EffectEvaluationContractKind.EnforcePure => (GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, new object[] { method.Name }),
+                EffectEvaluationContractKind.EnforcePure => (GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, [method.Name]),
                 EffectEvaluationContractKind.ZeroAllocations => (GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
-                    new object[] { method.Name, described }),
+                    [method.Name, described]),
                 EffectEvaluationContractKind.AllowedCapabilities => (GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
-                    new object[] { subject, method.Name, detail }),
+                    [subject, method.Name, detail]),
                 EffectEvaluationContractKind.DoesNotThrow => (GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-                    new object[] { method.Name, "[DoesNotThrow]", described }),
+                    [method.Name, "[DoesNotThrow]", described]),
                 EffectEvaluationContractKind.AllowedExceptions => (GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-                    new object[] { method.Name, "[AllowedExceptions]", described }),
-                _ => (GeneratedDiagnosticDescriptors.EffectContractNotProvenRule, new object[] { method.Name, described })
+                    [method.Name, "[AllowedExceptions]", described]),
+                _ => (GeneratedDiagnosticDescriptors.EffectContractNotProvenRule, [method.Name, described])
             };
-            return evaluation with { Diagnostic = rule, DiagnosticLocation = location, DiagnosticArguments = arguments };
+            return evaluation with { Diagnostic = diagnostic.Rule, DiagnosticLocation = location, DiagnosticArguments = diagnostic.Arguments };
         }
     }
 

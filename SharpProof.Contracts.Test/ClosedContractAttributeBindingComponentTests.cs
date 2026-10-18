@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,9 +9,9 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ClosedContractAttributeBindingComponentTests
 {
-    private static readonly IrExecutionSemantics[] Modes = [IrExecutionSemantics.Legacy, IrExecutionSemantics.Total];
-    private static readonly string[] ExpectedDiagnostics = ["[Positive] count", "[InRange(1L, 3L)] count"];
-    private static readonly long[] Inputs = [-1L, 2L, 4L];
+    private static readonly ImmutableArray<IrExecutionSemantics> Modes = [IrExecutionSemantics.Legacy, IrExecutionSemantics.Total];
+    private static readonly ImmutableArray<string> ExpectedDiagnostics = ["[Positive] count", "[InRange(1L, 3L)] count"];
+    private static readonly ImmutableArray<long> Inputs = [-1L, 2L, 4L];
     [Test]
     public void ValidCompilerAttributesProjectInSourceOrderAndKeepPredicateMeaning()
     {

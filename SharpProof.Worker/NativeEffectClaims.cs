@@ -93,16 +93,16 @@ internal static class NativeEffectClaims
     }
 
     // Requires clauses are labelled by ordinal in the passive VC.
-    private static HashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
+    private static ImmutableHashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
     {
 
         RepositoryParameterGuard.RequireInitialized(core.IsDefault, nameof(core), "Array must be initialized.");
         var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToArray();
-        var used = new HashSet<string>(StringComparer.Ordinal);
+        var used = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
             if (core.Contains("requires:" + ordinal.ToString(CultureInfo.InvariantCulture)) && requires[ordinal].AssumptionId is { } id)
-            { used.Add(id); }
+            { used = used.Add(id); }
         }
         return used;
     }

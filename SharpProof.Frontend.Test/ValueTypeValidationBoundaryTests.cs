@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.VisualBasic;
@@ -10,8 +11,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ValueTypeValidationBoundaryTests
 {
-    private static readonly string[] CSharpError = ["CS0246"];
-    private static readonly string[] VisualBasicError = ["BC30002"];
+    private static readonly ImmutableArray<string> CSharpError = ["CS0246"];
+    private static readonly ImmutableArray<string> VisualBasicError = ["BC30002"];
     [Test]
     public void StructParameterConstantRejectsActualIntSpecialization()
     {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
@@ -17,8 +18,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class BulkFrontendIlNullOperandOrderTests
 {
-    private static readonly string[] ExpectedLeft = ["Ldnull", "Ldarg", "Ceq", "Ret"];
-    private static readonly string[] ExpectedRight = ["Ldarg", "Ldnull", "Ceq", "Ret"];
+    private static readonly ImmutableArray<string> ExpectedLeft = ["Ldnull", "Ldarg", "Ceq", "Ret"];
+    private static readonly ImmutableArray<string> ExpectedRight = ["Ldarg", "Ldnull", "Ceq", "Ret"];
 
     [TestCase(true)]
     [TestCase(false)]

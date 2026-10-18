@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 
@@ -93,7 +94,7 @@ internal static class CorpusFileTransaction
             cancellationToken.ThrowIfCancellationRequested();
             await WriteMarkerAsync(
                     markerPath,
-                    new TransactionMarker(SchemaVersion, entries.ToArray()),
+                    new TransactionMarker(SchemaVersion, entries.ToImmutableArray()),
                     cancellationToken)
                 .ConfigureAwait(false);
             markerPublished = true;
@@ -143,7 +144,7 @@ internal static class CorpusFileTransaction
             throw new InvalidDataException(
                 "The corpus transaction marker is empty.");
         if (marker.SchemaVersion != SchemaVersion ||
-            marker.Entries is not { Length: > 0 })
+            marker.Entries.IsDefaultOrEmpty)
         {
             throw new InvalidDataException(
                 "The corpus transaction marker is invalid.");
@@ -318,9 +319,9 @@ internal static class CorpusFileTransaction
 
     private sealed record TransactionMarker(
         int SchemaVersion,
-        TransactionEntry[] Entries)
+        ImmutableArray<TransactionEntry> Entries)
     {
-        public TransactionEntry[] Entries { get; init; } = Entries ?? throw new System.ArgumentNullException(nameof(Entries));
+        public ImmutableArray<TransactionEntry> Entries { get; init; } = !Entries.IsDefault ? Entries : throw new System.ArgumentNullException(nameof(Entries));
     }
 
     private sealed record TransactionEntry(

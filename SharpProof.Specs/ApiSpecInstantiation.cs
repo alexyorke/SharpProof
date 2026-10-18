@@ -147,10 +147,10 @@ public static partial class ApiSpecInstantiator
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        private IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> _guarded_validatedTerms = validatedTerms ?? throw new System.ArgumentNullException(nameof(validatedTerms));
-        private IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> _guarded_variables = variables ?? throw new System.ArgumentNullException(nameof(variables));
-        private IReadOnlyDictionary<SpecVarId, IrTerm> _guarded_substitutions = substitutions ?? throw new System.ArgumentNullException(nameof(substitutions));
-        private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
+        private readonly IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> _guarded_validatedTerms = validatedTerms ?? throw new System.ArgumentNullException(nameof(validatedTerms));
+        private readonly IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> _guarded_variables = variables ?? throw new System.ArgumentNullException(nameof(variables));
+        private readonly IReadOnlyDictionary<SpecVarId, IrTerm> _guarded_substitutions = substitutions ?? throw new System.ArgumentNullException(nameof(substitutions));
+        private readonly IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         internal TermResult Term(SpecTermDeclaration term)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));

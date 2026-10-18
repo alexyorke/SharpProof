@@ -16,7 +16,7 @@ public static class IrSubstitution
 
         var replacementMap = CreateReplacementMap(
             factory,
-            new Dictionary<IrVarId, IrTerm> { [variable] = replacement });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement));
         return SubstituteValidated(factory, root, replacementMap);
     }
 
@@ -37,7 +37,7 @@ public static class IrSubstitution
     private static IrTerm SubstituteValidated(
         IrFactory factory,
         IrTerm root,
-        Dictionary<IrVarId, IrTerm> replacementMap)
+        ImmutableDictionary<IrVarId, IrTerm> replacementMap)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
@@ -110,7 +110,7 @@ public static class IrSubstitution
         // IReadOnlyList is a caller-owned view, not an immutable snapshot.
         // Validate and process the same materialized roots so a changing view
         // cannot substitute terms that were never checked for factory ownership.
-        var rootSnapshot = roots.ToArray();
+        var rootSnapshot = roots.ToImmutableArray();
         foreach (var root in rootSnapshot)
         {
             ArgumentNullGuard.NotNull(root, nameof(roots));
@@ -139,7 +139,7 @@ public static class IrSubstitution
         return result.MoveToImmutable();
     }
 
-    private static Dictionary<IrVarId, IrTerm> CreateReplacementMap(
+    private static ImmutableDictionary<IrVarId, IrTerm> CreateReplacementMap(
         IrFactory factory,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements)
     {
@@ -147,10 +147,18 @@ public static class IrSubstitution
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        var replacementMap = replacements.ToDictionary(
-            static pair => pair.Key,
-            static pair => pair.Value);
-        foreach (var replacement in replacementMap)
+        var replacementMap = ImmutableDictionary<IrVarId, IrTerm>.Empty;
+        var replacementOrder = ImmutableList<KeyValuePair<IrVarId, IrTerm>>.Empty;
+        foreach (var replacement in replacements)
+        {
+            if (replacementMap.ContainsKey(replacement.Key))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + replacement.Key);
+            }
+            replacementMap = replacementMap.Add(replacement.Key, replacement.Value);
+            replacementOrder = replacementOrder.Add(replacement);
+        }
+        foreach (var replacement in replacementOrder)
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             ArgumentNullGuard.NotNull(replacement.Value, nameof(replacements));
@@ -174,7 +182,7 @@ public static class IrSubstitution
     private static IrTerm Rewrite(
         IrFactory factory,
         IrTerm root,
-        Dictionary<IrVarId, IrTerm> replacements,
+        ImmutableDictionary<IrVarId, IrTerm> replacements,
         Dictionary<IrId, IrTerm> memo,
         ISet<IrVarId>? allowedVariables,
         out bool variablesValid,

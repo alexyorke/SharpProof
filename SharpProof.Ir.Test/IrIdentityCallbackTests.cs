@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -22,11 +23,12 @@ public sealed class IrIdentityCallbackTests
     {
         private bool _inserted;
         internal IrIdentityId InsertedIdentity { get; private set; }
-        internal List<(int, int)> Comparisons { get; } = (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : []);
+        internal ImmutableList<(int, int)> Comparisons { get; private set; } =
+            factory is null ? throw new System.ArgumentNullException(nameof(factory)) : ImmutableList<(int, int)>.Empty;
 
         public bool Equals(int left, int right)
         {
-            Comparisons.Add((left, right));
+            Comparisons = Comparisons.Add((left, right));
             if (!_inserted && right == 2)
             {
                 _inserted = true;

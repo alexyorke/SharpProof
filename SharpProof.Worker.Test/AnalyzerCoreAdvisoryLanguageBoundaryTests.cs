@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
 {
-    private static readonly string[] ExpectedIds = ["SP0027"];
+    private static readonly ImmutableArray<string> ExpectedIds = ["SP0027"];
 
     [TestCase(false)]
     [TestCase(true)]

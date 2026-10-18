@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -12,7 +13,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerOwnedMethodBodyGraphTests
 {
-    private static readonly string[] ExpectedOwnerNames = ["Root", "Helper"];
+    private static readonly ImmutableArray<string> ExpectedOwnerNames = ["Root", "Helper"];
     [TestCase("block")]
     [TestCase("expression")]
     [TestCase("partial-block")]

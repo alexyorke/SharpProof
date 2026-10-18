@@ -7,7 +7,7 @@ namespace SharpProof.Gates;
 
 internal static class CorpusSnapshotFormat
 {
-    private static readonly string[] Header =
+    private static readonly ImmutableArray<string> Header =
     [
         "# SharpProof analyzer corpus snapshot schema 3",
         "# case-id|verdict|semantic-outcome|sorted-diagnostics",
@@ -17,12 +17,12 @@ internal static class CorpusSnapshotFormat
     internal static string Render(IEnumerable<string> dataLines)
     {
         System.ArgumentNullException.ThrowIfNull(dataLines);
-        var lines = dataLines.ToArray();
+        var lines = dataLines.ToImmutableArray();
         ValidateCanonicalData(lines);
         return string.Join("\n", Header.Concat(lines)) + "\n";
     }
 
-    internal static string[] ReadDataLines(string path)
+    internal static ImmutableArray<string> ReadDataLines(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         return ParseDocument(File.ReadAllBytes(path)).DataLines;
@@ -35,7 +35,7 @@ internal static class CorpusSnapshotFormat
         return ParseDocument(File.ReadAllBytes(path)).Observations;
     }
 
-    internal static string[] Parse(byte[] bytes)
+    internal static ImmutableArray<string> Parse(byte[] bytes)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         return ParseDocument(bytes).DataLines;
@@ -81,19 +81,26 @@ internal static class CorpusSnapshotFormat
                 throw Invalid();
             }
         }
-        var data = lines.Skip(Header.Length).ToArray();
+        var data = lines.Skip(Header.Length).ToImmutableArray();
         return new ParsedSnapshot(data, ParseCanonicalData(data));
     }
 
-    private static void ValidateCanonicalData(string[] lines)
+    private static void ValidateCanonicalData(ImmutableArray<string> lines)
     {
-        System.ArgumentNullException.ThrowIfNull(lines, nameof(lines));
+        if (lines.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(lines));
+        }
         _ = ParseCanonicalData(lines);
     }
 
     private static ImmutableArray<CorpusObservation> ParseCanonicalData(
-        string[] lines)
+        ImmutableArray<string> lines)
     {
+        if (lines.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(lines));
+        }
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             lines.Length);
         string? previousCanonical = null;
@@ -172,10 +179,10 @@ internal static class CorpusSnapshotFormat
     }
 
     private sealed record ParsedSnapshot(
-        string[] DataLines,
+        ImmutableArray<string> DataLines,
         ImmutableArray<CorpusObservation> Observations)
     {
-        public string[] DataLines { get; init; } = DataLines ?? throw new System.ArgumentNullException(nameof(DataLines));
+        public ImmutableArray<string> DataLines { get; init; } = DataLines.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(DataLines)) : DataLines;
         public ImmutableArray<CorpusObservation> Observations { get; init; } = Observations.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Observations)) : Observations;
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,8 +15,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class FloatingEqualityEvaluationOrderAuditTests
 {
-    private static readonly ArgumentKind[] ExplicitArgumentKinds = [ArgumentKind.Explicit, ArgumentKind.Explicit];
-    private static readonly BinaryOperatorKind[] FloatingComparisonKinds = [BinaryOperatorKind.Equals, BinaryOperatorKind.NotEquals];
+    private static readonly ImmutableArray<ArgumentKind> ExplicitArgumentKinds = [ArgumentKind.Explicit, ArgumentKind.Explicit];
+    private static readonly ImmutableArray<BinaryOperatorKind> FloatingComparisonKinds = [BinaryOperatorKind.Equals, BinaryOperatorKind.NotEquals];
 
     private const string SourceTemplate = """
         #undef SHARPPROOF_CONTRACTS

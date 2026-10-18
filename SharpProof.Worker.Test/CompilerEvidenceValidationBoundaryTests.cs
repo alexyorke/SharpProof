@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerEvidenceValidationBoundaryTests
 {
-    private static readonly string[] ExpectedClaimIds = ["none", "argument", "effect"];
+    private static readonly ImmutableArray<string> ExpectedClaimIds = ["none", "argument", "effect"];
     [Test]
     public void ModuleEvidenceRequiresAnMvidBeforeMatchingLoadedAndFileIdentities()
     {

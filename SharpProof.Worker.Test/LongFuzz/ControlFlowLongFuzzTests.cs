@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -27,7 +28,7 @@ public sealed class ControlFlowLongFuzzTests
 
     // @@ is the nested body; %% marks a loop head, where the runtime copy
     // spends fuel so a nonterminating input stops instead of spinning.
-    private static readonly string[] s_wrappers =
+    private static readonly ImmutableArray<string> s_wrappers =
     [
         "try { @@ } finally { x++; }",
         "try { @@ } catch (System.DivideByZeroException) { x--; }",
@@ -72,7 +73,7 @@ public sealed class ControlFlowLongFuzzTests
     private const string BreakLeaf = "if (x == 3) break;";
     private const string ContinueLeaf = "if (x == 3) continue;";
 
-    private static readonly string[] s_leaves =
+    private static readonly ImmutableArray<string> s_leaves =
     [
         "x = 10 / x;",
         BreakLeaf,
@@ -104,7 +105,7 @@ public sealed class ControlFlowLongFuzzTests
 
     // Hand-written filter-versus-finally ordering cases: a filter observes
     // state before inner finally blocks run.
-    private static readonly string[] s_manual =
+    private static readonly ImmutableArray<string> s_manual =
     [
         "try { try { x = 1; throw new System.InvalidOperationException(); } finally { x = 2; } } catch (System.Exception) when (x == 2) { return 100; }",
         "try { try { x = 1; throw new System.InvalidOperationException(); } finally { x = 2; } } catch (System.Exception) when (x == 1) { return 100; }",
@@ -126,7 +127,7 @@ public sealed class ControlFlowLongFuzzTests
     // region, and the original disposable has no observable Dispose effect.
     // Every combination below is well-formed and runs on the full CLR input
     // grid, so cleanup order and exception precedence are exercised regularly.
-    private static readonly (string Name, string Body)[] s_cleanupScopes =
+    private static readonly ImmutableArray<(string Name, string Body)> s_cleanupScopes =
     [
         ("finally-write", "try { @@ } finally { State = x; }"),
         ("finally-throw", "try { @@ } finally { State = x; if (x == 2) throw new System.InvalidOperationException(); }"),
@@ -136,7 +137,7 @@ public sealed class ControlFlowLongFuzzTests
         ("using-statement", "using (var d = new ObservableDisposal(x, false)) { @@ }"),
     ];
 
-    private static readonly (string Name, string Body)[] s_cleanupExits =
+    private static readonly ImmutableArray<(string Name, string Body)> s_cleanupExits =
     [
         ("normal", "x += 1;"),
         ("return", "if (x == 0) return x; x += 1;"),
@@ -147,7 +148,7 @@ public sealed class ControlFlowLongFuzzTests
 
     // An outer filter runs before the inner using scope is unwound. The two
     // predicates give both a matching and a nonmatching catch on the grid.
-    private static readonly (string Name, string Body)[] s_disposalCases =
+    private static readonly ImmutableArray<(string Name, string Body)> s_disposalCases =
     [
         ("using-declaration-return", "{ using var d = new ObservableDisposal(x, false); if (x == 0) return x; x++; }"),
         ("using-nested-dispose-order", "{ using var first = new ObservableDisposal(1, false); using var second = new ObservableDisposal(x, false); x++; }"),
@@ -156,12 +157,12 @@ public sealed class ControlFlowLongFuzzTests
         ("filter-before-dispose-miss", "try { using (var d = new ObservableDisposal(2, false)) { State = 1; throw new System.InvalidOperationException(); } } catch (System.Exception) when (State == 2) { x = 5; }"),
     ];
 
-    private static readonly string[] s_modes =
+    private static readonly ImmutableArray<string> s_modes =
         ["dnt-int", "dnt-void", "dnt-long", "dnt-obj", "dnt-bool", "thr-int", "thr-eff", "pure-int", "ens-int"];
 
-    private static readonly string[] s_tails = [" Out: return x;", " return x;"];
+    private static readonly ImmutableArray<string> s_tails = [" Out: return x;", " return x;"];
 
-    private static readonly int[] s_inputs = [int.MinValue, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, int.MaxValue - 1, int.MaxValue];
+    private static readonly ImmutableArray<int> s_inputs = [int.MinValue, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, int.MaxValue - 1, int.MaxValue];
 
     private const string Prelude =
         "using SharpProof.Attributes; public sealed class D : System.IDisposable { public void Dispose() { } } " +

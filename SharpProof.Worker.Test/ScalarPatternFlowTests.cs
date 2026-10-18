@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -17,7 +18,7 @@ public sealed class ScalarPatternFlowTests
 {
     private const string Prelude = "using SharpProof.Attributes; public static class C { public static int State; ";
 
-    private static readonly int[] Inputs = [int.MinValue, int.MinValue + 1, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 97, 122, 123, int.MaxValue - 1, int.MaxValue];
+    private static readonly ImmutableArray<int> Inputs = [int.MinValue, int.MinValue + 1, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 97, 122, 123, int.MaxValue - 1, int.MaxValue];
 
     [TestCase("switch (x) { case 1: return 10 / (x - 1); case 2 when x > 0: return 9; default: return 2; }", WorkerClaimOutcome.Refuted)]
     [TestCase("switch (x) { case 1: return 10 / x; case 2 when x > 0: return 9; default: return 2; }", WorkerClaimOutcome.Proven)]

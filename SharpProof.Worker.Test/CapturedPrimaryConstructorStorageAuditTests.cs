@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -27,13 +28,13 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CapturedPrimaryConstructorStorageAuditTests
 {
-    private static readonly Dictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
 
-    private static readonly Case[] s_cases =
+    private static readonly ImmutableArray<Case> s_cases =
     [
         new("captured-simple-assignment",
             "using SharpProof.Attributes; public sealed class Counter(int value) { [EnforcePure] public void Reset() { value = 0; } public int Peek() => value; }",
@@ -507,7 +508,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableList<IlInstruction>.Empty;
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -525,7 +526,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 _ => 4
             };
             FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body, offset)) : null;
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
+            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
                 field?.MetadataToken, field?.Module.ModuleVersionId, field?.DeclaringType?.FullName, field?.Name));
             offset += size;
         }
@@ -593,7 +594,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+        private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))
@@ -618,10 +619,10 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, string Bytes, IlInstruction[] Instructions)
+    private sealed record IlObservation(int MethodToken, string Bytes, ImmutableArray<IlInstruction> Instructions)
     {
         public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
-        public IlInstruction[] Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record RuntimeObservation(int Before, int After, int? Returned, Guid LoadedMvid, Guid PeMvid,
         bool HasTypeInitializer, int StaticFieldCount, int InstanceFieldCount, string? FieldName, int? FieldToken,

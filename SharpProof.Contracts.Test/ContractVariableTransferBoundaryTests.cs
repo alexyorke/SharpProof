@@ -10,7 +10,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractVariableTransferBoundaryTests
 {
-    private static readonly bool[] BooleanValues = [false, true];
+    private static readonly ImmutableArray<bool> BooleanValues = [false, true];
     private const string SourceText = """
         using SharpProof.Attributes;
         public static class Frames {

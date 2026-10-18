@@ -20,7 +20,7 @@ internal sealed class EffectiveContractSourceResolver
         Compilation, EffectiveContractSourceResolver> Cache = new();
     private readonly ContractClauseInventoryBuilder _clauses;
     private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions;
-    private readonly IReadOnlyDictionary<INamedTypeSymbol,
+    private readonly ImmutableDictionary<INamedTypeSymbol,
         ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor>>
         _companionsByTarget;
     private readonly ConcurrentDictionary<

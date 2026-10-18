@@ -2006,7 +2006,7 @@ public sealed class FinalCompilationCollectorTests
         ReportDiagnostic reportDiagnostic)
         : SyntaxTreeOptionsProvider
     {
-        private string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
+        private readonly string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
         public override GeneratedKind IsGenerated(
             SyntaxTree tree,
             CancellationToken cancellationToken)

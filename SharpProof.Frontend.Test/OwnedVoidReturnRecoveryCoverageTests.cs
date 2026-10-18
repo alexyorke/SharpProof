@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,7 +14,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class OwnedVoidReturnRecoveryCoverageTests
 {
-    private static readonly string[] RecoveryErrorIds = ["CS0127"];
+    private static readonly ImmutableArray<string> RecoveryErrorIds = ["CS0127"];
 
     [TestCase("invalid-value", "return 1;", true)]
     [TestCase("bare-return", "return;", false)]

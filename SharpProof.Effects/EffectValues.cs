@@ -105,12 +105,12 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
 {
     private const int MembershipIndexThreshold = 4;
     private readonly ImmutableArray<INamedTypeSymbol> _types;
-    private readonly HashSet<INamedTypeSymbol>? _membership;
+    private readonly ImmutableHashSet<INamedTypeSymbol>? _membership;
 
     private EffectThrowSet(
         ImmutableArray<INamedTypeSymbol> types,
         bool includesUnknown,
-        HashSet<INamedTypeSymbol>? membership = null)
+        ImmutableHashSet<INamedTypeSymbol>? membership = null)
     {
 
         RepositoryParameterGuard.ThrowIfInvalid(types.IsDefault, nameof(types));
@@ -152,7 +152,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
                     EffectSymbolComparer<INamedTypeSymbol>.Instance)
             ],
             includesUnknown,
-            distinct.Count > MembershipIndexThreshold ? distinct : null);
+            distinct.Count > MembershipIndexThreshold ? distinct.ToImmutableHashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default) : null);
     }
 
     public bool Contains(INamedTypeSymbol type)

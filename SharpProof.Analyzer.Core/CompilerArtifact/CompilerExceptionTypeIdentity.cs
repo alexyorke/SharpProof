@@ -26,12 +26,12 @@ internal static class CompilerExceptionTypeIdentity
                 ":" + assembly))) + "]";
     }
 
-    internal static string[] EncodeHierarchy(INamedTypeSymbol? type)
+    internal static ImmutableArray<string> EncodeHierarchy(INamedTypeSymbol? type)
     {
-        var identities = new List<string>();
+        var identities = ImmutableList<string>.Empty;
         for (var current = type; current != null; current = current.BaseType)
         {
-            identities.Add(Encode(current));
+            identities = identities.Add(Encode(current));
         }
 
         return [.. identities.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)];

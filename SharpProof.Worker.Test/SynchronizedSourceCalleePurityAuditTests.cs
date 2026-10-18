@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -17,7 +18,7 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedSourceCalleePurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, 42];
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, 42];
     private const string SubjectTemplate = """
         using System.Runtime.CompilerServices;
         using SharpProof.Attributes;
@@ -110,7 +111,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (int)target.GetMethodImplementationFlags(),
                 target.IsStatic,
                 target.ReturnType == typeof(int),
-                target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                 Convert.ToHexStringLower(targetIl),
                 method.Name,
                 method.MetadataToken,
@@ -127,10 +128,10 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 method.IsStatic,
                 method.ReturnType == typeof(int),
-                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
+                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null,
-                s_inputValues.Select(execute).ToArray(),
+                s_inputValues.Select(execute).ToImmutableArray(),
                 Convert.ToHexStringLower(method.GetMethodBody()!.GetILAsByteArray()!),
                 subject.Module.ModuleVersionId.ToString("D"));
             await Save(evidenceDirectory, "runtime-observations.json", new
@@ -285,7 +286,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
     }
 
     private sealed record SourceCallObservation(string TargetName, int TargetMetadataToken, int TargetImplementationFlags,
-        bool TargetIsStatic, bool TargetReturnsInt32, string?[] TargetParameterTypes, string TargetIlHex,
+        bool TargetIsStatic, bool TargetReturnsInt32, ImmutableArray<string?> TargetParameterTypes, string TargetIlHex,
         string HelperName, int HelperMetadataToken, bool HelperIsPrivate, int CallMetadataToken,
         string CalledMethodName, string? CalledDeclaringType, int ResolvedMetadataToken, string ResolvedModuleVersionId)
     {
@@ -294,17 +295,17 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
         public string HelperName { get; init; } = HelperName ?? throw new System.ArgumentNullException(nameof(HelperName));
         public string CalledMethodName { get; init; } = CalledMethodName ?? throw new System.ArgumentNullException(nameof(CalledMethodName));
         public string ResolvedModuleVersionId { get; init; } = ResolvedModuleVersionId ?? throw new System.ArgumentNullException(nameof(ResolvedModuleVersionId));
-        public string?[] TargetParameterTypes { get; init; } = TargetParameterTypes ?? throw new System.ArgumentNullException(nameof(TargetParameterTypes));
+        public ImmutableArray<string?> TargetParameterTypes { get; init; } = TargetParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(TargetParameterTypes)) : TargetParameterTypes;
     }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
-        bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+        bool Synchronized, bool IsStatic, bool ReturnsInt32, ImmutableArray<string?> ParameterTypes, int FieldCount,
+        bool HasTypeInitializer, ImmutableArray<int> ReturnValues, string IlHex, string ModuleVersionId)
     {
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
         public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
-        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
-        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+        public ImmutableArray<string?> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
+        public ImmutableArray<int> ReturnValues { get; init; } = ReturnValues.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ReturnValues)) : ReturnValues;
     }
 }

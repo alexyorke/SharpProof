@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.VisualBasic;
 using NUnit.Framework;
@@ -7,7 +8,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ForeignSyntaxTreeSymbolHelperCoverageTests
 {
-    private static readonly KeyValuePair<string, object>[] DefinedSymbols =
+    private static readonly ImmutableArray<KeyValuePair<string, object>> DefinedSymbols =
         [new(ContractApiCatalog.ConditionalSymbol, true)];
 
     [Test]

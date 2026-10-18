@@ -11,15 +11,15 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractInvocationMaterializationExtendedMatrixTests
 {
-    private static readonly bool[] BooleanValues = [false, true];
-    private static readonly BoundContractKind[] BooleanClauseKinds =
+    private static readonly ImmutableArray<bool> BooleanValues = [false, true];
+    private static readonly ImmutableArray<BoundContractKind> BooleanClauseKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Assume,
         BoundContractKind.Ensures
     ];
-    private static readonly BoundContractKind[] RequiresOnlyKinds = [BoundContractKind.Requires];
-    private static readonly BoundContractKind[] CompanionClauseKinds =
+    private static readonly ImmutableArray<BoundContractKind> RequiresOnlyKinds = [BoundContractKind.Requires];
+    private static readonly ImmutableArray<BoundContractKind> CompanionClauseKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Ensures

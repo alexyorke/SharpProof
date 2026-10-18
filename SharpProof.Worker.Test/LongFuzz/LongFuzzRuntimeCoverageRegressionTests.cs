@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -11,8 +12,8 @@ namespace SharpProof.Worker.Test.LongFuzz;
 [TestFixture]
 public sealed class LongFuzzRuntimeCoverageRegressionTests
 {
-    private static readonly int[] SingleItem = [0];
-    private static readonly bool[] ClaimValidity = [false, true];
+    private static readonly ImmutableArray<int> SingleItem = [0];
+    private static readonly ImmutableArray<bool> ClaimValidity = [false, true];
 
     [TestCase(0, false, "==", 0)]
     [TestCase(1, true, "==", 1)]

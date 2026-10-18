@@ -15,13 +15,13 @@ internal static class CompilerReferenceLimits
     internal const int MaximumModuleCount = 4096;
 }
 
-internal sealed class CompilerCompilationSnapshot
+internal sealed record CompilerCompilationSnapshot
 {
     public string ProjectDirectory { get; set; } = string.Empty;
     [JsonIgnore]
-    public string AssemblyName { get; set; } = string.Empty;
+    public string AssemblyName { get; init; } = string.Empty;
     [JsonIgnore]
-    public string AssemblyIdentity { get; set; } = string.Empty;
+    public string AssemblyIdentity { get; init; } = string.Empty;
     [JsonIgnore]
     public string TargetFramework { get; set; } = string.Empty;
     [JsonIgnore]
@@ -29,7 +29,7 @@ internal sealed class CompilerCompilationSnapshot
     [JsonIgnore]
     public string CompilerMvid { get; set; } = string.Empty;
     [JsonIgnore]
-    public string CSharpCompilerVersion { get; set; } = string.Empty;
+    public string CSharpCompilerVersion { get; init; } = string.Empty;
     [JsonIgnore]
     public string CSharpCompilerMvid { get; set; } = string.Empty;
     [JsonIgnore]
@@ -43,7 +43,7 @@ internal sealed class CompilerCompilationSnapshot
     [JsonIgnore]
     public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
     [JsonIgnore]
-    public CompilerReferenceSnapshot[] References { get; set; } = [];
+    public CompilerReferenceSnapshot[] References { get; init; } = [];
     [JsonIgnore]
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
 }
@@ -60,29 +60,29 @@ internal enum CompilerReportDiagnostic
 
 internal sealed class CompilerCompilationOptionsSnapshot
 {
-    public CompilerOutputKind OutputKind { get; set; }
-    public string MainTypeName { get; set; } = string.Empty;
-    public CompilerOptimizationLevel OptimizationLevel { get; set; }
-    public CompilerPlatform Platform { get; set; }
-    public CompilerNullableContext NullableContext { get; set; }
-    public CompilerMetadataImportOptions MetadataImportOptions { get; set; }
-    public int WarningLevel { get; set; }
-    public CompilerReportDiagnostic GeneralDiagnosticOption { get; set; }
-    public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; set; } = [];
-    public bool ReportSuppressedDiagnostics { get; set; }
-    public bool CheckOverflow { get; set; }
-    public bool AllowUnsafe { get; set; }
-    public bool Deterministic { get; set; }
-    public bool ReferencesSupersedeLowerVersions { get; set; }
-    public CompilerAssemblyIdentityComparer AssemblyIdentityComparer { get; set; }
-    public string[] Usings { get; set; } = [];
-    public CompilerResolverPolicy ResolverPolicy { get; set; }
+    public CompilerOutputKind OutputKind { get; init; }
+    public string MainTypeName { get; init; } = string.Empty;
+    public CompilerOptimizationLevel OptimizationLevel { get; init; }
+    public CompilerPlatform Platform { get; init; }
+    public CompilerNullableContext NullableContext { get; init; }
+    public CompilerMetadataImportOptions MetadataImportOptions { get; init; }
+    public int WarningLevel { get; init; }
+    public CompilerReportDiagnostic GeneralDiagnosticOption { get; init; }
+    public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; init; } = [];
+    public bool ReportSuppressedDiagnostics { get; init; }
+    public bool CheckOverflow { get; init; }
+    public bool AllowUnsafe { get; init; }
+    public bool Deterministic { get; init; }
+    public bool ReferencesSupersedeLowerVersions { get; init; }
+    public CompilerAssemblyIdentityComparer AssemblyIdentityComparer { get; init; }
+    public string[] Usings { get; init; } = [];
+    public CompilerResolverPolicy ResolverPolicy { get; init; }
 }
 
 internal sealed class CompilerDiagnosticOptionSnapshot
 {
     public string Id { get; set; } = string.Empty;
-    public CompilerReportDiagnostic ReportDiagnostic { get; set; }
+    public CompilerReportDiagnostic ReportDiagnostic { get; init; }
 }
 
 internal sealed class CompilerSourceLineMapEntry
@@ -99,26 +99,26 @@ internal sealed class CompilerSyntaxTreeSnapshot
 {
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
-    public string Encoding { get; set; } = string.Empty;
-    public string ChecksumAlgorithm { get; set; } = string.Empty;
-    public string RoslynChecksum { get; set; } = string.Empty;
-    public string LineMapSha256 { get; set; } = string.Empty;
-    public int TextLength { get; set; }
+    public string Encoding { get; init; } = string.Empty;
+    public string ChecksumAlgorithm { get; init; } = string.Empty;
+    public string RoslynChecksum { get; init; } = string.Empty;
+    public string LineMapSha256 { get; init; } = string.Empty;
+    public int TextLength { get; init; }
     public CompilerSourceLineMapEntry[] LineMap { get; set; } = [];
-    public string LanguageVersion { get; set; } = string.Empty;
-    public string DocumentationMode { get; set; } = string.Empty;
+    public string LanguageVersion { get; init; } = string.Empty;
+    public string DocumentationMode { get; init; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
-    public string[] PreprocessorSymbols { get; set; } = [];
-    public string[] EffectivePreprocessorSymbols { get; set; } = [];
+    public string[] PreprocessorSymbols { get; init; } = [];
+    public string[] EffectivePreprocessorSymbols { get; init; } = [];
     public CompilerFeatureSnapshot[] Features { get; set; } = [];
 }
 
 internal sealed class CompilerReferenceSnapshot
 {
     public string Kind { get; set; } = string.Empty;
-    public bool EmbedInteropTypes { get; set; }
-    public bool HasRecursiveAliases { get; set; }
-    public string[] Aliases { get; set; } = [];
+    public bool EmbedInteropTypes { get; init; }
+    public bool HasRecursiveAliases { get; init; }
+    public string[] Aliases { get; init; } = [];
     public string Identity { get; set; } = string.Empty;
     public CompilerReferenceModuleSnapshot[] Modules { get; set; } = [];
 }
@@ -126,10 +126,10 @@ internal sealed class CompilerReferenceSnapshot
 internal sealed class CompilerReferenceModuleSnapshot
 {
     public string Name { get; set; } = string.Empty;
-    public string Mvid { get; set; } = string.Empty;
+    public string Mvid { get; init; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
-    public long SizeBytes { get; set; }
+    public long SizeBytes { get; init; }
 }
 
 internal sealed class CompilerAdditionalFileSnapshot
@@ -140,6 +140,6 @@ internal sealed class CompilerAdditionalFileSnapshot
 
 internal sealed class CompilerFeatureSnapshot
 {
-    public string Key { get; set; } = string.Empty;
+    public string Key { get; init; } = string.Empty;
     public string Value { get; set; } = string.Empty;
 }

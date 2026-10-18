@@ -10,7 +10,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ConditionalMetadataSymbolReaderTests
 {
-    private static readonly string[] ExpectedSymbols = ["existing", "FIRST", "SECOND", "FIRST"];
+    private static readonly ImmutableArray<string> ExpectedSymbols = ["existing", "FIRST", "SECOND", "FIRST"];
 
     [Test]
     public void CompiledConditionalAttributesAppendSymbolsInMetadataOrder()

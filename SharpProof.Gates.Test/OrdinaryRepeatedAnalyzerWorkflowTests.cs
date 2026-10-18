@@ -38,7 +38,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
     private sealed class RecordingFactory(CSharpCompilation compilation)
         : AnalyzerSessionFactoryBase<MethodOutcomeKey>(MethodOutcomeKeyComparer.Instance)
     {
-        private CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
+        private readonly CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
         internal int RecordCount { get; private set; }
 
         internal AnalyzerSemanticOutcome[] Snapshot()

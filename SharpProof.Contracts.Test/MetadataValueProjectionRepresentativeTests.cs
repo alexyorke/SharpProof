@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -9,9 +10,9 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class MetadataValueProjectionRepresentativeTests
 {
-    private static readonly string[] SingleAttributeNames = ["PositiveAttribute", "InRangeAttribute"];
-    private static readonly int[] SingleParameterOrdinals = [0, 0];
-    private static readonly int[] PairParameterOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> SingleAttributeNames = ["PositiveAttribute", "InRangeAttribute"];
+    private static readonly ImmutableArray<int> SingleParameterOrdinals = [0, 0];
+    private static readonly ImmutableArray<int> PairParameterOrdinals = [0, 1];
 
     [Test]
     public void RealMetadataAnnotationsRetainFacadeOrderAndIndependentPredicateTruth()

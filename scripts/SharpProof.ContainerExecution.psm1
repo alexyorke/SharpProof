@@ -478,31 +478,48 @@ function Get-SharpProofCpuBudget {
         1, [Math]::Floor($visibleProcessors * $percent / 100.0))
 }
 
-$script:SharpProofParallelismPolicies = @{
-    'test-project' = @{
-        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-        DivisorProperty   = 'testProjectCpuDivisor'
-        InvalidMessage    = 'The test-project CPU divisor must be positive.'
+function ConvertTo-SharpProofImmutablePolicy {
+    param([Parameter(Mandatory = $true)][hashtable]$Values)
+    $result = [System.Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in $Values.GetEnumerator()) {
+        $immutableValue = if ($entry.Value -is [hashtable]) {
+            ConvertTo-SharpProofImmutablePolicy -Values $entry.Value
+        }
+        elseif ($entry.Value -is [array]) {
+            , ([System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$entry.Value))
+        }
+        else { $entry.Value }
+        $result = $result.Add([string]$entry.Key, $immutableValue)
     }
-    semantic       = @{
-        OverrideVariables = @(
-            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
-            'SHARPPROOF_TEST_PROJECT_PARALLELISM')
-        AllVisible        = $true
-    }
-    package        = @{
-        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-        PercentProperty   = 'packageTestCpuPercent'
-        InvalidMessage    =
-        'The package-test CPU percentage must be between 1 and 100.'
-    }
-    build          = @{
-        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
-        PercentProperty   = 'buildCpuPercent'
-        InvalidMessage    =
-        'The build CPU percentage must be between 1 and 100.'
-    }
+    return , $result
 }
+
+New-Variable -Scope Script -Name SharpProofParallelismPolicies -Option Constant -Value (
+    ConvertTo-SharpProofImmutablePolicy -Values @{
+        'test-project' = @{
+            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+            DivisorProperty   = 'testProjectCpuDivisor'
+            InvalidMessage    = 'The test-project CPU divisor must be positive.'
+        }
+        semantic       = @{
+            OverrideVariables = @(
+                'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+                'SHARPPROOF_TEST_PROJECT_PARALLELISM')
+            AllVisible        = $true
+        }
+        package        = @{
+            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+            PercentProperty   = 'packageTestCpuPercent'
+            InvalidMessage    =
+            'The package-test CPU percentage must be between 1 and 100.'
+        }
+        build          = @{
+            OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+            PercentProperty   = 'buildCpuPercent'
+            InvalidMessage    =
+            'The build CPU percentage must be between 1 and 100.'
+        }
+    })
 
 function Get-SharpProofConfiguredParallelism {
     param(

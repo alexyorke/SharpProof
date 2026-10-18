@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -16,7 +17,7 @@ public sealed class ConcatenationIdentityCastAllocationTests
     private const string Empty = "(x == 0 ? \"\" : \"\")";
     private const string Letter = "(x == 0 ? \"a\" : \"b\")";
 
-    private static readonly string[] s_spliced =
+    private static readonly ImmutableArray<string> s_spliced =
     [
         "return (" + Letter + " + (string)(" + Empty + " + " + Empty + ") + " + Empty + " + " + Empty + ").Length;",
         "return ((string)(" + Letter + " + " + Empty + ") + " + Empty + " + " + Empty + " + " + Empty + ").Length;",
@@ -26,7 +27,7 @@ public sealed class ConcatenationIdentityCastAllocationTests
         "string a = " + Letter + "; string e = " + Empty + "; return ((string)(a + e) + (x == 5 ? e : e) + e + e).Length;"
     ];
 
-    private static readonly string[] s_separate =
+    private static readonly ImmutableArray<string> s_separate =
     [
         "return (" + Letter + " + (string)(" + Empty + " + " + Empty + ") + " + Empty + ").Length;",
         "string t = (string)(" + Empty + " + " + Empty + "); return (" + Letter + " + t + " + Empty + " + " + Empty + ").Length;",

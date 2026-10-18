@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,8 +15,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataInvocationBindingInvariantTests
 {
-    private static readonly int[] ExpectedOrdinals = [0, 1];
-    private static readonly string[] ExpectedRecoveryDiagnostics = ["CS1739"];
+    private static readonly ImmutableArray<int> ExpectedOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> ExpectedRecoveryDiagnostics = ["CS1739"];
 
     [TestCase("Library.Target(value, 7)", ArgumentKind.Explicit)]
     [TestCase("Library.Target(right: 7, left: value)", ArgumentKind.Explicit)]

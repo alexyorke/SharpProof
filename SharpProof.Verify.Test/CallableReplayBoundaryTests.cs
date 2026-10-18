@@ -190,7 +190,7 @@ public sealed class CallableReplayBoundaryTests
 
     private sealed class ModelBackend(BackendModel model) : ISmtBackend
     {
-        private BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
+        private readonly BackendModel _guarded_model = model ?? throw new System.ArgumentNullException(nameof(model));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query,
             CancellationToken cancellationToken)
         {

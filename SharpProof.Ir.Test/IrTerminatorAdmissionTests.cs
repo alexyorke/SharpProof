@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -5,7 +6,7 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrTerminatorAdmissionTests
 {
-    private static readonly IrInstructionKind[] s_terminalKinds =
+    private static readonly ImmutableArray<IrInstructionKind> s_terminalKinds =
     [
         IrInstructionKind.Branch, IrInstructionKind.Goto, IrInstructionKind.Throw,
         IrInstructionKind.Return, IrInstructionKind.ExceptionalExit

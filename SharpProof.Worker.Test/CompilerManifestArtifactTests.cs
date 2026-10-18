@@ -30,6 +30,99 @@ public sealed class CompilerManifestArtifactTests
         """;
 
     [Test]
+    public void SerializationCanonicalizesCopiesWithoutRewritingProducerCollections()
+    {
+        var artifact = CreateContractArtifact(
+            "using SharpProof.Attributes; internal static class Subject { " +
+            "internal static int B(int value) { Contract.Requires(value > 0); " +
+            "Contract.Ensures(Contract.Result<int>() == value); return value; } " +
+            "internal static int A(int value) { Contract.Requires(value > 0); " +
+            "Contract.Ensures(Contract.Result<int>() == value); return value; } }");
+        var canonical = CompilerManifestArtifactJson.Serialize(artifact, TestContext.CurrentContext.CancellationToken);
+        artifact.Callables = artifact.Callables.Reverse().ToArray();
+        artifact.Manifest.Callables = artifact.Manifest.Callables.Reverse().ToArray();
+        artifact.Manifest.Claims = artifact.Manifest.Claims.Reverse().ToArray();
+        foreach (var callable in artifact.Manifest.Callables)
+        {
+            callable.SelectedFeatures = callable.SelectedFeatures.Reverse().ToArray();
+            callable.SelectionReasons = callable.SelectionReasons.Reverse().ToArray();
+            callable.ClaimIds = callable.ClaimIds.Reverse().ToArray();
+            callable.Assumptions = callable.Assumptions.Reverse().ToArray();
+        }
+        var manifest = artifact.Manifest;
+        var payloads = artifact.Callables;
+        var entries = manifest.Callables;
+        var claims = manifest.Claims;
+        var collections = entries.Select(static entry =>
+            entry is null ? throw new ArgumentNullException(nameof(entry)) :
+                (Entry: entry, entry.SelectedFeatures, entry.SelectionReasons, entry.ClaimIds, entry.Assumptions)).ToImmutableArray();
+        var before = JsonSerializer.Serialize(artifact, WorkerProtocolJson.SharedOptions);
+
+        var actual = CompilerManifestArtifactJson.Serialize(artifact, TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(actual, Is.EqualTo(canonical));
+            Assert.That(JsonSerializer.Serialize(artifact, WorkerProtocolJson.SharedOptions), Is.EqualTo(before));
+            Assert.That(artifact.Manifest, Is.SameAs(manifest));
+            Assert.That(artifact.Callables, Is.SameAs(payloads));
+            Assert.That(manifest.Callables, Is.SameAs(entries));
+            Assert.That(manifest.Claims, Is.SameAs(claims));
+            foreach (var collection in collections)
+            {
+                Assert.That(collection.Entry.SelectedFeatures, Is.SameAs(collection.SelectedFeatures));
+                Assert.That(collection.Entry.SelectionReasons, Is.SameAs(collection.SelectionReasons));
+                Assert.That(collection.Entry.ClaimIds, Is.SameAs(collection.ClaimIds));
+                Assert.That(collection.Entry.Assumptions, Is.SameAs(collection.Assumptions));
+            }
+        }
+    }
+
+    [Test]
+    public void CallableDecodingCapturesAuthorityWithoutRewritingCompilation()
+    {
+        var artifact = CreateContractArtifact();
+        var compilation = artifact.Compilation;
+        compilation.SpecificationPackIds = ["producer-sentinel"];
+        compilation.SpecificationPackCatalogVersion = -1;
+        compilation.SpecificationPackCatalogSha256 = "producer-sentinel";
+        var originalIds = compilation.SpecificationPackIds;
+
+        var prepared = CompilerManifestArtifactJson.DecodeCallables(artifact, TestContext.CurrentContext.CancellationToken).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Compilation, Is.SameAs(compilation));
+            Assert.That(compilation.SpecificationPackIds, Is.SameAs(originalIds));
+            Assert.That(compilation.SpecificationPackIds, Has.Length.EqualTo(1));
+            Assert.That(compilation.SpecificationPackIds[0], Is.EqualTo("producer-sentinel"));
+            Assert.That(compilation.SpecificationPackCatalogVersion, Is.EqualTo(-1));
+            Assert.That(compilation.SpecificationPackCatalogSha256, Is.EqualTo("producer-sentinel"));
+            Assert.That(prepared.Compilation, Is.Not.SameAs(compilation));
+            Assert.That(prepared.Compilation.SpecificationPackIds, Is.EqualTo(artifact.SpecificationPackIds));
+            Assert.That(prepared.Compilation.SpecificationPackCatalogVersion, Is.EqualTo(artifact.SpecificationPackCatalogVersion));
+            Assert.That(prepared.Compilation.SpecificationPackCatalogSha256, Is.EqualTo(artifact.SpecificationPackCatalogSha256));
+        }
+    }
+
+    [Test]
+    public void DeserializationPreservesHydratedCompilationAuthority()
+    {
+        var artifact = CreateContractArtifact();
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken);
+
+        var decoded = CompilerManifestArtifactJson.DeserializePrepared(json, out var prepared, TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(decoded.Compilation.SpecificationPackIds, Is.EqualTo(decoded.SpecificationPackIds));
+            Assert.That(decoded.Compilation.SpecificationPackCatalogVersion, Is.EqualTo(decoded.SpecificationPackCatalogVersion));
+            Assert.That(decoded.Compilation.SpecificationPackCatalogSha256, Is.EqualTo(decoded.SpecificationPackCatalogSha256));
+            Assert.That(prepared.Single().Compilation, Is.SameAs(decoded.Compilation));
+        }
+    }
+
+    [Test]
     public void CompilerManifestCasesUseBoundedParallelism()
     {
         var fixtureAttribute = typeof(CompilerManifestArtifactTests)
@@ -960,8 +1053,9 @@ public sealed class CompilerManifestArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         var tree = artifact.Compilation.SyntaxTrees.Single();
-        foreach (var diagnostic in artifact.CompilerDiagnostics)
+        for (var index = 0; index < artifact.CompilerDiagnostics.Length; index++)
         {
+            var diagnostic = artifact.CompilerDiagnostics[index];
             var mappedLine = diagnostic.Location.Line - 1;
             var mappedColumn = diagnostic.Location.Column - 1;
             var entry = tree.LineMap.LastOrDefault(item =>
@@ -972,10 +1066,13 @@ public sealed class CompilerManifestArtifactTests
             diagnostic.Location.Path = entry!.MappedPath;
             diagnostic.Location.Start = entry.SourceStart +
                 mappedColumn - entry.MappedColumn;
-            diagnostic.SourceTreeOrdinal = 0;
-            diagnostic.SourceTreePath = tree.Path;
-            diagnostic.SourceTreeSha256 = tree.Sha256;
-            diagnostic.SourceLineMapSha256 = tree.LineMapSha256;
+            artifact.CompilerDiagnostics[index] = diagnostic with
+            {
+                SourceTreeOrdinal = 0,
+                SourceTreePath = tree.Path,
+                SourceTreeSha256 = tree.Sha256,
+                SourceLineMapSha256 = tree.LineMapSha256
+            };
         }
     }
 

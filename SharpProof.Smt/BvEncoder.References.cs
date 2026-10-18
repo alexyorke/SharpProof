@@ -7,7 +7,13 @@ internal sealed partial class BvEncoder
     private Expr? _nullReference;
     private readonly Dictionary<IrTypeId, Expr> _emptyArrays = [];
     private readonly Dictionary<IrStringId, Expr> _stringLiterals = [];
-    internal List<BoolExpr> ReferenceFacts { get; } = [];
+    internal ImmutableList<BoolExpr> ReferenceFacts { get; private set; } = ImmutableList<BoolExpr>.Empty;
+
+    private void AddReferenceFact(BoolExpr fact)
+    {
+        fact = RepositoryParameterGuard.NotNull(fact, nameof(fact));
+        ReferenceFacts = ReferenceFacts.Add(fact);
+    }
 
     // Witness lengths are charged when decoded. Prefer small string/array
     // models without restricting the unbounded query used for proofs.
@@ -36,8 +42,8 @@ internal sealed partial class BvEncoder
         if (_stringLiterals.TryGetValue(term.Value, out var existing))
         { return existing; }
         var value = owner.Own(context.MkConst("text" + term.Value.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
-        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
-        ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter),
+        AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter),
             owner.Own(context.MkBV(factory.GetString(term.Value).Length, 32)))));
         foreach (var literal in _stringLiterals.Values.Concat(_emptyArrays.Values))
         {
@@ -61,7 +67,7 @@ internal sealed partial class BvEncoder
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("concat" + term.Id.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
-        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         var empty = EncodeStringLiteral(factory.String(""), meter);
         RegisterConcatenation(value, left, right, meter);
         var leftEmpty = owner.Own(context.MkEq(EncodeLength(left, meter), owner.Own(context.MkBV(0, 32))));
@@ -77,8 +83,8 @@ internal sealed partial class BvEncoder
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
-        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
-        ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
+        AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
+        AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
         foreach (var previous in _emptyArrays)
         {
             meter.Consume();
@@ -110,7 +116,7 @@ internal sealed partial class BvEncoder
     {
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(left, right)))));
+        AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(left, right)))));
     }
 
     private Sort ReferenceSort => _referenceSort ??= context.MkUninterpretedSort("Ref");

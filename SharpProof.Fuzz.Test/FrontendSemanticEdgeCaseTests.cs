@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -8,8 +9,8 @@ namespace SharpProof.Fuzz.Test;
 [TestFixture]
 public sealed class FrontendSemanticEdgeCaseTests
 {
-    private static readonly long[] SequenceValue = [1L, 2L];
-    private static readonly ulong[] UnsupportedSequenceValue = [1UL];
+    private static readonly ImmutableArray<long> SequenceValue = [1L, 2L];
+    private static readonly ImmutableArray<ulong> UnsupportedSequenceValue = [1UL];
     private static readonly Array MultidimensionalSequenceValue =
         Array.CreateInstance(typeof(long), 2, 3);
 
@@ -29,13 +30,13 @@ public sealed class FrontendSemanticEdgeCaseTests
             Exact("long", "uint value", "(long)value", uint.MaxValue),
             Exact("long", "", "checked((int)3L)"),
             Exact("object?", "object? value", "value", new object()),
-            Exact("long[]", "long[] value", "value", SequenceValue),
+            Exact("long[]", "long[] value", "value", SequenceValue.ToArray()),
             Closed(
                 "ulong",
                 "ulong[] value",
                 "value[0]",
                 FrontendAbstention.UnsupportedType,
-                UnsupportedSequenceValue),
+                UnsupportedSequenceValue.ToArray()),
             Exact("string?", "object? value", "(string)value", (object?)null),
             Exact("string?", "object? value", "(string)value", "proof"),
             Exact("string?", "object? value", "(string)value", new object()),
@@ -247,8 +248,8 @@ public sealed class FrontendSemanticEdgeCaseTests
         long[] first,
         long[] second) : IReadOnlyList<object?>
     {
-        private long[] _guarded_second = second ?? throw new System.ArgumentNullException(nameof(second));
-        private long[] _guarded_first = first ?? throw new System.ArgumentNullException(nameof(first));
+        private readonly long[] _guarded_second = second ?? throw new System.ArgumentNullException(nameof(second));
+        private readonly long[] _guarded_first = first ?? throw new System.ArgumentNullException(nameof(first));
         public int Count => 2;
 
         public object this[int index] => index switch

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -551,6 +552,25 @@ public sealed class IrKernelTests
                 IrBinaryOperator.Add,
                 factory.Variable(second),
                 factory.Integer(1))));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SubstitutionRejectsRepeatedKeysEvenWithIdenticalReplacementTerms(bool many)
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var root = factory.Variable(variable);
+        var replacements = new RepeatedReplacementMap(variable, factory.Integer(7));
+
+        if (many)
+        {
+            Assert.Throws<ArgumentException>((Action)(() => IrSubstitution.SubstituteMany(factory, [root], replacements)));
+        }
+        else
+        {
+            Assert.Throws<ArgumentException>((Action)(() => IrSubstitution.Substitute(factory, root, replacements)));
+        }
     }
 
     [TestCase(false)]
@@ -1443,6 +1463,42 @@ public sealed class IrKernelTests
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(33L));
+    }
+
+    private sealed class RepeatedReplacementMap : IReadOnlyDictionary<IrVarId, IrTerm>
+    {
+        private readonly ImmutableDictionary<IrVarId, IrTerm> _values;
+
+        public RepeatedReplacementMap(IrVarId variable, IrTerm replacement)
+        {
+            ArgumentNullException.ThrowIfNull(replacement);
+            if (variable.IsDefault)
+            {
+                throw new ArgumentException("Variable must be initialized.", nameof(variable));
+            }
+            _values = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(variable, replacement);
+        }
+
+        public int Count => 2;
+        public IEnumerable<IrVarId> Keys => _values.Keys.Concat(_values.Keys);
+        public IEnumerable<IrTerm> Values => _values.Values.Concat(_values.Values);
+        public IrTerm this[IrVarId /* SPINT001: all values valid - absent keys retain dictionary lookup behavior */ key] => _values[key];
+        public bool ContainsKey(IrVarId /* SPINT001: all values valid - absent keys return false */ key)
+        {
+            return _values.ContainsKey(key);
+        }
+        public bool TryGetValue(IrVarId /* SPINT001: all values valid - absent keys return false */ key, out IrTerm value)
+        {
+            return _values.TryGetValue(key, out value!);
+        }
+        public IEnumerator<KeyValuePair<IrVarId, IrTerm>> GetEnumerator()
+        {
+            return _values.Concat(_values).GetEnumerator();
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     private sealed class ChangingIrTermList : IReadOnlyList<IrTerm>

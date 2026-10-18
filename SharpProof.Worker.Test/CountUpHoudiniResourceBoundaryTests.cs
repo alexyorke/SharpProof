@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -122,7 +123,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
 
     private const uint BoundaryMethodRlimit = 3_096_189;
 
-    private static readonly int[] RuntimeInputs = [0, 1, 2, 4, 16];
+    private static readonly ImmutableArray<int> RuntimeInputs = [0, 1, 2, 4, 16];
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     [Test]
@@ -217,7 +218,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                         frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.GetMethod()?.DeclaringType == typeof(MethodResourceBudget) ||
                         frame.GetMethod()?.DeclaringType?.FullName?.StartsWith(typeof(PassiveCallableSolver).FullName!, StringComparison.Ordinal) == true))
                         .Select(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (new CallFrame(frame.GetMethod()?.DeclaringType?.FullName,
-                            frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToArray();
+                            frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToImmutableArray();
                     budgetReads.Add(new(actual, recorder.Started,
                         frames.Any(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "TryStartQuery")) ||
                         frames.Any(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" &&
@@ -363,27 +364,27 @@ public sealed class CountUpHoudiniResourceBoundaryTests
     }
 
     private sealed record BudgetRead(long Actual, int CompletedNativeQueries,
-        bool InTryStartQuery, bool InCombinedRecheck, CallFrame[] Frames)
+        bool InTryStartQuery, bool InCombinedRecheck, ImmutableArray<CallFrame> Frames)
     {
-        public CallFrame[] Frames { get; init; } = Frames ?? throw new System.ArgumentNullException(nameof(Frames));
+        public ImmutableArray<CallFrame> Frames { get; init; } = Frames.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Frames)) : Frames;
     }
 
     private sealed record CallFrame(string? Type, string? Method, string? File, int Line);
 
     private sealed record QueryRecord(int Ordinal, string Diagnostic, int Location, int AssumptionCount,
         int ModelVariableCount, long Before, long After, long RelativeBefore, long RelativeAfter,
-        long Delta, string? Status, string? Reason, int[]? UnsatCore, bool? HasModel,
-        string? FailureType, CallFrame[] Frames)
+        long Delta, string? Status, string? Reason, ImmutableArray<int>? UnsatCore, bool? HasModel,
+        string? FailureType, ImmutableArray<CallFrame> Frames)
     {
         public string Diagnostic { get; init; } = Diagnostic ?? throw new System.ArgumentNullException(nameof(Diagnostic));
-        public CallFrame[] Frames { get; init; } = Frames ?? throw new System.ArgumentNullException(nameof(Frames));
+        public ImmutableArray<CallFrame> Frames { get; init; } = Frames.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Frames)) : Frames;
     }
 
     // No manufactured BackendCheckResult: exactly one real call, exact returned object.
     private sealed class RecordingNativeBackend(CallableSolverSession session, long baseline, QueryRecords records) : ISmtBackend
     {
-        private QueryRecords _guarded_records = records ?? throw new System.ArgumentNullException(nameof(records));
-        private CallableSolverSession _guarded_session = baseline < 0 ? throw new ArgumentOutOfRangeException(nameof(baseline)) : session ?? throw new System.ArgumentNullException(nameof(session));
+        private readonly QueryRecords _guarded_records = records ?? throw new System.ArgumentNullException(nameof(records));
+        private readonly CallableSolverSession _guarded_session = baseline < 0 ? throw new ArgumentOutOfRangeException(nameof(baseline)) : session ?? throw new System.ArgumentNullException(nameof(session));
         public async Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
             var ordinal = _guarded_records.Started++;
@@ -392,7 +393,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 ? new StackTrace(true).GetFrames().Where(frame =>
                     frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (frame.GetMethod()?.DeclaringType?.FullName?.StartsWith(typeof(PassiveCallableSolver).FullName!, StringComparison.Ordinal) == true))
                     .Select(frame => frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (new CallFrame(frame.GetMethod()?.DeclaringType?.FullName,
-                        frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToArray()
+                        frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber()))).ToImmutableArray()
                 : [];
             BackendCheckResult? result = null;
             string? failureType = null;
@@ -416,7 +417,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                     _guarded_records.Values.Add(new QueryRecord(ordinal, query.Goal.Diagnostic.ToString(), query.Goal.Location.Value,
                         query.Assumptions.Length, query.ModelVariables.Length, before, after, checked(before - baseline),
                         checked(after - baseline), delta, result?.Status.ToString(), result?.FailureReason.ToString(),
-                        result?.UnsatCore.ToArray(), result == null ? null : result.Model != null, failureType, frames));
+                        result?.UnsatCore, result == null ? null : result.Model != null, failureType, frames));
                 }
                 else
                 {

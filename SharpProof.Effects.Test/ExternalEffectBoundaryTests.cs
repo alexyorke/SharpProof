@@ -5,7 +5,7 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ExternalEffectBoundaryTests
 {
-    private static readonly string[] s_exceptionNames = ["System.InvalidOperationException"];
+    private static readonly ImmutableArray<string> s_exceptionNames = ["System.InvalidOperationException"];
 
     [Test]
     public void ReviewedContractPreservesRegionsCapabilitiesAndExceptions()

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -17,7 +18,7 @@ public sealed class ProtocolJsonTests
 {
     private const string InputHash =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    private static readonly string[] s_requestProperties = [
+    private static readonly ImmutableArray<string> s_requestProperties = [
         "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy"
     ];
 
@@ -1002,10 +1003,11 @@ public sealed class ProtocolJsonTests
     public void RequestBoundValidationRejectsCrossSwappedRuntimeDigests()
     {
         var response = CreateResponse(CreateManifest());
-        (response.Summary.Versions.WorkerBinarySha256,
-            response.Summary.Versions.ApiSpecContentSha256) =
-            (response.Summary.Versions.ApiSpecContentSha256,
-                response.Summary.Versions.WorkerBinarySha256);
+        response.Summary.Versions = response.Summary.Versions with
+        {
+            WorkerBinarySha256 = response.Summary.Versions.ApiSpecContentSha256,
+            ApiSpecContentSha256 = response.Summary.Versions.WorkerBinarySha256
+        };
 
         AssertErrorCode(ValidateForRequest(response), "response.versions_mismatch");
     }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,7 +11,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryCorpusDiagnosticWorkflowTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0002", "SP0045"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0002", "SP0045"];
 
     [Test]
     public async Task ActualAllocationAndStaticWriteProduceTwoOrderedCorpusDiagnostics()

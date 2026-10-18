@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -10,11 +11,11 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class Pr275BulkFrontendApiTests
 {
-    private static readonly IrExceptionKind[] ExpectedShortArrayFaults =
-    {
+    private static readonly ImmutableArray<IrExceptionKind> ExpectedShortArrayFaults =
+    [
         IrExceptionKind.NullReference,
         IrExceptionKind.IndexOutOfRange
-    };
+    ];
 
     private const string OpenTypeSource = """
         internal sealed class OpenTypeContainer<T>

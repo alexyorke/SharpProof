@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
@@ -5,7 +6,7 @@ namespace SharpProof.BuildTasks;
 
 internal sealed class VerificationPublication
 {
-    private readonly Dictionary<string, (string Stable, string Prepared)> _paths;
+    private readonly ImmutableDictionary<string, (string Stable, string Prepared)> _paths;
     private readonly string _invocationRequest;
     private readonly string _invocationResult;
 
@@ -14,7 +15,7 @@ internal sealed class VerificationPublication
         System.ArgumentNullException.ThrowIfNull(invocationRequest);
         System.ArgumentNullException.ThrowIfNull(invocationResult);
         System.ArgumentNullException.ThrowIfNull(paths);
-        _paths = paths;
+        _paths = paths.ToImmutableDictionary(StringComparer.Ordinal);
         _invocationRequest = invocationRequest;
         _invocationResult = invocationResult;
     }

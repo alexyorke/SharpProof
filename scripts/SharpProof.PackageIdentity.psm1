@@ -1,17 +1,20 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$SharpProofPackageIds = @(
-    'SharpProof',
-    'SharpProof.Attributes',
-    'SharpProof.Verifier'
-) | Sort-Object
+New-Variable -Scope Script -Name SharpProofPackageIds -Option ReadOnly -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string](
+        [string[]](@(
+                'SharpProof',
+                'SharpProof.Attributes',
+                'SharpProof.Verifier'
+            ) | Sort-Object)))
 
-$script:SharpProofPackagePushOrder = @(
-    'SharpProof.Attributes',
-    'SharpProof',
-    'SharpProof.Verifier'
-)
+New-Variable -Scope Script -Name SharpProofPackagePushOrder -Option ReadOnly -Value (
+    [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            'SharpProof.Attributes',
+            'SharpProof',
+            'SharpProof.Verifier'
+        )))
 
 function Get-SharpProofNuspecMetadata {
     param(

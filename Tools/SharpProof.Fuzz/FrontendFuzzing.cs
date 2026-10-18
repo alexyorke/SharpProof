@@ -654,7 +654,7 @@ public sealed record GeneratedCSharpCase(
 
 public sealed class SmallCSharpCaseGenerator(int seed)
 {
-    private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
+    private static readonly ImmutableArray<long> LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
 
     public GeneratedCSharpCase Next(int maximumDepth = 4)
@@ -668,10 +668,10 @@ public sealed class SmallCSharpCaseGenerator(int seed)
             ? null
             : Enumerable.Range(0, _random.Next(4))
                 .Select(_ => DifferentialIntegerCorpus.InterestingIntegers[
-                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)])
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)])
                 .ToArray();
         var index = DifferentialIntegerCorpus.InterestingIntegers[
-            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)];
+            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)];
         if (_random.Next(3) == 0 && values != null)
         {
             index = _random.Next(2) == 0 ? -1 : values.Length;
@@ -705,9 +705,9 @@ public sealed class SmallCSharpCaseGenerator(int seed)
             expression.Kind == GeneratedExpressionKind.ArrayIndex
                 ? index
                 : DifferentialIntegerCorpus.InterestingIntegers[
-                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)],
             DifferentialIntegerCorpus.InterestingIntegers[
-                _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
+                _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)],
             _random.Next(2) == 0)
         {
             Text = _random.Next(4) switch

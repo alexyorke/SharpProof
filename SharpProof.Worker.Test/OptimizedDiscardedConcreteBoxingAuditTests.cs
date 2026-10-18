@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -21,14 +22,14 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     private const int WarmupIterations = 10000;
     private const int MeasuredIterations = 128;
     private const int MeasurementRounds = 3;
-    private static readonly decimal[] WitnessValues = [0m, 1.25m];
-    private static readonly byte[] IdentityBody = [0x02, 0x2A];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableArray<decimal> WitnessValues = [0m, 1.25m];
+    private static readonly ImmutableArray<byte> IdentityBody = [0x02, 0x2A];
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string BoundarySource = """
         using SharpProof.Attributes;
@@ -245,7 +246,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
-        var rows = new List<IlInstruction>();
+        var rows = ImmutableList<IlInstruction>.Empty;
         var offset = 0;
         while (offset < bytes.Length)
         {
@@ -274,11 +275,11 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
                 OperandType.InlineTok => method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset))?.ToString(),
                 _ => null
             };
-            rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
+            rows = rows.Add(new(start, code.Name ?? "<unnamed>", Convert.ToHexString(bytes.AsSpan(offset, size)), operand));
             offset += size;
         }
         return new(method.DeclaringType!.FullName + "." + method.Name, method.Module.ModuleVersionId,
-            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows);
+            method.MetadataToken, method.GetMethodImplementationFlags().ToString(), Convert.ToHexString(bytes), rows.ToImmutableArray());
     }
 
     private sealed record RuntimeObservation(string Witness, int Round, long SubjectBytes, int SubjectResult,
@@ -292,11 +293,11 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions)
+        string RawIl, ImmutableArray<IlInstruction> Instructions)
     {
         public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
         public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
         public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
 }

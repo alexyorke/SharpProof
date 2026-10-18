@@ -38,16 +38,16 @@ internal sealed class MetadataSourceCompilation : IDisposable
 {
     private readonly DirectoryInfo directory = Directory.CreateTempSubdirectory("sharpproof-metadata-fuzz-");
     private readonly AssemblyLoadContext runtime = new("MetadataProgramFuzz", isCollectible: true);
-    private readonly string[] libraryMembers;
-    private readonly string[] sourceMembers;
+    private readonly ImmutableArray<string> libraryMembers;
+    private readonly ImmutableArray<string> sourceMembers;
     private MemoryStream? libraryImage;
     private MemoryStream? sourceImage;
 
     internal MetadataSourceCompilation(IReadOnlyList<MetadataProgramSourceCase> cases)
     {
         cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
-        libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
-        sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
+        libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
+        sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
     }
 
     internal Type Subject { get; private set; } = null!;

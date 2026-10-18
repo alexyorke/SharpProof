@@ -150,6 +150,16 @@ internal static class CompilerManifestArtifactJson
 
         if (canonicalize)
         {
+            // Canonicalization replaces collections on the manifest and callable
+            // entries. Copy those owners before sorting producer-owned data.
+            artifact = artifact with
+            {
+                Manifest = artifact.Manifest with
+                {
+                    Callables = artifact.Manifest.Callables?.Select(static (WorkerCallableManifestEntry /* SPINT001: all values valid - null entries are validated after canonicalization */ callable) =>
+                        callable is null ? null! : callable with { }).ToArray()!
+                }
+            };
             try
             { WorkerProtocolJson.Canonicalize(artifact.Manifest); }
             catch (ArgumentOutOfRangeException exception) when (exception.ActualValue is Enum)
@@ -222,7 +232,8 @@ internal static class CompilerManifestArtifactJson
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            callables = DecodeCallables(artifact, cancellationToken);
+            callables = DecodeCallables(artifact, out var compilation, cancellationToken);
+            artifact = artifact with { Compilation = compilation };
         }
         catch (InvalidDataException exception)
         {
@@ -236,17 +247,29 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        return DecodeCallables(artifact, out _, cancellationToken);
+    }
+
+    private static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
+        CompilerManifestArtifact artifact,
+        out CompilerCompilationSnapshot compilation,
+        CancellationToken cancellationToken)
+    {
         Validate(
             artifact,
             validateDecodability: false,
             cancellationToken);
-        artifact.Compilation.SpecificationPackIds = artifact.SpecificationPackIds;
-        artifact.Compilation.SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion;
-        artifact.Compilation.SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256;
+        compilation = artifact.Compilation with
+        {
+            SpecificationPackIds = artifact.SpecificationPackIds.ToArray(),
+            SpecificationPackCatalogVersion = artifact.SpecificationPackCatalogVersion,
+            SpecificationPackCatalogSha256 = artifact.SpecificationPackCatalogSha256
+        };
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
-            artifact.Compilation,
+            compilation,
             cancellationToken);
     }
 

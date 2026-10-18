@@ -14,8 +14,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerClosedParameterCaptureBoundaryTests
 {
-    private static readonly int[] ExpectedParameterOrdinals = [0, 1];
-    private static readonly string[] ExpectedAttributeKinds = ["Positive", "InRange"];
+    private static readonly ImmutableArray<int> ExpectedParameterOrdinals = [0, 1];
+    private static readonly ImmutableArray<string> ExpectedAttributeKinds = ["Positive", "InRange"];
     private const string Subject = """
         using SharpProof.Attributes;
         public sealed class RowAttribute : System.Attribute { }

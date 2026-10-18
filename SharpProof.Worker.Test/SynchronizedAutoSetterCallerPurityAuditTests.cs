@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -18,7 +19,7 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class SynchronizedAutoSetterCallerPurityAuditTests
 {
-    private static readonly int[] s_inputValues = [-7, 0, 42];
+    private static readonly ImmutableArray<int> s_inputValues = [-7, 0, 42];
     private const string SubjectTemplate = """
         using System.Runtime.CompilerServices;
         using SharpProof.Attributes;

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -26,7 +27,7 @@ internal sealed class PackagedProductFeed : IDisposable
     internal const string PackageSourceEnvironmentVariable =
         "SHARPPROOF_PACKAGE_SOURCE";
 
-    private static readonly string[] s_expectedPackageIds = [
+    private static readonly ImmutableArray<string> s_expectedPackageIds = [
         AttributesPackageId,
         PortablePackageId,
         VerifierPackageId
@@ -213,9 +214,7 @@ internal sealed class PackagedProductFeed : IDisposable
                 extension,
                 StringComparison.OrdinalIgnoreCase)))
             .Select(ReadPackage)
-            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (Array.IndexOf(
-                s_expectedPackageIds,
-                package.Id)))
+            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (s_expectedPackageIds.IndexOf(package.Id)))
         ];
     }
 

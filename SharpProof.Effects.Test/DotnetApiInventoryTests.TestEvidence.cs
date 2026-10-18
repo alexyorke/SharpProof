@@ -8,7 +8,7 @@ namespace SharpProof.Effects.Test;
 public sealed partial class DotnetApiInventoryTests
 {
     private static readonly string IntrinsicEvidenceTest = typeof(DotnetApiInventoryTests).FullName + "." + nameof(PinnedFrameworkApiSurfaceAndSupportEvidenceMatchReviewedBaseline);
-    private static readonly (string? Left, string? Right)[] EqualityEdges = [("same", "same"), ("left", "right"), ("", ""), (null, null), (null, "value"), ("value", null), ("a\0b", "a\0b"), ("\u00e9", "e")];
+    private static readonly ImmutableArray<(string? Left, string? Right)> EqualityEdges = [("same", "same"), ("left", "right"), ("", ""), (null, null), (null, "value"), ("value", null), ("a\0b", "a\0b"), ("\u00e9", "e")];
     private static void WriteIntrinsicTestEvidence(string root, CSharpCompilation compilation, DotnetApiInventory.Row[] inventory)
     {
         global::System.ArgumentNullException.ThrowIfNull(root);

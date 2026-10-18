@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace SharpProof.Dataflow.Test;
@@ -27,7 +28,7 @@ public sealed class IntervalDomainTests
         Assert.That(_domain.LessThanOrEqual(sparse, _domain.Range(first, last - 1)), Is.False);
     }
 
-    private static readonly IReadOnlyList<IntervalValue> Samples = [
+    private static readonly ImmutableArray<IntervalValue> Samples = [
         IntervalValue.Bottom,
         IntervalValue.Top,
         IntervalValue.Constant(-2),

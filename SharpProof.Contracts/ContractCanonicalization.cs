@@ -19,10 +19,10 @@ internal sealed class ContractCanonicalization(
     private sealed class TypeSpecializer
     {
         private readonly Compilation _compilation;
-        private readonly Dictionary<ITypeParameterSymbol, ITypeSymbol>
-            _substitutions = new(SymbolEqualityComparer.Default);
-        private readonly Dictionary<ITypeSymbol, ITypeSymbol> _signatureTypes =
-            new(SymbolEqualityComparer.IncludeNullability);
+        private ImmutableDictionary<ITypeParameterSymbol, ITypeSymbol>
+            _substitutions = ImmutableDictionary.Create<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+        private ImmutableDictionary<ITypeSymbol, ITypeSymbol> _signatureTypes =
+            ImmutableDictionary.Create<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.IncludeNullability);
 
         internal TypeSpecializer(
             Compilation compilation,
@@ -238,7 +238,7 @@ internal sealed class ContractCanonicalization(
             RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
             for (var index = 0; index < parameters.Length; index++)
             {
-                _substitutions[parameters[index]] = arguments[index];
+                _substitutions = _substitutions.SetItem(parameters[index], arguments[index]);
             }
         }
 
@@ -251,7 +251,7 @@ internal sealed class ContractCanonicalization(
             {
                 return;
             }
-            _signatureTypes.Add(original, constructed);
+            _signatureTypes = _signatureTypes.Add(original, constructed);
 
             switch (original, constructed)
             {
@@ -323,7 +323,7 @@ internal sealed class ContractCanonicalization(
         for (var index = 0; index < target.Parameters.Length; index++)
         {
             var parameter = target.Parameters[index];
-            result.Parameters.Add(result.Add(
+            result.AddParameter(result.Add(
                 parameter,
                 BoundContractVariableRole.Parameter,
                 index,
@@ -346,7 +346,7 @@ internal sealed class ContractCanonicalization(
         return result;
     }
 
-    internal IReadOnlyDictionary<IrVarId, IrTerm>? CreateSubstitutions(
+    internal ImmutableDictionary<IrVarId, IrTerm>? CreateSubstitutions(
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
@@ -362,7 +362,7 @@ internal sealed class ContractCanonicalization(
             expressionBinder.VariableBindings,
             expressionBinder.ResultVariable,
             expressionBinder.ReceiverVariables,
-            [.. expressionBinder.PreStateVariables],
+            expressionBinder.PreStateVariablePairs,
             canonical.ToBoundVariables(),
             canonical.CreatePreState);
     }
@@ -370,10 +370,18 @@ internal sealed class ContractCanonicalization(
 
 internal sealed class ContractCanonicalVariables(IrFactory factory)
 {
-    private readonly List<BoundContractVariable> _variables = (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : []);
+    private ImmutableList<BoundContractVariable> _variables = factory is null
+        ? throw new System.ArgumentNullException(nameof(factory))
+        : ImmutableList<BoundContractVariable>.Empty;
 
     internal IrVarId? Receiver { get; set; }
-    internal List<IrVarId> Parameters { get; } = [];
+    internal ImmutableArray<IrVarId> Parameters { get; private set; } = [];
+
+    internal void AddParameter(IrVarId variable)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        Parameters = Parameters.Add(variable);
+    }
     internal IrVarId? Result { get; set; }
 
     internal IrVarId Add(
@@ -386,7 +394,7 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var variable = factory.CreateVariable(name, type);
-        _variables.Add(new BoundContractVariable(
+        _variables = _variables.Add(new BoundContractVariable(
             symbol,
             role,
             ordinal,
@@ -403,7 +411,7 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
             "pre:" + current.Value.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
             info.Type);
-        _variables.Add(new BoundContractVariable(
+        _variables = _variables.Add(new BoundContractVariable(
             null,
             BoundContractVariableRole.PreState,
             -1,

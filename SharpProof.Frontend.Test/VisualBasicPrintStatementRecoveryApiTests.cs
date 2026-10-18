@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class VisualBasicPrintStatementRecoveryApiTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["BC31003"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["BC31003"];
 
     [TestCase(1)]
     [TestCase(2)]

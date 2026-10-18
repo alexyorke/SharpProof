@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -8,7 +9,7 @@ namespace SharpProof.Worker.Test;
 public sealed class VerificationTargetSchedulerTests
 {
     // The three pairs emitted by the worker after actual lane renewal failure.
-    private static readonly (WorkerCallableCoverageReason Callable, WorkerClaimReason Claim)[] Retirements =
+    private static readonly ImmutableArray<(WorkerCallableCoverageReason Callable, WorkerClaimReason Claim)> Retirements =
     [
         (WorkerCallableCoverageReason.MethodTimeout, WorkerClaimReason.MethodTimeout),
         (WorkerCallableCoverageReason.InfrastructureFailure, WorkerClaimReason.InfrastructureFailure),

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -8,10 +9,10 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerIlStreamFillTests
 {
-    private static readonly (int Offset, int Count)[] ExpectedPartialReads = [(0, 81920), (50000, 31921)];
-    private static readonly byte[] ExpectedUntouchedDestination = [0xcc, 0xcc];
-    private static readonly byte[] TwoByteSource = [10, 20];
-    private static readonly byte[] OneByteSource = [10];
+    private static readonly ImmutableArray<(int Offset, int Count)> ExpectedPartialReads = [(0, 81920), (50000, 31921)];
+    private static readonly ImmutableArray<byte> ExpectedUntouchedDestination = [0xcc, 0xcc];
+    private static readonly ImmutableArray<byte> TwoByteSource = [10, 20];
+    private static readonly ImmutableArray<byte> OneByteSource = [10];
 
     [Test]
     public void GenuineCapturedScalarDependencyStillUsesTheProviderAndBodyMemoization()
@@ -91,7 +92,7 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void CancellationPrecedesReadingAndLeavesTheDestinationUntouched()
     {
-        using var stream = new MemoryStream(TwoByteSource, writable: false);
+        using var stream = new MemoryStream(TwoByteSource.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var destination = new byte[] { 0xcc, 0xcc };
@@ -130,7 +131,7 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(true)]
     public void EmptyDestinationDoesNotReadOrObserveCancellation(bool canceled)
     {
-        using var stream = new MemoryStream(OneByteSource, writable: false);
+        using var stream = new MemoryStream(OneByteSource.ToArray(), writable: false);
         using var cancellation = new CancellationTokenSource();
         if (canceled)
         { cancellation.Cancel(); }

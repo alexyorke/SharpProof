@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
 {
-    private static readonly (string TypeName, int Expected)[] DispatchControls = [("Conflicting", 1), ("Matching", 0)];
+    private static readonly ImmutableArray<(string TypeName, int Expected)> DispatchControls = [("Conflicting", 1), ("Matching", 0)];
 
     private const string Source = """
         using SharpProof.Attributes;

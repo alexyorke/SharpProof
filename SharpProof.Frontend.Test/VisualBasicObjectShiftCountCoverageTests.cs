@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -14,7 +15,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class VisualBasicObjectShiftCountCoverageTests
 {
-    private static readonly string[] RuntimeMethodNames = ["Target", "Control"];
+    private static readonly ImmutableArray<string> RuntimeMethodNames = ["Target", "Control"];
 
     [TestCase("SByte", (sbyte)6, true)]
     [TestCase("Byte", (byte)6, true)]

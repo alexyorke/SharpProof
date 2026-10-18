@@ -6,7 +6,7 @@ namespace SharpProof.Testing;
 internal sealed class DictionaryAnalyzerConfigOptions(
     IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
 {
-    private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
+    private readonly IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
     internal static DictionaryAnalyzerConfigOptions Empty { get; } =
         new(new Dictionary<string, string>());
 

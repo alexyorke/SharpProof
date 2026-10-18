@@ -206,7 +206,7 @@ public sealed class ScalarDifferentialMatrixTests
         }
     }
 
-    private static readonly ScalarCase[] SupportedCases = [
+    private static readonly ImmutableArray<ScalarCase> SupportedCases = [
         new(
             "SByte",
             "sbyte",
@@ -241,7 +241,7 @@ public sealed class ScalarDifferentialMatrixTests
             [long.MinValue, -1L, 0L, 1L, long.MaxValue])
     ];
 
-    private static readonly WideningCase[] WideningCases = [
+    private static readonly ImmutableArray<WideningCase> WideningCases = [
         Widen("SByte", "sbyte", "Int16", "short"),
         Widen("SByte", "sbyte", "Int32", "int"),
         Widen("SByte", "sbyte", "Int64", "long"),
@@ -265,7 +265,7 @@ public sealed class ScalarDifferentialMatrixTests
         Widen("UInt32", "uint", "Int64", "long")
     ];
 
-    private static readonly ArithmeticCase[] ArithmeticCases = [
+    private static readonly ImmutableArray<ArithmeticCase> ArithmeticCases = [
         Binary("AddNormal", "checked(left + right)", 2L, 3L, 5L),
         Binary(
             "AddBoundary",
@@ -350,15 +350,15 @@ public sealed class ScalarDifferentialMatrixTests
             IrExceptionKind.Overflow)
     ];
 
-    private static readonly string[] RequiredReferenceFileNames = [
+    private static readonly ImmutableArray<string> RequiredReferenceFileNames = [
         "System.Private.CoreLib.dll",
         "System.Linq.dll",
         "System.Runtime.dll",
         "netstandard.dll"
     ];
 
-    private static readonly string[] UnaryParameterNames = ["value"];
-    private static readonly string[] BinaryParameterNames = ["left", "right"];
+    private static readonly ImmutableArray<string> UnaryParameterNames = ["value"];
+    private static readonly ImmutableArray<string> BinaryParameterNames = ["left", "right"];
 
     [Test]
     public async Task SupportedScalarMatrixAgreesAcrossRuntimeIrAndSmt()

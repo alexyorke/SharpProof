@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -14,7 +15,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
 {
     private const string Run = " public static int Run(int x) => Target<int>(x) ? 1 : 0; }";
 
-    private static readonly string[] s_implicit =
+    private static readonly ImmutableArray<string> s_implicit =
     [
         "public static bool Target<T>(T value) { return value is object; }" + Run,
         "public static bool Target<T>(T value) { if (value is object) return true; return false; }" + Run,
@@ -28,7 +29,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         "public static bool Target<T>(T value) { return F<int>(); } static bool F<U>() { U local = default(U); return local is object; }" + Run
     ];
 
-    private static readonly string[] s_folded =
+    private static readonly ImmutableArray<string> s_folded =
     [
         "public static bool Target<T>(T value) { if (value is int) return true; return false; }" + Run,
         "public static bool Target<T>(T value) { return value is System.IComparable; }" + Run,

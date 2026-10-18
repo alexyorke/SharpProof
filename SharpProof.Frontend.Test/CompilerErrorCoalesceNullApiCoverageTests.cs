@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -11,7 +12,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CompilerErrorCoalesceNullApiCoverageTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["CS0019"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["CS0019"];
 
     [Test]
     public void ActualInvalidCoalesceNullTestRejectsItsScalarCapture()

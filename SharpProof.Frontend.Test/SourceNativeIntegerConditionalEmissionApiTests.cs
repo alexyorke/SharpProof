@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -16,8 +17,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class SourceNativeIntegerConditionalEmissionApiTests
 {
-    private static readonly string[] EnabledSymbols = ["ABSENT"];
-    private static readonly byte[] OmittedTargetIl = [0x1d, 0x2a];
+    private static readonly ImmutableArray<string> EnabledSymbols = ["ABSENT"];
+    private static readonly ImmutableArray<byte> OmittedTargetIl = [0x1d, 0x2a];
 
     // SP-NATIVE-CONDITIONAL-001 nearby controls, added in the green phase.
     // These source-backed cases were NOT run on the red baseline. The original

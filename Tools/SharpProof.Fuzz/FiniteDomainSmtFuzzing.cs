@@ -24,7 +24,7 @@ public sealed record FiniteDomainDifferentialResult(
 public static class FiniteDomainSmtDifferentialOracle
 {
     private const int MaximumAssignmentCount = 65_536;
-    private static readonly bool[] BooleanDomain = [false, true];
+    private static readonly ImmutableArray<bool> BooleanDomain = [false, true];
 
     public static ImmutableArray<long> IntegerDomain
     {

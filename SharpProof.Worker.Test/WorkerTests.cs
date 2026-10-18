@@ -118,7 +118,7 @@ public sealed partial class WorkerTests
         }
         """;
 
-    private static readonly string[] InvalidBudgetErrorCodes = [
+    private static readonly ImmutableArray<string> InvalidBudgetErrorCodes = [
         "protocol.unsupported",
         "budgets.rlimit",
         "budgets.method_rlimit",
@@ -128,7 +128,7 @@ public sealed partial class WorkerTests
         "cache.maximum_bytes"
     ];
 
-    private static readonly string[] RequiredReferenceFileNames = [
+    private static readonly ImmutableArray<string> RequiredReferenceFileNames = [
         "System.Private.CoreLib.dll",
         "System.Linq.dll",
         "System.Runtime.dll",
@@ -1498,13 +1498,13 @@ public sealed partial class WorkerTests
         switch (binding)
         {
             case nameof(CompilerDiagnosticArtifact.SourceTreePath):
-                diagnostic.SourceTreePath = null!;
+                diagnostic = diagnostic with { SourceTreePath = null! };
                 break;
             case nameof(CompilerDiagnosticArtifact.SourceTreeSha256):
-                diagnostic.SourceTreeSha256 = null!;
+                diagnostic = diagnostic with { SourceTreeSha256 = null! };
                 break;
             case nameof(CompilerDiagnosticArtifact.SourceLineMapSha256):
-                diagnostic.SourceLineMapSha256 = null!;
+                diagnostic = diagnostic with { SourceLineMapSha256 = null! };
                 break;
             default:
                 throw new AssertionException(
@@ -5730,7 +5730,7 @@ public sealed partial class WorkerTests
         for (var index = 0; index < count; index++)
         {
             var boundary = random.Next(-50, 51);
-            var inputs = new[] {
+            ImmutableArray<long> inputs = [
                 -100L,
                 -1L,
                 0L,
@@ -5741,7 +5741,7 @@ public sealed partial class WorkerTests
                 boundary + 1L,
                 random.Next(-100, 101),
                 random.Next(-100, 101)
-            };
+            ];
             var name = "M" + index.ToString(
                 "D2",
                 System.Globalization.CultureInfo.InvariantCulture);
@@ -5854,13 +5854,13 @@ public sealed partial class WorkerTests
         Func<long, bool> Requires,
         Func<long, long, bool> Ensures,
         WorkerClaimOutcome ExpectedStatus,
-        long[] Inputs)
+        ImmutableArray<long> Inputs)
     {
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
         public string EnsuresSource { get; init; } = EnsuresSource ?? throw new System.ArgumentNullException(nameof(EnsuresSource));
         public Func<long, bool> Requires { get; init; } = Requires ?? throw new System.ArgumentNullException(nameof(Requires));
         public Func<long, long, bool> Ensures { get; init; } = Ensures ?? throw new System.ArgumentNullException(nameof(Ensures));
-        public long[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ImmutableArray<long> Inputs { get; init; } = Inputs.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
     }
 
     private const string TautologySource =
@@ -5973,7 +5973,7 @@ public sealed partial class WorkerTests
     private sealed class SignalingDelayingBackend(
         TaskCompletionSource started) : ISmtBackend
     {
-        private TaskCompletionSource _guarded_started = started ?? throw new System.ArgumentNullException(nameof(started));
+        private readonly TaskCompletionSource _guarded_started = started ?? throw new System.ArgumentNullException(nameof(started));
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken)
@@ -6327,7 +6327,7 @@ public sealed partial class WorkerTests
             System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             DirectoryPath = temporary.FullName;
-            SourcePaths = sourcePaths;
+            SourcePaths = sourcePaths.ToImmutableArray();
             CacheDirectory = Path.Combine(DirectoryPath, "cache");
         }
 
@@ -6335,7 +6335,7 @@ public sealed partial class WorkerTests
         {
             get;
         }
-        internal string[] SourcePaths
+        internal ImmutableArray<string> SourcePaths
         {
             get;
         }

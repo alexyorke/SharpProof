@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,18 +10,18 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CSharpScalarSemanticsTests
 {
-    private static readonly Dictionary<SpecialType, Type> ExpectedIntegerTypes =
-        new()
-        {
-            [SpecialType.System_SByte] = typeof(sbyte),
-            [SpecialType.System_Byte] = typeof(byte),
-            [SpecialType.System_Int16] = typeof(short),
-            [SpecialType.System_UInt16] = typeof(ushort),
-            [SpecialType.System_Char] = typeof(char),
-            [SpecialType.System_Int32] = typeof(int),
-            [SpecialType.System_UInt32] = typeof(uint),
-            [SpecialType.System_Int64] = typeof(long)
-        };
+    private static readonly ImmutableDictionary<SpecialType, Type> ExpectedIntegerTypes =
+        ImmutableDictionary.CreateRange<SpecialType, Type>(
+        [
+            new(SpecialType.System_SByte, typeof(sbyte)),
+            new(SpecialType.System_Byte, typeof(byte)),
+            new(SpecialType.System_Int16, typeof(short)),
+            new(SpecialType.System_UInt16, typeof(ushort)),
+            new(SpecialType.System_Char, typeof(char)),
+            new(SpecialType.System_Int32, typeof(int)),
+            new(SpecialType.System_UInt32, typeof(uint)),
+            new(SpecialType.System_Int64, typeof(long))
+                ]);
 
     [Test]
     public void SupportedIntegerCatalogIsExactAndExhaustive()

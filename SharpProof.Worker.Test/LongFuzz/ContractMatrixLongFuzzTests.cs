@@ -21,22 +21,22 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class ContractMatrixLongFuzzTests
 {
     private const string Harness = "contract-matrix";
-    private static readonly int[] s_values = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-    private static readonly string[] s_specMaxExpressions =
+    private static readonly ImmutableArray<int> s_values = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+    private static readonly ImmutableArray<string> s_specMaxExpressions =
     [
         "Math.Max(value, value + 2)",
         "Math.Max(val2: value + 2, val1: value)",
         "Math.Max(val2: ++value, val1: value *= 2)",
         "Math.Max(value *= 2, ++value)"
     ];
-    private static readonly int[][] s_specMaxMaximum = [[0, 2], [0, 2], [-1, 2], [-3, 1]];
-    private static readonly int[][] s_specMaxValue = [[-2, 0], [-2, 0], [-2, 2], [-3, 1]];
+    private static readonly ImmutableArray<ImmutableArray<int>> s_specMaxMaximum = [[0, 2], [0, 2], [-1, 2], [-3, 1]];
+    private static readonly ImmutableArray<ImmutableArray<int>> s_specMaxValue = [[-2, 0], [-2, 0], [-2, 2], [-3, 1]];
 
-    private sealed record Domain(string Name, string[] Callee, string[] WiderCaller)
+    private sealed record Domain(string Name, ImmutableArray<string> Callee, ImmutableArray<string> WiderCaller)
     {
         public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
-        public string[] Callee { get; init; } = Callee ?? throw new System.ArgumentNullException(nameof(Callee));
-        public string[] WiderCaller { get; init; } = WiderCaller ?? throw new System.ArgumentNullException(nameof(WiderCaller));
+        public ImmutableArray<string> Callee { get; init; } = Callee.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Callee)) : Callee;
+        public ImmutableArray<string> WiderCaller { get; init; } = WiderCaller.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(WiderCaller)) : WiderCaller;
     }
     private sealed record GeneratedCase(string Name, string Source, bool Call, int Variant, int Bias,
         int Rewrite, bool Joint = false)
@@ -62,7 +62,7 @@ public sealed class ContractMatrixLongFuzzTests
         public string StateSource { get; init; } = StateSource ?? throw new System.ArgumentNullException(nameof(StateSource));
     }
 
-    private static readonly Domain[] s_domains =
+    private static readonly ImmutableArray<Domain> s_domains =
     [
         new("interval", ["x >= -2", "x <= 2"], ["x >= -3", "x <= 3"]),
         new("implication", ["x >= -2", "x < 1 || y >= 1"], ["x >= -2"]),
@@ -70,7 +70,7 @@ public sealed class ContractMatrixLongFuzzTests
         new("dependent-boundary", ["x >= -2", "x <= 2", "x < 0 || y >= 0"],
             ["x >= -2", "x <= 2"])
     ];
-    private static readonly string[] s_jointDomains =
+    private static readonly ImmutableArray<string> s_jointDomains =
     [
         "x == 0 || x == 1",
         "x >= 0 && x <= 1",
@@ -507,8 +507,8 @@ public sealed class ContractMatrixLongFuzzTests
     private static Domain Rewrite(Domain domain, int rewrite)
     {
         System.ArgumentNullException.ThrowIfNull(domain);
-        return new Domain(domain.Name, domain.Callee.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (Rewrite(clause, rewrite))).ToArray(),
-            domain.WiderCaller.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (Rewrite(clause, rewrite))).ToArray());
+        return new Domain(domain.Name, domain.Callee.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (Rewrite(clause, rewrite))).ToImmutableArray(),
+            domain.WiderCaller.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (Rewrite(clause, rewrite))).ToImmutableArray());
     }
 
     private static string Rewrite(string predicate, int rewrite)
@@ -524,15 +524,21 @@ public sealed class ContractMatrixLongFuzzTests
         };
     }
 
-    private static string Conjunction(string[] clauses)
+    private static string Conjunction(ImmutableArray<string> clauses)
     {
-        System.ArgumentNullException.ThrowIfNull(clauses, nameof(clauses));
+        if (clauses.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(clauses));
+        }
         return string.Join(" && ", clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ("(" + clause + ")")));
     }
 
-    private static string Requires(string[] clauses)
+    private static string Requires(ImmutableArray<string> clauses)
     {
-        System.ArgumentNullException.ThrowIfNull(clauses, nameof(clauses));
+        if (clauses.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(clauses));
+        }
         return string.Join(" ", clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ("Contract.Requires(" + clause + ");")));
     }
 

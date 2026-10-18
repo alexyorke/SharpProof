@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -8,7 +9,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerLinkedModuleCountWorkflowTests
 {
-    private static readonly string[] ExpectedModuleNames = ["CaptureLinked.dll", "First.netmodule", "Second.netmodule"];
+    private static readonly ImmutableArray<string> ExpectedModuleNames = ["CaptureLinked.dll", "First.netmodule", "Second.netmodule"];
 
     [Test]
     public void SameGenuineThreeModuleReferenceRejectsCountTwoAndAcceptsCountThree()

@@ -55,7 +55,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
-    private readonly Dictionary<IrInstructionId, int> _callMarkers;
+    private readonly ImmutableDictionary<IrInstructionId, int> _callMarkers;
     private readonly ImmutableDictionary<IrInstructionId, int> _checkpointMarkers;
     private readonly ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>> _pendingThrows;
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints = [];
@@ -67,7 +67,7 @@ internal sealed class PassiveCallableVcBuilder
     // Approximated field and element reads.
     private readonly List<IrTerm> _reads = [];
     internal ImmutableArray<IrTerm> Reads => [.. _reads];
-    private readonly HashSet<IrInstructionId> _sequenceReaders;
+    private readonly ImmutableHashSet<IrInstructionId> _sequenceReaders;
     // Static field reads, which observable purity excludes.
     private readonly List<IrTerm> _ambientReads = [];
     internal ImmutableArray<IrTerm> AmbientReads => [.. _ambientReads];
@@ -127,9 +127,9 @@ internal sealed class PassiveCallableVcBuilder
         _sequenceReaders = IrSequenceReads.Readers(_program);
         _stops = encoding?.Stops ?? [];
         var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => ((clause.Value is null || clause.Safe is null || clause.Marker.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : ((clause.Marker, Ordinal: ordinal))))
-            .ToDictionary(row => row.Marker, row => row.Ordinal);
+            .ToImmutableDictionary(row => row.Marker, row => row.Ordinal);
         _callMarkers = encoding == null ? originalMarkers : encoding.CallMarkers
-            .ToDictionary(row => row.Key, row => originalMarkers[row.Value]);
+            .ToImmutableDictionary(row => row.Key, row => originalMarkers[row.Value]);
         _checkpointMarkers = encoding?.Checkpoints ?? ImmutableDictionary<IrInstructionId, int>.Empty;
         _pendingThrows = encoding?.PendingThrows ?? ImmutableDictionary<IrInstructionId, ImmutableArray<IrThrowInstruction>>.Empty;
         _cancellationToken = cancellationToken;

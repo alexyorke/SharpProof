@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -10,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class InitializerIntrinsicConstructorMatrixAuditTests
 {
-    private static readonly string[] ExpectedDiagnosticIds = ["SP0024"];
+    private static readonly ImmutableArray<string> ExpectedDiagnosticIds = ["SP0024"];
 
     [TestCase(false, false, false)]
     [TestCase(false, false, true)]

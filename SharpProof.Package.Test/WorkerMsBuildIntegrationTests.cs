@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -22,35 +23,35 @@ public sealed class WorkerMsBuildIntegrationTests
         "sharpproof-worker-integration-" +
         typeof(WorkerMsBuildIntegrationTests).Assembly.ManifestModule
             .ModuleVersionId.ToString("N");
-    private static readonly string[] s_publicPolicyProperties = [
+    private static readonly ImmutableArray<string> s_publicPolicyProperties = [
         "SharpProofProfile",
         "SharpProofFeatures",
         "SharpProofVerifyPolicy",
         "SharpProofAssumptionPolicy",
         "SharpProofSpecificationPacks"
     ];
-    private static readonly string[] s_analyzerConfigurationProperties = [
+    private static readonly ImmutableArray<string> s_analyzerConfigurationProperties = [
         "_SharpProofProfileWasDefaulted",
         "_SharpProofFeaturesWasDefaulted"
     ];
-    private static readonly string[] s_compilerManifestProperties = [
+    private static readonly ImmutableArray<string> s_compilerManifestProperties = [
         "_SharpProofCompilerManifestPath",
         "_SharpProofCompilationTargetFramework",
         "_SharpProofProjectDirectory"
     ];
-    private static readonly string[] s_reconstructionArguments = [
+    private static readonly ImmutableArray<string> s_reconstructionArguments = [
         "--project-directory", "--assembly-name", "--sources", "--references",
         "--constants", "--target-framework", "--language-version", "--nullable",
         "--checked-overflow", "--optimize", "--allow-unsafe", "--deterministic",
         "--output-type", "--platform-target", "--prefer-32-bit", "--features"
     ];
-    private static readonly string[] s_reconstructionListArtifacts = [
+    private static readonly ImmutableArray<string> s_reconstructionListArtifacts = [
         "_SharpProofWriteOptionsInput", "_SharpProofSourceList",
         "_SharpProofReferenceList", "_SharpProofConstantList",
         "WriteLinesToFile", "sources.list", "references.list",
         "constants.list", "options.input"
     ];
-    private static readonly string[] s_manualConsumerElementOrder = [
+    private static readonly ImmutableArray<string> s_manualConsumerElementOrder = [
         "Import",
         "Import",
         "PropertyGroup",
@@ -60,18 +61,18 @@ public sealed class WorkerMsBuildIntegrationTests
         "Target",
         "Target"
     ];
-    private static readonly string[] s_manualConsumerImportOrder = [
+    private static readonly ImmutableArray<string> s_manualConsumerImportOrder = [
         "SharpProof.props",
         "SharpProof.Verifier.props",
         "SharpProof.targets",
         "SharpProof.Verifier.targets"
     ];
-    private static readonly string[] s_runtimeClosureProperties = [
+    private static readonly ImmutableArray<string> s_runtimeClosureProperties = [
         "_SharpProofTestToolsDirectory",
         "SharpProofWorkerPath",
         "SharpProofLauncherPath"
     ];
-    private static readonly string[] s_removedPackagePathProperties = [
+    private static readonly ImmutableArray<string> s_removedPackagePathProperties = [
         "SharpProofAnalyzerDirectory",
         "SharpProofCollectorDirectory",
         "SharpProofCompilerCollectorPath",

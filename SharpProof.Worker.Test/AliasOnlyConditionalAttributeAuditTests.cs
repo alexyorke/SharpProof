@@ -26,16 +26,16 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class AliasOnlyConditionalAttributeAuditTests
 {
-    private static readonly int[] RetainedInputs = [-7, 0, 42];
-    private static readonly int[] ZeroInput = [0];
-    private static readonly int[] OneInput = [1];
+    private static readonly ImmutableArray<int> RetainedInputs = [-7, 0, 42];
+    private static readonly ImmutableArray<int> ZeroInput = [0];
+    private static readonly ImmutableArray<int> OneInput = [1];
     private static readonly ImmutableArray<string> ShadowAliases = ["Shadow"];
-    private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
+    private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
         .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string NamespaceProducerSource = """
         namespace System.Diagnostics
@@ -558,10 +558,13 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     }
 
     private static async Task ObserveClr(string directory, byte[] producerBytes, byte[] callerBytes,
-        PeObservation producerPe, PeObservation callerPe, CaseSettings settings, bool retained, bool throws, int[] inputs)
+        PeObservation producerPe, PeObservation callerPe, CaseSettings settings, bool retained, bool throws, ImmutableArray<int> inputs)
     {
         System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(inputs));
+        }
         System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
         System.ArgumentNullException.ThrowIfNull(callerPe);
         System.ArgumentNullException.ThrowIfNull(directory);
@@ -702,7 +705,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
         Assert.That(il, Is.EqualTo(method.GetMethodBody()!.GetILAsByteArray()));
-        var instructions = new List<IlInstruction>();
+        var instructions = ImmutableList<IlInstruction>.Empty;
         for (var offset = 0; offset < il.Length;)
         {
             var start = offset;
@@ -732,11 +735,11 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 resolved = member.ToString();
                 resolvedMvid = member.Module.ModuleVersionId;
             }
-            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)),
+            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(il.AsSpan(offset, size)),
                 token, resolved, resolvedMvid));
             offset += size;
         }
-        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions);
+        return new(method.MetadataToken, method.Module.ModuleVersionId, Convert.ToHexStringLower(il), instructions.ToImmutableArray());
     }
 
     private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
@@ -794,10 +797,10 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
         public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
     }
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string RawIl, List<IlInstruction> Instructions)
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string RawIl, ImmutableArray<IlInstruction> Instructions)
     {
         public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
-        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+        public ImmutableArray<IlInstruction> Instructions { get; init; } = Instructions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Instructions)) : Instructions;
     }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
     private sealed record ReplayObservation(string Status, bool ConsumedApproximation,

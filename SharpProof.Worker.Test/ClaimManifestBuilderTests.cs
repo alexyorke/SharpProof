@@ -16,11 +16,11 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ClaimManifestBuilderTests
 {
-    private static readonly int[] DenseOrdinals = [0, 1];
-    private static readonly int[] FailingShadowInputs = [0, 10];
-    private static readonly string[] PotentialOwnerGapReasons =
+    private static readonly ImmutableArray<int> DenseOrdinals = [0, 1];
+    private static readonly ImmutableArray<int> FailingShadowInputs = [0, 10];
+    private static readonly ImmutableArray<string> PotentialOwnerGapReasons =
         ["UnsupportedOwner", "UnsupportedSignature"];
-    private static readonly WorkerClaimEvidence[] CompanionEvidence = [
+    private static readonly ImmutableArray<WorkerClaimEvidence> CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];

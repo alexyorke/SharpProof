@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,7 +9,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ReferencedTypeSymbolsTests
 {
-    private static readonly string[] ExpectedTraversalOrder =
+    private static readonly ImmutableArray<string> ExpectedTraversalOrder =
     [
         "ConsumerAssembly:ConsumerRoot",
         "ConsumerAssembly:ConsumerRoot.Nested",

@@ -18,7 +18,7 @@ internal static class ContractForSymbolMatcher
         internal INamedTypeSymbol Target => ContractTarget.Target;
     }
 
-    internal static IReadOnlyDictionary<INamedTypeSymbol,
+    internal static ImmutableDictionary<INamedTypeSymbol,
         ImmutableArray<CompanionDescriptor>> BuildCompanionTargetIndex(
         ImmutableArray<CompanionDescriptor> companions)
     {
@@ -40,7 +40,7 @@ internal static class ContractForSymbolMatcher
             bucket.Add(companion);
         }
 
-        return indexed.ToDictionary(
+        return indexed.ToImmutableDictionary(
             static pair => pair.Key,
             static pair => pair.Value.ToImmutable(),
             (IEqualityComparer<INamedTypeSymbol>)
@@ -52,9 +52,9 @@ internal static class ContractForSymbolMatcher
         HashSet<INamedTypeSymbol> selfTargeting,
         HashSet<INamedTypeSymbol> cyclic)
     {
-        private readonly HashSet<INamedTypeSymbol> _selfTargeting =
-            (selfTargeting ?? throw new System.ArgumentNullException(nameof(selfTargeting)));
-        private readonly HashSet<INamedTypeSymbol> _cyclic = (cyclic ?? throw new System.ArgumentNullException(nameof(cyclic)));
+        private readonly ImmutableHashSet<INamedTypeSymbol> _selfTargeting =
+            (selfTargeting ?? throw new System.ArgumentNullException(nameof(selfTargeting))).ToImmutableHashSet(selfTargeting.Comparer);
+        private readonly ImmutableHashSet<INamedTypeSymbol> _cyclic = (cyclic ?? throw new System.ArgumentNullException(nameof(cyclic))).ToImmutableHashSet(cyclic.Comparer);
 
         internal ImmutableArray<CompanionDescriptor> Accepted { get; } =
             (accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(accepted)) : accepted);

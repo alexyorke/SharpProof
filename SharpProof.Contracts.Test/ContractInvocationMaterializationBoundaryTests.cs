@@ -11,8 +11,8 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractInvocationMaterializationBoundaryTests
 {
-    private static readonly bool[] BooleanValues = [false, true];
-    private static readonly BoundContractKind[] FullKinds =
+    private static readonly ImmutableArray<bool> BooleanValues = [false, true];
+    private static readonly ImmutableArray<BoundContractKind> FullKinds =
     [
         BoundContractKind.Requires,
         BoundContractKind.Assume,

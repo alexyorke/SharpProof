@@ -1087,13 +1087,13 @@ public static partial class WorkerProtocolJson
 
     internal static bool SameAssumptionDeclarations(
             WorkerAssumptionEvidence[]? actual,
-            (string Id, WorkerAssumptionKind Kind)[] expected)
+            IEnumerable<(string Id, WorkerAssumptionKind Kind)> expected)
     {
         expected = RepositoryParameterGuard.NotNull(expected, nameof(expected));
         return NormalizeAssumptionDeclarations(actual).SequenceEqual(expected);
     }
 
-    private static (string Id, WorkerAssumptionKind Kind)[]
+    private static ImmutableArray<(string Id, WorkerAssumptionKind Kind)>
         NormalizeAssumptionDeclarations(WorkerAssumptionEvidence[]? values)
     {
         return [.. (values ?? []).Where(static value => value != null)
@@ -1125,26 +1125,25 @@ public static partial class WorkerProtocolJson
         internal WorkerClaimManifestEntry[] Claims { get; }
         internal OrdinalIdentityIndex<WorkerCallableManifestEntry> CallablesById { get; }
         internal OrdinalIdentityIndex<WorkerClaimManifestEntry> ClaimsById { get; }
-        internal Dictionary<string?, (string Id, WorkerAssumptionKind Kind)[]> CallableAssumptionsById { get; }
+        internal ImmutableDictionary<string, ImmutableArray<(string Id, WorkerAssumptionKind Kind)>> CallableAssumptionsById { get; }
 
-        internal (string Id, WorkerAssumptionKind Kind)[] GetCallableAssumptions(string? id)
+        internal ImmutableArray<(string Id, WorkerAssumptionKind Kind)> GetCallableAssumptions(string? id)
         {
             return id != null && CallableAssumptionsById.TryGetValue(id, out var values)
                 ? values
                 : [];
         }
 
-        private static Dictionary<string?, (string Id, WorkerAssumptionKind Kind)[]>
+        private static ImmutableDictionary<string, ImmutableArray<(string Id, WorkerAssumptionKind Kind)>>
             CreateCallableAssumptions(WorkerCallableManifestEntry[] callables)
         {
             callables = RepositoryParameterGuard.NotNull(callables, nameof(callables));
-            var result = new Dictionary<string?, (string Id, WorkerAssumptionKind Kind)[]>(
-                s_ordinal);
+            var result = ImmutableDictionary.Create<string, ImmutableArray<(string Id, WorkerAssumptionKind Kind)>>(s_ordinal);
             foreach (var callable in callables)
             {
                 if (callable.CallableId != null && !result.ContainsKey(callable.CallableId))
                 {
-                    result.Add(
+                    result = result.Add(
                         callable.CallableId,
                         NormalizeAssumptionDeclarations(callable.Assumptions));
                 }
@@ -1156,9 +1155,9 @@ public static partial class WorkerProtocolJson
     private sealed class OrdinalIdentityIndex<T>
         where T : class
     {
-        private readonly Dictionary<string, T> _byId = new(s_ordinal);
-        private bool _hasNull;
-        private T? _nullValue;
+        private readonly ImmutableDictionary<string, T> _byId = ImmutableDictionary.Create<string, T>(s_ordinal);
+        private readonly bool _hasNull;
+        private readonly T? _nullValue;
 
         internal OrdinalIdentityIndex(
             IEnumerable<T> values,
@@ -1179,7 +1178,7 @@ public static partial class WorkerProtocolJson
                 }
                 else if (!_byId.ContainsKey(id))
                 {
-                    _byId.Add(id, value);
+                    _byId = _byId.Add(id, value);
                 }
             }
         }

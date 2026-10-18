@@ -235,9 +235,9 @@ internal readonly record struct CompilerIlToken(int Offset, string RawCode, long
 // Decodes scalar IL representation; provider admission remains unchanged.
 internal static class CompilerScalarIlDecoder
 {
-    private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+    private static readonly ImmutableDictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode))).Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
-        .ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
+        .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
     internal static bool Candidate(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));

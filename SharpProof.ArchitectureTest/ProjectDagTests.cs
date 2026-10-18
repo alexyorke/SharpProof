@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Xml.Linq;
 using NUnit.Framework;
 
@@ -8,27 +9,27 @@ public sealed class ProjectDagTests
 {
     // Every production project must appear here; adding a project or a
     // reference is an explicit architecture decision.
-    private static readonly Dictionary<string, string[]> AllowedReferences =
-        new(StringComparer.Ordinal)
-        {
-            ["ConsoleLoggingAnalyzer"] = [],
-            ["DefensiveCodingAnalyzer"] = [],
-            ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
-            ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
-            ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Host", "SharpProof.Worker.Protocol"],
-            ["SharpProof.CodeFixes"] = [],
-            ["SharpProof.CompilerArtifact"] = ["SharpProof.Ir", "SharpProof.Worker.Protocol"],
-            ["SharpProof.CompilerCollector"] = [
+    private static readonly ImmutableDictionary<string, ImmutableArray<string>> AllowedReferences =
+        ImmutableDictionary.CreateRange<string, ImmutableArray<string>>(StringComparer.Ordinal,
+        [
+            new("ConsoleLoggingAnalyzer", []),
+            new("DefensiveCodingAnalyzer", []),
+            new("SharpProof.Analyzer", ["SharpProof.Analyzer.Core"]),
+            new("SharpProof.Analyzer.Core", ["SharpProof.Contracts", "SharpProof.Effects"]),
+            new("SharpProof.Attributes", []),
+            new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
+            new("SharpProof.CodeFixes", []),
+            new("SharpProof.CompilerArtifact", ["SharpProof.Ir", "SharpProof.Worker.Protocol"]),
+            new("SharpProof.CompilerCollector", [
                 "SharpProof.Analyzer.Core",
                 "SharpProof.CompilerArtifact"
-            ],
-            ["SharpProof.ContractForGenerator"] = [],
-            ["SharpProof.Contracts"] = ["SharpProof.Frontend"],
-            ["SharpProof.Dataflow"] = [],
-            ["SharpProof.Effects"] = ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"],
-            ["SharpProof.Frontend"] = ["SharpProof.Attributes", "SharpProof.Ir"],
-            ["SharpProof.Fuzz"] = [
+            ]),
+            new("SharpProof.ContractForGenerator", []),
+            new("SharpProof.Contracts", ["SharpProof.Frontend"]),
+            new("SharpProof.Dataflow", []),
+            new("SharpProof.Effects", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
+            new("SharpProof.Frontend", ["SharpProof.Attributes", "SharpProof.Ir"]),
+            new("SharpProof.Fuzz", [
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
@@ -37,44 +38,44 @@ public sealed class ProjectDagTests
                 "SharpProof.Smt",
                 "SharpProof.Testing",
                 "SharpProof.Worker"
-            ],
-            ["SharpProof.Gates"] = [
+            ]),
+            new("SharpProof.Gates", [
                 "SharpProof.Analyzer",
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.ContractForGenerator",
                 "SharpProof.Logging",
                 "SharpProof.Worker"
-            ],
-            ["SharpProof.Host"] = [],
-            ["SharpProof.Ir"] = [],
-            ["SharpProof.Logging"] = [],
-            ["SharpProof.Smt"] = ["SharpProof.Verify"],
-            ["SharpProof.Specs"] = ["SharpProof.Ir"],
-            ["SharpProof.Verify"] = ["SharpProof.Specs"],
-            ["SharpProof.Worker"] = [
+            ]),
+            new("SharpProof.Host", []),
+            new("SharpProof.Ir", []),
+            new("SharpProof.Logging", []),
+            new("SharpProof.Smt", ["SharpProof.Verify"]),
+            new("SharpProof.Specs", ["SharpProof.Ir"]),
+            new("SharpProof.Verify", ["SharpProof.Specs"]),
+            new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Dataflow",
                 "SharpProof.Host",
                 "SharpProof.Logging",
                 "SharpProof.Smt"
-            ],
-            ["SharpProof.Worker.Protocol"] = [],
-        };
+            ]),
+            new("SharpProof.Worker.Protocol", []),
+                ]);
 
     // Projects that exist only to package, host tests, or smoke-test.
-    private static readonly HashSet<string> NonProductionProjects =
-        new(StringComparer.Ordinal)
-        {
+    private static readonly ImmutableHashSet<string> NonProductionProjects =
+        ImmutableHashSet.CreateRange<string>(StringComparer.Ordinal,
+        [
             "SharpProof.CompilerProbe.TestAsset",
             "SharpProof.Package",
             "SharpProof.Smoke.Net472",
             "SharpProof.Testing",
             "SharpProof.Verifier",
-        };
+                ]);
 
     // The worker must not depend on anything that binds C# source.
-    private static readonly string[] CompilerFacingProjects =
+    private static readonly ImmutableArray<string> CompilerFacingProjects =
     [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
@@ -85,7 +86,7 @@ public sealed class ProjectDagTests
         "SharpProof.Frontend",
     ];
 
-    private static readonly string[] Z3Consumers = ["SharpProof.Smt", "SharpProof.Fuzz"];
+    private static readonly ImmutableArray<string> Z3Consumers = ["SharpProof.Smt", "SharpProof.Fuzz"];
 
     [Test]
     public void EveryProductionProjectHasAnExplicitDagEntry()

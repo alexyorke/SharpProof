@@ -5,8 +5,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private sealed class SourceCallFrame(Action<IrBlockId, OperationId, IrTerm?> returned,
         Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> search)
     {
-        private Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> _guarded_search = search ?? throw new System.ArgumentNullException(nameof(search));
-        private Action<IrBlockId, OperationId, IrTerm?> _guarded_returned = returned ?? throw new System.ArgumentNullException(nameof(returned));
+        private readonly Func<IrExceptionKind, OperationId, Func<IrBlockId, IrBlockId>, IrBlockId> _guarded_search = search ?? throw new System.ArgumentNullException(nameof(search));
+        private readonly Action<IrBlockId, OperationId, IrTerm?> _guarded_returned = returned ?? throw new System.ArgumentNullException(nameof(returned));
         internal IrBlockId Entry { get; set; }
         internal void Return(IrBlockId block, OperationId site, IrTerm? value)
         { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); _guarded_returned(block, site, value); }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,7 +11,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
 {
-    private static readonly string[] RefusalDiagnosticIds = ["SP0047", "SP0047", "SPCF0007"];
+    private static readonly ImmutableArray<string> RefusalDiagnosticIds = ["SP0047", "SP0047", "SPCF0007"];
 
     [TestCase(false)]
     [TestCase(true)]

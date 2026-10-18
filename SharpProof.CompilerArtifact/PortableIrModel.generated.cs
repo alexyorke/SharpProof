@@ -63,7 +63,7 @@ internal sealed class PortableIrMember(
 )
 {
     public int Identity { get; set; } = identity;
-    public int DeclaringType { get; set; } = declaringType;
+    public int DeclaringType { get; init; } = declaringType;
     public string Name { get; set; } = name ?? string.Empty;
     public int ReturnType { get; set; } = returnType;
     public bool IsStatic { get; set; } = isStatic;
@@ -88,7 +88,7 @@ internal sealed class PortableIrSourceSpan
     public int Start { get; set; }
     [System.Text.Json.Serialization.JsonRequired]
     public int Length { get; set; }
-    public int Line { get; set; }
+    public int Line { get; init; }
     public int Column { get; set; }
 }
 

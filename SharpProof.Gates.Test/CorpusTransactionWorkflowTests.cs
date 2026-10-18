@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -6,7 +7,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusTransactionWorkflowTests
 {
-    private static readonly string[] ExpectedFiles = ["snapshot.txt"];
+    private static readonly ImmutableArray<string> ExpectedFiles = ["snapshot.txt"];
 
     [Test]
     public async Task EmptyUpdateLeavesExistingCorpusFilesUnchanged()

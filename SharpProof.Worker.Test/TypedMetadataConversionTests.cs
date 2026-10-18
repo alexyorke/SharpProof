@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using NUnit.Framework;
@@ -9,7 +10,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class TypedMetadataConversionTests
 {
-    private static readonly string[] NumericTypes = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
+    private static readonly ImmutableArray<string> NumericTypes = ["sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"];
 
     private static IEnumerable<TestCaseData> Conversions()
     {

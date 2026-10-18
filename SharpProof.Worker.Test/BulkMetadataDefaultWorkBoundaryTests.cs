@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,9 +16,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class BulkMetadataDefaultWorkBoundaryTests
 {
-    private static readonly int[] DivisionInputs = [3, 2];
-    private static readonly int[] MetadataInputs = [3];
-    private static readonly bool[] ExpectedPreconditions = [true];
+    private static readonly ImmutableArray<int> DivisionInputs = [3, 2];
+    private static readonly ImmutableArray<int> MetadataInputs = [3];
+    private static readonly ImmutableArray<bool> ExpectedPreconditions = [true];
 
     [Test]
     public void NaturalMetadataDivisionStopsAtTheDefaultFaultWorkBoundary()
@@ -213,9 +214,12 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
     }
 
-    private static void AssertCompleteControl(MetadataTestSubject subject, int[] inputs, int expected)
+    private static void AssertCompleteControl(MetadataTestSubject subject, ImmutableArray<int> inputs, int expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(inputs));
+        }
         System.ArgumentNullException.ThrowIfNull(subject);
         AssertCallerShape(subject.Compilation, discarded: inputs.Length == 1);
         var references = Capture(subject.Compilation);

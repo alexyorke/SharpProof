@@ -246,7 +246,7 @@ internal static class GeneratedDomainLawAssertions
 
 internal static class GeneratedDomainSamples
 {
-    private static readonly int[] Moduli = [1, 2, 3, 4, 5, 8, 16];
+    private static readonly ImmutableArray<int> Moduli = [1, 2, 3, 4, 5, 8, 16];
 
     public static IReadOnlyList<IntervalValue> Intervals(int seed, int count)
     {

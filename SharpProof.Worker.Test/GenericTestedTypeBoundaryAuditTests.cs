@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -68,7 +69,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericTypeBoundary_" + boundary, isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         try
         {
             var subject = runtime.LoadFromStream(image).GetType("Subject")!;
@@ -154,7 +155,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
         return new(boundary, cases, claim.Outcome, claim.Reason);
     }
 
-    private static CaseObservation[] ObserveCases(string boundary, MethodInfo target, MethodInfo control)
+    private static ImmutableArray<CaseObservation> ObserveCases(string boundary, MethodInfo target, MethodInfo control)
     {
         System.ArgumentNullException.ThrowIfNull(control);
         System.ArgumentNullException.ThrowIfNull(target);
@@ -380,10 +381,10 @@ public sealed class GenericTestedTypeBoundaryAuditTests
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
-    private sealed record BoundaryObservation(string Boundary, CaseObservation[] Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
+    private sealed record BoundaryObservation(string Boundary, ImmutableArray<CaseObservation> Cases, WorkerClaimOutcome Outcome, WorkerClaimReason Reason)
     {
         public string Boundary { get; init; } = Boundary ?? throw new System.ArgumentNullException(nameof(Boundary));
-        public CaseObservation[] Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+        public ImmutableArray<CaseObservation> Cases { get; init; } = Cases.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Cases)) : Cases;
     }
 
     private sealed record CaseObservation(string Name, string ValueType, string TestedType, Measurement Target, Measurement Control)
