@@ -2,7 +2,8 @@
 
 The automatic inventory covers every declared public, protected, and protected-internal
 type/member in **Microsoft.NETCore.App.Ref 9.0.18 / net9.0**, supplied by the canonical
-.NET SDK 9.0.316 container. This is a framework API inventory, not an inventory of
+container's pinned .NET SDK 9.0.316 reference-pack stage. The primary build SDK and
+minimum supported SDK remain independently pinned. This is a framework API inventory, not an inventory of
 SDK command-line tools. It does not load implementation assemblies or execute API bodies.
 
 The unit is `(defining assembly name, XML documentation declaration ID)`. Overloads

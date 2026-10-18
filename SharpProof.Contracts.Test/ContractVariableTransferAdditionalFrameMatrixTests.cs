@@ -92,7 +92,7 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
 
         Assert.That(substitutions, Is.Not.Null);
         var actualSubstitutions = substitutions ?? throw new AssertionException("Expected a successful actual instance frame transfer.");
-        Assert.That(substitutions, Is.Empty);
+        Assert.That(actualSubstitutions, Is.Empty);
     }
 
     private static ImmutableDictionary<IrVarId, IrTerm>? Transfer(

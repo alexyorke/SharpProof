@@ -1,6 +1,7 @@
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc
 ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim@sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8
 ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.410-bookworm-slim@sha256:b56053d0a8f4627047740941396e76cd9e7a9421c83b1d81b68f10e5019862d7
+ARG DOTNET_API_REFERENCE_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim@sha256:2205fd3a7cf5e422c58398a9968aa8b5041fdbb47c76574fe631082e4cbfa2b8
 ARG DOTNET_TEST_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76
 ARG POWERSHELL_IMAGE=mcr.microsoft.com/powershell:7.5-debian-12@sha256:7ab5bd5ca6f95a3351fa0c6a1205237d57048c94542355aab55519a0861a9b25
 
@@ -8,6 +9,7 @@ FROM ${POWERSHELL_IMAGE} AS powershell
 FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime
 FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk
 FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
+FROM ${DOTNET_API_REFERENCE_IMAGE} AS api-reference
 
 FROM ${DOTNET_SDK_IMAGE} AS toolchain
 ARG TARGETOS
@@ -31,6 +33,8 @@ COPY --from=minimum-sdk /usr/share/dotnet/shared /usr/share/dotnet/shared
 COPY --from=minimum-sdk /usr/share/dotnet/packs /usr/share/dotnet/packs
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16
+# Keep the reviewed API inventory pack alongside the minimum-SDK packs.
+COPY --from=api-reference /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
 RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \

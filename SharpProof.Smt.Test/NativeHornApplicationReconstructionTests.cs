@@ -74,6 +74,7 @@ public sealed class NativeHornApplicationReconstructionTests
 
     [TestCase("add", Z3_decl_kind.Z3_OP_ADD, 3, 32, 10UL)]
     [TestCase("multiply", Z3_decl_kind.Z3_OP_MUL, 3, 32, 30UL)]
+    [TestCase("subtract", Z3_decl_kind.Z3_OP_SUB, 2, 32, 3UL)]
     [TestCase("negate", Z3_decl_kind.Z3_OP_UMINUS, 1, 32, 4294967291UL)]
     [TestCase("bvadd", Z3_decl_kind.Z3_OP_BADD, 2, 8, 0UL)]
     [TestCase("bvmultiply", Z3_decl_kind.Z3_OP_BMUL, 2, 8, 254UL)]
@@ -102,7 +103,7 @@ public sealed class NativeHornApplicationReconstructionTests
         {
             "add" => context.MkAdd(two, three, five),
             "multiply" => context.MkMul(two, three, five),
-            "subtract" => context.MkSub(five, two, three),
+            "subtract" => context.MkSub(five, two),
             "negate" => context.MkUnaryMinus(five),
             "bvadd" => context.MkBVAdd(minusOne, bvOne),
             "bvmultiply" => context.MkBVMul(minusOne, bvTwo),
@@ -116,7 +117,7 @@ public sealed class NativeHornApplicationReconstructionTests
         Expr[] expectedArguments = operation switch
         {
             "add" or "multiply" => [two, three, five],
-            "subtract" => [five, two, three],
+            "subtract" => [five, two],
             "negate" => [five],
             "bvadd" or "bvsubtract" => [minusOne, bvOne],
             "bvmultiply" => [minusOne, bvTwo],
