@@ -24,6 +24,7 @@ x-sharpproof-common: &sharpproof-common
     NUGET_PACKAGES: /home/sharpproof/.nuget/packages
     DOTNET_CLI_HOME: /home/sharpproof/.dotnet
     SHARPPROOF_REPO_ROOT: /workspace/SharpProof
+    SHARPPROOF_COVERAGE_COMPARISON_REF: ${SHARPPROOF_COVERAGE_COMPARISON_REF:-}
     # Keep automatic CPU/2 project parallelism by default, but allow a
     # caller running several containers to cap each container's lane budget.
     SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
@@ -71,6 +72,17 @@ services:
       - *sharpproof-dotnet-volume
       - ./artifacts:/workspace/LoopArtifacts
     command: ["dev", "-lc", "while sleep 1000; do :; done"]
+
+  # Lint tools are layered over the canonical toolchain only for this service.
+  lint:
+    <<: *sharpproof-common
+    image: ${COMPOSE_PROJECT_NAME}-lint:local
+    build:
+      context: .
+      dockerfile: eng/lint/Dockerfile
+      additional_contexts:
+        canonical_tooling: service:tooling
+    command: ["lint"]
 
   tooling:
     <<: *sharpproof-common

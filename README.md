@@ -1,20 +1,48 @@
 # SharpProof
 
-SharpProof checks C# contracts and effects. Its portable analyzer reports usage problems and conservative effect information; its optional build verifier proves selected claims with a bounded native Z3 worker.
+SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style project and build to run the analyzer and full verification automatically.
 
 **This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
+## Repository checks
+
+Run all repository lint, spelling, package compatibility, and link checks with one
+Docker command:
+
+```sh
+docker compose run --rm --build lint
+```
+
+It builds the pinned toolchain and lint tools automatically, writes reports under
+`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
+`pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](eng/lint/README.md)
+for scope and individual checks.
+
 ## Packages
+
+The standard setup is `dotnet add package SharpProof` using your configured feed, or this one reference with no SharpProof configuration properties:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+</ItemGroup>
+```
+
+It restores the contract API, analyzer, worker, and pinned native solver automatically and defaults to strict verification. Keep the standard reference without `PrivateAssets="all"` so application contract dependencies propagate. The internal dependency graph remains version-matched; no separate installation is needed.
 
 | Package | Purpose |
 | --- | --- |
 | `SharpProof.Attributes` | Application contract API and IntelliSense XML; targets netstandard2.0 |
-| `SharpProof` | Portable analyzer, companion validation hook, compiler collector, and build configuration |
-| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64 and macOS Z3 payloads |
+| `SharpProof` | Standard complete entrypoint: automatically restores the API, analyzer, build tasks, worker and pinned native solver |
+| `SharpProof.Verifier` | Compatibility entrypoint and implementation payload for analysis and verification |
 
-Reference Attributes from application code. Keep analyzer and verifier references private. Full verification runs in the [canonical container](docs/container-development.md) or natively on macOS ARM64/x64; the portable analyzer does not load native Z3.
+Full verification covers six native OS/architecture combinations: Windows, macOS, and glibc Linux, each on x64 and ARM64, plus the canonical Linux container, within the [host and filesystem support matrix](docs/preview-support.md). Windows solver payloads include the C++ runtime statically, so no separate Visual C++ redistributable installation is needed. Linux requires a compatible glibc distribution and native runtime dependencies; musl remains unsupported. Repository development commands run in the [canonical container](docs/container-development.md). An explicit advisory/off profile opts out of default strict verification.
 
-Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This is a compiler-host requirement, separate from the application's target framework. The canonical image supplies the pinned SDK.
+The standard setup requires .NET SDK 10.0.100 or newer and its .NET 10 runtime, independently of the application's target framework. Explicit portable-only advisory analysis retains its separate SDK 9.0.300+/Roslyn 4.14 minimum; that older host cannot run the default verifier. The canonical image supplies the pinned SDK.
+
+The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
+
+See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
 
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
@@ -36,7 +64,7 @@ public static class Calculator
 
 Contract clauses belong in a contiguous method prologue. They express static conditions and are normally removed by the C# compiler. Do not define `SHARPPROOF_CONTRACTS`: SharpProof has no runtime contract-checking mode.
 
-See [getting started](docs/getting-started.md) for package references, profiles, and verifier policy, and [public API](docs/public-api.md) for the full contract surface.
+Start with the [single-reference setup](docs/getting-started.md#first-use-in-three-steps) and [your first proof](docs/getting-started.md#your-first-proof). [Project templates](templates/README.md) generate the standard setup or an explicit portable-only alternative using this checkout's package version. Follow [incremental adoption](docs/adoption.md) for an existing repository and [upgrades](docs/upgrading.md) when changing versions. See [public API](docs/public-api.md) for the full contract surface.
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 
@@ -47,7 +75,7 @@ From the repository root, with Docker Compose v2 and Linux containers:
 ```text
 docker compose build tooling
 docker compose run --rm tooling contract
-docker compose run --rm tooling test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
+docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
 docker compose run --rm tooling pr
 ```
 

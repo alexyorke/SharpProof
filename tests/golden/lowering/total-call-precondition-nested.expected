@@ -12,18 +12,18 @@ block: b0 entry
 block: b1 cfg:0
   i4 op0 Goto b2 source=none
 block: b2 cfg:1
-  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-nested.cs:214+8
-  i6 op4 Assign v9:int[width=32,signed=True] = v1 source=total-call-precondition-nested.cs:220+1
-  i7 op3 Assign v10:bool[width=0,signed=False] = (v9 >= 0) source=total-call-precondition-nested.cs:214+8
-  i8 op3 Assign v4:int[width=32,signed=True] = v9 source=total-call-precondition-nested.cs:214+8
-  i9 op3 Goto b6 source=total-call-precondition-nested.cs:214+8
+  i5 op3 Assign v8:int[width=32,signed=True] = 0 source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
+  i6 op4 Assign v9:int[width=32,signed=True] = v1 source=total-call-precondition-nested.cs:tokens["x"]#2
+  i7 op3 Assign v10:bool[width=0,signed=False] = (v9 >= 0) source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
+  i8 op3 Assign v4:int[width=32,signed=True] = v9 source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
+  i9 op3 Goto b6 source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
 block: b3 cfg:2
   i37 op0 Return void source=none
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b5 call:continued
-  i35 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-nested.cs:214+8
-  i36 op1 Return v3 source=total-call-precondition-nested.cs:214+8
+  i35 op1 Assign v3:int[width=32,signed=True] = v8 source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
+  i36 op1 Return v3 source=total-call-precondition-nested.cs:tokens["Outer","(","x",")"]#1
 block: b6 call:body
   i10 op5 Assign v5:int[width=32,signed=True] = v4 source=none
   i11 op5 Assign v6:int[width=32,signed=True] = v4 source=none
@@ -31,19 +31,19 @@ block: b6 call:body
 block: b7 call:body
   i13 op5 Goto b8 source=none
 block: b8 call:body
-  i14 op8 Assign v15:int[width=32,signed=True] = 0 source=total-call-precondition-nested.cs:317+12
-  i15 op9 Assign v16:int[width=32,signed=True] = v5 source=total-call-precondition-nested.cs:323+5
-  i16 op8 Assign v17:bool[width=0,signed=False] = (v16 > 0) source=total-call-precondition-nested.cs:317+12
-  i17 op8 Assign v11:int[width=32,signed=True] = v16 source=total-call-precondition-nested.cs:317+12
-  i18 op8 Goto b12 source=total-call-precondition-nested.cs:317+12
+  i14 op8 Assign v15:int[width=32,signed=True] = 0 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
+  i15 op9 Assign v16:int[width=32,signed=True] = v5 source=total-call-precondition-nested.cs:tokens["value"]#3
+  i16 op8 Assign v17:bool[width=0,signed=False] = (v16 > 0) source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
+  i17 op8 Assign v11:int[width=32,signed=True] = v16 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
+  i18 op8 Goto b12 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
 block: b9 call:body
   i19 op5 Goto b5 source=none
 block: b10 call:body
   i20 op5 ExceptionalExit source=none
 block: b11 call:body
-  i21 op6 Assign v7:int[width=32,signed=True] = v15 source=total-call-precondition-nested.cs:317+12
-  i22 op6 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-nested.cs:317+12
-  i23 op6 Goto b5 source=total-call-precondition-nested.cs:317+12
+  i21 op6 Assign v7:int[width=32,signed=True] = v15 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
+  i22 op6 Assign v8:int[width=32,signed=True] = v7 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
+  i23 op6 Goto b5 source=total-call-precondition-nested.cs:tokens["Inner","(","value",")"]#1
 block: b12 call:body
   i24 op10 Assign v12:int[width=32,signed=True] = v11 source=none
   i25 op10 Assign v13:int[width=32,signed=True] = v11 source=none
@@ -51,11 +51,11 @@ block: b12 call:body
 block: b13 call:body
   i27 op10 Goto b14 source=none
 block: b14 call:body
-  i28 op11 Allocate t3:object source=total-call-precondition-nested.cs:422+12
-  i29 op13 Assign v18:int[width=32,signed=True] = v12 source=total-call-precondition-nested.cs:451+5
-  i30 op12 Assign v14:int[width=32,signed=True] = v18 source=total-call-precondition-nested.cs:451+5
-  i31 op12 Assign v15:int[width=32,signed=True] = v14 source=total-call-precondition-nested.cs:451+5
-  i32 op12 Goto b11 source=total-call-precondition-nested.cs:451+5
+  i28 op11 Allocate t3:object source=total-call-precondition-nested.cs:tokens["new","object","(",")"]#1
+  i29 op13 Assign v18:int[width=32,signed=True] = v12 source=total-call-precondition-nested.cs:tokens["value"]#6
+  i30 op12 Assign v14:int[width=32,signed=True] = v18 source=total-call-precondition-nested.cs:tokens["value"]#6
+  i31 op12 Assign v15:int[width=32,signed=True] = v14 source=total-call-precondition-nested.cs:tokens["value"]#6
+  i32 op12 Goto b11 source=total-call-precondition-nested.cs:tokens["value"]#6
 block: b15 call:body
   i33 op10 Goto b11 source=none
 block: b16 call:body

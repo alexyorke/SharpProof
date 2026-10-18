@@ -73,18 +73,18 @@ try {
 
     $manifest = [ordered]@{
         schemaVersion = 1
-        platform = [string]$catalog.platform
-        version = [string]$z3.version
-        sourceUrl = [string]$z3.archiveUrl
-        files = @(
+        platform      = [string]$catalog.platform
+        version       = [string]$z3.version
+        sourceUrl     = [string]$z3.archiveUrl
+        files         = @(
             [ordered]@{
-                name = 'libz3.so'
-                bytes = [int64]$z3.libraryBytes
+                name   = 'libz3.so'
+                bytes  = [int64]$z3.libraryBytes
                 sha256 = [string]$z3.librarySha256
             },
             [ordered]@{
-                name = 'Microsoft.Z3.dll'
-                bytes = [int64]$z3.managedAssemblyBytes
+                name   = 'Microsoft.Z3.dll'
+                bytes  = [int64]$z3.managedAssemblyBytes
                 sha256 = [string]$z3.managedAssemblySha256
             }
         )
@@ -101,66 +101,88 @@ finally {
 
 Write-Output $payloadDirectory
 
-$windows = $z3.windows
-$windowsArchive = Join-Path $resolvedDownload "z3-$($z3.version)-x64-win.zip"
-$windowsExtractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-win-extract"
+$linuxArm64 = $z3.linuxArm64
+$linuxArm64Archive = Join-Path $resolvedDownload "z3-$($z3.version)-linux-arm64.whl"
+$linuxArm64StagingLibrary = Join-Path $resolvedDownload "z3-$($z3.version)-linux-arm64-libz3.so"
 try {
-    if (-not (Test-Path -LiteralPath $windowsArchive -PathType Leaf)) {
-        Invoke-WebRequest -Uri ([string]$windows.archiveUrl) -OutFile $windowsArchive
+    if (-not (Test-Path -LiteralPath $linuxArm64Archive -PathType Leaf)) {
+        Invoke-WebRequest -Uri ([string]$linuxArm64.archiveUrl) -OutFile $linuxArm64Archive
     }
-    Assert-Sha256 $windowsArchive ([string]$windows.archiveSha256) 'Windows Z3 archive'
-
-    if (Test-Path -LiteralPath $windowsExtractRoot) {
-        Remove-Item -LiteralPath $windowsExtractRoot -Recurse -Force
+    Assert-Sha256 $linuxArm64Archive ([string]$linuxArm64.archiveSha256) 'Linux ARM64 Z3 wheel'
+    $linuxArm64Zip = [System.IO.Compression.ZipFile]::OpenRead($linuxArm64Archive)
+    try {
+        # The official wheel also contains an older libz3.so.4.10. Extract only
+        # the exact catalog-owned entry, never a wildcard or a directory tree.
+        $linuxArm64Entry = $linuxArm64Zip.GetEntry([string]$linuxArm64.archiveLibraryPath)
+        if ($null -eq $linuxArm64Entry) {
+            throw 'The verified Linux ARM64 Z3 wheel is missing its catalog-owned native entry.'
+        }
+        Assert-Equal ([int64]$linuxArm64Entry.Length) ([int64]$linuxArm64.libraryBytes) 'Linux ARM64 libz3.so byte length'
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($linuxArm64Entry, $linuxArm64StagingLibrary, $true)
     }
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($windowsArchive, $windowsExtractRoot)
-
-    $windowsLibrary = Join-Path $windowsExtractRoot ([string]$windows.archiveLibraryPath)
-    $windowsManaged = Join-Path $windowsExtractRoot ([string]$windows.archiveManagedAssemblyPath)
-    if (-not (Test-Path -LiteralPath $windowsLibrary -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $windowsManaged -PathType Leaf)) {
-        throw 'The verified Windows Z3 archive did not contain the catalog-owned payload paths.'
-    }
-
-    Assert-Equal ([int64](Get-Item -LiteralPath $windowsLibrary).Length) ([int64]$windows.libraryBytes) 'libz3.dll byte length'
-    Assert-Equal ([int64](Get-Item -LiteralPath $windowsManaged).Length) ([int64]$windows.managedAssemblyBytes) 'Windows Microsoft.Z3.dll byte length'
-    Assert-Sha256 $windowsLibrary ([string]$windows.librarySha256) 'libz3.dll'
-    Assert-Sha256 $windowsManaged ([string]$windows.managedAssemblySha256) 'Windows Microsoft.Z3.dll'
-
-    $windowsPayloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/win-x64"
-    [System.IO.Directory]::CreateDirectory($windowsPayloadDirectory) | Out-Null
-    Copy-Item -LiteralPath $windowsLibrary -Destination (Join-Path $windowsPayloadDirectory 'libz3.dll') -Force
-    Copy-Item -LiteralPath $windowsManaged -Destination (Join-Path $windowsPayloadDirectory 'Microsoft.Z3.dll') -Force
-
-    $windowsManifest = [ordered]@{
-        schemaVersion = 1
-        platform = 'windows/amd64'
-        version = [string]$z3.version
-        sourceUrl = [string]$windows.archiveUrl
-        files = @(
-            [ordered]@{
-                name = 'libz3.dll'
-                bytes = [int64]$windows.libraryBytes
-                sha256 = [string]$windows.librarySha256
-            },
-            [ordered]@{
-                name = 'Microsoft.Z3.dll'
-                bytes = [int64]$windows.managedAssemblyBytes
-                sha256 = [string]$windows.managedAssemblySha256
-            }
-        )
-    }
-    $windowsManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $windowsPayloadDirectory 'payload.json') -Encoding utf8NoBOM
+    finally { $linuxArm64Zip.Dispose() }
+    Assert-Sha256 $linuxArm64StagingLibrary ([string]$linuxArm64.librarySha256) 'Linux ARM64 libz3.so'
+    $linuxArm64PayloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-arm64"
+    [System.IO.Directory]::CreateDirectory($linuxArm64PayloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $linuxArm64StagingLibrary -Destination (Join-Path $linuxArm64PayloadDirectory 'libz3.so') -Force
+    [ordered]@{
+        schemaVersion     = 1
+        platform          = 'linux/arm64'
+        version           = [string]$z3.version
+        sourceUrl         = [string]$linuxArm64.archiveUrl
+        sourceMetadataUrl = [string]$linuxArm64.sourceMetadataUrl
+        files             = @([ordered]@{
+                name   = 'libz3.so'
+                bytes  = [int64]$linuxArm64.libraryBytes
+                sha256 = [string]$linuxArm64.librarySha256
+            })
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath (Join-Path $linuxArm64PayloadDirectory 'payload.json') -Encoding utf8NoBOM
 }
 finally {
-    foreach ($temporaryPath in @($windowsExtractRoot, $windowsArchive)) {
-        if (Test-Path -LiteralPath $temporaryPath) {
-            Remove-Item -LiteralPath $temporaryPath -Recurse -Force
+    foreach ($temporaryPath in @($linuxArm64StagingLibrary, $linuxArm64Archive)) {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
         }
     }
 }
+Write-Output $linuxArm64PayloadDirectory
 
-Write-Output $windowsPayloadDirectory
+# Windows native DLLs are built and pinned in the Docker cross-build stage.
+# Consume only that verified closure; never download the upstream VC-dependent DLL.
+$windowsBuildRoot = '/opt/sharpproof/windows-native'
+foreach ($architecture in @('x64', 'arm64')) {
+    $rid = "win-$architecture"
+    $windows = if ($architecture -ceq 'x64') { $z3.windows } else { $z3.windowsArm64 }
+    $sourceDirectory = Join-Path $windowsBuildRoot $rid
+    $windowsLibrary = Join-Path $sourceDirectory 'libz3.dll'
+    $receiptPath = Join-Path $sourceDirectory 'payload-receipt.json'
+    if (-not (Test-Path -LiteralPath $windowsLibrary -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+        throw "The pinned Windows cross-build payload is missing: $rid"
+    }
+    Assert-Equal ([int64](Get-Item -LiteralPath $windowsLibrary).Length) ([int64]$windows.libraryBytes) "$rid libz3.dll byte length"
+    Assert-Sha256 $windowsLibrary ([string]$windows.librarySha256) "$rid libz3.dll"
+    $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    Assert-Equal ([string]$receipt.rid) $rid "$rid receipt RID"
+    Assert-Equal ([int64]$receipt.libraryBytes) ([int64]$windows.libraryBytes) "$rid receipt native byte length"
+    Assert-Equal ([string]$receipt.librarySha256) ([string]$windows.librarySha256) "$rid receipt native digest"
+    Assert-Equal ([string]$receipt.sourceArchiveSha256) ([string]$z3.windowsCrossBuild.sourceArchiveSha256) "$rid receipt source digest"
+    Assert-Equal ([string]$receipt.compilerArchiveSha256) ([string]$z3.windowsCrossBuild.compilerArchiveSha256) "$rid receipt compiler digest"
+    Assert-Equal ([string]$receipt.sourceCommit) ([string]$z3.windowsCrossBuild.sourceCommit) "$rid receipt source commit"
+    Assert-Equal ([bool]$receipt.sourceModified) $false "$rid source modification status"
+    Assert-Equal ([int64]$receipt.sourceDateEpoch) ([int64]$z3.windowsCrossBuild.sourceDateEpoch) "$rid reproducibility epoch"
+    Assert-Equal ([int64]$receipt.peTimestamp) ([int64]0) "$rid deterministic PE timestamp"
+    $expectedMachine = if ($architecture -ceq 'x64') { '0x8664' } else { '0xaa64' }
+    Assert-Equal ([string]$receipt.peMachine) $expectedMachine "$rid PE machine"
+    $windowsPayloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/$rid"
+    [System.IO.Directory]::CreateDirectory($windowsPayloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $windowsLibrary -Destination (Join-Path $windowsPayloadDirectory 'libz3.dll') -Force
+    Copy-Item -LiteralPath $receiptPath -Destination (Join-Path $windowsPayloadDirectory 'payload.json') -Force
+    # Both architectures use the canonical managed assembly already verified above.
+    Copy-Item -LiteralPath (Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64/Microsoft.Z3.dll") -Destination (Join-Path $windowsPayloadDirectory 'Microsoft.Z3.dll') -Force
+    Write-Output $windowsPayloadDirectory
+}
 
 foreach ($architecture in @('arm64', 'x64')) {
     $mac = $catalog.macos.$architecture

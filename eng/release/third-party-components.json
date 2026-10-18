@@ -1,7 +1,108 @@
 {
   "schemaVersion": 1,
   "packages": {
-    "SharpProof": [
+    "SharpProof": [],
+    "SharpProof.Attributes": [],
+    "SharpProof.Verifier": [
+      {
+        "id": "Microsoft.Z3",
+        "version": "4.12.2",
+        "license": "MIT",
+        "entries": [
+          "tools/net10/Microsoft.Z3.dll",
+          "tools/native/linux-x64/libz3.so",
+          "tools/native/linux-arm64/libz3.so",
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll",
+          "tools/native/osx-arm64/libz3.dylib",
+          "tools/native/osx-x64/libz3.dylib"
+        ],
+        "entrySha256": [
+          {
+            "path": "tools/native/linux-x64/libz3.so",
+            "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
+          },
+          {
+            "path": "tools/native/linux-arm64/libz3.so",
+            "sha256": "2813d0a498cfd56115f6104123454fd0953cefe90fa662aea5c2bf445c7e58ed"
+          },
+          {
+            "path": "tools/native/win-x64/libz3.dll",
+            "sha256": "726da4e2d504e28b38a2182511535a874b5810dd9cf739ec061cbe620b06c143"
+          },
+          {
+            "path": "tools/net10/Microsoft.Z3.dll",
+            "sha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+          },
+          {
+            "path": "tools/native/osx-arm64/libz3.dylib",
+            "sha256": "805397314d7308c52fbbefd16175e905f79771f20cc23dfd2eee9d5e90c63473"
+          },
+          {
+            "path": "tools/native/osx-x64/libz3.dylib",
+            "sha256": "76f238b9c4ddac577bc349c18d397dec1ac616933936a834172f453a98fc3ab8"
+          },
+          {
+            "path": "tools/native/win-arm64/libz3.dll",
+            "sha256": "5bb22c138161b7ab743a72af809ade13153e0478b799bfedf148f5684cac0013"
+          }
+        ]
+      },
+      {
+        "id": "LLVM.libc++",
+        "version": "23.1.3",
+        "license": "Apache-2.0 WITH LLVM-exception",
+        "linkage": "static",
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-23.1.3/libcxx",
+        "entries": [
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll"
+        ]
+      },
+      {
+        "id": "LLVM.libc++abi",
+        "version": "23.1.3",
+        "license": "Apache-2.0 WITH LLVM-exception",
+        "linkage": "static",
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-23.1.3/libcxxabi",
+        "entries": [
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll"
+        ]
+      },
+      {
+        "id": "LLVM.libunwind",
+        "version": "23.1.3",
+        "license": "Apache-2.0 WITH LLVM-exception",
+        "linkage": "static",
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-23.1.3/libunwind",
+        "entries": [
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll"
+        ]
+      },
+      {
+        "id": "LLVM.compiler-rt",
+        "version": "23.1.3",
+        "license": "Apache-2.0 WITH LLVM-exception",
+        "linkage": "static",
+        "source": "https://github.com/llvm/llvm-project/tree/llvmorg-23.1.3/compiler-rt",
+        "entries": [
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll"
+        ]
+      },
+      {
+        "id": "MinGW-w64.runtime",
+        "version": "15.0.0",
+        "license": "LicenseRef-MinGW-w64-runtime",
+        "linkage": "static",
+        "source": "https://github.com/mingw-w64/mingw-w64/tree/a3d93999ef0521681d45e445c39964a7af0f593f",
+        "entries": [
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/win-arm64/libz3.dll"
+        ]
+      },
       {
         "id": "Microsoft.Bcl.AsyncInterfaces",
         "version": "10.0.10",
@@ -96,76 +197,6 @@
         "license": "MIT",
         "entries": [
           "tools/shared/netstandard2.0/System.Threading.Tasks.Extensions.dll"
-        ]
-      }
-    ],
-    "SharpProof.Attributes": [],
-    "SharpProof.Verifier": [
-      {
-        "id": "Microsoft.Z3",
-        "version": "4.12.2",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/Microsoft.Z3.dll",
-          "tools/native/linux-x64/libz3.so",
-          "tools/native/win-x64/libz3.dll",
-          "tools/native/osx-arm64/libz3.dylib",
-          "tools/native/osx-x64/libz3.dylib"
-        ],
-        "entrySha256": [
-          {
-            "path": "tools/native/linux-x64/libz3.so",
-            "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
-          },
-          {
-            "path": "tools/native/win-x64/libz3.dll",
-            "sha256": "3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae"
-          },
-          {
-            "path": "tools/net9/Microsoft.Z3.dll",
-            "sha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
-          },
-          {
-            "path": "tools/native/osx-arm64/libz3.dylib",
-            "sha256": "805397314d7308c52fbbefd16175e905f79771f20cc23dfd2eee9d5e90c63473"
-          },
-          {
-            "path": "tools/native/osx-x64/libz3.dylib",
-            "sha256": "76f238b9c4ddac577bc349c18d397dec1ac616933936a834172f453a98fc3ab8"
-          }
-        ]
-      },
-      {
-        "id": "System.Collections.Immutable",
-        "version": "9.0.18",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Collections.Immutable.dll"
-        ]
-      },
-      {
-        "id": "System.IO.Pipelines",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.IO.Pipelines.dll"
-        ]
-      },
-      {
-        "id": "System.Text.Encodings.Web",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Text.Encodings.Web.dll",
-          "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
-        ]
-      },
-      {
-        "id": "System.Text.Json",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Text.Json.dll"
         ]
       }
     ]

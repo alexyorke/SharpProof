@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "SharpProof contributors",
+  "classifications": ["SharpProof", "Library"],
+  "identity": "SharpProof.Verified.Library",
+  "name": "SharpProof single-reference verified library",
+  "shortName": "sp-verified",
+  "sourceName": "SharpProofStarter",
+  "preferNameDirectory": true,
+  "sources": [{ "source": "./", "target": "./", "rename": { "SharpProofStarter.csproj.in": "SharpProofStarter.csproj" } }],
+  "symbols": {
+    "packageVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "description": "Matching SharpProof package version; installer supplies the checkout default.",
+      "isRequired": true,
+      "replaces": "SHARPPROOF_PACKAGE_VERSION"
+    }
+  }
+}

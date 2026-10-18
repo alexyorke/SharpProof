@@ -1,0 +1,13 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../../'))" />
+  <Import Project="../../eng/NonProductionDefaults.props" />
+  <PropertyGroup>
+    <SharpProofSamplePackageVersion>$(SharpProofPackageVersion)</SharpProofSamplePackageVersion>
+    <SharpProofProfile>advisory</SharpProofProfile>
+    <SharpProofFeatures>all</SharpProofFeatures>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof"
+                      Version="$(SharpProofSamplePackageVersion)" />
+  </ItemGroup>
+</Project>

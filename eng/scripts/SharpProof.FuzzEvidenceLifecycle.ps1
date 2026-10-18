@@ -1,0 +1,340 @@
+Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
+
+function Get-SharpProofRotatingSeed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][DateTime]$UtcDate)
+
+    $utcDay = [int]$UtcDate.ToUniversalTime().Date.Subtract(
+        [DateTime]::UnixEpoch).TotalDays
+    return [int]($utcDay * 1009 + [int][Math]::Floor($utcDay / 397))
+}
+
+function Get-SharpProofCleanFuzzSourceCommit {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $headOutput = @(& git -C $RepositoryRoot rev-parse HEAD)
+    $headExitCode = $LASTEXITCODE
+    $head = if ($headOutput.Count -eq 1) {
+        ([string]$headOutput[0]).Trim()
+    }
+    else {
+        ''
+    }
+    if ($headExitCode -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
+        throw 'Unable to bind fuzz evidence to the exact source commit.'
+    }
+    $dirty = @(& git -C $RepositoryRoot status `
+            --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
+        throw 'Fuzz evidence requires a clean repository source tree.'
+    }
+    return $head
+}
+
+function Assert-SharpProofFuzzCaseBudget {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][object]$Value,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if (($Value -isnot [int] -and $Value -isnot [int64]) -or
+        [int64]$Value -le 0 -or [int64]$Value -gt 1000000) {
+        throw "$Name must be an integer from 1 through 1000000."
+    }
+    return [int]$Value
+}
+
+function Assert-SharpProofFuzzCampaignBudget {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][int]$RotatingCases,
+        [Parameter(Mandatory = $true)][int]$RetainedCases,
+        [Parameter(Mandatory = $true)][int]$RetainedRunCount,
+        [Parameter(Mandatory = $true)][int]$MaximumCases
+    )
+
+    if ($RotatingCases -le 0 -or $RetainedCases -le 0 -or
+        $RetainedRunCount -lt 0 -or $RetainedRunCount -gt 1024 -or
+        $MaximumCases -le 0) {
+        throw 'Fuzz campaign budget inputs are invalid.'
+    }
+    [long]$requestedCases = [long]$RotatingCases +
+    [long]$RetainedCases * [long]$RetainedRunCount
+    if ($requestedCases -gt $MaximumCases) {
+        throw "Fuzz campaign requests $requestedCases cases; maximum is $MaximumCases."
+    }
+    return [int]$requestedCases
+}
+
+function Get-SharpProofFuzzCampaignSchedule {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][int]$RotatingSeed,
+        [Parameter(Mandatory = $true)][int[]]$RetainedSeeds,
+        [Parameter(Mandatory = $true)][int]$RotatingCases,
+        [Parameter(Mandatory = $true)][int]$RetainedCases,
+        [Parameter(Mandatory = $true)][int]$MaximumCases
+    )
+
+    $rotatingCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RotatingCases -Name 'rotatingCases'
+    $retainedCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RetainedCases -Name 'retainedCasesPerSeed'
+    $maximumCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $MaximumCases -Name 'maximumCampaignCases'
+    $retainedRunSeeds = [Collections.Generic.List[int]]::new()
+    $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+    $sharedRetainedSeed = $false
+    foreach ($seed in $RetainedSeeds) {
+        if (-not $seenSeeds.Add($seed)) {
+            throw 'The retained fuzz seed schedule contains duplicate seeds.'
+        }
+        if ($seed -eq $RotatingSeed) {
+            $sharedRetainedSeed = $true
+        }
+        else {
+            $retainedRunSeeds.Add($seed)
+        }
+    }
+
+    $scheduledRotatingCases = $rotatingCaseCount
+    if ($sharedRetainedSeed -and
+        $retainedCaseCount -gt $scheduledRotatingCases) {
+        $scheduledRotatingCases = $retainedCaseCount
+    }
+    $requestedCases = Assert-SharpProofFuzzCampaignBudget `
+        -RotatingCases $scheduledRotatingCases `
+        -RetainedCases $retainedCaseCount `
+        -RetainedRunCount $retainedRunSeeds.Count `
+        -MaximumCases $maximumCaseCount
+
+    return [pscustomobject]@{
+        RotatingCases          = $scheduledRotatingCases
+        RequestedRotatingCases = $rotatingCaseCount
+        RetainedCasesPerSeed   = $retainedCaseCount
+        RetainedSeeds          = [int[]]$RetainedSeeds
+        RetainedRunSeeds       = $retainedRunSeeds.ToArray()
+        SharedRetainedSeed     = $sharedRetainedSeed
+        RequestedCases         = $requestedCases
+    }
+}
+
+function Read-SharpProofRetainedFuzzSeedManifest {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [scriptblock]$AfterValidation
+    )
+
+    $document = $null
+    try {
+        $validation = Read-SharpProofBoundedJsonDocument -Path $Path `
+            -ByteLimitMessage 'The retained fuzz seed manifest exceeds its byte limit.' `
+            -ShortReadMessage 'The retained fuzz seed manifest changed while read.' `
+            -GrowthMessage 'The retained fuzz seed manifest changed while read.'
+        $document = $validation.Document
+        $root = $document.RootElement
+        if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'The retained fuzz seed manifest must be an object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($root.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -RejectDuplicates `
+            -Expected @('schemaVersion', 'casesPerSeed', 'seeds') `
+            -Description 'Retained fuzz seed manifest'
+
+        [int]$schemaVersion = 0
+        $schema = $root.GetProperty('schemaVersion')
+        if ($schema.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
+            -not $schema.TryGetInt32([ref]$schemaVersion)) {
+            throw 'The retained fuzz seed schema version must be an exact Int32.'
+        }
+        [int]$casesPerSeed = 0
+        $cases = $root.GetProperty('casesPerSeed')
+        if ($cases.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
+            -not $cases.TryGetInt32([ref]$casesPerSeed)) {
+            throw 'Retained fuzz cases per seed must be an exact Int32.'
+        }
+        $seedValues = $root.GetProperty('seeds')
+        if ($seedValues.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
+            throw 'Retained fuzz seeds must be an array.'
+        }
+        $seeds = [Collections.Generic.List[int]]::new()
+        $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+        $hasDuplicateSeed = $false
+        foreach ($element in $seedValues.EnumerateArray()) {
+            [int]$seed = 0
+            if ($element.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
+                -not $element.TryGetInt32([ref]$seed)) {
+                throw 'Every retained fuzz seed must be an exact Int32.'
+            }
+            $seeds.Add($seed)
+            if (-not $seenSeeds.Add($seed)) {
+                $hasDuplicateSeed = $true
+            }
+        }
+        if ($schemaVersion -ne 1 -or $casesPerSeed -le 0 -or
+            $casesPerSeed -gt 1000000 -or
+            $seeds.Count -eq 0 -or $seeds.Count -gt 1024) {
+            throw 'Invalid retained fuzz seed manifest.'
+        }
+        if ($hasDuplicateSeed) {
+            throw 'The retained fuzz seed manifest contains duplicate seeds.'
+        }
+        if ($null -ne $AfterValidation) {
+            & $AfterValidation $Path
+        }
+
+        return [pscustomobject]@{
+            SchemaVersion = $schemaVersion
+            CasesPerSeed  = $casesPerSeed
+            Seeds         = @($seeds)
+        }
+    }
+    finally {
+        if ($null -ne $document) { $document.Dispose() }
+    }
+}
+
+function Get-SharpProofRetainedFuzzSeed {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $manifest = Read-SharpProofRetainedFuzzSeedManifest -Path $Path
+    $seeds = @($manifest.Seeds)
+    if ($seeds.Count -ne 1) {
+        throw 'The acceptance fuzz run requires exactly one retained seed.'
+    }
+    return [int]$seeds[0]
+}
+
+function Initialize-SharpProofFuzzEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory
+    )
+
+    [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+    foreach ($file in [IO.Directory]::EnumerateFiles($OutputDirectory)) {
+        $name = [IO.Path]::GetFileName($file)
+        if ($name -ceq 'campaign.json' -or
+            $name -ceq '.campaign.json.tmp') {
+            [IO.File]::Delete($file)
+            continue
+        }
+        if ($name -cmatch `
+                '^(?:rotating|retained)-(?<seed>-?[0-9]+)\.(?:stdout\.json|stderr\.txt)$') {
+            $seed = 0
+            $seedToken = $Matches.seed
+            if ([int]::TryParse(
+                    $seedToken,
+                    [Globalization.NumberStyles]::Integer,
+                    [Globalization.CultureInfo]::InvariantCulture,
+                    [ref]$seed) -and
+                $seedToken -ceq $seed.ToString(
+                    [Globalization.CultureInfo]::InvariantCulture)) {
+                [IO.File]::Delete($file)
+            }
+        }
+    }
+}
+
+function Enter-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [ValidateRange(0, 3600)]
+        [int]$TimeoutSeconds = 120
+    )
+
+    [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+    $lockPath = Join-Path $OutputDirectory '.campaign.lock'
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            # FileShare.None makes the lock a process-held lease over the
+            # whole namespace, including initialization and publication.
+            return [IO.FileStream]::new(
+                $lockPath,
+                [IO.FileMode]::OpenOrCreate,
+                [IO.FileAccess]::ReadWrite,
+                [IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Timed out acquiring fuzz evidence lease: $lockPath"
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Exit-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [IO.FileStream]$Lease
+    )
+
+    $Lease.Dispose()
+}
+
+function Publish-SharpProofFuzzEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Json
+    )
+
+    $destination = Join-Path $OutputDirectory 'campaign.json'
+    $temporary = Join-Path $OutputDirectory '.campaign.json.tmp'
+    try {
+        [IO.File]::WriteAllText(
+            $temporary,
+            $Json,
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::Move($temporary, $destination, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporary)) {
+            [IO.File]::Delete($temporary)
+        }
+    }
+}
+
+function Complete-SharpProofFuzzEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Summary
+    )
+
+    $json = ($Summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
+    Write-Output $json
+    Publish-SharpProofFuzzEvidence `
+        -OutputDirectory $OutputDirectory `
+        -Json ($json + "`n")
+    if (-not [bool]$Summary.passed) {
+        $destination = Join-Path $OutputDirectory 'campaign.json'
+        throw "SharpProof fuzz campaign failed. Evidence: $destination"
+    }
+}

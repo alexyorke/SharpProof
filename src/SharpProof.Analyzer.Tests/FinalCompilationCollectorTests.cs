@@ -1,0 +1,2072 @@
+using System.Collections.Immutable;
+using System.Globalization;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
+using SharpProof.Contracts;
+using SharpProof.Ir;
+using SharpProof.Testing;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Analyzer.Test;
+
+[TestFixture]
+public sealed class FinalCompilationCollectorTests
+{
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task EmittedQueryPredicatesRetainTheirClaimsThroughThePublicCollector(bool querySyntax)
+    {
+        using var workspace = new CollectorWorkspace();
+        var sequence = querySyntax
+            ? "(from item in new[] { value } select item)"
+            : "new[] { value }.Select(item => item)";
+        var compilation = CreateCompilation(
+            $$"""
+            using System.Linq;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Root(int value) {
+                    Contract.Ensures({{sequence}}.Single() == value);
+                    return value;
+                }
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("query-predicate"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().Evidence, Is.EqualTo(WorkerClaimEvidence.DirectClause));
+            Assert.That(artifact.Manifest.Claims.Single().CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(method)));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CyclicStaticFieldWritesDoNotPublishAnInitializationSafetyConstraint(bool cyclic)
+    {
+        using var workspace = new CollectorWorkspace();
+        var secondWrite = cyclic ? "First.Value = 2;" : "Value = 2;";
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal static class First {
+                internal static int Value;
+                static First() { Second.Value = 1; }
+                [DoesNotThrow]
+                internal static int Root() => 1;
+            }
+            internal static class Second {
+                internal static int Value;
+                static Second() { {{secondWrite}} }
+            }
+            """).WithAssemblyName(cyclic ? "CyclicInitializerFixture" : "AcyclicInitializerFixture");
+        var image = AnalyzerTestHost.EmitImage(compilation);
+        Assert.That(image, Is.Not.Empty);
+        var runtimeAssembly = System.Reflection.Assembly.Load(image);
+        var runtimeRoot = runtimeAssembly.GetType("First", throwOnError: true)!
+            .GetMethod("Root", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        object? runtimeResult = null;
+        Assert.DoesNotThrow((Action)(() => { runtimeResult = runtimeRoot.Invoke(null, null); }));
+        Assert.That(runtimeResult, Is.EqualTo(1));
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("cyclic-initialization"));
+        var prepared = artifact.Callables.Single();
+        Assert.That(prepared.Total, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(prepared.Total!.IsBodyAbstraction, Is.False);
+            Assert.That(prepared.Total.ExceptionConstraints, Has.Length.EqualTo(cyclic ? 0 : 1));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReferenceCaptureRejectsAnActualBackingFileKindChange(bool originalAssembly)
+    {
+        using var workspace = new CollectorWorkspace();
+        const string dependencySource = "public static class Dependency { public static int Value => 1; }";
+        var originalKind = originalAssembly ? OutputKind.DynamicallyLinkedLibrary : OutputKind.NetModule;
+        var replacementKind = originalAssembly ? OutputKind.NetModule : OutputKind.DynamicallyLinkedLibrary;
+        var originalImage = EmitImage(dependencySource, "KindDependency", originalKind);
+        var replacementImage = EmitImage(dependencySource, "KindDependency", replacementKind);
+        var path = Path.Combine(workspace.Path, originalAssembly ? "KindDependency.dll" : "KindDependency.netmodule");
+        await File.WriteAllBytesAsync(path, originalImage);
+        var properties = new MetadataReferenceProperties(originalAssembly ? MetadataImageKind.Assembly : MetadataImageKind.Module);
+        var reference = MetadataReference.CreateFromImage(originalImage, properties, filePath: path);
+        var compilation = CreateCompilation("internal static class Subject { internal static int Root() => Dependency.Value; }")
+            .AddReferences(reference);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        Assert.That(compilation.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+        Assert.That(compilation.GetTypeByMetadataName("Dependency"), Is.Not.Null);
+        var originalCapture = CompilerCompilationCapture.CaptureReferences(
+            compilation.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken).Single(snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Modules[0].Path == NormalizePath(path)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(originalCapture.Modules, Has.Length.EqualTo(1));
+            Assert.That(originalCapture.Modules[0].Sha256, Is.EqualTo(ReadSha256(path)));
+            Assert.That(originalCapture.Modules[0].Mvid, Is.EqualTo(ReadMvid(path)));
+            Assert.That(originalCapture.Modules[0].SizeBytes, Is.EqualTo(originalImage.Length));
+        }
+        await File.WriteAllBytesAsync(path, replacementImage);
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            _ = CompilerCompilationCapture.CaptureReferences(
+                compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(exception!.Message, Is.EqualTo("A compiler reference kind does not match its file metadata."));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReceiverFieldPostconditionAdmitsExactBodyAndRejectsOpaqueArrayMutation(bool mutate)
+    {
+        using var workspace = new CollectorWorkspace();
+        var mutation = mutate ? "Mutator.Clear(values);" : string.Empty;
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal class Subject {
+                public int Count;
+                internal int Run(int[] values) {
+                    Contract.Ensures(this.Count > 0);
+                    {{mutation}}
+                    return values[0];
+                }
+            }
+            internal static class Mutator {
+                static Mutator() { }
+                internal static void Clear(int[] values) =>
+                    System.Array.Clear(values, 0, values.Length);
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("receiver-field-array-clear"));
+        var total = artifact.Callables.Single().Total;
+        if (total != null)
+        {
+            var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                .GroupBy(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)).OrderBy(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key)).Take(8)
+                .Select(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (FormattableString.Invariant($"{group.Key}:{group.Count()}"))));
+            await TestContext.Out.WriteLineAsync(FormattableString.Invariant(
+                $"Receiver artifact: mutate={mutate}, abstraction={total.IsBodyAbstraction}, receiver={total.HasReceiver}, parameters={total.Parameters.Length}, clauses={total.Clauses.Length}, terms={total.Graph.Terms.Length}, instructions={instructionKinds}"));
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+        if (mutate)
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+        }
+        else
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
+            Assert.That(artifact.Callables.Single().Total!.IsBodyAbstraction, Is.False);
+            Assert.That(artifact.Callables.Single().Total!.HasReceiver, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task EmittedMetadataEffectUsesActualSourceCompanionLocation()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataEffectLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataEffectLocationControl", image, assembly =>
+        {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                public static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+            .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-effect-location"),
+            captureRawArtifact: true);
+        var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
+        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(3));
+            Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(attributeClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(effectClaim.Evidence, Is.EqualTo(WorkerClaimEvidence.Attribute));
+            Assert.That(effectClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(effectClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(effectClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(effectClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.Location.Line, Is.EqualTo(attributeClaim.Location.Line).And.GreaterThan(0));
+            Assert.That(effectClaim.Location.Column, Is.EqualTo(attributeClaim.Location.Column).And.GreaterThan(0));
+            Assert.That(unchangedImage, Is.EqualTo(image));
+        }
+    }
+
+    // Raw component rejection boundary; a mismatched companion does not authorize a public proof.
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MetadataCompanionSignatureFailureRetainsUnlocatedComponentClaims(bool matchingSignature)
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataRejectedCompanionLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", image, assembly =>
+        {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var companionSource = matchingSignature
+            ? """
+              using SharpProof.Attributes;
+              [ContractFor(typeof(Dependency))]
+              public static class DependencyContracts {
+                  public static int Identity(int value) {
+                      Contract.Ensures(Contract.Result<int>() == value);
+                      return value;
+                  }
+              }
+              """
+            : """
+              using SharpProof.Attributes;
+              [ContractFor(typeof(Dependency))]
+              public static class DependencyContracts {
+                  public static int Identity(string value) {
+                      Contract.Ensures(Contract.Result<int>() == 7);
+                      return 7;
+                  }
+              }
+              """;
+        var compilation = CreateCompilation(companionSource)
+            .AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        Assert.That(binding.IsSuccess, Is.EqualTo(matchingSignature));
+        Assert.That(binding.Failure, Is.EqualTo(matchingSignature
+            ? ContractBindingFailure.None : ContractBindingFailure.CompanionSignatureMismatch));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        Assert.That(discovery.Targets, Has.Count.EqualTo(1));
+        var target = discovery.Targets.Values.Single();
+        Assert.That(SymbolEqualityComparer.Default.Equals(target.Method, method), Is.True);
+        Assert.That(discovery.Manifest.Claims, Has.Length.EqualTo(matchingSignature ? 3 : 2));
+        var path = workspace.SealPath("metadata-rejected-companion-location");
+        if (matchingSignature)
+        {
+            var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
+                .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+                .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+            var artifact = await EmitArtifact(compilation, path, captureRawArtifact: true);
+            foreach (var claim in artifact.Manifest.Claims.Where(static claim =>
+                         claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence is WorkerClaimEvidence.ReturnAttribute or WorkerClaimEvidence.Attribute)))
+            {
+                Assert.That(claim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+                Assert.That(claim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+                Assert.That(claim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+                Assert.That(claim.Location.Line, Is.GreaterThan(0));
+                Assert.That(claim.Location.Column, Is.GreaterThan(0));
+            }
+        }
+        else
+        {
+            Assert.That(target.IsVerifierSupported, Is.False);
+            var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
+            var capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
+            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken), Is.Null);
+            foreach (var location in discovery.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location))
+                         .Append(target.Entry.Location))
+            {
+                Assert.That(location.Path, Is.Empty);
+                Assert.That(location.Start, Is.EqualTo(0));
+                Assert.That(location.Length, Is.EqualTo(0));
+                Assert.That(location.Line, Is.EqualTo(0));
+                Assert.That(location.Column, Is.EqualTo(0));
+            }
+            Func<Task> capture = async () => { await EmitArtifact(compilation, path, captureRawArtifact: true); };
+            Assert.ThrowsAsync<System.Text.Json.JsonException>(capture);
+        }
+        Assert.That(await File.ReadAllBytesAsync(dependencyPath), Is.EqualTo(image));
+    }
+    [Test]
+    public async Task EmittedMetadataEffectWithBodylessCompanionRetainsValidOwnedLocation()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataBodylessEffectLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectLocationControl", image, assembly =>
+        {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                [System.Runtime.InteropServices.DllImport("unused_companion_contract")]
+                public static extern int Identity(int value);
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        var companion = compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(companion.IsExtern, Is.True);
+        var companionDeclaration = await companion.DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        Assert.That(companionDeclaration, Is.TypeOf<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        var bodylessDeclaration = (Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax)companionDeclaration;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bodylessDeclaration.Body, Is.Null);
+            Assert.That(bodylessDeclaration.ExpressionBody, Is.Null);
+            Assert.That(compilation.SyntaxTrees.Contains(companionDeclaration.SyntaxTree), Is.True);
+        }
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-location"),
+            captureRawArtifact: true);
+        var attributeClaim = artifact.Manifest.Claims.Single(static claim =>
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
+        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(attributeClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(effectClaim.Evidence, Is.EqualTo(WorkerClaimEvidence.Attribute));
+            Assert.That(effectClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(effectClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(effectClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(effectClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.Location.Line, Is.EqualTo(attributeClaim.Location.Line).And.GreaterThan(0));
+            Assert.That(effectClaim.Location.Column, Is.EqualTo(attributeClaim.Location.Column).And.GreaterThan(0));
+            Assert.That(unchangedImage, Is.EqualTo(image));
+        }
+    }
+
+    [Test]
+    public async Task EmittedMetadataEffectOnlyWithBodylessCompanionRetainsValidOwnedLocation()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataBodylessEffectOnlyLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", image, assembly =>
+        {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                [System.Runtime.InteropServices.DllImport("unused_companion_contract")]
+                public static extern int Identity(int value);
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes(), Is.Empty);
+        Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        var companion = compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(companion.IsExtern, Is.True);
+        var companionDeclaration = await companion.DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        Assert.That(companionDeclaration, Is.TypeOf<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        var bodylessDeclaration = (Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax)companionDeclaration;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bodylessDeclaration.Body, Is.Null);
+            Assert.That(bodylessDeclaration.ExpressionBody, Is.Null);
+            Assert.That(compilation.SyntaxTrees.Contains(companionDeclaration.SyntaxTree), Is.True);
+        }
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-only-location"),
+            captureRawArtifact: true);
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect));
+        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Line, Is.GreaterThan(0));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Column, Is.GreaterThan(0));
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(effectClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(effectClaim.Evidence, Is.EqualTo(WorkerClaimEvidence.Attribute));
+            Assert.That(effectClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(effectClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(effectClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(effectClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.Location.Line, Is.GreaterThan(0));
+            Assert.That(effectClaim.Location.Column, Is.GreaterThan(0));
+            Assert.That(unchangedImage, Is.EqualTo(image));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task ActualPartialReturnAttributeOrderPreservesExactSpanAdmission(bool matchingPathOrder)
+    {
+        using var workspace = new CollectorWorkspace();
+        var definitionPath = matchingPathOrder ? "a.Definition.cs" : "z.Definition.cs";
+        var implementationPath = matchingPathOrder ? "z.Implementation.cs" : "a.Implementation.cs";
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static partial class Subject {
+                [return: Positive]
+                public static partial int Root(int value);
+            }
+            """, [], filePath: definitionPath)
+            .WithAssemblyName("PartialReturnOrder_" + matchingPathOrder);
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            """
+            using SharpProof.Attributes;
+            public static partial class Subject {
+                [return: InRange(1L, 100L)]
+                public static partial int Root(int value) => value;
+            }
+            """, (CSharpParseOptions)compilation.SyntaxTrees.Single().Options, implementationPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var definition = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var implementation = definition.PartialImplementationPart;
+        Assert.That(implementation, Is.Not.Null);
+        Assert.That(implementation!.GetReturnTypeAttributes().Select(static attribute =>
+            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference!.SyntaxTree.FilePath)),
+            Is.EqualTo(new[] { definitionPath, implementationPath }));
+        var image = AnalyzerTestHost.EmitImage(compilation);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("PartialReturnOrderControl", image, assembly =>
+        {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("partial-return-order"),
+            captureRawArtifact: true);
+        var prepared = artifact.Callables.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence)),
+                Is.All.EqualTo(WorkerClaimEvidence.ReturnAttribute));
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)),
+                Is.EqualTo(new[] { definitionPath, implementationPath }.Order(StringComparer.Ordinal)));
+            Assert.That(prepared.FailureReason, Is.EqualTo(matchingPathOrder
+                ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
+        }
+        if (matchingPathOrder)
+        {
+            Assert.That(prepared.Total, Is.Not.Null);
+            Assert.That(prepared.Total!.IsBodyAbstraction, Is.False);
+        }
+        else
+        {
+            Assert.That(prepared.Total, Is.Null);
+        }
+    }
+
+    [Test]
+    public async Task EmittedMetadataReturnAttributeRetainsItsNoSourceLocationThroughACompanion()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataReturnAttributeDependency");
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                public static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+            .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"), captureRawArtifact: true);
+        var attributeClaim = artifact.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence == WorkerClaimEvidence.ReturnAttribute));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)~System.Int32"));
+            Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(attributeClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
+    public async Task FieldLikeEventMethodClaimsPublishGeneratedAccessorBoundaries()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal class Subject {
+                [method: DoesNotThrow]
+                public event System.Action Changed;
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("field-like-event-methods"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(artifact.Callables.All(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total == null)), Is.True);
+            Assert.That(artifact.Callables.All(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.FailureReason == WorkerClaimReason.UnsupportedCallable)), Is.True);
+            Assert.That(artifact.ReachableSource, Is.Not.Null);
+            Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        }
+    }
+
+    [Test]
+    public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("primary-constructor-overload");
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [method: DoesNotThrow]
+            public sealed class Subject(int value) {
+                public Subject(string value) : this(0) { }
+            }
+            """);
+
+        var artifact = await EmitArtifact(compilation, path);
+
+        var subject = compilation.GetTypeByMetadataName("Subject")!;
+        var constructors = subject.InstanceConstructors;
+        Assert.That(constructors, Has.Length.EqualTo(2));
+        var primaryConstructor = constructors.Single(constructor =>
+            constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
+        var stringOverload = constructors.Single(constructor =>
+            constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.Parameters.Length == 1 &&
+            constructor.Parameters[0].Type.SpecialType == SpecialType.System_String);
+        var callableId = SemanticClaimIdentity.CreateCallableId(primaryConstructor);
+        var stringOverloadId = SemanticClaimIdentity.CreateCallableId(stringOverload);
+        var attribute = primaryConstructor.GetAttributes().Single(candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.DoesNotThrowAttribute");
+        var expectedClaimId = SemanticClaimIdentity.Create(
+            compilation.AssemblyName!,
+            callableId,
+            "effect:DoesNotThrow:" + SemanticClaimIdentity.CreateAttributeFingerprint(attribute, primaryConstructor),
+            duplicateRank: 0);
+        var callable = artifact.Manifest.Callables.Single();
+        var claim = artifact.Manifest.Claims.Single();
+
+        Assert.That(stringOverloadId, Is.Not.EqualTo(callableId));
+        Assert.That(stringOverload.GetAttributes().Any(candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.DoesNotThrowAttribute"), Is.False);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(callable.CallableId, Is.EqualTo(callableId));
+            Assert.That(claim.ClaimId, Is.EqualTo(expectedClaimId));
+            Assert.That(claim.CallableId, Is.EqualTo(callableId));
+            Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
+            Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+        }
+    }
+
+    [TestCase('\uD800')]
+    [TestCase('\uDC00')]
+    public void TextHashRejectsLoneSurrogatesBeforeEncoding(char value)
+    {
+        var malformed = SourceText.From(new string(value, 1), Encoding.Unicode);
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            _ = CompilerCompilationCapture.ComputeTextSha256(malformed)));
+        Assert.That(exception!.Message, Does.Contain("ill-formed UTF-16"));
+    }
+
+    [Test]
+    public void TextHashDistinguishesValidPairFromReplacementCharacter()
+    {
+        var pair = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\U0001F600", Encoding.Unicode));
+        var replacement = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\uFFFD", Encoding.Unicode));
+
+        Assert.That(pair, Is.Not.EqualTo(replacement));
+    }
+
+    [TestCase("Source.cs", '\uD800')]
+    [TestCase("Source.cs", '\uDC00')]
+    [TestCase("Generated.Subject.g.cs", '\uD800')]
+    [TestCase("Generated.Subject.g.cs", '\uDC00')]
+    public async Task MalformedSourceOrGeneratedTextProducesTypedDiagnostic(
+        string filePath,
+        char surrogate)
+    {
+        System.ArgumentNullException.ThrowIfNull(filePath);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-text");
+        var compilation = CreateCompilation();
+        var malformed = CSharpSyntaxTree.ParseText(
+            "// " + new string(surrogate, 1),
+            (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+            filePath,
+            Encoding.Unicode);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation.AddSyntaxTrees(malformed),
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "ill-formed UTF-16");
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task StatefulAdditionalTextCannotAuthenticateALaterValue()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("stateful-additional-text");
+        var additional = new StatefulAdditionalText(
+            "proof.inputs",
+            "generator-value",
+            "later-value");
+
+        Assert.That(
+            additional.GetText(cancellationToken: TestContext.CurrentContext.CancellationToken).ToString(),
+            Is.EqualTo("generator-value"));
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [additional]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(
+                diagnostics.FirstOrDefault()?.GetMessage(
+                    CultureInfo.InvariantCulture) ?? string.Empty,
+                Does.Contain("stable compiler input"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ValidPairAndReplacementRoundTripWithDistinctFingerprints()
+    {
+        using var workspace = new CollectorWorkspace();
+        var pairPath = workspace.SealPath("pair");
+        var replacementPath = workspace.SealPath("replacement");
+        var prefix =
+            "using SharpProof.Attributes; internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"";
+        const string suffix = "\"); return value; } }";
+        var pair = CreateCompilation(prefix + "\\uD83D\\uDE00" + suffix);
+        var replacement = CreateCompilation(
+            prefix + "\\uFFFD" + suffix);
+
+        var pairArtifact = await EmitArtifact(pair, pairPath);
+        var replacementArtifact = await EmitArtifact(
+            replacement,
+            replacementPath);
+        var pairRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(pairArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var replacementRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(replacementArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                Digest(pairArtifact),
+                Is.Not.EqualTo(Digest(replacementArtifact)));
+            Assert.That(
+                pairArtifact.Manifest.Hash,
+                Is.Not.EqualTo(replacementArtifact.Manifest.Hash));
+            Assert.That(
+                pairArtifact.Manifest.Claims.Single().ClaimId,
+                Is.Not.EqualTo(
+                    replacementArtifact.Manifest.Claims.Single().ClaimId));
+            Assert.That(Digest(pairRoundTrip), Is.EqualTo(Digest(pairArtifact)));
+            Assert.That(Digest(replacementRoundTrip), Is.EqualTo(Digest(replacementArtifact)));
+            Assert.That(pairRoundTrip.CompilerDiagnostics, Is.Empty);
+            Assert.That(replacementRoundTrip.CompilerDiagnostics, Is.Empty);
+            // Well-formed strings bind; only ill-formed ones are unsupported expressions.
+            Assert.That(pairRoundTrip.Callables.Single().FailureReason,
+                Is.Not.EqualTo(WorkerClaimReason.UnsupportedExpression));
+            Assert.That(replacementRoundTrip.Callables.Single().FailureReason,
+                Is.EqualTo(pairRoundTrip.Callables.Single().FailureReason));
+        }
+    }
+
+    [TestCase("D800")]
+    [TestCase("DC00")]
+    public async Task IllFormedCompilerStringTermsBecomeUnsupportedExpression(
+        string escape)
+    {
+        System.ArgumentNullException.ThrowIfNull(escape);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-string-term-" + escape);
+        var compilation = CreateCompilation(
+            "using SharpProof.Attributes; " +
+            "internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"\\u" + escape +
+            "\"); return value; } }");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+            Assert.That(
+                artifact.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+    }
+
+    [TestCase("class", "public sealed class Subject(int value) { }")]
+    [TestCase("record", "public sealed record Subject(int value);")]
+    public async Task PrimaryConstructorSelectionIsInventoriedExactlyOnce(
+        string? /* SPINT001: all values valid - this unused test-case label accepts null */ _,
+        string declaration)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("primary-constructor");
+        var compilation = CreateCompilation(
+            "using SharpProof.Attributes;\n[method: DoesNotThrow]\n" + declaration);
+
+        var artifact = await EmitArtifact(compilation, path);
+
+        Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.That(artifact.Callables, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                artifact.Manifest.Callables[0].SelectedFeatures,
+                Is.EqualTo([WorkerSelectedFeature.Effects]));
+            Assert.That(
+                artifact.Manifest.Callables[0].ClaimIds,
+                Is.EqualTo([artifact.Manifest.Claims[0].ClaimId]));
+            Assert.That(
+                artifact.Callables[0].FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
+    public async Task GeneratedPrimaryConstructorSelectionIsInventoried()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("generated-primary-constructor");
+        var compilation = CreateCompilation();
+        var generated = CSharpSyntaxTree.ParseText(
+            """
+            // <auto-generated />
+            using SharpProof.Attributes;
+            [method: DoesNotThrow]
+            internal sealed class GeneratedSubject(int value) { }
+            """,
+            (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+            "Generated.PrimaryConstructor.g.cs");
+
+        var artifact = await EmitArtifact(
+            compilation.AddSyntaxTrees(generated),
+            path);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables, Has.Length.EqualTo(1));
+        }
+    }
+
+    private const string OutputKey =
+        "build_property._SharpProofCompilerManifestPath";
+    private const string TargetFrameworkKey =
+        "build_property._SharpProofCompilationTargetFramework",
+        ProjectDirectoryKey = "build_property._SharpProofProjectDirectory";
+    private const string MaximumExpressionDepthKey =
+        "build_property.SharpProofVerifyMaximumExpressionDepth";
+    private const string SpecificationPacksKey =
+        "build_property.SharpProofSpecificationPacks";
+
+    [Test]
+    public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation();
+
+        var withoutPath = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path: null));
+        var off = await AnalyzeCollectorAsync(
+            compilation,
+            Options(workspace.SealPath("off"), profile: "off"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(withoutPath, Is.Empty);
+            Assert.That(off, Is.Empty);
+            Assert.That(Directory.EnumerateFiles(workspace.Path), Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task RuntimeEnabledGhostContractsPreventArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("runtime-contracts");
+        var compilation = CreateCompilation(
+            """
+            #define SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        var collectorDiagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(collectorDiagnostics, Is.Empty);
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task FinalCompilationSealIsCanonicalAndIncludesGeneratedInputs()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation();
+        var generated = CSharpSyntaxTree.ParseText(
+            """
+            // <auto-generated />
+            using SharpProof.Attributes;
+            internal static class Generated {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    Contract.Assume(value >= 0);
+                    return value;
+                }
+            }
+
+            """,
+            ((CSharpParseOptions)compilation.SyntaxTrees.Single().Options)
+                .WithPreprocessorSymbols("GENERATED"),
+            "Generated.Contract.g.cs");
+        compilation = compilation.AddSyntaxTrees(generated);
+        var additional = ImmutableArray.Create<AdditionalText>(
+            new MemoryAdditionalText("proof.inputs", "value=1"));
+        var path = workspace.SealPath("canonical");
+
+        var firstDiagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path),
+            additional);
+        var first = await File.ReadAllBytesAsync(path);
+        var secondDiagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path),
+            additional);
+        var second = await File.ReadAllBytesAsync(path);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            Encoding.UTF8.GetString(first), cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstDiagnostics, Is.Empty);
+            Assert.That(secondDiagnostics, Is.Empty);
+            Assert.That(second, Is.EqualTo(first));
+            Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
+            Assert.That(first, Does.Not.Contain((byte)'\r'));
+            Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
+            Assert.That(
+                artifact.SchemaVersion,
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("13"));
+            Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
+            Assert.That(
+                artifact.MaximumExpressionDepth,
+                Is.EqualTo(64));
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+            Assert.That(artifact.Callables, Has.Length.EqualTo(1));
+            Assert.That(Digest(artifact), Has.Length.EqualTo(64));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                artifact.Manifest.Callables.Single().Assumptions,
+                Has.Length.EqualTo(1));
+        }
+    }
+
+
+
+    [Test]
+    public async Task DiagnosticPolicyAndRealizedErrorsInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                internal static int Method() {
+                    int unused;
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+            }
+            """);
+        var baseline = await EmitArtifact(
+            compilation, workspace.SealPath("diagnostic-baseline"));
+        var warningLevel = await EmitArtifact(
+            compilation.WithOptions(compilation.Options.WithWarningLevel(0)),
+            workspace.SealPath("diagnostic-warning-level"));
+        var generalError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithGeneralDiagnosticOption(ReportDiagnostic.Error)),
+            workspace.SealPath("diagnostic-general"),
+            allowCompilationErrors: true);
+        var specificError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithSpecificDiagnosticOptions(
+                    compilation.Options.SpecificDiagnosticOptions.SetItem(
+                        "CS0168", ReportDiagnostic.Error))),
+            workspace.SealPath("diagnostic-specific"),
+            allowCompilationErrors: true);
+        var providerError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithSyntaxTreeOptionsProvider(
+                    new FixedDiagnosticProvider(
+                        "CS0168", ReportDiagnostic.Error))),
+            workspace.SealPath("diagnostic-provider"),
+            allowCompilationErrors: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(baseline.CompilerDiagnostics, Is.Empty);
+            Assert.That(warningLevel.CompilerDiagnostics, Is.Empty);
+            Assert.That(
+                new[] { generalError, specificError, providerError },
+                Has.All.Matches<CompilerManifestArtifact>(artifact =>
+                    artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (artifact.CompilerDiagnostics.Any(diagnostic =>
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS0168")))));
+            Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
+            Assert.That(new[] { generalError, specificError, providerError }.Select(Digest),
+                Has.All.EqualTo(Digest(generalError)));
+            Assert.That(Digest(generalError), Is.Not.EqualTo(Digest(baseline)));
+            Assert.That(
+                providerError.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
+    public async Task SuppressedWarningAsErrorDoesNotInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            #pragma warning disable CS0168
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                [DoesNotThrow]
+                internal static int Method() {
+                    int unused;
+                    return 1;
+                }
+            }
+            #pragma warning restore CS0168
+            """).WithOptions(
+                CreateCompilation().Options.WithGeneralDiagnosticOption(
+                    ReportDiagnostic.Error));
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("suppressed-warning-as-error"));
+
+        Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        Assert.That(
+            artifact.Callables.Single().FailureReason,
+            Is.Not.EqualTo(CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason));
+    }
+
+    [TestCase("?", "first.cs")]
+    [TestCase("class C {\n    void M() {\n        Missing();\n    }\n}", "ordinary.cs")]
+    [TestCase("#line 100 \"mapped.cs\"\nclass C { void M() { Missing(); } }", "physical.cs")]
+    [TestCase("class C {", "end.cs")]
+    [TestCase("class Generated { void M() { Missing(); } }", "Generated.Subject.g.cs")]
+    public async Task CompilerDiagnosticLocationsUseOneBasedMappedCoordinates(
+        string source,
+        string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(source);
+        using var workspace = new CollectorWorkspace();
+        var seed = CreateCompilation();
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            (CSharpParseOptions)seed.SyntaxTrees.Single().Options,
+            path,
+            Encoding.UTF8);
+        var compilation = seed.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
+        var expected = compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.Location.IsInSource))
+            .Select(static diagnostic =>
+            {
+                System.ArgumentNullException.ThrowIfNull(diagnostic);
+                var mapped = diagnostic.Location.GetMappedLineSpan();
+                return new
+                {
+                    Code = "compiler." + diagnostic.Id,
+                    Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+                    diagnostic.Location.SourceSpan.Start,
+                    diagnostic.Location.SourceSpan.Length,
+                    Path = mapped.Path ?? string.Empty,
+                    Line = mapped.StartLinePosition.Line + 1,
+                    Column = mapped.StartLinePosition.Character + 1
+                };
+            })
+            .ToArray();
+        Assert.That(expected, Is.Not.Empty);
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("diagnostic-location"),
+            allowCompilationErrors: true);
+        var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (new
+            {
+                diagnostic.Code,
+                diagnostic.Message,
+                diagnostic.Location.Start,
+                diagnostic.Location.Length,
+                diagnostic.Location.Path,
+                diagnostic.Location.Line,
+                diagnostic.Location.Column
+            })).ToArray();
+
+        Assert.That(actual, Is.EquivalentTo(expected));
+    }
+
+    [Test]
+    public async Task EmissionFailureIsTypedAndDoesNotEscapeAsAd0001()
+    {
+        using var workspace = new CollectorWorkspace();
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(workspace.Path));
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+        Assert.That(
+            diagnostics[0].DefaultSeverity,
+            Is.EqualTo(DiagnosticSeverity.Error));
+    }
+
+    [Test]
+    public async Task CompilerDiagnosticWithoutSourceLocationRemainsUnmapped()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation("internal static class Subject { }");
+        compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
+        var expected = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS5001"));
+        Assert.That(expected.Location.IsInSource, Is.False);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("missing-main"), allowCompilationErrors: true);
+        var diagnostic = artifact.CompilerDiagnostics.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code == "compiler.CS5001"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostic.IsSource, Is.False);
+            Assert.That(diagnostic.Message, Is.EqualTo(expected.GetMessage(CultureInfo.InvariantCulture)));
+            Assert.That(diagnostic.Location.Path, Is.Empty);
+            Assert.That(diagnostic.Location.Start, Is.Zero);
+            Assert.That(diagnostic.Location.Length, Is.Zero);
+            Assert.That(diagnostic.Location.Line, Is.Zero);
+            Assert.That(diagnostic.Location.Column, Is.Zero);
+        }
+    }
+
+    [TestCase("0")]
+    [TestCase("257")]
+    [TestCase("not-a-number")]
+    public async Task InvalidExpressionDepthFailsArtifactEmission(string value)
+    {
+        System.ArgumentNullException.ThrowIfNull(value);
+        using var workspace = new CollectorWorkspace();
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(
+                workspace.SealPath("invalid-depth"),
+                maximumExpressionDepth: value));
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+    }
+
+    [TestCase(";dotnet.scalar")]
+    [TestCase("dotnet.scalar;")]
+    [TestCase(";;dotnet.scalar")]
+    [TestCase(" ;dotnet.scalar")]
+    public async Task BlankSpecificationPackSegmentFailsArtifactEmission(
+        string value)
+    {
+        System.ArgumentNullException.ThrowIfNull(value);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("blank-specification-pack");
+        var options = Options(path);
+        options[SpecificationPacksKey] = value;
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            options);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task EmptyOrUnsetSpecificationPacksRemainNoPacksDefault()
+    {
+        using var workspace = new CollectorWorkspace();
+        string?[] values = [null, string.Empty, "   "];
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            var path = workspace.SealPath("no-specification-packs-" + index);
+            var options = Options(path);
+            if (values[index] != null)
+            {
+                options[SpecificationPacksKey] = values[index]!;
+            }
+
+            var diagnostics = await AnalyzeCollectorAsync(
+                CreateCompilation(),
+                options);
+
+            Assert.That(diagnostics, Is.Empty);
+            var artifact = CompilerManifestArtifactJson.Deserialize(
+                await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(artifact.SpecificationPackIds, Is.Empty);
+                Assert.That(artifact.Compilation.SpecificationPackIds, Is.Empty);
+            }
+        }
+    }
+
+    [Test]
+    public async Task NonFileReferenceFailsWithTypedInfrastructureDiagnostic()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation();
+        var reference = compilation.References
+            .OfType<PortableExecutableReference>()
+            .First();
+        var image = await File.ReadAllBytesAsync(reference.FilePath!);
+        var inMemory = MetadataReference.CreateFromImage(image);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation.ReplaceReference(reference, inMemory),
+            Options(workspace.SealPath("in-memory")));
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+    }
+
+    [Test]
+    public async Task ReferencePathMustMatchLoadedMetadata()
+    {
+        using var workspace = new CollectorWorkspace();
+        var imageA = EmitImage(
+            "internal static class VersionA { const int Value = 1; }",
+            "TwinReference");
+        var imageB = EmitImage(
+            "internal static class VersionB { const int Value = 2; }",
+            "TwinReference");
+        var backingPath = Path.Combine(workspace.Path, "TwinReference.dll");
+        await File.WriteAllBytesAsync(backingPath, imageB);
+        var mismatched = MetadataReference.CreateFromImage(
+            imageA,
+            filePath: backingPath);
+        var artifactPath = workspace.SealPath("reference-mismatch");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation().AddReferences(mismatched),
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged()
+    {
+        using var workspace = new CollectorWorkspace();
+        var image = EmitImage(
+            "internal static class OriginalMarker { const int Value = 1; }",
+            "PatchedReference");
+        var patched = PatchAscii(image, "OriginalMarker", "XriginalMarker");
+        var backingPath = Path.Combine(workspace.Path, "PatchedReference.dll");
+        await File.WriteAllBytesAsync(backingPath, patched);
+        var mismatched = MetadataReference.CreateFromImage(
+            image,
+            filePath: backingPath);
+        var artifactPath = workspace.SealPath("patched-reference-mismatch");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation().AddReferences(mismatched),
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task LinkedNetmoduleProvenanceCapturesCompleteClosure()
+    {
+        using var workspace = new CollectorWorkspace();
+        var firstPath = Path.Combine(workspace.Path, "A.netmodule");
+        var secondPath = Path.Combine(workspace.Path, "B.netmodule");
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+        var firstImage = EmitImage(
+            "public static class A { public static int Value => 1; }",
+            "A",
+            OutputKind.NetModule);
+        var secondImage = EmitImage(
+            "public static class B { public static int Value => 2; }",
+            "B",
+            OutputKind.NetModule);
+        await File.WriteAllBytesAsync(firstPath, firstImage);
+        await File.WriteAllBytesAsync(secondPath, secondImage);
+        var moduleProperties = new MetadataReferenceProperties(
+            MetadataImageKind.Module);
+        var firstReference = MetadataReference.CreateFromImage(
+            firstImage,
+            moduleProperties,
+            filePath: firstPath);
+        var secondReference = MetadataReference.CreateFromImage(
+            secondImage,
+            moduleProperties,
+            filePath: secondPath);
+        var manifest = CreateCompilation(
+                "public static class Linked { public static int Value => A.Value + B.Value; }")
+            .WithAssemblyName("Linked")
+            .AddReferences(
+                firstReference,
+                secondReference);
+        var manifestImage = AnalyzerTestHost.EmitImage(manifest);
+        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        using var assemblyMetadata = AssemblyMetadata.Create(
+            ModuleMetadata.CreateFromImage(manifestImage),
+            ModuleMetadata.CreateFromImage(firstImage),
+            ModuleMetadata.CreateFromImage(secondImage));
+        var reference = assemblyMetadata.GetReference(filePath: manifestPath);
+        var subject = CreateCompilation().AddReferences(reference);
+        Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+
+        var artifact = await EmitArtifact(
+            subject,
+            workspace.SealPath("linked-modules"));
+        var captured = CompilerCompilationCapture.CaptureReferences(subject.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules[0].Path.EndsWith(
+                "/Linked.dll",
+                StringComparison.Ordinal)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
+                Is.EqualTo(["Linked.dll", "A.netmodule", "B.netmodule"]));
+            Assert.That(
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(NormalizePath)));
+            Assert.That(
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Mvid)),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(ReadMvid)));
+            Assert.That(
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Sha256)),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(ReadSha256)));
+            Assert.That(
+                captured.Modules.Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new FileInfo(path).Length))));
+        }
+    }
+
+    [Test]
+    public async Task ReferenceCapturePreservesRecursiveAliases()
+    {
+        using var workspace = new CollectorWorkspace();
+        var referencePath = Path.Combine(
+            workspace.Path,
+            "RecursiveAlias.dll");
+        var image = EmitImage(
+            "internal static class RecursiveAlias {}",
+            "RecursiveAlias");
+        await File.WriteAllBytesAsync(referencePath, image);
+        var withRecursiveAliases = typeof(MetadataReferenceProperties)
+            .GetMethod(
+                "WithRecursiveAliases",
+                BindingFlags.Instance | BindingFlags.NonPublic) ??
+            throw new InvalidOperationException(
+                "Recursive reference aliases are unavailable.");
+        var properties = (MetadataReferenceProperties)withRecursiveAliases.Invoke(
+            new MetadataReferenceProperties(
+                MetadataImageKind.Assembly,
+                aliases: ["recursive"]),
+            [true])!;
+        var reference = MetadataReference.CreateFromFile(
+            referencePath,
+            properties);
+
+        var captured = CompilerCompilationCapture.CaptureReferences(
+            [reference],
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(captured.Single().HasRecursiveAliases, Is.True);
+    }
+
+    [Test]
+    public async Task ReferenceCaptureEnforcesModuleClosureAndCountLimits()
+    {
+        using var workspace = new CollectorWorkspace();
+        var firstImage = EmitImage(
+            "internal static class First {}",
+            "FirstLimit");
+        var secondImage = EmitImage(
+            "internal static class Second {}",
+            "SecondLimit");
+        var firstPath = Path.Combine(workspace.Path, "FirstLimit.dll");
+        var secondPath = Path.Combine(workspace.Path, "SecondLimit.dll");
+        await File.WriteAllBytesAsync(firstPath, firstImage);
+        await File.WriteAllBytesAsync(secondPath, secondImage);
+        MetadataReference[] references =
+        [
+            MetadataReference.CreateFromImage(
+                firstImage,
+                filePath: firstPath),
+            MetadataReference.CreateFromImage(
+                secondImage,
+                filePath: secondPath)
+        ];
+        var maximumModule = Math.Max(
+            firstImage.LongLength,
+            secondImage.LongLength);
+        var closure = firstImage.LongLength + secondImage.LongLength;
+
+        var captured = CompilerCompilationCapture.CaptureReferences(
+            references,
+            new CompilerCompilationCapture.ReferenceCaptureLimits(
+                maximumModule,
+                closure,
+                references.Length),
+            TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                captured.SelectMany(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules))
+                    .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
+                Is.EqualTo(new[]
+                {
+                    firstImage.LongLength,
+                    secondImage.LongLength
+                }));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule - 1,
+                        closure,
+                        references.Length),
+                    TestContext.CurrentContext.CancellationToken)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule,
+                        closure - 1,
+                        references.Length),
+                    TestContext.CurrentContext.CancellationToken)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule,
+                        closure,
+                        references.Length - 1),
+                    TestContext.CurrentContext.CancellationToken)));
+        }
+    }
+
+    [Test]
+    public async Task StaleLinkedNetmoduleIsRejected()
+    {
+        using var workspace = new CollectorWorkspace();
+        var modulePath = Path.Combine(workspace.Path, "LinkedPart.netmodule");
+        var manifestPath = Path.Combine(workspace.Path, "StaleLinked.dll");
+        var moduleImage = EmitImage(
+            "public static class LinkedPart { public static int Value => 1; }",
+            "LinkedPart",
+            OutputKind.NetModule);
+        await File.WriteAllBytesAsync(modulePath, moduleImage);
+        var moduleReference = MetadataReference.CreateFromImage(
+            moduleImage,
+            new MetadataReferenceProperties(MetadataImageKind.Module),
+            filePath: modulePath);
+        var manifest = CreateCompilation(
+                "public static class StaleLinked { public static int Value => LinkedPart.Value; }")
+            .WithAssemblyName("StaleLinked")
+            .AddReferences(moduleReference);
+        var manifestImage = AnalyzerTestHost.EmitImage(manifest);
+        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        using var assemblyMetadata = AssemblyMetadata.Create(
+            ModuleMetadata.CreateFromImage(manifestImage),
+            ModuleMetadata.CreateFromImage(moduleImage));
+        var reference = assemblyMetadata.GetReference(filePath: manifestPath);
+        var subject = CreateCompilation().AddReferences(reference);
+        Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+        await File.WriteAllBytesAsync(
+            modulePath,
+            EmitImage(
+                "public static class LinkedPart { public static int Value => 2; }",
+                "LinkedPart",
+                OutputKind.NetModule));
+        var artifactPath = workspace.SealPath("stale-linked-module");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            subject,
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
+    }
+
+    [TestCase("")]
+    [TestCase(".")]
+    [TestCase("..")]
+    [TestCase("nested/part.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleMustBeANonemptySiblingFileName(
+        string moduleName)
+    {
+        System.ArgumentNullException.ThrowIfNull(moduleName);
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName)));
+    }
+
+    [TestCase("part.netmodule:payload")]
+    [TestCase("CON.netmodule")]
+    [TestCase("part\\name.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleAllowsOrdinaryLinuxFileNameCharacters(
+        string moduleName)
+    {
+        System.ArgumentNullException.ThrowIfNull(moduleName);
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.That(
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName),
+            Is.EqualTo(Path.Combine(workspace.Path, moduleName)));
+    }
+
+    [Test]
+    public async Task TreeLocalConfigurationCannotOverridePackageDefaults()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("tree-configuration");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            new TreeOptionsProvider(
+                Options(path),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["sharpproof_profile"] = "strict"
+                }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task GlobalConfigurationOverridesDefaultFeaturesInArtifact()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("global-configuration");
+        var options = Options(
+            path,
+            profile: "strict",
+            verifyPolicy: "require-proven",
+            assumptionPolicy: "error");
+        options["build_property._SharpProofProfileWasDefaulted"] = "false";
+        options["build_property._SharpProofFeaturesWasDefaulted"] = "true";
+        options["sharpproof_profile"] = "strict";
+        options["sharpproof_features"] = "effects";
+        var diagnostics = await AnalyzeCollectorAsync(CreateCompilation(), options);
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(File.Exists(path), Is.True);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
+    }
+
+    [Test]
+    public async Task TreeConfigurationProviderFailureFailsArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("tree-provider-failure");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            new ThrowingTreeOptionsProvider(Options(path)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [TestCase("advisory", "off", "all", false)]
+    [TestCase("off", "advisory", "all", false)]
+    [TestCase("invalid", "advisory", "all", false)]
+    [TestCase("   ", "off", "all", false)]
+    [TestCase(" AdViSoRy ", "strict", "contracts", false)]
+    [TestCase("advisory", "strict", "effects", false)]
+    [TestCase("advisory", "strict", "invalid", false)]
+    [TestCase(" strict ", "strict", "all", true)]
+    public async Task CollectorRejectsConflictingConfigurationAliases(
+        string rawProfile,
+        string buildProfile,
+        string features,
+        bool shouldEmit)
+    {
+        System.ArgumentNullException.ThrowIfNull(buildProfile);
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(rawProfile);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("profile-alias-order");
+        var options = Options(
+            path,
+            profile: buildProfile,
+            features: features);
+        options["sharpproof_profile"] = rawProfile;
+
+        _ = await AnalyzeCollectorAsync(CreateCompilation(), options);
+
+        Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
+    }
+
+    private static string Digest(CompilerManifestArtifact artifact)
+    {
+        System.ArgumentNullException.ThrowIfNull(artifact);
+        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+    }
+    private static async Task<CompilerManifestArtifact> EmitArtifact(
+        CSharpCompilation compilation,
+        string path,
+        bool allowCompilationErrors = false,
+        bool captureRawArtifact = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(path);
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path),
+            allowCompilationErrors: allowCompilationErrors);
+        Assert.That(diagnostics, Is.Empty);
+        var rawArtifact = await File.ReadAllTextAsync(path);
+        if (captureRawArtifact)
+        {
+            const int maximumCapturedCharacters = 131072;
+            if (rawArtifact.Length <= maximumCapturedCharacters)
+            {
+                await TestContext.Out.WriteLineAsync($"BEGIN METADATA COLLECTOR RAW JSON ({rawArtifact.Length} characters)");
+                await TestContext.Out.WriteLineAsync(rawArtifact);
+                await TestContext.Out.WriteLineAsync("END METADATA COLLECTOR RAW JSON");
+            }
+            else
+            {
+                await TestContext.Out.WriteLineAsync($"Metadata collector raw JSON exceeds capture limit: {rawArtifact.Length} characters.");
+            }
+        }
+        return CompilerManifestArtifactJson.Deserialize(rawArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is handled downstream */ additionalFiles = default,
+        bool allowCompilationErrors = false)
+    {
+
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(values);
+        return AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            values,
+            additionalFiles,
+            new FinalCompilationCollectorAnalyzer(),
+            allowCompilationErrors);
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
+        CSharpCompilation compilation,
+        AnalyzerConfigOptionsProvider optionsProvider)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(optionsProvider);
+        return AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            optionsProvider,
+            new FinalCompilationCollectorAnalyzer());
+    }
+
+    private static CSharpCompilation CreateCompilation(
+        string source = "internal static class Fixture { const int Value = 1; }")
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        return AnalyzerTestHost.CreateCompilation(source, []);
+    }
+
+    private static byte[] EmitImage(
+        string source,
+        string assemblyName,
+        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
+    {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var compilation = CreateCompilation(source);
+        return AnalyzerTestHost.EmitImage(compilation
+            .WithAssemblyName(assemblyName)
+            .WithOptions(compilation.Options
+                .WithOutputKind(outputKind)));
+    }
+
+    private static string NormalizePath(string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        return Path.GetFullPath(path).Replace('\\', '/');
+    }
+
+    private static string ReadMvid(string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        using var stream = File.OpenRead(path);
+        using var reader = new PEReader(stream);
+        var metadata = reader.GetMetadataReader();
+        return metadata.GetGuid(metadata.GetModuleDefinition().Mvid)
+            .ToString("D");
+    }
+
+    private static string ReadSha256(string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        using var stream = File.OpenRead(path);
+        using var hash = SHA256.Create();
+        return SharpProof.Ir.HashEncoding.ToLowerHex(hash.ComputeHash(stream));
+    }
+
+    private static byte[] PatchAscii(
+        byte[] image,
+        string original,
+        string replacement)
+    {
+        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        System.ArgumentNullException.ThrowIfNull(original);
+        System.ArgumentNullException.ThrowIfNull(replacement);
+        var originalBytes = Encoding.ASCII.GetBytes(original);
+        var replacementBytes = Encoding.ASCII.GetBytes(replacement);
+        Assert.That(replacementBytes, Has.Length.EqualTo(originalBytes.Length));
+        var offsets = Enumerable.Range(
+                0, image.Length - originalBytes.Length + 1)
+            .Where(offset => image.AsSpan(offset, originalBytes.Length)
+                .SequenceEqual(originalBytes))
+            .ToArray();
+        Assert.That(offsets, Has.Length.EqualTo(1));
+        var patched = (byte[])image.Clone();
+        replacementBytes.CopyTo(patched, offsets[0]);
+        return patched;
+    }
+
+    private static Dictionary<string, string> Options(
+        string? path,
+        string profile = "advisory",
+        string features = "all",
+        string verifyPolicy = "advisory",
+        string assumptionPolicy = "allow",
+        string maximumExpressionDepth = "64")
+    {
+        System.ArgumentNullException.ThrowIfNull(assumptionPolicy);
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(maximumExpressionDepth);
+        System.ArgumentNullException.ThrowIfNull(profile);
+        System.ArgumentNullException.ThrowIfNull(verifyPolicy);
+        var values = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase)
+        {
+            [TargetFrameworkKey] = "net9.0",
+            [ProjectDirectoryKey] = Environment.CurrentDirectory,
+            [MaximumExpressionDepthKey] = maximumExpressionDepth,
+            ["build_property.SharpProofProfile"] = profile,
+            ["build_property.SharpProofFeatures"] = features,
+            ["build_property.SharpProofVerifyPolicy"] = verifyPolicy,
+            ["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy
+        };
+        if (path != null)
+        {
+            values[OutputKey] = path;
+        }
+
+        return values;
+    }
+
+    private sealed class MemoryAdditionalText(
+        string path,
+        string content) : AdditionalText, ICompilerAdditionalTextSnapshot
+    {
+        private readonly SourceText _text = SourceText.From(
+            (content ?? throw new System.ArgumentNullException(nameof(content))),
+            Encoding.UTF8);
+
+        public override string Path { get; } = (path ?? throw new System.ArgumentNullException(nameof(path)));
+
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return _text;
+        }
+    }
+
+    private sealed class StatefulAdditionalText(
+        string path,
+        string first,
+        string later) : AdditionalText
+    {
+        private int _readCount;
+
+        public override string Path { get; } = (later is null ? throw new System.ArgumentNullException(nameof(later)) : (first is null ? throw new System.ArgumentNullException(nameof(first)) : (path ?? throw new System.ArgumentNullException(nameof(path)))));
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceText.From(
+                Interlocked.Increment(ref _readCount) == 1 ? first : later,
+                Encoding.UTF8);
+        }
+    }
+
+    private sealed class TreeOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues,
+        IReadOnlyDictionary<string, string> treeValues)
+        : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _global =
+            new DictionaryAnalyzerConfigOptions((globalValues ?? throw new System.ArgumentNullException(nameof(globalValues))));
+        private readonly AnalyzerConfigOptions _tree =
+            new DictionaryAnalyzerConfigOptions((treeValues ?? throw new System.ArgumentNullException(nameof(treeValues))));
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            System.ArgumentNullException.ThrowIfNull(tree);
+            return _tree;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            System.ArgumentNullException.ThrowIfNull(textFile);
+            return _tree;
+        }
+    }
+
+    private sealed class ThrowingTreeOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues)
+        : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _global =
+            new DictionaryAnalyzerConfigOptions((globalValues ?? throw new System.ArgumentNullException(nameof(globalValues))));
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            System.ArgumentNullException.ThrowIfNull(tree);
+            throw new InvalidOperationException("tree options unavailable");
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            System.ArgumentNullException.ThrowIfNull(textFile);
+            throw new InvalidOperationException("additional options unavailable");
+        }
+    }
+
+    private sealed class FixedDiagnosticProvider(
+        string diagnosticId,
+        ReportDiagnostic reportDiagnostic)
+        : SyntaxTreeOptionsProvider
+    {
+        private string _guarded_diagnosticId = diagnosticId ?? throw new System.ArgumentNullException(nameof(diagnosticId));
+        public override GeneratedKind IsGenerated(
+            SyntaxTree tree,
+            CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(tree);
+            return GeneratedKind.Unknown;
+        }
+
+        public override bool TryGetDiagnosticValue(
+            SyntaxTree tree,
+            string requestedDiagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity)
+        {
+            System.ArgumentNullException.ThrowIfNull(requestedDiagnosticId);
+            System.ArgumentNullException.ThrowIfNull(tree);
+            severity = reportDiagnostic;
+            return string.Equals(
+                requestedDiagnosticId,
+                _guarded_diagnosticId,
+                StringComparison.Ordinal);
+        }
+
+        public override bool TryGetGlobalDiagnosticValue(
+            string requestedDiagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity)
+        {
+            System.ArgumentNullException.ThrowIfNull(requestedDiagnosticId);
+            severity = ReportDiagnostic.Default;
+            return false;
+        }
+    }
+
+    private sealed class CollectorWorkspace : IDisposable
+    {
+        private readonly TempDirectory _temporary;
+
+        internal CollectorWorkspace()
+        {
+            _temporary = TempDirectory.CreateOwned(
+                "SharpProof.FinalCompilationCollector",
+                string.Empty,
+                "Refusing to remove an unexpected final-compilation collector directory.");
+            Path = _temporary.FullName;
+        }
+
+        internal string Path
+        {
+            get;
+        }
+        internal string SealPath(string name)
+        {
+            System.ArgumentNullException.ThrowIfNull(name);
+            return System.IO.Path.Combine(Path, name + ".seal");
+        }
+
+        public void Dispose()
+        {
+            _temporary.Dispose();
+        }
+    }
+}

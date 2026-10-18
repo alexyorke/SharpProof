@@ -16,37 +16,37 @@ block: b0 entry
 block: b1 cfg:0
   i6 op0 Goto b2 source=none
 block: b2 cfg:1
-  i7 op1 Assign v8:int[width=32,signed=True] = v1 source=total-integer-bitwise-and.cs:129+3
-  i8 op2 Branch ((((v8 >= 0) && true) && ((v8 + 1) < 0)) || (((v8 < 0) && false) && ((v8 + 1) >= 0))) ? b5 : b6 source=total-integer-bitwise-and.cs:129+3
+  i7 op1 Assign v8:int[width=32,signed=True] = v1 source=total-integer-bitwise-and.cs:tokens["x","++"]#1
+  i8 op2 Branch ((((v8 >= 0) && true) && ((v8 + 1) < 0)) || (((v8 < 0) && false) && ((v8 + 1) >= 0))) ? b5 : b6 source=total-integer-bitwise-and.cs:tokens["x","++"]#1
 block: b3 cfg:2
   i30 op0 Return void source=none
 block: b4 exceptional:exit
   i4 op0 ExceptionalExit source=none
 block: b5 throw
-  i9 op2 Throw Overflow -> b4 source=total-integer-bitwise-and.cs:129+3
+  i9 op2 Throw Overflow -> b4 source=total-integer-bitwise-and.cs:tokens["x","++"]#1
 block: b6 normal
-  i10 op3 Assign v9:int[width=32,signed=True] = (v8 + 1) source=total-integer-bitwise-and.cs:129+3
-  i11 op4 Assign v1:int[width=32,signed=True] = v9 source=total-integer-bitwise-and.cs:129+3
-  i12 op4 Write Local source=total-integer-bitwise-and.cs:129+3
-  i13 op5 Assign v10:int[width=32,signed=True] = v4 source=total-integer-bitwise-and.cs:135+3
-  i14 op6 Branch ((((v10 >= 0) && true) && ((v10 + 1) < 0)) || (((v10 < 0) && false) && ((v10 + 1) >= 0))) ? b7 : b8 source=total-integer-bitwise-and.cs:135+3
+  i10 op3 Assign v9:int[width=32,signed=True] = (v8 + 1) source=total-integer-bitwise-and.cs:tokens["x","++"]#1
+  i11 op4 Assign v1:int[width=32,signed=True] = v9 source=total-integer-bitwise-and.cs:tokens["x","++"]#1
+  i12 op4 Write Local source=total-integer-bitwise-and.cs:tokens["x","++"]#1
+  i13 op5 Assign v10:int[width=32,signed=True] = v4 source=total-integer-bitwise-and.cs:tokens["++","y"]#1
+  i14 op6 Branch ((((v10 >= 0) && true) && ((v10 + 1) < 0)) || (((v10 < 0) && false) && ((v10 + 1) >= 0))) ? b7 : b8 source=total-integer-bitwise-and.cs:tokens["++","y"]#1
 block: b7 throw
-  i15 op6 Throw Overflow -> b4 source=total-integer-bitwise-and.cs:135+3
+  i15 op6 Throw Overflow -> b4 source=total-integer-bitwise-and.cs:tokens["++","y"]#1
 block: b8 normal
-  i16 op7 Assign v11:int[width=32,signed=True] = (v10 + 1) source=total-integer-bitwise-and.cs:135+3
-  i17 op8 Assign v4:int[width=32,signed=True] = v11 source=total-integer-bitwise-and.cs:135+3
-  i18 op8 Write Local source=total-integer-bitwise-and.cs:135+3
-  i19 op9 Assign v12:int[width=32,signed=True] = (v8 & v11) source=total-integer-bitwise-and.cs:129+9
-  i20 op10 Assign v7:int[width=32,signed=True] = v12 source=total-integer-bitwise-and.cs:113+26
-  i21 op10 Write Local source=total-integer-bitwise-and.cs:113+26
-  i22 op11 Assign v13:int[width=32,signed=True] = v7 source=total-integer-bitwise-and.cs:149+10
-  i23 op12 Assign v14:int[width=32,signed=True] = v1 source=total-integer-bitwise-and.cs:158+1
-  i24 op13 Assign v15:int[width=32,signed=True] = (v13 & v14) source=total-integer-bitwise-and.cs:149+10
-  i25 op14 Assign v7:int[width=32,signed=True] = v15 source=total-integer-bitwise-and.cs:149+10
-  i26 op14 Write Local source=total-integer-bitwise-and.cs:149+10
-  i27 op16 Assign v16:int[width=32,signed=True] = v7 source=total-integer-bitwise-and.cs:176+5
-  i28 op15 Assign v6:int[width=32,signed=True] = v16 source=total-integer-bitwise-and.cs:176+5
-  i29 op15 Return v6 source=total-integer-bitwise-and.cs:176+5
+  i16 op7 Assign v11:int[width=32,signed=True] = (v10 + 1) source=total-integer-bitwise-and.cs:tokens["++","y"]#1
+  i17 op8 Assign v4:int[width=32,signed=True] = v11 source=total-integer-bitwise-and.cs:tokens["++","y"]#1
+  i18 op8 Write Local source=total-integer-bitwise-and.cs:tokens["++","y"]#1
+  i19 op9 Assign v12:int[width=32,signed=True] = (v8 & v11) source=total-integer-bitwise-and.cs:tokens["x","++","&","++","y"]#1
+  i20 op10 Assign v7:int[width=32,signed=True] = v12 source=total-integer-bitwise-and.cs:tokens["value","=","checked","(","x","++","&","++","y",")"]#1
+  i21 op10 Write Local source=total-integer-bitwise-and.cs:tokens["value","=","checked","(","x","++","&","++","y",")"]#1
+  i22 op11 Assign v13:int[width=32,signed=True] = v7 source=total-integer-bitwise-and.cs:tokens["value","&=","x"]#1
+  i23 op12 Assign v14:int[width=32,signed=True] = v1 source=total-integer-bitwise-and.cs:tokens["x"]#3
+  i24 op13 Assign v15:int[width=32,signed=True] = (v13 & v14) source=total-integer-bitwise-and.cs:tokens["value","&=","x"]#1
+  i25 op14 Assign v7:int[width=32,signed=True] = v15 source=total-integer-bitwise-and.cs:tokens["value","&=","x"]#1
+  i26 op14 Write Local source=total-integer-bitwise-and.cs:tokens["value","&=","x"]#1
+  i27 op16 Assign v16:int[width=32,signed=True] = v7 source=total-integer-bitwise-and.cs:tokens["value"]#3
+  i28 op15 Assign v6:int[width=32,signed=True] = v16 source=total-integer-bitwise-and.cs:tokens["value"]#3
+  i29 op15 Return v6 source=total-integer-bitwise-and.cs:tokens["value"]#3
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v3
 term: ir2 Variable type=t1:int width=32 signed=True value=v1

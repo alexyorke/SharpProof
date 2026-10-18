@@ -4,7 +4,8 @@ public static class C
 {
     private static int Helper(object gate, int x)
     {
-        while (x > 0) { lock (gate) { x--; } }
+        while (x > 0)
+        { lock (gate) { x--; } }
         return x;
     }
     [AllowedCapabilities(SharpProofCapability.None)]

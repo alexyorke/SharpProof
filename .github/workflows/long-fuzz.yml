@@ -59,6 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -103,7 +104,7 @@ jobs:
             -e SHARPPROOF_LONGFUZZ_MINUTES="$MINUTES" \
             -e SHARPPROOF_LONGFUZZ_OUTPUT="$LONGFUZZ_OUTPUT" \
             tooling test \
-            -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj \
+            -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj \
             -TestFilter TestCategory=LongFuzz &
           fuzz_pid=$!
           # vstest does not stream test output, so follow the harness event
@@ -164,3 +165,10 @@ jobs:
           fi
           echo "$errors error finding(s)."
           test "$errors" -eq 0
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+          name: ${{ github.job }}-${{ matrix.shard }}

@@ -8,6 +8,7 @@ internal static class ApiSpecTestFacets
         SpecEvidence evidence,
         bool includeTermination = false)
     {
+        System.ArgumentNullException.ThrowIfNull(evidence);
         return new(
             new SpecEffectFacet(SpecEffect.None, evidence),
             new SpecAllocationFacet(SpecAllocationBehavior.None, evidence),

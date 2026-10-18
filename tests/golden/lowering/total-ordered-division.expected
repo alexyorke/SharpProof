@@ -23,35 +23,35 @@ block: b0 entry
 block: b1 cfg:0
   i10 op0 Goto b2 source=none
 block: b2 cfg:1
-  i11 op2 Assign v13:int[width=32,signed=True] = v1 source=total-ordered-division.cs:114+1
-  i12 op3 Assign v14:int[width=32,signed=True] = v4 source=total-ordered-division.cs:118+1
-  i13 op4 Branch (v14 == 0) ? b5 : b6 source=total-ordered-division.cs:114+5
+  i11 op2 Assign v13:int[width=32,signed=True] = v1 source=total-ordered-division.cs:tokens["a"]#2
+  i12 op3 Assign v14:int[width=32,signed=True] = v4 source=total-ordered-division.cs:tokens["b"]#2
+  i13 op4 Branch (v14 == 0) ? b5 : b6 source=total-ordered-division.cs:tokens["a","/","b"]#1
 block: b3 cfg:2
   i28 op0 Return void source=none
 block: b4 exceptional:exit
   i8 op0 ExceptionalExit source=none
 block: b5 throw
-  i14 op4 Throw DivideByZero -> b4 source=total-ordered-division.cs:114+5
+  i14 op4 Throw DivideByZero -> b4 source=total-ordered-division.cs:tokens["a","/","b"]#1
 block: b6 normal
-  i15 op5 Branch ((v13 == -2147483648) && (v14 == -1)) ? b7 : b8 source=total-ordered-division.cs:114+5
+  i15 op5 Branch ((v13 == -2147483648) && (v14 == -1)) ? b7 : b8 source=total-ordered-division.cs:tokens["a","/","b"]#1
 block: b7 throw
-  i16 op5 Throw Overflow -> b4 source=total-ordered-division.cs:114+5
+  i16 op5 Throw Overflow -> b4 source=total-ordered-division.cs:tokens["a","/","b"]#1
 block: b8 normal
-  i17 op6 Assign v15:int[width=32,signed=True] = (v13 / v14) source=total-ordered-division.cs:114+5
-  i18 op7 Assign v16:int[width=32,signed=True] = v7 source=total-ordered-division.cs:122+1
-  i19 op8 Assign v17:int[width=32,signed=True] = v10 source=total-ordered-division.cs:126+1
-  i20 op9 Branch (v17 == 0) ? b9 : b10 source=total-ordered-division.cs:122+5
+  i17 op6 Assign v15:int[width=32,signed=True] = (v13 / v14) source=total-ordered-division.cs:tokens["a","/","b"]#1
+  i18 op7 Assign v16:int[width=32,signed=True] = v7 source=total-ordered-division.cs:tokens["c"]#2
+  i19 op8 Assign v17:int[width=32,signed=True] = v10 source=total-ordered-division.cs:tokens["d"]#2
+  i20 op9 Branch (v17 == 0) ? b9 : b10 source=total-ordered-division.cs:tokens["c","/","d"]#1
 block: b9 throw
-  i21 op9 Throw DivideByZero -> b4 source=total-ordered-division.cs:122+5
+  i21 op9 Throw DivideByZero -> b4 source=total-ordered-division.cs:tokens["c","/","d"]#1
 block: b10 normal
-  i22 op10 Branch ((v16 == -2147483648) && (v17 == -1)) ? b11 : b12 source=total-ordered-division.cs:122+5
+  i22 op10 Branch ((v16 == -2147483648) && (v17 == -1)) ? b11 : b12 source=total-ordered-division.cs:tokens["c","/","d"]#1
 block: b11 throw
-  i23 op10 Throw Overflow -> b4 source=total-ordered-division.cs:122+5
+  i23 op10 Throw Overflow -> b4 source=total-ordered-division.cs:tokens["c","/","d"]#1
 block: b12 normal
-  i24 op11 Assign v18:int[width=32,signed=True] = (v16 / v17) source=total-ordered-division.cs:122+5
-  i25 op12 Assign v19:int[width=32,signed=True] = (v15 + v18) source=total-ordered-division.cs:114+13
-  i26 op1 Assign v12:int[width=32,signed=True] = v19 source=total-ordered-division.cs:114+13
-  i27 op1 Return v12 source=total-ordered-division.cs:114+13
+  i24 op11 Assign v18:int[width=32,signed=True] = (v16 / v17) source=total-ordered-division.cs:tokens["c","/","d"]#1
+  i25 op12 Assign v19:int[width=32,signed=True] = (v15 + v18) source=total-ordered-division.cs:tokens["a","/","b","+","c","/","d"]#1
+  i26 op1 Assign v12:int[width=32,signed=True] = v19 source=total-ordered-division.cs:tokens["a","/","b","+","c","/","d"]#1
+  i27 op1 Return v12 source=total-ordered-division.cs:tokens["a","/","b","+","c","/","d"]#1
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Variable type=t1:int width=32 signed=True value=v3
 term: ir2 Variable type=t1:int width=32 signed=True value=v6

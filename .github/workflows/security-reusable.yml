@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Reject vulnerable dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -34,6 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -51,24 +54,8 @@ jobs:
           path: artifacts/dependency-audit/dependency-audit.json
           if-no-files-found: error
 
-  # Preserve the branch-rule contexts for both gates in the combined profile.
-  # Always report a failure if that profile failed, was canceled, or was skipped.
-  dependency-audit:
-    needs: repository-security
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require the complete security profile
-        env:
-          SECURITY_RESULT: ${{ needs.repository-security.result }}
-        run: test "$SECURITY_RESULT" = success
-
-  banned-apis:
-    needs: repository-security
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require the complete security profile
-        env:
-          SECURITY_RESULT: ${{ needs.repository-security.result }}
-        run: test "$SECURITY_RESULT" = success
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report

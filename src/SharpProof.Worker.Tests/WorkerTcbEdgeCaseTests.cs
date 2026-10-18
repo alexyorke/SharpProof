@@ -1,0 +1,602 @@
+using System.Collections.Immutable;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Dataflow;
+using SharpProof.Host;
+using SharpProof.Ir;
+using SharpProof.Smt;
+using SharpProof.Verify;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class WorkerTcbEdgeCaseTests
+{
+    private const string CacheFileSuffix = VerificationCache.CacheFileSuffix;
+
+    [TestCase(
+        BackendFailureReason.Timeout,
+        WorkerClaimReason.MethodTimeout)]
+    [TestCase(
+        BackendFailureReason.UnsupportedEncoding,
+        WorkerClaimReason.UnsupportedExpression)]
+    public async Task BackendAbstentionsMapToAccountableClaimReasons(
+        BackendFailureReason backendReason,
+        WorkerClaimReason expectedReason)
+    {
+        using var project = new ShadowTestProject(NativeTrivialSource);
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(),
+            new FixedBackend(BackendCheckResult.Unknown(backendReason)), new WorkerBudgets());
+        Assert.That(results, Has.Length.EqualTo(1));
+        Assert.That(results[0].Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results[0].Reason, Is.EqualTo(expectedReason));
+    }
+    [TestCase(MalformedBodyKind.MissingAssignmentSource)]
+    [TestCase(MalformedBodyKind.UnboundCall)]
+    [TestCase(MalformedBodyKind.MissingBranchCondition)]
+    [TestCase(MalformedBodyKind.MissingReturnValue)]
+    [TestCase(MalformedBodyKind.UnsupportedInstruction)]
+    public void MalformedProgramBodiesFailClosedBeforeBackendInvocation(MalformedBodyKind kind)
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    if (value > 0) return value;
+                    return value;
+                }
+            }
+            """);
+        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        switch (kind)
+        {
+            case MalformedBodyKind.MissingAssignmentSource:
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)).B = -1;
+                break;
+            case MalformedBodyKind.UnboundCall:
+                var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
+                call.Kind = IrInstructionKind.Call;
+                call.B = int.MaxValue;
+                break;
+            case MalformedBodyKind.MissingBranchCondition:
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)).A = -1;
+                break;
+            case MalformedBodyKind.MissingReturnValue:
+                instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)).A = -1;
+                break;
+            case MalformedBodyKind.UnsupportedInstruction:
+                instructions[0].Kind = (IrInstructionKind)int.MaxValue;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+        RejectMalformedArtifact(artifact);
+    }
+    [Test]
+    public void ContractClaimOrderMismatchFailsClosedBeforeBackendInvocation()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
+        artifact.Callables.Single().Total!.Clauses.Single().ClaimId = "foreign-claim";
+        RejectMalformedArtifact(artifact);
+    }
+    [Test]
+    public void MoreEnsuresClausesThanClaimIdsFailsClosedWithoutIndexing()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
+        var total = artifact.Callables.Single().Total!;
+        total.Clauses = [total.Clauses.Single(), total.Clauses.Single()];
+        RejectMalformedArtifact(artifact);
+    }
+    [Test]
+    public async Task MissingPreparedBodyFailsClosedBeforeBackendInvocation()
+    {
+        using var project = new ShadowTestProject(NativeTrivialSource);
+        var target = project.Snapshot.Callables.Single() with { Total = null };
+        var backend = new ThrowingBackend("Missing typed body reached the backend.");
+        var results = await VerifyNativeClaimsAsync(target, backend, new WorkerBudgets());
+        Assert.That(backend.CallCount, Is.Zero);
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+    [Test]
+    public async Task DeepPreconditionFailsClosedBeforeBackendInvocation()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    Contract.Ensures(true);
+                    return value;
+                }
+            }
+            """);
+        var target = project.Snapshot.Callables.Single();
+        var backend = new ThrowingBackend("Deep typed precondition reached the backend.");
+        var budgets = new WorkerBudgets { MaximumExpressionDepth = 1 };
+        var results = await VerifyNativeClaimsAsync(target, backend, budgets);
+        var entry = await TotalCallableVerifier.VerifyEntryAsync(target, budgets, TestContext.CurrentContext.CancellationToken,
+            backend, CreateResourceBudget());
+        Assert.That(backend.CallCount, Is.Zero);
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        Assert.That(entry.IsUnknown, Is.True);
+        Assert.That(entry.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+    }
+    [Test]
+    public async Task ResourceCounterCrossingMethodLimitDiscardsBackendOutcome()
+    {
+        using var project = new ShadowTestProject(NativeTrivialSource);
+        long consumed = 0;
+        var backend = new ResourceConsumingBackend(() => consumed = 11,
+            BackendCheckResult.Unsatisfiable([]));
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend,
+            new WorkerBudgets { QueryRlimit = 10, MethodRlimit = 10 }, () => Volatile.Read(ref consumed));
+        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+    }
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence(bool fullCallable)
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    Contract.Requires(value < 0);
+                    Contract.Ensures(false);
+                    return value;
+                }
+            }
+            """);
+        if (fullCallable)
+        {
+            var result = await VerifyNativeSourceAsync(project);
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
+            Assert.That(result.ProofCore, Is.Not.Empty);
+        }
+        else
+        {
+            var result = await TotalCallableVerifier.VerifyEntryAsync(project.Snapshot.Callables.Single(),
+                project.Request.Budgets, TestContext.CurrentContext.CancellationToken);
+            Assert.That(result.IsContradictory, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task ResultSourceDomainCannotCreatePreconditionVacuity()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static byte Target() { Contract.Ensures(false); return byte.MaxValue; }
+            }
+            """);
+        var result = await VerifyNativeSourceAsync(project);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task UserAssumeCreatesNormalCompletionVacuity(bool hasPrecondition)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    {{(hasPrecondition ? "Contract.Requires(value > 0);" : "")}}
+                    Contract.Assume({{(hasPrecondition ? "value < 0" : "false")}});
+                    Contract.Ensures(false);
+                    return value;
+                }
+            }
+            """);
+        var result = await VerifyNativeSourceAsync(project);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).Used, Is.True);
+    }
+
+    [TestCase(true, WorkerClaimOutcome.Proven)]
+    [TestCase(false, WorkerClaimOutcome.Refuted)]
+    public async Task SatisfiablePreconditionPreservesPostconditionVerdict(bool postcondition, WorkerClaimOutcome expectedOutcome)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    Contract.Ensures({{(postcondition ? "true" : "false")}});
+                    return value;
+                }
+            }
+            """);
+        var result = await VerifyNativeSourceAsync(project);
+        Assert.That(result.Outcome, Is.EqualTo(expectedOutcome));
+        Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
+    [Test]
+    public async Task UnknownPreconditionSatisfiabilityCannotBecomeVacuousProof()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    Contract.Ensures(true);
+                    return value;
+                }
+            }
+            """);
+        var backend = new ScriptedBackend(BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure));
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend, project.Request.Budgets);
+        Assert.That(backend.CallCount, Is.EqualTo(1));
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        Assert.That(results.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
+    [TestCase(false, false, WorkerVacuityKind.NoModeledNormalReturn)]
+    [TestCase(true, false, WorkerVacuityKind.None)]
+    [TestCase(false, true, WorkerVacuityKind.NoModeledNormalReturn)]
+    [TestCase(true, true, WorkerVacuityKind.None)]
+    public async Task NormalCompletionVacuityMatchesModeledPath(bool nonzero, bool assumeCompletion, WorkerVacuityKind expectedVacuity)
+    {
+        using var project = new ShadowTestProject(DivisionSource(nonzero, assumeCompletion));
+        var result = await VerifyNativeSourceAsync(project);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(result.Vacuity, Is.EqualTo(expectedVacuity));
+    }
+
+    [Test]
+    public async Task UnknownNormalCompletionSatisfiabilityCannotBecomeProof()
+    {
+        using var project = new ShadowTestProject(DivisionSource(nonzero: true, assumeCompletion: false));
+        using var backend = new UnknownNormalCompletionBackend();
+        var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend, project.Request.Budgets);
+        Assert.That(backend.CallCount, Is.EqualTo(2));
+        Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        Assert.That(results.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+    }
+
+    private static string DivisionSource(bool nonzero, bool assumeCompletion)
+    {
+        return $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value {{(nonzero ? "!=" : "==")}} 0);
+                    {{(assumeCompletion ? "Contract.Assume(1 / value == 1 / value);" : "")}}
+                    Contract.Ensures({{(nonzero ? "true" : "false")}});
+                    return 1 / value;
+                }
+            }
+            """;
+    }
+
+    private static async Task<WorkerClaimResult> VerifyNativeSourceAsync(ShadowTestProject project)
+    {
+        System.ArgumentNullException.ThrowIfNull(project);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        return response.ClaimResults.Single();
+    }
+    [Test]
+    public void UnknownCompilerClauseKindIsRejectedExhaustively()
+    {
+        var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(NativeTrivialSource);
+        artifact.Callables.Single().Total!.Clauses.Single().Kind = (CompilerContractKind)int.MaxValue;
+        RejectMalformedArtifact(artifact);
+    }
+
+    private static void RejectMalformedArtifact(CompilerManifestArtifact artifact)
+    {
+        System.ArgumentNullException.ThrowIfNull(artifact);
+        Assert.Throws<JsonException>(new Action(() =>
+        {
+            var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        }));
+    }
+
+    [Test]
+    public void ClaimAssumptionsDoNotAliasManifestOrSiblingEvidence()
+    {
+        var target = CreateTrivialTarget();
+        target.Entry.Assumptions =
+        [
+            new WorkerAssumptionEvidence
+            {
+                Id = "assumption",
+                Kind = WorkerAssumptionKind.UserAssume
+            }
+        ];
+        var first = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+        var sibling = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+
+        first.Assumptions[0].Id = "mutated";
+        first.Assumptions[0].Used = true;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                first.Assumptions[0],
+                Is.Not.SameAs(target.Entry.Assumptions[0]));
+            Assert.That(first.Assumptions[0], Is.Not.SameAs(sibling.Assumptions[0]));
+            Assert.That(target.Entry.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(target.Entry.Assumptions[0].Used, Is.False);
+            Assert.That(sibling.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(sibling.Assumptions[0].Used, Is.False);
+        }
+    }
+
+    [TestCase(
+        false,
+        TestName = "CacheRejectsAHashedPayloadWithNullCallableResults")]
+    [TestCase(
+        true,
+        TestName = "CacheRejectsPayloadSealedForADifferentManifest")]
+    public async Task CacheRejectsMalformedPayload(bool differentManifest)
+    {
+        using var temporaryDirectory = new TempDirectory("worker-cache-edge-");
+        var directory = temporaryDirectory.FullName;
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var inputHash = new string(differentManifest ? 'b' : 'a', 64);
+        await WriteCacheEnvelopeAsync(
+            directory,
+            inputHash,
+            differentManifest ? new string('c', 64) : manifest.Hash,
+            differentManifest ? [] : null,
+            []);
+        var cache = new VerificationCache(directory, 1024 * 1024);
+
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(response, Is.Null);
+    }
+
+    [Test]
+    public async Task CacheRejectsOversizedJsonBeforeDeserialization()
+    {
+        using var temporaryDirectory = new TempDirectory("worker-cache-size-");
+        var directory = temporaryDirectory.FullName;
+        var inputHash = new string('d', 64);
+        var path = Path.Combine(
+            directory,
+            inputHash + CacheFileSuffix);
+        await File.WriteAllBytesAsync(
+            path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
+        var cache = new VerificationCache(
+            directory, WorkerProtocolJson.MaximumJsonBytes * 2L);
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            new WorkerBudgets(),
+            TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(response, Is.Null);
+    }
+
+    [Test]
+    public async Task CacheWriteLimitsAreRejectedBeforePublication()
+    {
+        var inputHash = new string('e', 64);
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            ClaimResults = [new WorkerClaimResult
+            {
+                ProofCore = [new string('x', WorkerProtocolJson.MaximumJsonBytes)]
+            }]
+        };
+        foreach (var maximumBytes in new[]
+        {
+            1L,
+            (long)WorkerProtocolJson.MaximumJsonBytes * 2
+        })
+        {
+            using var temporaryDirectory = new TempDirectory(
+                "worker-cache-write-size-");
+            var directory = temporaryDirectory.FullName;
+            var cache = new VerificationCache(directory, maximumBytes);
+            Assert.That(
+                await cache.TryWriteAsync(
+                    response,
+                    inputHash,
+                    manifest,
+                    TestContext.CurrentContext.CancellationToken),
+                Is.False,
+                maximumBytes.ToString(CultureInfo.InvariantCulture));
+            Assert.That(
+                Directory.GetFiles(directory, "*" + CacheFileSuffix),
+                Is.Empty,
+                maximumBytes.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static Task WriteCacheEnvelopeAsync(
+        string directory,
+        string inputHash,
+        string manifestHash,
+        WorkerCallableResult[]? callableResults,
+        WorkerClaimResult[] claimResults)
+    {
+        System.ArgumentNullException.ThrowIfNull(claimResults, nameof(claimResults));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(inputHash);
+        System.ArgumentNullException.ThrowIfNull(manifestHash);
+        var entry = JsonSerializer.Serialize(
+            new
+            {
+                SchemaVersion = WorkerCacheVersions.Current,
+                InputHash = inputHash,
+                ManifestHash = manifestHash,
+                CallableResults = callableResults,
+                ClaimResults = claimResults
+            },
+            WorkerProtocolJson.Options);
+        return File.WriteAllTextAsync(
+            Path.Combine(
+                directory,
+                inputHash + CacheFileSuffix),
+            entry);
+    }
+
+    private const string NativeTrivialSource = """
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static void Target() { Contract.Ensures(true); }
+        }
+        """;
+
+    private static async Task<ImmutableArray<WorkerClaimResult>> VerifyNativeClaimsAsync(
+        CompilerCallablePreparation target, ISmtBackend backend, WorkerBudgets budgets,
+        Func<long>? readConsumedResources = null)
+    {
+        System.ArgumentNullException.ThrowIfNull(backend);
+        System.ArgumentNullException.ThrowIfNull(budgets);
+        System.ArgumentNullException.ThrowIfNull(target);
+        using var projectBoundary = new CancellationTokenSource();
+        var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, budgets,
+            readConsumedResources, WorkerBudgets.DefaultMethodWallTimeMilliseconds,
+            projectBoundary, TestContext.CurrentContext.CancellationToken);
+        return result.Claims;
+    }
+    private static CompilerCallablePreparation CreateTrivialTarget()
+    {
+        return new(
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "M:Test.Subject.Verify",
+                ClaimIds = ["claim"]
+            },
+            WorkerClaimReason.None);
+    }
+
+    private static MethodResourceBudget CreateResourceBudget()
+    {
+        return new(
+            null,
+            WorkerBudgets.DefaultQueryRlimit,
+            WorkerBudgets.DefaultMethodRlimit);
+    }
+
+    private sealed class FixedBackend(BackendCheckResult result)
+        : ISmtBackend
+    {
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(query);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class ResourceConsumingBackend(
+        Action consume,
+        BackendCheckResult result) : ISmtBackend
+    {
+        private readonly Action _consume = (consume ?? throw new System.ArgumentNullException(nameof(consume)));
+        private readonly BackendCheckResult _result = (result ?? throw new System.ArgumentNullException(nameof(result)));
+        private int _callCount;
+
+        internal int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(query);
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _callCount);
+            _consume();
+            return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class ScriptedBackend(
+        params BackendCheckResult[] results) : ISmtBackend
+    {
+        private readonly Queue<BackendCheckResult> _results = new((results ?? throw new System.ArgumentNullException(nameof(results))));
+        private int _callCount;
+
+        internal int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(query);
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _callCount);
+            return Task.FromResult(_results.Dequeue());
+        }
+    }
+
+    private sealed class UnknownNormalCompletionBackend : ISmtBackend, IDisposable
+    {
+        private readonly NativeCallableBackend _backend;
+        internal int CallCount { get; private set; }
+
+        internal UnknownNormalCompletionBackend()
+        {
+            ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+            _backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
+        }
+
+        public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            return CallCount switch
+            {
+                1 => _backend.CheckAsync(query, cancellationToken),
+                2 => Task.FromResult(BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure)),
+                _ => throw new AssertionException("A postcondition query followed unknown normal completion.")
+            };
+        }
+
+        public void Dispose() { _backend.Dispose(); }
+    }
+    public enum MalformedBodyKind
+    {
+        MissingAssignmentSource,
+        UnboundCall,
+        MissingBranchCondition,
+        MissingReturnValue,
+        UnsupportedInstruction
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SharpProof: attach to managed process (Dev Container)",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}",
+      "justMyCode": false,
+      "requireExactSource": true,
+      "sourceFileMap": { "/workspace/SharpProof": "${workspaceFolder}" }
+    }
+  ]
+}

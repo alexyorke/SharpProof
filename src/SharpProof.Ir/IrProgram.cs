@@ -1,0 +1,43 @@
+namespace SharpProof.Ir;
+
+public abstract partial class IrInstruction
+{
+    public bool IsTerminal => Kind is IrInstructionKind.Branch
+        or IrInstructionKind.Goto or IrInstructionKind.Return
+        or IrInstructionKind.Throw or IrInstructionKind.ExceptionalExit;
+}
+
+public sealed partial class IrBasicBlock
+{
+    internal IIrTerminator ControlFlow { get; }
+
+    public IrInstruction Terminator => ControlFlow.Instruction;
+}
+
+public sealed partial class IrProgram
+{
+    internal IrProgram(
+        IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)
+    {
+        RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Blocks must be initialized.");
+
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        (Factory, Scope, Entry, Blocks) = (factory, scope, entry, blocks);
+    }
+
+    public IrBasicBlock GetBlock(IrBlockId id)
+    {
+        if (id.Scope != Scope)
+        {
+            throw new ArgumentException(
+                "The block identifier belongs to a different program.",
+                nameof(id));
+        }
+
+        return Blocks[ArgumentNullGuard.RequireIndex(
+            id.Value,
+            Blocks.Length,
+            nameof(id))];
+    }
+}

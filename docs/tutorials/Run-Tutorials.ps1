@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1' -or
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64) {
+    [Runtime.InteropServices.Architecture]::X64) {
     throw 'Run tutorials in the canonical Linux amd64 container.'
 }
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -42,12 +42,12 @@ try {
     if (@($untrackedCode | Where-Object { $_ -notlike 'docs/tutorials/*' }).Count) {
         throw 'Commit non-tutorial untracked source before running the tutorial snapshot.'
     }
-    [xml]$release = Get-Content (Join-Path $sourceRoot 'SharpProof.Release.props') -Raw
+    [xml]$release = Get-Content (Join-Path $sourceRoot 'eng/Versions.props') -Raw
     $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).Replace(
         '$(SharpProofVersionPrefix)', [string]$release.Project.PropertyGroup.SharpProofVersionPrefix)
     $feed = Join-Path $scratch 'feed'
     [void][IO.Directory]::CreateDirectory($feed)
-    $manifest = Get-Content (Join-Path $sourceRoot 'scripts/package-projects.json') -Raw | ConvertFrom-Json
+    $manifest = Get-Content (Join-Path $sourceRoot 'eng/scripts/package-projects.json') -Raw | ConvertFrom-Json
     Write-Host "Building tutorial feed: $version"
     foreach ($project in $manifest.projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension($project)
@@ -56,7 +56,7 @@ try {
             -LogPath (Join-Path $evidenceRoot "pack-$name.log")
         if ($exitCode -ne 0) { throw "Packing $name failed; see the evidence directory." }
     }
-    $nugetConfig = Join-Path $scratch 'NuGet.Config'
+    $nugetConfig = Join-Path $scratch 'NuGet.config'
     $escapedFeed = [Security.SecurityElement]::Escape($feed)
     [IO.File]::WriteAllText($nugetConfig, @"
 <configuration>
@@ -91,7 +91,6 @@ try {
         $consumer = Join-Path $scratch $id
         [void][IO.Directory]::CreateDirectory($consumer)
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "code/$id.cs") -Destination (Join-Path $consumer 'Example.cs')
-        $verifierReference = if ($case.Native) { "<PackageReference Include=`"SharpProof.Verifier`" Version=`"$version`" PrivateAssets=`"all`" />" } else { '' }
         $verify = if ($case.Native) { 'true' } else { 'false' }
         [IO.File]::WriteAllText((Join-Path $consumer 'Example.csproj'), @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -102,9 +101,7 @@ try {
     <SharpProofAssumptionPolicy>warn</SharpProofAssumptionPolicy>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Attributes" Version="$version" />
-    <PackageReference Include="SharpProof" Version="$version" PrivateAssets="all" />
-    $verifierReference
+    <PackageReference Include="SharpProof" Version="$version" />
   </ItemGroup>
 </Project>
 "@, $utf8)
@@ -150,12 +147,12 @@ dotnet_diagnostic.SP0047.severity = warning
             }
             Publish-Line "  run: $($result.runStatus); failure: $($result.failureReason)"
             $claimLines = foreach ($claim in $result.claimResults) {
-                $entry = @($result.manifest.claims | Where-Object claimId -eq $claim.claimId)[0]
+                $entry = @($result.manifest.claims | Where-Object claimId -EQ $claim.claimId)[0]
                 "  $($entry.callableId) | $($entry.kind)/$($entry.effectContractKind) | $($claim.outcome) | $($claim.reason) | $($claim.effectCertainty) | $($claim.vacuity)"
             }
             foreach ($line in @($claimLines | Sort-Object)) { Publish-Line $line }
             if ($id -in @('03-effects', '04-branching', '05-loops-and-state') -and
-                @($result.claimResults | Where-Object outcome -ne 'Proven').Count) {
+                @($result.claimResults | Where-Object outcome -NE 'Proven').Count) {
                 throw "$id did not prove all selected claims."
             }
             if ($id -eq '06-outcomes' -and
@@ -164,7 +161,7 @@ dotnet_diagnostic.SP0047.severity = warning
             }
             if ($id -eq '08-trusted-boundary' -and
                 ($result.claimResults[0].outcome -ne 'Proven' -or
-                 $result.claimResults[0].effectCertainty -ne 'TrustedCompleteBoundary')) {
+                $result.claimResults[0].effectCertainty -ne 'TrustedCompleteBoundary')) {
                 throw 'Trusted boundary evidence changed; review its declaration.'
             }
         }

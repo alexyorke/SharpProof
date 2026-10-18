@@ -16,17 +16,17 @@ public sealed class RepositoryLogger
         this.error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
-    public void Info(string message)
+    public void Info(string? message)
     {
         output.WriteLine(message);
     }
 
-    public void Error(string message)
+    public void Error(string? message)
     {
         error.WriteLine(message);
     }
 
-    public void Error(Exception exception)
+    public void Error(Exception? exception)
     {
         error.WriteLine(exception);
     }

@@ -5,3 +5,8 @@
 - Use `tooling test -Target <project> -TestFilter <filter>` for isolated targeted tests; task commands copy the worktree into a private container workspace.
 - Compose normally isolates worktrees by directory name. Set a distinct `COMPOSE_PROJECT_NAME` when directory basenames collide. Never run concurrent builds against one worktree's bind-mounted `bin`, `obj`, or `artifacts` directories.
 - Docker owns CPU and memory isolation. Do not add host Job Objects, cgroup readers, RSS monitors, or process-memory command-line budgets.
+
+- Follow the pinned Arcade SDK in `global.json`; keep `eng/common` byte-for-byte identical to `eng/arcade-source.json`.
+- Put C# projects under `src/`; test project filenames end in `.Tests`, `.UnitTests`, `.IntegrationTests`, or `.PerformanceTests`.
+- Keep dependency versions in `eng/Versions.props` and compiler output under `artifacts/bin` and `artifacts/obj`.
+- Run `docker compose run --rm tooling layout` after structural changes. Finite task build outputs stay private to the container; evidence and packages are exported on completion.

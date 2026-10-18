@@ -1,0 +1,650 @@
+namespace SharpProof.Ir;
+
+public sealed class IrProgramBuilder(IrFactory factory)
+{
+    private static long s_nextScope;
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+    private readonly long _scope = Interlocked.Increment(ref s_nextScope);
+    private readonly List<MutableBlock> _blocks = [];
+    private int _nextInstruction;
+    private IrBlockId? _entry;
+    private bool _built;
+
+    public IrBlockId CreateBlock(string? name = null)
+    {
+        EnsureMutable();
+        var id = new IrBlockId(_scope, _blocks.Count);
+        var nameId = string.IsNullOrWhiteSpace(name)
+            ? (IrStringId?)null
+            : _factory.InternString(name!);
+        _blocks.Add(new MutableBlock(id, nameId));
+        _entry ??= id;
+        return id;
+    }
+
+    public void SetEntry(IrBlockId entry)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        EnsureMutable();
+        GetBlock(entry);
+        _entry = entry;
+    }
+
+    public IrMemberLocation MemberLocation(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        ImmutableArray<IrTerm> immutableArguments = [.. arguments];
+
+        var memberInfo = _factory.GetMemberInfo(member);
+        _factory.ValidateCallShape(
+            memberInfo,
+            receiver,
+            immutableArguments,
+            nameof(arguments));
+        return new IrMemberLocation(
+            memberInfo.ReturnType,
+            member,
+            receiver,
+            immutableArguments);
+    }
+
+    public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index)
+    {
+        var elementType = _factory.ValidateSequenceTerms(
+            sequence, index,
+            "A sequence location requires a sequence term.",
+            "A sequence location requires an integer index.",
+            nameof(sequence), nameof(index));
+        return new IrSequenceLocation(
+            elementType, sequence, index);
+    }
+
+    public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
+        IrTerm? length = null, ImmutableArray<IrTerm> /* SPINT001: all values valid - default denotes no array initializers */ initialValues = default)
+    { RepositoryParameterGuard.ThrowIfInvalid(allocatedType.IsDefault, nameof(allocatedType)); RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation)); return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length, initialValues)); }
+
+    public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
+    { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation)); return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
+
+    // Stores value at sequence[index]; the caller has already guarded the
+    // array's nullness and the index's range.
+    public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
+            ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
+            ArgumentNullGuard.NotNull(value, nameof(value))));
+    }
+
+    // Stores value in receiver's field; the caller has already guarded the
+    // receiver's nullness.
+    public IrWriteInstruction FieldStore(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm receiver,
+        IrMemberId field, IrTerm value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        receiver = ArgumentNullGuard.NotNull(receiver, nameof(receiver));
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        return FieldStore(block, operation, region, receiver, field, value, null);
+    }
+
+    public IrWriteInstruction FieldStore(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm receiver,
+        IrMemberId field, IrTerm value, IrTerm? key)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
+            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value)), key));
+    }
+
+    public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
+    { receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver)); RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation)); return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
+
+    public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return Append(
+            block,
+            new IrAssignInstruction(
+                NextInstructionId(), operation, target, value));
+    }
+
+    public IrLoadInstruction Load(IrBlockId block, OperationId operation, IrVarId target, IrLocation location)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
+        return Append(
+            block,
+            new IrLoadInstruction(
+                NextInstructionId(), operation, target, location));
+    }
+
+    public IrStoreInstruction Store(IrBlockId block, OperationId operation, IrLocation location, IrTerm value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return Append(
+            block,
+            new IrStoreInstruction(
+                NextInstructionId(), operation, location, value));
+    }
+
+    public IrCallInstruction Call(
+        IrBlockId block,
+        OperationId operation,
+        IrVarId? target,
+        IrMemberId member,
+        IrTerm? receiver,
+        params IrTerm[] arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+
+        return Append(
+            block,
+            new IrCallInstruction(
+                NextInstructionId(), operation, target, member, receiver,
+                [.. arguments]));
+    }
+
+    public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
+        return Append(
+            block,
+            new IrAssumeInstruction(
+                NextInstructionId(), operation, condition));
+    }
+
+    public IrAssertInstruction Assert(IrBlockId block, OperationId operation, IrTerm condition)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
+        return Append(
+            block,
+            new IrAssertInstruction(
+                NextInstructionId(), operation, condition));
+    }
+
+    public IrHavocInstruction Havoc(
+        IrBlockId block,
+        OperationId operation,
+        IrHavocKind havocKind,
+        params IrVarId[] variables)
+    {
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Havoc(block, operation, havocKind, IrHavocOrigin.Approximation, variables);
+    }
+
+    public IrHavocInstruction Havoc(
+        IrBlockId block, OperationId operation, IrHavocKind havocKind,
+        IrHavocOrigin origin, params IrVarId[] variables)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        ArgumentNullGuard.NotNull(variables, nameof(variables));
+
+        var distinct = variables
+            .Distinct()
+            .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
+            .ToImmutableArray();
+        return Append(
+            block,
+            new IrHavocInstruction(
+                NextInstructionId(), operation, havocKind, distinct, origin));
+    }
+
+    public IrBranchInstruction Branch(
+        IrBlockId block, OperationId operation, IrTerm condition,
+        IrBlockId whenTrue, IrBlockId whenFalse)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(whenFalse.IsDefault, nameof(whenFalse));
+        RepositoryParameterGuard.ThrowIfInvalid(whenTrue.IsDefault, nameof(whenTrue));
+        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
+        return Append(
+            block,
+            new IrBranchInstruction(
+                NextInstructionId(), operation, condition, whenTrue, whenFalse));
+    }
+
+    public IrGotoInstruction Goto(IrBlockId block, OperationId operation, IrBlockId target)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        return Append(
+            block,
+            new IrGotoInstruction(
+                NextInstructionId(), operation, target));
+    }
+
+    public IrReturnInstruction Return(IrBlockId block, OperationId operation, IrTerm? value = null)
+    {
+        EnsureMutable();
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Append(
+            block,
+            new IrReturnInstruction(
+                NextInstructionId(), operation, value));
+    }
+
+    public IrThrowInstruction Throw(IrBlockId block, OperationId operation,
+        IrExceptionKind exceptionKind, IrBlockId target)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        return Append(block, new IrThrowInstruction(NextInstructionId(), operation, exceptionKind, target));
+    }
+
+    public IrExceptionalExitInstruction ExceptionalExit(IrBlockId block, OperationId operation)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return Append(block, new IrExceptionalExitInstruction(NextInstructionId(), operation));
+    }
+
+    public IrProgram Build()
+    {
+        EnsureMutable();
+        if (_entry == null)
+        {
+            throw new InvalidOperationException(
+                "A program must contain at least one block.");
+        }
+
+        var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(_blocks.Count);
+        foreach (var block in _blocks)
+        {
+            if (block.Instructions.Count == 0 ||
+                !block.Instructions[block.Instructions.Count - 1].IsTerminal)
+            {
+                throw new InvalidOperationException(
+                    "Every program block must end in a control-flow terminator.");
+            }
+
+            blocks.Add(block.Freeze());
+        }
+        _built = true;
+        return new IrProgram(
+            _factory,
+            _scope,
+            _entry.Value,
+            blocks.MoveToImmutable());
+    }
+
+    private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+        EnsureMutable();
+        _factory.GetOperationInfo(instruction.Operation);
+        instruction.Accept(TerminatorValidationVisitor.Instance, this);
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrLockInstruction Append(IrBlockId blockId, IrLockInstruction synchronization)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(synchronization.Operation);
+        if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
+            (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
+        { throw InvalidArgument("Synchronization requires a reference receiver.", "receiver"); }
+        return AppendValidated(blockId, synchronization);
+    }
+
+    private IrWriteInstruction Append(IrBlockId blockId, IrWriteInstruction write)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(write.Operation);
+        if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
+        { throw InvalidArgument("A write region is undefined.", "region"); }
+        if (write.Field is { } field)
+        {
+            var fieldInfo = _factory.GetMemberInfo(field);
+            if (write.Region is not (IrWriteRegion.Field or IrWriteRegion.Parameter) || write.Target == null ||
+                write.Value == null ||
+                (write.Index == null ? !fieldInfo.ParameterTypes.IsEmpty :
+                    fieldInfo.ParameterTypes.Length != 1 ||
+                    ValidateTerm(write.Index, "index") != fieldInfo.ParameterTypes[0] ||
+                    _factory.GetTypeInfo(write.Index.Type).Kind != IrTypeKind.Integer) ||
+                !IrFieldSites.IsField(_factory, field) || fieldInfo.IsStatic ||
+                _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
+                ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)
+            { throw InvalidArgument("A field store requires an object, an instance field and a value of its type.", "field"); }
+        }
+        else if (write.Target is { } stored)
+        {
+            var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "target"));
+            if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
+                write.Index == null || write.Value == null ||
+                _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
+                ValidateTerm(write.Value, "value") != sequenceType.ElementType)
+            { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
+        }
+        return AppendValidated(blockId, write);
+    }
+
+    private IrAllocationInstruction Append(IrBlockId blockId, IrAllocationInstruction allocation)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(allocation.Operation);
+        if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+        { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
+        if (allocation.Target is { } allocatedTarget &&
+            (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
+                !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
+                _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
+        { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
+        if (allocation.Length is { } length &&
+            (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
+                ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
+        { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
+        if (!allocation.InitialValues.IsEmpty)
+        {
+            if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
+            { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }
+            var elementType = _factory.GetTypeInfo(allocation.AllocatedType).ElementType;
+            foreach (var initial in allocation.InitialValues)
+            {
+                if (initial is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm) ||
+                    ValidateTerm(initial, "initialValues") != elementType)
+                { throw InvalidArgument("Array initializers require matching constant elements.", "initialValues"); }
+            }
+        }
+        return AppendValidated(blockId, allocation);
+    }
+
+    private IrAssignInstruction Append(IrBlockId blockId, IrAssignInstruction value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),
+            "The assigned value does not match the target type.", "value");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrLoadInstruction Append(IrBlockId blockId, IrLoadInstruction value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            _factory.GetVariableInfo(value.Target).Type, ValidateLocation(value.Location),
+            "The loaded location does not match the target type.", "location");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrStoreInstruction Append(IrBlockId blockId, IrStoreInstruction value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            ValidateLocation(value.Location), ValidateTerm(value.Value, "value"),
+            "The stored value does not match the location type.", "value");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrCallInstruction Append(IrBlockId blockId, IrCallInstruction value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        var member = _factory.GetMemberInfo(value.Member);
+        _factory.ValidateCallShape(
+            member, value.Receiver, value.Arguments, "arguments");
+        if (value.Target.HasValue &&
+            _factory.GetVariableInfo(value.Target.Value).Type != member.ReturnType)
+        {
+            throw InvalidArgument(
+                "The call result does not match the target type.", "target");
+        }
+
+        return AppendValidated(blockId, value);
+    }
+
+    private IrAssumeInstruction Append(IrBlockId blockId, IrAssumeInstruction instruction)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(instruction.Operation);
+        ValidateBoolean(instruction.Condition, "condition");
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrAssertInstruction Append(IrBlockId blockId, IrAssertInstruction instruction)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(instruction.Operation);
+        ValidateBoolean(instruction.Condition, "condition");
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrHavocInstruction Append(IrBlockId blockId, IrHavocInstruction value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
+        _ = ArgumentNullGuard.RequireDefined(
+            value.HavocKind,
+            "havocKind");
+
+        var memoryOnly = value.HavocKind == IrHavocKind.Memory;
+        if (memoryOnly != value.Variables.IsEmpty)
+        {
+            throw InvalidArgument(memoryOnly
+                ? "Memory havoc cannot name variables."
+                : "Variable havoc requires at least one variable.", "variables");
+        }
+
+        foreach (var variableId in value.Variables)
+        {
+            _factory.GetVariableInfo(variableId);
+        }
+
+        return AppendValidated(blockId, value);
+    }
+
+    private T AppendValidated<T>(IrBlockId blockId, T instruction) where T : IrInstruction
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
+        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+        var block = GetBlock(blockId);
+        if (block.Instructions.Count != 0 &&
+            block.Instructions[block.Instructions.Count - 1].IsTerminal)
+        {
+            throw new InvalidOperationException(
+                "No instruction can follow a block terminator.");
+        }
+
+        _nextInstruction++;
+        block.Instructions.Add(instruction);
+        return instruction;
+    }
+
+    private IrInstructionId NextInstructionId()
+    {
+        EnsureMutable();
+        return new IrInstructionId(_scope, _nextInstruction);
+    }
+
+    private sealed class TerminatorValidationVisitor : IIrTerminatorVisitor<IrProgramBuilder>
+    {
+        internal static TerminatorValidationVisitor Instance { get; } = new();
+
+        public void Visit(IrBranchInstruction value, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            state.ValidateBoolean(value.Condition, "condition");
+            state.GetBlock(value.WhenTrue);
+            state.GetBlock(value.WhenFalse);
+        }
+
+        public void Visit(IrGotoInstruction value, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            value = RepositoryParameterGuard.NotNull(value, nameof(value));
+            state.GetBlock(value.Target);
+        }
+
+        public void Visit(IrThrowInstruction value, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
+            state.GetBlock(value.Target);
+        }
+
+        public void Visit(IrExceptionalExitInstruction instruction, IrProgramBuilder state)
+        {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+        }
+
+        public void Visit(IrReturnInstruction value, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            if (value.Value != null)
+            {
+                state.ValidateTerm(value.Value, "value");
+            }
+
+        }
+    }
+
+    private MutableBlock GetBlock(IrBlockId id)
+    {
+        if (id.Scope != _scope)
+        {
+            throw new ArgumentException(
+                "The block identifier belongs to a different program builder.",
+                nameof(id));
+        }
+
+        return _blocks[ArgumentNullGuard.RequireIndex(
+            id.Value,
+            _blocks.Count,
+            nameof(id))];
+    }
+
+    private IrTypeId ValidateLocation(IrLocation location)
+    {
+        ArgumentNullGuard.NotNull(location, nameof(location));
+        return location.Accept(LocationValidationVisitor.Instance, this);
+    }
+
+    private sealed class LocationValidationVisitor : IIrLocationVisitor<IrProgramBuilder, IrTypeId>
+    {
+        internal static LocationValidationVisitor Instance { get; } = new();
+
+        public IrTypeId Visit(IrMemberLocation location, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            var memberInfo = state._factory.GetMemberInfo(location.Member);
+            state._factory.ValidateCallShape(
+                memberInfo, location.Receiver, location.Arguments, nameof(location));
+            RequireSameType(
+                memberInfo.ReturnType, location.Type, "The member location has an invalid type.", nameof(location));
+            return location.Type;
+        }
+
+        public IrTypeId Visit(IrSequenceLocation location, IrProgramBuilder state)
+        {
+            state = RepositoryParameterGuard.NotNull(state, nameof(state));
+            var elementType = state._factory.ValidateSequenceTerms(
+                location.Sequence, location.Index,
+                "The sequence location has an invalid type.",
+                "The sequence location has an invalid type.",
+                nameof(location), nameof(location));
+            RequireSameType(
+                elementType, location.Type, "The sequence location has an invalid type.", nameof(location));
+            return location.Type;
+        }
+    }
+
+    private void ValidateBoolean(IrTerm condition, string parameterName)
+    {
+        _ = IrFactory.RequireBooleanTerm(
+            _factory,
+            condition,
+            parameterName,
+            "The condition must be boolean.");
+    }
+
+    private IrTypeId ValidateTerm(IrTerm term, string parameterName)
+    {
+        ArgumentNullGuard.NotNull(term, parameterName);
+
+        _factory.EnsureTerm(term, parameterName);
+        return term.Type;
+    }
+
+    private static void RequireSameType(
+        IrTypeId actual, IrTypeId expected, string detail, string parameterName)
+    {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
+        if (actual != expected)
+        {
+            throw new ArgumentException(detail, parameterName);
+        }
+    }
+
+    private static ArgumentException InvalidArgument(
+        string detail, string parameterName)
+    {
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
+        return new(detail, parameterName);
+    }
+
+    private void EnsureMutable()
+    {
+        if (_built)
+        {
+            throw new InvalidOperationException(
+                "The program builder has already been consumed.");
+        }
+    }
+
+    private sealed class MutableBlock(IrBlockId id, IrStringId? name)
+    {
+        internal IrBlockId Id { get; } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
+        internal IrStringId? Name { get; } = name;
+        internal List<IrInstruction> Instructions { get; } = [];
+
+        internal IrBasicBlock Freeze()
+        {
+            return new(Id, Name, [.. Instructions]);
+        }
+    }
+}

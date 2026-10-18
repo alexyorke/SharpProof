@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <SharpProofProfile>advisory</SharpProofProfile>
+    <SharpProofVerify>false</SharpProofVerify>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof" Version="SHARPPROOF_PACKAGE_VERSION" />
+  </ItemGroup>
+</Project>

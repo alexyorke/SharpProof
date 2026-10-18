@@ -1,0 +1,9 @@
+<Project>
+  <!-- Use the repository-pinned NUnit adapter through the SDK's vstest host. -->
+  <Target Name="RunTests" Condition="'@(TestToRun)' != ''">
+    <MakeDir Directories="$(ArtifactsTestResultsDir)" />
+    <Delete Files="%(TestToRun.ResultsTrxPath)" />
+    <Exec IgnoreStandardErrorWarningFormat="true"
+          Command="dotnet vstest &quot;%(TestToRun.Identity)&quot; &quot;/ResultsDirectory:$(ArtifactsTestResultsDir)&quot; &quot;/logger:trx;LogFileName=%(TestToRun.ResultsFilePathWithoutExtension).trx&quot; %(TestToRun.TestRunnerAdditionalArguments)" />
+  </Target>
+</Project>

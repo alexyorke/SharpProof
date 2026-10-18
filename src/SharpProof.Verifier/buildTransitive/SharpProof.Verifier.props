@@ -1,0 +1,39 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.props" Condition="'$(_SharpProofPortablePackagePresent)' != 'true' AND Exists('$(MSBuildThisFileDirectory)SharpProof.props')" />
+  <PropertyGroup>
+    <_SharpProofVerifierPackagePresent>true</_SharpProofVerifierPackagePresent>
+    <_SharpProofVerifierHostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SharpProofVerifierHostArchitecture>
+    <_SharpProofVerifierProcessArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)</_SharpProofVerifierProcessArchitecture>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('Windows')) AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('Windows')) AND '$(_SharpProofVerifierHostArchitecture)' == 'Arm64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Full' AND '$(UsingMicrosoftNETSdk)' == 'true' AND $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0')) AND $([MSBuild]::IsOSPlatform('Windows')) AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Full' AND '$(UsingMicrosoftNETSdk)' == 'true' AND $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0')) AND $([MSBuild]::IsOSPlatform('Windows')) AND '$(_SharpProofVerifierHostArchitecture)' == 'Arm64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('Linux')) AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('Linux')) AND '$(_SharpProofVerifierHostArchitecture)' == 'Arm64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('OSX')) AND '$(_SharpProofVerifierHostArchitecture)' == 'Arm64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND $([MSBuild]::IsOSPlatform('OSX')) AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
+    <_SharpProofPackageToolsDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net10'))</_SharpProofPackageToolsDirectory>
+    <_SharpProofPackageNativeZ3Path>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/linux-x64/libz3.so'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofPackageNativeZ3Path Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/linux-arm64/libz3.so'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofPackageNativeZ3Path Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/osx-arm64/libz3.dylib'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofPackageNativeZ3Path Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/osx-x64/libz3.dylib'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofPackageNativeZ3Path Condition="$([MSBuild]::IsOSPlatform('Windows'))">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/win-x64/libz3.dll'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofPackageNativeZ3Path Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$(_SharpProofVerifierProcessArchitecture)' == 'Arm64'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/native/win-arm64/libz3.dll'))</_SharpProofPackageNativeZ3Path>
+    <_SharpProofToolsDirectory>$(_SharpProofPackageToolsDirectory)</_SharpProofToolsDirectory>
+    <_SharpProofToolsDirectory Condition="'$(_SharpProofTestToolsDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestToolsDirectory)'))</_SharpProofToolsDirectory>
+    <_SharpProofBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofBuildTasksPath>
+    <_SharpProofBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofBuildTasksPath>
+    <_SharpProofPackageWorkerPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageWorkerPath>
+    <_SharpProofPackageLauncherPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageLauncherPath>
+    <_SharpProofPackageWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofPackageWorkerProtocolPath>
+    <_SharpProofPackageBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofPackageBuildTasksPath>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props" />
+  <PropertyGroup>
+    <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == '' AND '$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_SharpProofDotNetHost>
+    <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == ''">dotnet</_SharpProofDotNetHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilerCaptureRequestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
+  </ItemGroup>
+</Project>

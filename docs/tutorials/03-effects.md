@@ -4,11 +4,13 @@ A tiny method can demonstrate four independent properties: observable purity, ze
 
 ## Enable full verification
 
-Add Verifier privately to the lesson 1 package references. Inside the canonical container, use:
+Keep the same single `SharpProof` reference from lesson 1; do not add a second package. For the standard setup, remove the lesson's portable-only overrides and build: strict full verification is already the package default.
+
+The executable tutorial deliberately exercises separate profile and worker policies, so its equivalent configuration below keeps the advisory profile, enables verification explicitly, and requires Proven results. These overrides are for comparing lesson evidence, not installation prerequisites:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" PrivateAssets="all" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
 </ItemGroup>
 <PropertyGroup>
   <SharpProofProfile>advisory</SharpProofProfile>
@@ -18,7 +20,7 @@ Add Verifier privately to the lesson 1 package references. Inside the canonical 
 </PropertyGroup>
 ```
 
-The tutorial uses advisory analyzer configuration with an explicit require-proven worker policy. `strict` is the alternative profile that requires worker verification and defaults to require-proven plus assumption policy error. These controls are separate.
+The tutorial uses advisory analyzer configuration with an explicit require-proven worker policy and visible assumption warnings. The standard default `strict` profile requires worker verification and defaults to require-proven plus assumption policy error. These controls are separate; ordinary adoption needs only the package reference.
 
 Build with `dotnet build -c Release` in that container. Verification runs through MSBuild after compilation; you do not invoke Z3 yourself. To retain machine-readable reports at explicit paths, add:
 

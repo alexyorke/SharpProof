@@ -1,0 +1,342 @@
+using System.Collections.Immutable;
+using System.Globalization;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using NUnit.Framework;
+using SharpProof.Analyzer;
+using SharpProof.Attributes;
+using SharpProof.Testing;
+
+namespace SharpProof.Analyzer.Test;
+
+internal static class AnalyzerTestHost
+{
+    // SharpProofAnalyzer keeps all compilation state in the analyzer session
+    // created by the engine, so the Roslyn analyzer object itself is safe to
+    // share between independent fixture compilations. Reusing it avoids an
+    // allocation on every test-host invocation without sharing mutable
+    // compilation state.
+    private static readonly SharpProofAnalyzer DefaultAnalyzer = new();
+    private static readonly ImmutableDictionary<string, DiagnosticDescriptor>
+        SupportedDiagnosticMap = DefaultAnalyzer.SupportedDiagnostics
+            .ToImmutableDictionary(
+                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
+                StringComparer.Ordinal);
+    private static readonly CSharpParseOptions ParseOptions =
+        new(LanguageVersion.Preview);
+    private static readonly ImmutableArray<MetadataReference> References =
+        TestMetadataReferences.WithSharpProof;
+
+    internal static void AssertMessageContains(Diagnostic diagnostic, string expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
+        System.ArgumentNullException.ThrowIfNull(expected);
+        Assert.That(diagnostic.GetMessage(CultureInfo.InvariantCulture), Does.Contain(expected));
+    }
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        params string[] expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        var actual = diagnostics.ToArray();
+        Assert.That(
+            actual.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Is.EqualTo(expected),
+            string.Join(
+                Environment.NewLine,
+                actual.Select(static diagnostic =>
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}: " +
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)))));
+    }
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        string expected,
+        int count)
+    {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        System.ArgumentNullException.ThrowIfNull(expected);
+        AssertIds(diagnostics, [.. Enumerable.Repeat(expected, count)]);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        string source,
+        string? mode,
+        IEnumerable<string> enabledIds,
+        DiagnosticAnalyzer? analyzer = null,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string? profile = null,
+        string? features = null,
+        string filePath = "input.cs",
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(enabledIds);
+        System.ArgumentNullException.ThrowIfNull(filePath);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var compilation = CreateCompilation(
+            source,
+            enabledIds,
+            additionalReferences,
+            filePath);
+        return await AnalyzeAsync(
+                compilation,
+                mode,
+                analyzer,
+                profile,
+                features,
+                allowCompilationErrors)
+            .ConfigureAwait(false);
+    }
+
+    internal static CSharpCompilation CreateCompilation(
+        string source,
+        IEnumerable<string> enabledIds,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string filePath = "input.cs")
+    {
+        System.ArgumentNullException.ThrowIfNull(enabledIds);
+        System.ArgumentNullException.ThrowIfNull(filePath);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            ParseOptions,
+            filePath);
+        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (!enabled.IsEmpty)
+        {
+            options = options.WithSpecificDiagnosticOptions(
+                SupportedDiagnosticMap.ToImmutableDictionary(
+                    static pair => pair.Key,
+                    pair => enabled.Contains(pair.Key)
+                        ? ReportDiagnostic.Warn
+                        : ReportDiagnostic.Suppress,
+                    StringComparer.Ordinal));
+        }
+
+        return CSharpCompilation.Create(
+            "AnalyzerFixture",
+            [tree],
+            additionalReferences == null
+                ? References
+                : References.AddRange(additionalReferences),
+            options);
+    }
+
+    internal static CSharpCompilation WithEnabledDiagnostics(
+        CSharpCompilation compilation,
+        params string[] enabledIds)
+    {
+        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
+        var options = compilation.Options.WithSpecificDiagnosticOptions(
+            SupportedDiagnosticMap.ToImmutableDictionary(
+                static pair => pair.Key,
+                pair => enabled.Contains(pair.Key)
+                    ? ReportDiagnostic.Warn
+                    : ReportDiagnostic.Suppress,
+                StringComparer.Ordinal));
+        return compilation.WithOptions(options);
+    }
+
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        string? mode,
+        DiagnosticAnalyzer? analyzer = null,
+        string? profile = null,
+        string? features = null,
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        return AnalyzeAsync(compilation, mode, TestContext.CurrentContext.CancellationToken,
+            analyzer, profile, features, allowCompilationErrors);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        string? mode,
+        CancellationToken cancellationToken,
+        DiagnosticAnalyzer? analyzer = null,
+        string? profile = null,
+        string? features = null,
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var values = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        if (mode != null)
+        {
+            switch (mode.ToUpperInvariant())
+            {
+                case "OFF":
+                    profile ??= "off";
+                    break;
+                case "EFFECTS":
+                case "CONTRACTS":
+                    features ??= mode;
+                    break;
+                case "ALL-EXPERIMENTAL":
+                    features ??= "all";
+                    break;
+                default:
+                    values.Add("sharpproof_mode", mode);
+                    break;
+            }
+        }
+
+        if (profile != null)
+        {
+            values.Add("build_property.SharpProofProfile", profile);
+        }
+
+        if (features != null)
+        {
+            values.Add("build_property.SharpProofFeatures", features);
+        }
+
+        return await AnalyzeAsync(
+                compilation,
+                values,
+                analyzer: analyzer,
+                allowCompilationErrors: allowCompilationErrors,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(values);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        return AnalyzeAsync(compilation, values, TestContext.CurrentContext.CancellationToken,
+            additionalFiles, analyzer, allowCompilationErrors);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
+    {
+
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(values);
+        var analyzerOptions = new AnalyzerOptions(
+            additionalFiles.IsDefault ? [] : additionalFiles,
+            new DictionaryAnalyzerConfigOptionsProvider(values));
+        return await AnalyzeAsync(
+                compilation,
+                analyzerOptions,
+                analyzer,
+                allowCompilationErrors,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        AnalyzerOptions analyzerOptions,
+        DiagnosticAnalyzer? analyzer,
+        bool allowCompilationErrors,
+        CancellationToken cancellationToken)
+    {
+        System.ArgumentNullException.ThrowIfNull(analyzerOptions);
+        if (!allowCompilationErrors)
+        {
+            EnsureCompilationHasNoErrors(compilation);
+        }
+        var withAnalyzers = compilation.WithAnalyzers(
+            [analyzer ?? DefaultAnalyzer],
+            new CompilationWithAnalyzersOptions(
+                analyzerOptions,
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false,
+                reportSuppressedDiagnostics: false));
+        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync(
+                cancellationToken))
+            .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)];
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        AnalyzerConfigOptionsProvider optionsProvider,
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(optionsProvider);
+        var analyzerOptions = new AnalyzerOptions([], optionsProvider);
+        return await AnalyzeAsync(
+                compilation,
+                analyzerOptions,
+                analyzer,
+                allowCompilationErrors,
+                TestContext.CurrentContext.CancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static void EnsureCompilationHasNoErrors(CSharpCompilation compilation)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .ToImmutableArray();
+        if (errors.IsEmpty)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Analyzer fixture compilation failed:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
+    }
+
+    internal static byte[] EmitImage(CSharpCompilation compilation)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                string.Join(
+                    Environment.NewLine,
+                    result.Diagnostics.Select(static diagnostic =>
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        }
+
+        return stream.ToArray();
+    }
+
+    internal static MetadataReference EmitReference(
+        string source,
+        string assemblyName)
+    {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            ParseOptions,
+            assemblyName + ".cs");
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [tree],
+            References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return MetadataReference.CreateFromImage(EmitImage(compilation));
+    }
+
+}

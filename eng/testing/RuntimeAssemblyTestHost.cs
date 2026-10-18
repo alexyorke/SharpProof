@@ -8,6 +8,9 @@ internal static class RuntimeAssemblyTestHost
         byte[] image,
         Action<Assembly> action)
     {
+        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(contextName);
         using var stream = new MemoryStream(image, writable: false);
         WithRuntimeAssembly(contextName, stream, action);
     }
@@ -17,6 +20,9 @@ internal static class RuntimeAssemblyTestHost
         Stream image,
         Action<Assembly> action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(contextName);
+        System.ArgumentNullException.ThrowIfNull(image);
         var context = new AssemblyLoadContext(
             contextName,
             isCollectible: true);
@@ -37,10 +43,12 @@ internal static class RuntimeAssemblyTestHost
         AssemblyLoadContext context,
         AssemblyName requestedName)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(requestedName);
         return AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(candidate =>
-                AssemblyName.ReferenceMatchesDefinition(
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (AssemblyName.ReferenceMatchesDefinition(
                     candidate.GetName(),
-                    requestedName));
+                    requestedName)));
     }
 }

@@ -1,0 +1,111 @@
+namespace SharpProof.Ir;
+
+public sealed partial class IrPrinter(IrFactory factory)
+{
+    private const int MaximumFormatDepth = 1024;
+
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+
+    public string Print(IrTerm term)
+    {
+        ArgumentNullGuard.NotNull(term, nameof(term));
+
+        _factory.EnsureTerm(term, nameof(term));
+        // Count expanded work, not unique DAG nodes. Include a conservative
+        // escaped-text allowance so a few enormous atoms cannot bypass it.
+        IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
+        {
+            RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
+
+            costs = RepositoryParameterGuard.NotNull(costs, nameof(costs));
+            node = RepositoryParameterGuard.NotNull(node, nameof(node));
+            var textLength = node switch
+            {
+                IrStringTerm text => _factory.GetString(text.Value).Length,
+                IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
+                _ => 0
+            };
+            var cost = 64L + 6L * textLength + children.Sum(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (costs[child.Id]));
+            if (cost > 1_048_576)
+            {
+                throw new InvalidOperationException("IR term exceeds the printer formatting work limit.");
+            }
+            return cost;
+        });
+        return FormatChild(term, 0);
+    }
+
+    private string FormatChild(IrTerm term, int depth)
+    {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        if (depth >= MaximumFormatDepth)
+        {
+            throw new InvalidOperationException(
+                "IR term exceeds the printer formatting depth limit.");
+        }
+
+        return Format(term, depth + 1);
+    }
+
+    private string FormatOpaque(IrOpaqueTerm opaque, int depth)
+    {
+        opaque = RepositoryParameterGuard.NotNull(opaque, nameof(opaque));
+        var prefix = opaque.Purity == IrOpaquePurity.Pure
+            ? "pure:"
+            : "impure:" + opaque.Operation + ":";
+        var arguments = string.Join(
+            ", ",
+            opaque.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (FormatChild(argument, depth))));
+        var receiver = opaque.Receiver == null
+            ? ""
+            : FormatChild(opaque.Receiver, depth) +
+                (opaque.Arguments.IsDefaultOrEmpty ? "" : "; ");
+        return prefix + opaque.Member + "(" + receiver + arguments + ")";
+    }
+
+    private string TypeName(IrTypeId type)
+    {
+        // Keep display names unambiguous and safe to embed in the diagnostic
+        // grammar. The local type id disambiguates distinct semantic types
+        // that happen to have the same display name.
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        return Quote(_factory.GetString(_factory.GetTypeInfo(type).Name)) +
+            "#t" + type.Value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string Quote(string value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        var builder = new StringBuilder().Append('"');
+        foreach (var character in value)
+        {
+            var escape = character switch
+            {
+                '"' => "\\\"",
+                '\\' => "\\\\",
+                '\n' => "\\n",
+                '\r' => "\\r",
+                '\t' => "\\t",
+                _ => null
+            };
+            if (escape != null)
+            {
+                builder.Append(escape);
+                continue;
+            }
+            if (character is < ' ' or > '~')
+            {
+                builder.Append("\\u").Append(
+                    ((int)character).ToString(
+                        "X4",
+                        CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                builder.Append(character);
+            }
+        }
+        return builder.Append('"').ToString();
+    }
+}

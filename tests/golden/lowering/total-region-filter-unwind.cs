@@ -5,7 +5,8 @@ public static class Subject
     {
         try
         {
-            try { return 10 / x; }
+            try
+            { return 10 / x; }
             finally { x = x * 10 + 2; }
         }
         catch (System.DivideByZeroException) when ((x = x * 10 + 1) > 0)

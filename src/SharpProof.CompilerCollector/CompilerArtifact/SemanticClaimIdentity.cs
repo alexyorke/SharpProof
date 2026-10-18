@@ -1,0 +1,898 @@
+// Semantic claim identities are sealed by the build-time collector.
+namespace SharpProof.CompilerArtifact;
+
+internal static partial class SemanticClaimIdentity
+{
+    private const string ClaimDomain = "SharpProofClaim/v1";
+    private const string AssumptionDomain = "SharpProofAssumption/v1";
+    private const string FingerprintDomain = "SharpProofPredicate/v1";
+
+    internal static string Create(
+        string assemblyName, string callableId, string predicateFingerprint, int duplicateRank)
+    {
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        predicateFingerprint = RepositoryParameterGuard.NotNull(predicateFingerprint, nameof(predicateFingerprint));
+        return CreateEvidenceId(
+            "spc1:", ClaimDomain, assemblyName, callableId, "postcondition", predicateFingerprint, duplicateRank);
+    }
+
+    internal static string CreateAssumption(
+        string assemblyName, string callableId, WorkerAssumptionKind kind, string evidenceFingerprint, int duplicateRank)
+    {
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        evidenceFingerprint = RepositoryParameterGuard.NotNull(evidenceFingerprint, nameof(evidenceFingerprint));
+        return CreateEvidenceId("spa1:", AssumptionDomain, assemblyName, callableId,
+            kind.ToString(), evidenceFingerprint, duplicateRank);
+    }
+
+    private static string CreateEvidenceId(
+        string prefix, string domain, string assemblyName, string callableId,
+        string kind, string fingerprint, int duplicateRank)
+    {
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        fingerprint = RepositoryParameterGuard.NotNull(fingerprint, nameof(fingerprint));
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
+        duplicateRank = ArgumentNullGuard.RequireNonnegative(
+            duplicateRank, nameof(duplicateRank));
+        using var writer = new CanonicalHashWriter();
+        writer.Add(domain).Add(assemblyName).Add(callableId).Add(kind)
+            .Add(fingerprint).Add(duplicateRank);
+        return prefix + writer.Finish();
+    }
+
+    internal static string CreateInvocationFingerprint(
+        IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source, bool usesCompanion,
+        ContractApiSymbols? intrinsics = null)
+    {
+        invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        source = ArgumentNullGuard.NotNull(source, nameof(source));
+
+        if (invocation.Arguments.Length != 1)
+        {
+            return CreateMalformedInvocationFingerprint(invocation, target, source);
+        }
+
+        var context = new ClaimIdentityContext(target, source, usesCompanion) { Intrinsics = intrinsics, Model = invocation.SemanticModel };
+        return CreateOperationFingerprint(invocation.Arguments[0].Value, context);
+    }
+
+    internal static string CreateAttributeFingerprint(
+        AttributeData attribute, IMethodSymbol target, IParameterSymbol? parameter = null)
+    {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+
+        var context = new ClaimIdentityContext(target, target, false);
+        using var writer = new CanonicalHashWriter();
+        writer.Add(FingerprintDomain).Add(parameter == null ? "return-attribute" : "parameter-attribute");
+        if (parameter != null)
+        {
+            writer.Add(parameter.Ordinal);
+        }
+
+        WriteType(writer, parameter?.Type ?? target.ReturnType, context);
+        WriteType(writer, attribute.AttributeClass, context);
+        WriteAttributeArguments(writer, attribute, context, includeNamed: true);
+        return writer.Finish();
+    }
+
+    internal static string CreateTrustedFingerprint(AttributeData attribute, ISymbol scope, IMethodSymbol target)
+    {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+        scope = ArgumentNullGuard.NotNull(scope, nameof(scope));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+
+        var context = new ClaimIdentityContext(target, target, false);
+        using var writer = new CanonicalHashWriter();
+        writer.Add(FingerprintDomain).Add("trusted-boundary");
+        WriteSymbol(writer, scope, context);
+        WriteType(writer, attribute.AttributeClass, context);
+        WriteAttributeArguments(writer, attribute, context, includeNamed: false);
+        return writer.Finish();
+    }
+
+    internal static string CreateCallableId(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+
+        method = NormalizeCallable(method);
+        var documentationId = DocumentationCommentId.CreateDeclarationId(method);
+        if (!RequiresStructuralCallableId(method) &&
+            !string.IsNullOrEmpty(documentationId))
+        {
+            return documentationId!;
+        }
+
+        using var writer = new CanonicalHashWriter();
+        writer.Add("SharpProofCallable/v1");
+        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false), forCallableIdentity: true);
+        return "spm1:" + writer.Finish();
+    }
+    internal static string CreateNestedCallableId(
+        string parentId, IMethodSymbol method, int siblingOrdinal)
+    {
+        parentId = ArgumentNullGuard.NotNull(parentId, nameof(parentId));
+
+        if (string.IsNullOrWhiteSpace(parentId))
+        {
+            throw new ArgumentException("The value cannot be an empty string or composed entirely of whitespace.", nameof(parentId));
+        }
+
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+
+        siblingOrdinal = ArgumentNullGuard.RequireNonnegative(
+            siblingOrdinal, nameof(siblingOrdinal));
+        method = NormalizeCallable(method);
+        using var writer = new CanonicalHashWriter();
+        writer.Add("SharpProofCallable/v1").Add(parentId).Add(siblingOrdinal);
+        WriteMethod(writer, method, new ClaimIdentityContext(method, method, false), forCallableIdentity: true);
+        return "spm1:" + writer.Finish();
+    }
+    internal static string CreateContainerId(ISymbol symbol)
+    {
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
+
+        var documentationId = DocumentationCommentId.CreateDeclarationId(symbol);
+        if (!RequiresStructuralContainerId(symbol) &&
+            !string.IsNullOrEmpty(documentationId))
+        {
+            return documentationId!;
+        }
+
+        using var writer = new CanonicalHashWriter();
+        writer.Add("SharpProofContainer/v1").Add(symbol.Kind.ToString())
+            .Add(symbol.MetadataName)
+            .Add(DocumentationCommentId.CreateReferenceId(symbol));
+        WriteSpecialContainingTypeIdentity(writer, symbol);
+        return "sps1:" + writer.Finish();
+    }
+
+    private static string CreateMalformedInvocationFingerprint(
+        IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        var context = new ClaimIdentityContext(target, source, false);
+        using var writer = new CanonicalHashWriter();
+        writer.Add(FingerprintDomain).Add("malformed-ensures");
+        WriteMethod(writer, invocation.TargetMethod, context);
+        writer.Add(invocation.Arguments.Length);
+        foreach (var argument in invocation.Arguments)
+        {
+            WriteOperation(writer, argument, context);
+        }
+
+        return writer.Finish();
+    }
+
+    private static string CreateOperationFingerprint(IOperation operation, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        using var writer = new CanonicalHashWriter();
+        writer.Add(FingerprintDomain);
+        WriteOperation(writer, operation, context);
+        return writer.Finish();
+    }
+
+    /// <summary>
+    /// Ceiling on operation nesting walked recursively. Nothing this deep can be
+    /// verified anyway -- the verifier's hard expression-depth cap is the same
+    /// 256 -- so truncating costs no reachable precision, and it keeps a
+    /// generated expression from taking the compiler down with an uncatchable
+    /// StackOverflowException.
+    /// </summary>
+    private const int MaximumFingerprintDepth = 256;
+
+    private static void WriteOperation(
+        CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        WriteOperation(writer, operation, context, 0);
+    }
+
+    private static void WriteOperation(
+        CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context, int depth)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (depth >= MaximumFingerprintDepth)
+        {
+            // Truncation is deterministic, and claim identity also carries a
+            // duplicate rank (ClaimManifestBuilder.NextRank), so two claims whose
+            // fingerprints truncate to the same value still receive distinct ids.
+            writer.Add("depth-limit");
+            return;
+        }
+
+        writer.Add(operation.Kind.ToString()).Add(operation.IsImplicit);
+        WriteType(writer, operation.Type, context);
+        WriteOptionalConstant(writer, operation.ConstantValue, context);
+        switch (operation)
+        {
+            case IParameterReferenceOperation value:
+                WriteParameterRole(writer, value.Parameter, context);
+                break;
+            case ILocalReferenceOperation value:
+                writer.Add("local").Add(value.Local.IsConst);
+                WriteLocalRole(writer, value.Local);
+                WriteType(writer, value.Local.Type, context);
+                break;
+            case IInstanceReferenceOperation value:
+                writer.Add(value.ReferenceKind.ToString());
+                break;
+            case IInvocationOperation value:
+                WriteMethod(writer, value.TargetMethod, context);
+                writer.Add(value.IsVirtual);
+                break;
+            case IObjectCreationOperation value:
+                WriteMethod(writer, value.Constructor, context);
+                break;
+            case IMethodReferenceOperation value:
+                WriteMethod(writer, value.Method, context);
+                writer.Add(value.IsVirtual);
+                break;
+            case IMemberReferenceOperation value:
+                WriteSymbol(writer, value.Member, context);
+                break;
+            case IArgumentOperation value:
+                writer.Add(value.ArgumentKind.ToString()).Add(value.Parameter?.Ordinal ?? -1)
+                    .Add(value.Parameter?.RefKind.ToString() ?? string.Empty);
+                break;
+            case IConversionOperation value:
+                writer.Add(value.Conversion.Exists).Add(value.Conversion.IsIdentity)
+                    .Add(value.Conversion.IsNumeric).Add(value.Conversion.IsReference)
+                    .Add(value.Conversion.IsUserDefined).Add(value.IsChecked);
+                WriteMethod(writer, value.OperatorMethod, context);
+                break;
+            case IBinaryOperation value:
+                writer.Add(value.OperatorKind.ToString()).Add(value.IsLifted).Add(value.IsChecked);
+                WriteMethod(writer, value.OperatorMethod, context);
+                break;
+            case IUnaryOperation value:
+                writer.Add(value.OperatorKind.ToString()).Add(value.IsLifted).Add(value.IsChecked);
+                WriteMethod(writer, value.OperatorMethod, context);
+                break;
+            case ITypeOfOperation value:
+                WriteType(writer, value.TypeOperand, context);
+                break;
+            case IIsTypeOperation value:
+                WriteType(writer, value.TypeOperand, context);
+                writer.Add(value.IsNegated);
+                break;
+        }
+        var children = operation.ChildOperations;
+        writer.Add(children.Count);
+        foreach (var child in children)
+        {
+            WriteOperation(writer, child, context, depth + 1);
+        }
+    }
+    private static void WriteLocalRole(CanonicalHashWriter writer, ILocalSymbol local)
+    {
+        local = RepositoryParameterGuard.NotNull(local, nameof(local));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        var declaration = local.DeclaringSyntaxReferences
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax())).FirstOrDefault();
+        var owner = (local.ContainingSymbol as IMethodSymbol)?.DeclaringSyntaxReferences
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
+            .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (declaration != null &&
+                syntax.SyntaxTree == declaration.SyntaxTree &&
+                syntax.Span.Contains(declaration.Span)));
+        CompilerOwnedSyntaxPath.Write(writer, declaration, owner);
+    }
+
+    private static void WriteParameterRole(
+        CanonicalHashWriter writer, IParameterSymbol parameter, ClaimIdentityContext context)
+    {
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (SymbolEqualityComparer.Default.Equals(
+                parameter.ContainingSymbol.OriginalDefinition, context.Source.OriginalDefinition))
+        {
+            if (context.UsesCompanion && !context.Target.IsStatic)
+            {
+                writer.Add(parameter.Ordinal == 0 ? "receiver" : "parameter");
+                if (parameter.Ordinal != 0)
+                {
+                    writer.Add(parameter.Ordinal - 1);
+                }
+            }
+            else
+            {
+                writer.Add("parameter").Add(parameter.Ordinal);
+            }
+            writer.Add(parameter.RefKind.ToString());
+            WriteType(writer, parameter.Type, context);
+            return;
+        }
+        writer.Add("external-parameter")
+            .Add(parameter.Ordinal).Add(parameter.RefKind.ToString());
+        WriteSymbol(writer, parameter.ContainingSymbol, context);
+    }
+
+    private static void WriteSymbol(CanonicalHashWriter writer, ISymbol symbol, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        writer.Add(symbol.Kind.ToString());
+        switch (symbol)
+        {
+            case IMethodSymbol method:
+                WriteMethod(writer, method, context);
+                return;
+            case INamedTypeSymbol type:
+                WriteType(writer, type, context);
+                return;
+            case IPropertySymbol property:
+                WriteNamedMember(writer, property, context);
+                WriteType(writer, property.Type, context);
+                writer.Add(property.Parameters.Length);
+                foreach (var parameter in property.Parameters)
+                {
+                    writer.Add(parameter.RefKind.ToString());
+                    WriteType(writer, parameter.Type, context);
+                }
+                return;
+            case IFieldSymbol field:
+                WriteNamedMember(writer, field, context);
+                WriteType(writer, field.Type, context);
+                return;
+            case IEventSymbol @event:
+                WriteNamedMember(writer, @event, context);
+                WriteType(writer, @event.Type, context);
+                return;
+            default:
+                WriteReferenceId(writer, symbol);
+                return;
+        }
+    }
+
+    private static void WriteNamedMember(CanonicalHashWriter writer, ISymbol member, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (RequiresStructuralContainerId(member))
+        {
+            WriteSpecialContainingTypeIdentity(writer, member);
+        }
+        writer.Add(member.MetadataName);
+        WriteType(writer, member.ContainingType, context);
+        writer.Add(DocumentationCommentId.CreateDeclarationId(member.OriginalDefinition));
+        if (!SymbolEqualityComparer.Default.Equals(member.ContainingAssembly, context.Source.ContainingAssembly))
+        {
+            writer.Add("referenced-assembly").Add(member.ContainingAssembly.Identity.ToString());
+        }
+    }
+
+    private static void WriteMethod(CanonicalHashWriter writer, IMethodSymbol? method, ClaimIdentityContext context,
+        bool forCallableIdentity = false)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (method == null)
+        {
+            writer.Add("null-method");
+            return;
+        }
+        writer.Add(method.MethodKind.ToString()).Add(method.Arity).Add(method.IsStatic);
+        WriteSpecialContainingTypeIdentity(writer, method);
+        if (forCallableIdentity && method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction ||
+            context.Intrinsics is { } intrinsics && (intrinsics.IsResult(method) || intrinsics.IsOld(method)))
+        {
+            // Nested callable identity is supplied by its ancestor and sibling
+            // slot. Synthesized names must not make it depend on source trivia.
+            WriteReferenceId(writer, method);
+        }
+        else if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+        {
+            WriteNestedTargetIdentity(writer, method, context);
+        }
+        else
+        {
+            // Roslyn's reference IDs do not identify method symbols. Preserve
+            // named targets even when their signatures need structural encoding.
+            writer.Add(method.MetadataName);
+            WriteType(writer, method.ContainingType, context);
+            writer.Add(DocumentationCommentId.CreateDeclarationId(
+                (method.PartialImplementationPart ?? method).OriginalDefinition));
+            if (!forCallableIdentity && !SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly, context.Source.ContainingAssembly))
+            {
+                writer.Add("referenced-assembly").Add(method.ContainingAssembly.Identity.ToString());
+            }
+        }
+        writer.Add(method.TypeArguments.Length);
+        foreach (var argument in method.TypeArguments)
+        {
+            WriteType(writer, argument, context);
+        }
+
+        writer.Add(method.Parameters.Length);
+        foreach (var parameter in method.Parameters)
+        {
+            writer.Add(parameter.RefKind.ToString()).Add(parameter.ScopedKind.ToString());
+            WriteType(writer, parameter.Type, context);
+        }
+        writer.Add(method.RefKind.ToString());
+        WriteType(writer, method.ReturnType, context);
+    }
+
+    private static void WriteNestedTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
+        ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        var chain = new Stack<IMethodSymbol>();
+        while (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+        {
+            chain.Push(method);
+            if (method.ContainingSymbol is not IMethodSymbol parent)
+            {
+                break;
+            }
+            method = parent;
+        }
+        writer.Add("nested-method-target");
+        if (method.MethodKind is not (MethodKind.AnonymousFunction or MethodKind.LocalFunction))
+        {
+            WriteMethod(writer, method, context, forCallableIdentity: true);
+        }
+        else
+        {
+            writer.Add(CreateContainerId(method.ContainingSymbol));
+        }
+        foreach (var nested in chain)
+        {
+            var declaration = nested.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ??
+                throw new InvalidOperationException("A nested method target has no source declaration.");
+            var container = declaration.Ancestors().FirstOrDefault(static node =>
+                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node))) ??
+                declaration.SyntaxTree.GetRoot();
+            if (!IsNestedCallableSyntax(declaration) &&
+                TryWriteQueryTargetIdentity(writer, nested, declaration, context))
+            {
+                WriteMethod(writer, nested, context, forCallableIdentity: true);
+                continue;
+            }
+
+            var ordinal = 0;
+            var found = false;
+            foreach (var node in container.DescendantNodes(node =>
+                         node is null ? throw new System.ArgumentNullException(nameof(node)) : (ReferenceEquals(node, container) || !IsNestedCallableSyntax(node))))
+            {
+                if (!IsNestedCallableSyntax(node))
+                {
+                    continue;
+                }
+                if (node.SyntaxTree == declaration.SyntaxTree && node.Span == declaration.Span &&
+                    node.RawKind == declaration.RawKind)
+                {
+                    found = true;
+                    break;
+                }
+                ordinal++;
+            }
+            if (!found)
+            {
+                throw new InvalidOperationException("A nested method target has no lexical sibling role.");
+            }
+            writer.Add(ordinal);
+            WriteMethod(writer, nested, context, forCallableIdentity: true);
+        }
+    }
+
+    private static bool TryWriteQueryTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
+        SyntaxNode declaration, ClaimIdentityContext context)
+    {
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (!method.IsImplicitlyDeclared || context.Model == null)
+        { return false; }
+        foreach (var query in declaration.AncestorsAndSelf().OfType<QueryExpressionSyntax>())
+        {
+            var sourceDeclaration = context.Source.DeclaringSyntaxReferences
+                .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
+                .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.SyntaxTree == query.SyntaxTree &&
+                    syntax.Span.Contains(query.Span)));
+            if (sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
+                context.Model.GetOperation(query) is not { } queryOperation)
+            { continue; }
+            var syntaxPath = new Stack<int>();
+            for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
+            {
+                syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
+            }
+            var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
+            pending.Push((queryOperation, []));
+            while (pending.Count != 0)
+            {
+                var (operation, operationPath) = pending.Pop();
+                if (operation is IAnonymousFunctionOperation anonymous &&
+                    SymbolEqualityComparer.Default.Equals(anonymous.Symbol.OriginalDefinition, method.OriginalDefinition))
+                {
+                    // Both positions come from the actual owning syntax and bound
+                    // query tree; neither range-variable spelling nor a guessed
+                    // declaration is used to identify the generated method.
+                    writer.Add("query-generated-method").Add(syntaxPath.Count);
+                    foreach (var ordinal in syntaxPath)
+                    { writer.Add(ordinal); }
+                    writer.Add(operationPath.Length);
+                    foreach (var ordinal in operationPath)
+                    { writer.Add(ordinal); }
+                    return true;
+                }
+                var children = operation.ChildOperations.ToArray();
+                for (var ordinal = children.Length - 1; ordinal >= 0; ordinal--)
+                { pending.Push((children[ordinal], operationPath.Add(ordinal))); }
+            }
+        }
+        return false;
+    }
+
+    private static bool IsNestedCallableSyntax(SyntaxNode node)
+    {
+        node = RepositoryParameterGuard.NotNull(node, nameof(node));
+        return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
+    }
+
+    private readonly partial record struct ClaimIdentityContext
+    {
+        internal ContractApiSymbols? Intrinsics { get; init; }
+        internal SemanticModel? Model { get; init; }
+    }
+
+    private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (type == null)
+        {
+            writer.Add("null-type");
+            return;
+        }
+        writer.Add(type.TypeKind.ToString()).Add(type.NullableAnnotation.ToString());
+        if (type is ITypeParameterSymbol parameter)
+        {
+            WriteTypeParameter(writer, parameter, context);
+            return;
+        }
+        if (type is IFunctionPointerTypeSymbol functionPointer)
+        {
+            WriteFunctionPointerType(writer, functionPointer, context);
+            return;
+        }
+        // Documentation IDs omit nested function-pointer signatures. Encode
+        // their wrappers recursively while preserving other type encodings.
+        if (type is IArrayTypeSymbol array && ContainsFunctionPointer(array.ElementType))
+        {
+            writer.Add("array").Add(array.Rank).Add(array.IsSZArray);
+            WriteType(writer, array.ElementType, context);
+            return;
+        }
+        if (type is IPointerTypeSymbol pointer && ContainsFunctionPointer(pointer.PointedAtType))
+        {
+            writer.Add("pointer");
+            WriteType(writer, pointer.PointedAtType, context);
+            return;
+        }
+        if (type is INamedTypeSymbol named && ContainsFunctionPointer(named))
+        {
+            writer.Add("named-type").Add(DocumentationCommentId.CreateReferenceId(named.OriginalDefinition));
+            WriteType(writer, named.ContainingType, context);
+            writer.Add(named.TypeArguments.Length);
+            foreach (var argument in named.TypeArguments)
+            {
+                WriteType(writer, argument, context);
+            }
+            return;
+        }
+        writer.Add(DocumentationCommentId.CreateReferenceId(type));
+    }
+
+    private static void WriteFunctionPointerType(
+        CanonicalHashWriter writer,
+        IFunctionPointerTypeSymbol functionPointer,
+        ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        functionPointer = RepositoryParameterGuard.NotNull(functionPointer, nameof(functionPointer));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        var signature = functionPointer.Signature;
+        writer.Add("function-pointer")
+            .Add(signature.CallingConvention.ToString())
+            .Add(signature.RefKind.ToString())
+            .Add(signature.ReturnsByRefReadonly)
+            .Add(signature.UnmanagedCallingConventionTypes.Length);
+        foreach (var convention in signature.UnmanagedCallingConventionTypes)
+        {
+            WriteType(writer, convention, context);
+        }
+
+        WriteType(writer, signature.ReturnType, context);
+        writer.Add(signature.Parameters.Length);
+        foreach (var parameter in signature.Parameters)
+        {
+            writer.Add(parameter.RefKind.ToString())
+                .Add(parameter.ScopedKind.ToString())
+                .Add(parameter.IsParams);
+            WriteType(writer, parameter.Type, context);
+        }
+    }
+
+    private static bool RequiresStructuralCallableId(IMethodSymbol method)
+    {
+        return RequiresStructuralContainerId(method) ||
+            HasFunctionPointerSignature(method);
+    }
+
+    private static bool RequiresStructuralContainerId(ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        for (var type = symbol is INamedTypeSymbol named
+                ? named
+                : symbol.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            if (type.IsFileLocal || type.IsExtension)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasFunctionPointerSignature(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return ContainsFunctionPointer(method.ReturnType) ||
+            method.Parameters.Any(static parameter =>
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ContainsFunctionPointer(parameter.Type)));
+    }
+
+    private static bool ContainsFunctionPointer(ITypeSymbol type)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        return type switch
+        {
+            IFunctionPointerTypeSymbol => true,
+            IArrayTypeSymbol array => ContainsFunctionPointer(array.ElementType),
+            IPointerTypeSymbol pointer => ContainsFunctionPointer(pointer.PointedAtType),
+            INamedTypeSymbol named => named.TypeArguments.Any(ContainsFunctionPointer) ||
+                named.ContainingType != null && ContainsFunctionPointer(named.ContainingType),
+            _ => false
+        };
+    }
+
+    private static void WriteSpecialContainingTypeIdentity(
+        CanonicalHashWriter writer,
+        ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        var types = new Stack<INamedTypeSymbol>();
+        for (var type = symbol is INamedTypeSymbol named
+                ? named
+                : symbol.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            if (type.IsFileLocal || type.IsExtension)
+            {
+                types.Push(type);
+            }
+        }
+
+        writer.Add("special-containing-types").Add(types.Count);
+        while (types.Count > 0)
+        {
+            var type = types.Pop();
+            writer.Add(type.MetadataName).Add(type.IsFileLocal).Add(type.IsExtension);
+            if (type.IsExtension && type.ExtensionParameter?.Type is { } receiver)
+            {
+                writer.Add(DocumentationCommentId.CreateReferenceId(receiver));
+            }
+        }
+    }
+
+    private static void WriteTypeParameter(
+        CanonicalHashWriter writer, ITypeParameterSymbol parameter, ClaimIdentityContext context)
+    {
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (parameter.ContainingSymbol is IMethodSymbol owner &&
+            SymbolEqualityComparer.Default.Equals(owner.OriginalDefinition, context.Source.OriginalDefinition))
+        {
+            writer.Add("method-parameter").Add(parameter.Ordinal);
+            return;
+        }
+        if (parameter.ContainingSymbol is INamedTypeSymbol typeOwner &&
+            ClaimIdentitySymbolOwnership.TryGetContainingTypeDepth(context.Source.ContainingType, typeOwner, out var depth))
+        {
+            writer.Add("type-parameter").Add(depth).Add(parameter.Ordinal);
+            return;
+        }
+        if (parameter.ContainingSymbol is IMethodSymbol ancestor &&
+            ClaimIdentitySymbolOwnership.TryGetContainingMethodDepth(context.Source, ancestor, out var methodDepth))
+        {
+            writer.Add("ancestor-method-parameter").Add(methodDepth).Add(parameter.Ordinal);
+            return;
+        }
+        writer.Add("external-type-parameter").Add(parameter.TypeParameterKind.ToString())
+            .Add(parameter.Ordinal)
+            .Add(parameter.ContainingSymbol.MetadataName);
+    }
+
+    private static void WriteReferenceId(CanonicalHashWriter writer, ISymbol symbol)
+    {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        writer.Add(DocumentationCommentId.CreateReferenceId(symbol));
+    }
+
+    private static void WriteOptionalConstant(
+        CanonicalHashWriter writer, Optional<object?> constant /* SPINT001: all values valid - missing and present constants are both encoded */, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        writer.Add(constant.HasValue);
+        if (constant.HasValue)
+        {
+            WriteConstant(writer, constant.Value, context);
+        }
+    }
+
+    private static void WriteAttributeArguments(
+        CanonicalHashWriter writer, AttributeData attribute, ClaimIdentityContext context, bool includeNamed)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        writer.Add(attribute.ConstructorArguments.Length);
+        foreach (var argument in attribute.ConstructorArguments)
+        {
+            WriteTypedConstant(writer, argument, context);
+        }
+
+        if (!includeNamed)
+        {
+            return;
+        }
+
+        writer.Add(attribute.NamedArguments.Length);
+        foreach (var item in attribute.NamedArguments.OrderBy(static item => item.Key, StringComparer.Ordinal))
+        {
+            writer.Add(item.Key);
+            WriteTypedConstant(writer, item.Value, context);
+        }
+    }
+
+    private static void WriteTypedConstant(
+        CanonicalHashWriter writer, TypedConstant constant /* SPINT001: all values valid - scalar, array, null, and compiler-error constants are all encoded */, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        writer.Add(constant.Kind.ToString());
+        WriteType(writer, constant.Type, context);
+        if (constant.Kind != TypedConstantKind.Array)
+        {
+            WriteConstant(writer, constant.Value, context);
+        }
+        else
+        {
+            // Roslyn represents an ill-formed array argument with a default
+            // Values array.  Treat it as an empty array for identity purposes;
+            // fingerprinting must never turn a compiler diagnostic into an
+            // exception while walking metadata.
+            var values = constant.Values.IsDefault
+                ? ImmutableArray<TypedConstant>.Empty
+                : constant.Values;
+            writer.Add(values.Length);
+            foreach (var value in values)
+            {
+                WriteTypedConstant(writer, value, context);
+            }
+        }
+    }
+
+    private static void WriteConstant(CanonicalHashWriter writer, object? value, ClaimIdentityContext context)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
+
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
+        if (value == null)
+        {
+            writer.Add("null");
+            return;
+        }
+        var runtimeType = value.GetType();
+        writer.Add(runtimeType.FullName ?? runtimeType.Name);
+        switch (value)
+        {
+            case string text:
+                writer.Add(Utf16WellFormedness.IsWellFormed(text)
+                    ? text
+                    : "ill-formed-utf16");
+                break;
+            case char codeUnit when char.IsSurrogate(codeUnit):
+                // Legal char constants need not form a Unicode scalar value.
+                // Preserve their exact UTF-16 unit without passing it through
+                // the strict UTF-8 string encoder. Other char identities stay
+                // byte-identical to the established string representation.
+                writer.Add((int)codeUnit);
+                break;
+            case ITypeSymbol type:
+                WriteType(writer, type, context);
+                break;
+            case float number:
+                writer.Add(BitConverter.ToInt32(BitConverter.GetBytes(number), 0));
+                break;
+            case double number:
+                writer.Add(BitConverter.DoubleToInt64Bits(number));
+                break;
+            case decimal number:
+                foreach (var part in decimal.GetBits(number))
+                {
+                    writer.Add(part);
+                }
+
+                break;
+            case IFormattable formattable:
+                writer.Add(formattable.ToString(null, CultureInfo.InvariantCulture));
+                break;
+            default:
+                writer.Add(value.ToString() ?? string.Empty);
+                break;
+        }
+    }
+
+    private static IMethodSymbol NormalizePartial(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return method.PartialImplementationPart ?? method;
+    }
+
+    private static IMethodSymbol NormalizeCallable(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return NormalizePartial(method).OriginalDefinition;
+    }
+
+    internal static IMethodSymbol NormalizeCandidate(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        method = method.ReducedFrom ?? method;
+        return method.PartialImplementationPart ?? method;
+    }
+
+    private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
+    {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        return SyntaxSite.IsSame(left, right);
+    }
+
+}
