@@ -1501,3 +1501,17 @@ outer-container ownership, local constant candidates, and the remaining script
 producers. A read-only literal-local review identified 16 provisional const-string
 candidates; main verification and numeric/computed-local review remain pending.
 Comprehensive completion is not claimed while these coverage gaps remain.
+
+## Local constant follow-up inventory
+
+The focused string/bool literal review is recorded in
+[immutability-const-audit.tsv](immutability-const-audit.tsv). Main independently
+checked all declarations and their binding/mutation contexts with Roslyn. There
+are 17 verified const-string candidates across 14 files, including one additional
+reference-case helper literal. That helper already points to the interned literal
+"a"; const preserves the shared string identity and leaves the actual mutable
+array subjects unchanged. Raw program text remains byte-for-byte identical.
+Evidence: immutability-const-local-review2.log. Implementation and focused tests
+follow this committed inventory. Numeric/computed constants and other filtered
+binding-sensitive cases still require semantic review; this focused inventory
+is not represented as exhaustive local-constant coverage.
