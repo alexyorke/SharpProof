@@ -8,7 +8,20 @@ Check the branch, HEAD, upstream, worktrees, and dirty state. Preserve unrelated
 
 For a bug, reproduce the failure or trace the incorrect behavior before editing. Add a focused regression that exercises the actual failing boundary. A passing test must establish the required behavior, not merely mirror the implementation.
 
-## Validate
+## Find the first useful check
+
+| Change | Start here | First useful check |
+| --- | --- | --- |
+| Portable diagnostic | `SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, analyzer tests | Focused analyzer regression and diagnostic help link |
+| Contract API/docs | `SharpProof.Attributes`, Attributes tests | Public API/XML checks and documentation snippets |
+| Language semantics | Collector, frontend, verifier and replay boundaries | A compiler-backed regression covering affected stages |
+| Package/MSBuild integration | `SharpProof.Package`, `SharpProof.Verifier`, package tests | Package-backed external consumer reproducing the issue |
+| Protocol/cache/publication | Worker protocol and validator tests | Matching-evidence, malformed-input and compatibility regressions |
+| Guides/templates | `docs`, `templates` | Documentation checks, snippet tests and exact-feed template smoke check |
+
+For a first contribution, reproduce one issue, locate its existing test cohort, add the smallest meaningful regression, make the fix, run that focused test, then the relevant broader gate below. The [architecture](docs/architecture.md) maps the pipeline; [development workflows](docs/development-workflows.md) explains feedback versus qualification. Hand-maintained files marked `.generated.cs` are edited according to their headers, not by an assumed generator.
+
+## Run validation
 
 ```text
 docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression

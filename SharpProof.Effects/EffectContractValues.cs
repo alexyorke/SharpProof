@@ -1,4 +1,5 @@
 namespace SharpProof.Effects;
+
 internal static class EffectContractMetadata
 {
     internal const string AttributeMetadataName =

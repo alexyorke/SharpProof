@@ -4,6 +4,7 @@
     <_SharpProofProfileWasDefaulted Condition="'$(SharpProofProfile)' != ''">false</_SharpProofProfileWasDefaulted>
     <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' == ''">true</_SharpProofFeaturesWasDefaulted>
     <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' != ''">false</_SharpProofFeaturesWasDefaulted>
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofVerifierPackagePresent)' == 'true'">strict</SharpProofProfile>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').Trim().ToLowerInvariant())</_SharpProofProfileNormalized>

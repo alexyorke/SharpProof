@@ -112,13 +112,22 @@ function New-FrameworkPackageSource {
 
     $frameworkSource = Join-Path $Root 'framework-packages'
     [IO.Directory]::CreateDirectory($frameworkSource) | Out-Null
-    $toolchain = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/container/toolchain.json') -Raw |
-        ConvertFrom-Json
-    $testRuntimeVersion = [string]$toolchain.dotnet.testRuntimeVersion
-    if ($testRuntimeVersion -notmatch '^8\.0\.[0-9]+$') {
-        throw "The container test runtime version is invalid: '$testRuntimeVersion'."
-    }
+    # Targeting packs are selected by the consumer SDK, independently of the
+    # runtime used to execute repository tests. Query the exact SDK selected
+    # by this fixture's global.json before constructing its isolated feed.
+    $frameworkProbe = Join-Path $Root 'FrameworkProbe.proj'
+    [IO.File]::WriteAllText($frameworkProbe,
+        '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>',
+        [Text.UTF8Encoding]::new($false))
+    $frameworkEvaluation = (Invoke-ConsumerDotNet `
+        -WorkingDirectory $Root `
+        -Arguments @('msbuild', $frameworkProbe, '-nologo',
+            '-getItem:KnownFrameworkReference') -Quiet) | ConvertFrom-Json
+    $frameworkReferences = @($frameworkEvaluation.Items.KnownFrameworkReference |
+        Where-Object { $_.TargetFramework -eq 'net8.0' })
+    $targetingPacks = @(
+        'Microsoft.NETCore.App.Ref', 'Microsoft.AspNetCore.App.Ref')
+    if ($IsWindows) { $targetingPacks += 'Microsoft.WindowsDesktop.App.Ref' }
     $frameworkPackages = @(
         [pscustomobject]@{
             Id = 'netstandard.library'
@@ -131,16 +140,6 @@ function New-FrameworkPackageSource {
             Pattern = 'Microsoft.NETCore.Platforms'
         }
         [pscustomobject]@{
-            Id = 'microsoft.netcore.app.ref'
-            Version = $testRuntimeVersion
-            Pattern = 'Microsoft.NETCore.App.Ref'
-        }
-        [pscustomobject]@{
-            Id = 'microsoft.aspnetcore.app.ref'
-            Version = $testRuntimeVersion
-            Pattern = 'Microsoft.AspNetCore.App.Ref'
-        }
-        [pscustomobject]@{
             Id = 'microsoft.netframework.referenceassemblies'
             Version = '1.0.3'
             Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
@@ -151,11 +150,19 @@ function New-FrameworkPackageSource {
             Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
         }
     )
-    if ($IsWindows) {
+    foreach ($targetingPack in $targetingPacks) {
+        $packVersions = @($frameworkReferences |
+            Where-Object { $_.TargetingPackName -eq $targetingPack } |
+            Select-Object -ExpandProperty TargetingPackVersion -Unique)
+        if ($packVersions.Count -ne 1 -or
+            [string]$packVersions[0] -notmatch '^8\.0\.[0-9]+$') {
+            throw "The selected consumer SDK did not declare one net8.0 targeting-pack version for '$targetingPack'."
+        }
+        Write-Host "Consumer SDK requires $targetingPack $($packVersions[0])."
         $frameworkPackages += [pscustomobject]@{
-            Id = 'microsoft.windowsdesktop.app.ref'
-            Version = $testRuntimeVersion
-            Pattern = 'Microsoft.WindowsDesktop.App.Ref'
+            Id = $targetingPack.ToLowerInvariant()
+            Version = [string]$packVersions[0]
+            Pattern = $targetingPack
         }
     }
     foreach ($package in $frameworkPackages) {
@@ -268,14 +275,17 @@ function Invoke-ConsumerDotNet {
         [string]$WorkingDirectory,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [string[]]$Arguments,
+
+        [switch]$Quiet
     )
 
     Push-Location $WorkingDirectory
     try {
         $output = & dotnet @Arguments 2>&1 | Out-String
         $exitCode = $LASTEXITCODE
-        if (-not [string]::IsNullOrEmpty($output)) {
+        if (-not [string]::IsNullOrEmpty($output) -and
+            (-not $Quiet -or $exitCode -ne 0)) {
             Write-Host $output.TrimEnd()
         }
         if ($exitCode -ne 0) {

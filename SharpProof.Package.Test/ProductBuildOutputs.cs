@@ -7,7 +7,7 @@ internal static class ProductBuildOutputs
         System.ArgumentNullException.ThrowIfNull(project);
         return AssemblyPath(
             project,
-            "net9.0",
+            "net10.0",
             project + ".dll");
     }
 

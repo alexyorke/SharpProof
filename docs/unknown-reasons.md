@@ -6,6 +6,8 @@ The wire enums and validation rules are in [ProtocolModel.generated.cs](../Sharp
 
 ## Worker claim reasons
 
+The build adds a next action to typed Unknown diagnostics and includes source locations for claims. Start at that location and retain the matching result/manifest. Unsupported syntax or effect summaries call for checking the modeled boundary and simplifying a reproduction; raising a timeout cannot add semantics. Resource/time reasons call for comparing the affected method and current budgets before making a measured adjustment. Replay/undefined-postcondition reasons call for checking the executable expression and evidence; they do not establish a definite bug in the application. Infrastructure/backend reasons call for checking the qualified host, payload and original error. Use [support](support.md) when a minimal supported example still fails; never add trust or assumptions merely to silence Unknown.
+
 | Reason | Interpretation |
 | --- | --- |
 | `UnsupportedCallable` | The selected callable shape is outside execution support |

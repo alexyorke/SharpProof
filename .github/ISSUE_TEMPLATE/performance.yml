@@ -1,0 +1,20 @@
+name: Performance regression
+description: Report comparable end-to-end measurements with proof quality retained.
+body:
+  - type: markdown
+    attributes:
+      value: "See docs/consumer-performance.md and docs/support.md. Do not attach unreviewed logs or proprietary source."
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Inputs, environment and exact reproduction
+      description: Package/SDK versions, OS/architecture, hardware/container limits, project size, cache state and commands.
+    validations:
+      required: true
+  - type: textarea
+    id: measurements
+    attributes:
+      label: Comparable baseline and changed measurements
+      description: Include iterations, clean/no-op/rebuild/edit timings, restore separately, and selected claims/outcomes/incomplete coverage/assumptions. Explain what changed.
+    validations:
+      required: true

@@ -26,29 +26,25 @@
     <file src="..\README.md" />
     <file src="..\LICENSE" />
     <file src="..\THIRD-PARTY-NOTICES.txt" />
-    <file src="$nativeroot$/z3/4.12.2/linux-x64/Microsoft.Z3.dll" target="tools/net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.*.pdb" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Logging.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Host.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.dll" target="tools\net9" />
-    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.dll" target="tools\net9" />
-    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.pdb" target="tools\net9" />
-    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.deps.json" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.runtimeconfig.json" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Collections.Immutable.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.IO.Pipelines.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\runtimes\win\lib\net9.0\System.Text.Encodings.Web.dll" target="tools/net9/runtimes/win/lib/net9.0" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />
+    <file src="$nativeroot$/z3/4.12.2/linux-x64/Microsoft.Z3.dll" target="tools/net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.*.pdb" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.CompilerArtifact.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Dataflow.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Ir.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Logging.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Host.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Smt.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Specs.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Verify.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.Protocol.dll" target="tools\net10" />
+    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net10.0\SharpProof.BuildTasks.dll" target="tools\net10" />
+    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net10.0\SharpProof.BuildTasks.pdb" target="tools\net10" />
+    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net10.0\SharpProof.BuildTasks.deps.json" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.dll" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.deps.json" target="tools\net10" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.runtimeconfig.json" target="tools\net10" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
+    <file src="$nativeroot$/z3/4.12.2/linux-arm64/libz3.so" target="tools/native/linux-arm64" />
     <file src="$nativeroot$/z3/4.12.2/win-x64/libz3.dll" target="tools/native/win-x64" />
     <file src="$nativeroot$/z3/4.12.2/osx-arm64/libz3.dylib" target="tools/native/osx-arm64" />
     <file src="$nativeroot$/z3/4.12.2/osx-x64/libz3.dylib" target="tools/native/osx-x64" />

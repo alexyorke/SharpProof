@@ -100,8 +100,11 @@ if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
 if ($coverageEnabled) {
     # The corpus verifier starts its own worker pool and must run in a separate
     # task that reserves every slot. Attributes has its own collector stage.
+    # Architecture XML/DAG checks retain a separate strict noninstrumented TRX task.
     $semanticProjects = @($semanticProjects | Where-Object {
-        $_ -cne $gatesProject -and (-not $AttributesCollectedSeparately -or
+        $_ -cne $gatesProject -and
+        $_ -cne 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj' -and
+        (-not $AttributesCollectedSeparately -or
             $_ -cne 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj')
     })
     $partitionFilter = Join-Path $repositoryRoot (
@@ -202,9 +205,10 @@ $mainParallelism = [Math]::Max(
     1,
     [Math]::Floor($parallelism / 2))
 $architectureShardingEnabled =
-    $ArchitectureOnly -or (
+    $coverageEnabled -or $ArchitectureOnly -or (
         -not $coverageEnabled -and
         [string]::IsNullOrWhiteSpace($TestFilter))
+# Separate project results roots also prevent cross-project VSTest collector attachment races.
 $semanticProjectShardingEnabled =
     $architectureShardingEnabled -and -not $ArchitectureOnly
 $workerClassPrefix = 'SharpProof.Worker.Test.'
@@ -395,6 +399,7 @@ if (-not $ArchitectureOnly) {
 if ($architectureShardingEnabled) {
     $tasks.Add([pscustomobject]@{
         Name = 'architecture'
+        EvidenceKind = 'ArchitectureOnly'
         Target = Join-Path $repositoryRoot (
             'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
         Filter = $semanticFilter
@@ -498,10 +503,10 @@ try {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
                 -SourceDirectory (Join-Path $repositoryRoot (
                     'SharpProof.Worker.Test/bin/' + $Configuration +
-                    '/net9.0')) `
+                    '/net10.0')) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
-                        $task.Name + '/' + $Configuration + '/net9.0'))
+                        $task.Name + '/' + $Configuration + '/net10.0'))
         }
         $directVstest = -not $coverageEnabled -and
             $task.Target.EndsWith(
@@ -537,7 +542,7 @@ try {
             }
             $arguments = Add-SharpProofCoverageArguments `
                 -Arguments $arguments `
-                -Enabled $coverageEnabled `
+                -Enabled ($coverageEnabled -and $task.Name -cne 'architecture') `
                 -Settings $resolvedCoverageSettings
         }
         return [pscustomobject]@{

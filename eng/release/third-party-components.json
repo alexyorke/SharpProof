@@ -106,8 +106,9 @@
         "version": "4.12.2",
         "license": "MIT",
         "entries": [
-          "tools/net9/Microsoft.Z3.dll",
+          "tools/net10/Microsoft.Z3.dll",
           "tools/native/linux-x64/libz3.so",
+          "tools/native/linux-arm64/libz3.so",
           "tools/native/win-x64/libz3.dll",
           "tools/native/osx-arm64/libz3.dylib",
           "tools/native/osx-x64/libz3.dylib"
@@ -118,11 +119,15 @@
             "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
           },
           {
+            "path": "tools/native/linux-arm64/libz3.so",
+            "sha256": "2813d0a498cfd56115f6104123454fd0953cefe90fa662aea5c2bf445c7e58ed"
+          },
+          {
             "path": "tools/native/win-x64/libz3.dll",
             "sha256": "3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae"
           },
           {
-            "path": "tools/net9/Microsoft.Z3.dll",
+            "path": "tools/net10/Microsoft.Z3.dll",
             "sha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
           },
           {
@@ -133,39 +138,6 @@
             "path": "tools/native/osx-x64/libz3.dylib",
             "sha256": "76f238b9c4ddac577bc349c18d397dec1ac616933936a834172f453a98fc3ab8"
           }
-        ]
-      },
-      {
-        "id": "System.Collections.Immutable",
-        "version": "9.0.18",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Collections.Immutable.dll"
-        ]
-      },
-      {
-        "id": "System.IO.Pipelines",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.IO.Pipelines.dll"
-        ]
-      },
-      {
-        "id": "System.Text.Encodings.Web",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Text.Encodings.Web.dll",
-          "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
-        ]
-      },
-      {
-        "id": "System.Text.Json",
-        "version": "10.0.10",
-        "license": "MIT",
-        "entries": [
-          "tools/net9/System.Text.Json.dll"
         ]
       }
     ]

@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SharpProof: targeted tests (Docker)",
+      "type": "process",
+      "command": "pwsh",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/Invoke-SharpProof.ps1", "test", "-Target", "${input:testProject}", "-TestFilter", "${input:testFilter}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "SharpProof: targeted tests (Dev Container)",
+      "type": "process",
+      "command": "sp",
+      "args": ["test", "-Target", "${input:testProject}", "-TestFilter", "${input:testFilter}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "SharpProof: pack (Docker)",
+      "type": "process",
+      "command": "pwsh",
+      "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/Invoke-SharpProof.ps1", "pack", "-Configuration", "Release"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": "$msCompile"
+    }
+  ],
+  "inputs": [
+    { "id": "testProject", "type": "promptString", "description": "Test project name", "default": "SharpProof.CodeFixes.Test" },
+    { "id": "testFilter", "type": "promptString", "description": "dotnet test filter", "default": "FullyQualifiedName~ResultTypeCodeFixTests" }
+  ]
+}

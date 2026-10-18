@@ -325,6 +325,12 @@ internal static class Program
             {
                 ReportRefutedClaim(claim, result);
             }
+            if (result.Outcome == WorkerClaimOutcome.Unknown)
+            {
+                Log.Info(LauncherPresentation.SourcePrefix(claim.Location) + ": Unknown " +
+                    result.ClaimId + " (" + result.Reason + "). " +
+                    LauncherPresentation.UnknownGuidance(result.Reason));
+            }
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
         }
         var incompleteCount = response.CallableResults.Count(
@@ -343,11 +349,11 @@ internal static class Program
                 callable.Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
-                result.Reason == WorkerCallableCoverageReason.ProjectTimeout
+                (result.Reason == WorkerCallableCoverageReason.ProjectTimeout
                     ? FormattableString.Invariant(
                         $"Project analysis timed out for {result.CallableId} ({result.Reason}).")
                     : FormattableString.Invariant(
-                        $"Selected analysis is incomplete for {result.CallableId} ({result.Reason})."));
+                        $"Selected analysis is incomplete for {result.CallableId} ({result.Reason}).")) + " " + LauncherPresentation.IncompleteGuidance(result.Reason));
         }
         if (incompleteCount == 0 && projectTimedOut)
         {
@@ -361,6 +367,7 @@ internal static class Program
         var incompleteError = (incompleteCount != 0 || projectTimedOut) &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
+        Log.Info(LauncherPresentation.HumanSummary(response));
         Log.Info("SharpProof summary " + JsonSerializer.Serialize(
             new
             {
@@ -498,8 +505,9 @@ internal static class Program
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
         }
         using var publicationDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        publicationDeadline.CancelAfter(TimeSpan.FromMilliseconds(
-            (long)request.Budgets.ProjectWallTimeMilliseconds + arguments.TerminationGraceMilliseconds + PublicationLease.TimeoutMilliseconds));
+        publicationDeadline.CancelAfter(GetPublicationTimeout(
+            request.Budgets.ProjectWallTimeMilliseconds,
+            arguments.TerminationGraceMilliseconds));
         using var lease = await PublicationLease.AcquireAsync(members, publicationDeadline.Token).ConfigureAwait(false);
 
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
@@ -529,6 +537,19 @@ internal static class Program
         await AtomicFile.WriteUtf8Async(
             arguments.PublishResultPath!,
             WorkerProtocolJson.SerializeCanonicalResponse(response), publicationDeadline.Token).ConfigureAwait(false);
+        Log.Info("SharpProof evidence: request=" + arguments.PublishRequestPath +
+            "; result=" + arguments.PublishResultPath + "; compiler manifest=" + arguments.PublishCompilerManifestPath +
+            (arguments.PublishSarifPath == null ? string.Empty : "; SARIF=" + arguments.PublishSarifPath));
+    }
+
+    internal static TimeSpan GetPublicationTimeout(
+        int projectMilliseconds,
+        int terminationGraceMilliseconds)
+    {
+        return TimeSpan.FromMilliseconds(
+            (long)projectMilliseconds +
+            terminationGraceMilliseconds +
+            PublicationLease.TimeoutMilliseconds);
     }
 
     // A failed run must still publish a typed failure result after cancellation.

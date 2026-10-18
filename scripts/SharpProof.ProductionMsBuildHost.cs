@@ -29,10 +29,11 @@ internal static class SharpProofProductionMsBuildHost
                 return File.Exists(path) ? context.LoadFromAssemblyPath(path) : null;
             };
             var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(sdk, "dotnet.dll"));
-            var commandType = assembly.GetType("Microsoft.DotNet.Tools.MSBuild.MSBuildCommand", true);
+            var commandType = assembly.GetType("Microsoft.DotNet.Cli.Commands.MSBuild.MSBuildCommand", true);
             var fromArgs = commandType.GetMethod("FromArgs", new[] { typeof(string[]), typeof(string) });
             var execute = commandType.GetMethod("Execute", Type.EmptyTypes);
-            if (fromArgs == null || execute == null)
+            var msbuildArguments = commandType.GetProperty("MSBuildArguments");
+            if (fromArgs == null || execute == null || msbuildArguments == null)
                 throw new MissingMethodException("The active SDK has no MSBuild forwarding entrypoint.");
             var records = new List<object>();
             var forwarding = new List<object>();
@@ -48,7 +49,7 @@ internal static class SharpProofProductionMsBuildHost
                     Console.SetOut(capture);
                     Console.SetError(capture);
                     var command = fromArgs.Invoke(null, new object[] { arguments, null });
-                    var forwarded = commandType.GetProperty("MSBuildArguments").GetValue(command);
+                    var forwarded = msbuildArguments.GetValue(command);
                     forwarding.Add(new
                     {
                         projectRelativePath = query.GetProperty("projectRelativePath").GetString(),
@@ -85,7 +86,7 @@ internal static class SharpProofProductionMsBuildHost
                 sdkAssembly = assembly.Location,
                 runtimeAssemblies,
                 sdkBaseDirectory = AppContext.BaseDirectory,
-                entrypoint = "Microsoft.DotNet.Tools.MSBuild.MSBuildCommand.FromArgs.Execute",
+                entrypoint = "Microsoft.DotNet.Cli.Commands.MSBuild.MSBuildCommand.FromArgs.Execute",
                 forwarding
             }) + "\n");
             return 0;

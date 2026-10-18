@@ -47,7 +47,7 @@ try {
     $project = @'
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <SharpProofProfile>strict</SharpProofProfile>
     <SharpProofVerify>true</SharpProofVerify>

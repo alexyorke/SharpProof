@@ -1,5 +1,12 @@
 Set-StrictMode -Version Latest
 
+function Test-SharpProofCoverageReportName {
+    param([string]$Path)
+
+    # VSTest disambiguates same-second collector attachments with [1], [2], etc.
+    return $Path -cmatch '\.cobertura(?:\[[1-9][0-9]*\])?\.xml$'
+}
+
 function Save-SharpProofCoverageCohort {
     param([string]$Root, [object[]]$Expected, [object[]]$Completed, [string]$ProjectPath = '')
 
@@ -17,6 +24,15 @@ function Save-SharpProofCoverageCohort {
         if ($receipts.Count -eq 0) { throw "Coverage task '$name' has no TRX receipt." }
         $descriptor = @($Expected | Where-Object { $_.Name -ceq $name })[0]
         $target = if ($descriptor.PSObject.Properties.Name -contains 'Target') { [string]$descriptor.Target } else { $ProjectPath }
+        $architectureEvidence = $false
+        if ($descriptor.PSObject.Properties.Name -contains 'EvidenceKind') {
+            if ([string]$descriptor.EvidenceKind -cne 'ArchitectureOnly' -or
+                $name -cne 'architecture' -or
+                $target.Replace('\', '/') -cnotmatch '(^|/)SharpProof\.ArchitectureTest/SharpProof\.ArchitectureTest\.csproj$') {
+                throw 'Only the exact noninstrumented architecture task may use architecture-only receipt evidence.'
+            }
+            $architectureEvidence = $true
+        }
         $requiredProjects = if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
             @((Get-Content -LiteralPath $target -Raw | ConvertFrom-Json).solution.projects)
         }
@@ -33,6 +49,9 @@ function Save-SharpProofCoverageCohort {
                 [int]$counters.failed -ne 0 -or [int]$counters.error -ne 0) {
                 throw "Coverage task '$name' has an empty or failed TRX receipt."
             }
+            if ($architectureEvidence -and [int]$counters.total -lt 5) {
+                throw 'Architecture-only evidence must retain all five established architecture tests.'
+            }
             $definitions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
             foreach ($definition in $trx.SelectNodes('//*[local-name()="TestDefinitions"]/*[local-name()="UnitTest"]')) {
                 $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
@@ -40,6 +59,9 @@ function Save-SharpProofCoverageCohort {
                     throw "Coverage task '$name' has an invalid test definition."
                 }
                 $assembly = [IO.Path]::GetFileName(([string]$method.codeBase).Replace('\', '/'))
+                if ($architectureEvidence -and $assembly -cne 'SharpProof.ArchitectureTest.dll') {
+                    throw 'Architecture-only receipt evidence cannot contain production or other test assemblies.'
+                }
                 $id = [string]$definition.id
                 if ($definitions.ContainsKey($id) -and $definitions[$id] -cne $assembly) {
                     throw "Coverage task '$name' has inconsistent test definitions."
@@ -53,7 +75,8 @@ function Save-SharpProofCoverageCohort {
             foreach ($result in $results) {
                 $id = [string]$result.testId
                 if (-not $definitions.ContainsKey($id) -or
-                    [string]$result.outcome -cnotin @('Passed', 'NotExecuted')) {
+                    [string]$result.outcome -cnotin @('Passed', 'NotExecuted') -or
+                    ($architectureEvidence -and [string]$result.outcome -cne 'Passed')) {
                     throw "Coverage task '$name' has a dangling or unsuccessful test result."
                 }
                 if ([string]$result.outcome -ceq 'Passed') {
@@ -61,7 +84,13 @@ function Save-SharpProofCoverageCohort {
                 }
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
-                Where-Object { [string]$_.href -match '\.cobertura(?:\[\d+\])?\.xml$' })
+                Where-Object { Test-SharpProofCoverageReportName -Path ([string]$_.href) })
+            if ($architectureEvidence) {
+                if ($attachments.Count -ne 0) {
+                    throw 'The architecture-only task must execute without production coverage collection.'
+                }
+                continue
+            }
             if ($attachments.Count -eq 0) { throw "Coverage task '$name' has no collector attachment." }
             foreach ($attachment in $attachments) {
                 $report = Join-Path $receipt.DirectoryName ([string]$attachment.href)
@@ -90,14 +119,14 @@ function Save-SharpProofCoverageShardManifest {
 
     $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
+            $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
         Sort-Object FullName | ForEach-Object {
             [ordered]@{
                 path = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
             }
         })
-    if (@($files | Where-Object { $_.path -match '\.cobertura(?:\[\d+\])?\.xml$' }).Count -eq 0 -or
+    if (@($files | Where-Object { Test-SharpProofCoverageReportName -Path $_.path }).Count -eq 0 -or
         @($files | Where-Object { $_.path -like '*/coverage-cohort.json' }).Count -ne 1) {
         throw "Coverage shard '$Phase' has no complete cohort evidence."
     }
@@ -118,12 +147,12 @@ function Assert-SharpProofCoverageShardManifest {
     }
     $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Name -eq 'coverage-authority.json' -or $_.Name -eq 'coverage-cohort.json' -or
-            $_.Name -like '*.trx' -or $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
+            $_.Name -like '*.trx' -or (Test-SharpProofCoverageReportName -Path $_.Name) } |
         ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/') } | Sort-Object)
     $recorded = @($manifest.files | ForEach-Object { [string]$_.path } | Sort-Object)
     if ($actual.Count -eq 0 -or ($actual -join "`n") -cne ($recorded -join "`n") -or
         @($recorded | Select-Object -Unique).Count -ne $recorded.Count -or
-        @($recorded | Where-Object { $_ -match '\.cobertura(?:\[\d+\])?\.xml$' }).Count -eq 0 -or
+        @($recorded | Where-Object { Test-SharpProofCoverageReportName -Path $_ }).Count -eq 0 -or
         @($recorded | Where-Object { $_ -like '*/coverage-cohort.json' }).Count -ne 1 -or
         @($recorded | Where-Object { $_ -eq 'coverage-authority.json' }).Count -ne 1 -or
         ($Phase -eq 'semantic' -and $recorded -cnotcontains 'coverage-cohort.json')) {
