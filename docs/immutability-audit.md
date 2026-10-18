@@ -2251,3 +2251,20 @@ freeze covered projects after solution discovery and preserve Add's duplicate re
 for names. Keep source traversal, failure first-20 order, static import controls,
 project evaluation order, pinned common validation and JSON report schema unchanged.
 The report's ordered records remain serialization adapters. Status: open before edits.
+## Protocol mutable-subject contract review
+
+IMM-M047: Coordinator verified all 21 remaining ProtocolModel.generated.cs setters
+against production mutators and explicit tests, rather than excluding them merely for
+JSON. Fourteen ImmutableArray owner-replacement setters and manifest Hash support
+public in-place Canonicalize/SealManifest APIs (ProtocolManifest.cs and ProtocolJson.cs).
+ProtocolBoundaryContractTests observes canonicalization mutations; ProtocolJsonTests
+separately verifies serialization copies do not rewrite producer owners. Preserve these
+mutable subjects while their retained collection values remain immutable.
+
+The six WorkerBudgets setters are an explicit mutable input subject:
+WorkerResultAssemblerTests.AssemblySnapshotsMutableBudgets mutates the original query
+limit after response creation and asserts the retained snapshot stays unchanged. Making
+that subject init-only would remove the behavior under test. Preserve it under the
+user's mutable-SUT exception. The generated file is hand-maintained; no active generator
+needs regeneration. Null/default/empty wire-array distinctions remain unchanged.
+Status: verified exclusions from setter removal; no protocol code changes.

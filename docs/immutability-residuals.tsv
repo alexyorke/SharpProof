@@ -2086,22 +2086,18 @@ RES-D7C88784A45618E1	src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs	5
 RES-15A0D95B6A56E031	src/SharpProof.Worker.Tests/ActualCompilerEntryOwnershipAdmissionTests.cs	29	23	CollectionMaterialization	ActualCompilerEntryOwnershipAdmissionTests.EntryAdmissionRejectsOtherActualCompilerOwnedEntryWithoutRebinding	ToArray	Open: coordinator review
 RES-616B3865F1581608	src/SharpProof.Worker.Tests/ActualCompilerEntryOwnershipAdmissionTests.cs	42	41	ArrayCreation	ActualCompilerEntryOwnershipAdmissionTests.EntryAdmissionRejectsOtherActualCompilerOwnedEntryWithoutRebinding	implicit[]	Open: coordinator review
 RES-C0E9CFEF2A18CFE5	src/SharpProof.Worker.Tests/ActualMalformedResultProjectionTests.cs	19	34	ArrayCreation	ActualMalformedResultProjectionTests.MalformedProjectionUsesActualTargetBindingsAndActualForeignResponseValidation	implicit[]	Open: coordinator review
-RES-BB551D97AF95FA3E	src/SharpProof.Worker.Tests/ActualNativeProjectionAdmissionTests.cs	69	24	CollectionMaterialization	ActualNativeProjectionAdmissionTests.EntryProjectionRejectsRealBodyProofWithDisjointInputCore	ToDictionary	Open: coordinator review
-RES-02EB01B9D86D8139	src/SharpProof.Worker.Tests/ActualNativeProjectionAdmissionTests.cs	98	23	CollectionMaterialization	ActualNativeProjectionAdmissionTests.ClaimProjectionRejectsActualOtherCallablePublication	ToArray	Open: coordinator review
-RES-993D50E4F150D950	src/SharpProof.Worker.Tests/ActualNativeProjectionAdmissionTests.cs	100	22	CollectionCreation	ActualNativeProjectionAdmissionTests.ClaimProjectionRejectsActualOtherCallablePublication	List<(CompilerCallablePreparation Target, TotalCallableClaimCheck Check)>	Open: coordinator review
-RES-78951BCE8A06F995	src/SharpProof.Worker.Tests/ActualNativeProjectionAdmissionTests.cs	118	29	ArrayCreation	ActualNativeProjectionAdmissionTests.ClaimProjectionRejectsActualOtherCallablePublication	implicit[]	Open: coordinator review
+RES-E282A5CEA6384CD3	src/SharpProof.Worker.Tests/ActualNativeProjectionAdmissionTests.cs	101	28	CollectionMaterialization	ActualNativeProjectionAdmissionTests.ClaimProjectionRejectsActualOtherCallablePublication	CreateBuilder	Open: coordinator review
 RES-1E83E7928CFFAC7A	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	53	43	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
 RES-7244FCB8D7426DC7	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	54	48	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
-RES-B3DC57F5AFF74029	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	79	22	CollectionCreation	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	Dictionary<ProofJustification, string>	Open: coordinator review
-RES-305A252D237496B7	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	80	19	CollectionCreation	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	Dictionary<string, string>	Open: coordinator review
+RES-963286A7A7AAA71A	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	79	22	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	CreateBuilder	Open: coordinator review
+RES-29742CEEE0B2DB4D	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	80	19	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	CreateBuilder	Open: coordinator review
 RES-D3F431F305D3F418	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	81	29	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	CreateBuilder	Open: coordinator review
-RES-FAD86EAA1F0ABE52	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	103	9	ArrayCollectionExpression	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	long[]	Open: coordinator review
 RES-201768E5D817B397	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	114	9	ArrayCollectionExpression	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	(int First, int Second)[]	Open: coordinator review
-RES-2CA08B6397C13CA2	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	126	31	CollectionCreation	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	List<IrTerm>	Open: coordinator review
-RES-4423A5FD5054AD3F	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	163	57	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
-RES-0156571DC79DD35B	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	190	63	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
-RES-FE70D70AE1CB51EF	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	194	27	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
-RES-E676FC0AA7A01C80	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	210	70	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
+RES-B72E18B622604BF6	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	126	31	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	CreateBuilder	Open: coordinator review
+RES-9C3FBD269721B903	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	161	57	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
+RES-A4101CC6873C2B48	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	188	63	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
+RES-A989613FC3E30B55	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	192	27	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
+RES-C06C5FF5B90FA854	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryCompletionTests.cs	208	70	CollectionMaterialization	ActualOwnedSessionEntryCompletionTests.EntryCompletionReadsActualOverdrawnRawNativeSession	ToArray	Open: coordinator review
 RES-8D9E253542FB7902	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryReservationTests.cs	74	9	ArrayCollectionExpression	ActualOwnedSessionEntryReservationTests.EntryReservationReadsPriorDistinctOwnedNativeObligations	long[]	Open: coordinator review
 RES-CD5D1D34291C03F7	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryReservationTests.cs	101	35	ArrayCreation	ActualOwnedSessionEntryReservationTests.EntryReservationReadsPriorDistinctOwnedNativeObligations	implicit[]	Open: coordinator review
 RES-E8681C149A504D79	src/SharpProof.Worker.Tests/ActualOwnedSessionEntryReservationTests.cs	136	61	CollectionMaterialization	ActualOwnedSessionEntryReservationTests.EntryReservationReadsPriorDistinctOwnedNativeObligations	ToArray	Open: coordinator review
@@ -2628,7 +2624,7 @@ RES-48BC23F50C8388E6	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	36	
 RES-C63946EACA2EE2A4	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	36	73	CollectionMaterialization	LongFuzzSession.<type>	CreateBuilder	Open: coordinator review
 RES-B374D4FCCD364540	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	37	5	FieldStorage	LongFuzzSession.<type>	ImmutableDictionary<string, int>.Builder _hitKinds	Open: coordinator review
 RES-6B285D4C7E099C81	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	37	75	CollectionMaterialization	LongFuzzSession.<type>	CreateBuilder	Open: coordinator review
-RES-B11AF42595C6A676	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	110	22	CollectionCreation	LongFuzzSession.RecordHit	StringBuilder	Open: coordinator review
+RES-9AD77A190B45F9C6	src/SharpProof.Worker.Tests/LongFuzz/LongFuzzSession.cs	111	22	CollectionCreation	LongFuzzSession.RecordHit	StringBuilder	Open: coordinator review
 RES-627B41FBD4877701	src/SharpProof.Worker.Tests/LongFuzz/RoslynSyntaxMutationRegressionTests.cs	65	23	CollectionMaterialization	RoslynSyntaxMutationRegressionTests.ProbeCase	ToArray	Open: coordinator review
 RES-93A48D82B9F21A49	src/SharpProof.Worker.Tests/LongFuzz/RoslynSyntaxMutationRegressionTests.cs	76	23	CollectionMaterialization	RoslynSyntaxMutationRegressionTests.ProbeCase	ToArray	Open: coordinator review
 RES-2A9C86F7A60906F2	src/SharpProof.Worker.Tests/LongFuzz/RoslynSyntaxMutationRegressionTests.cs	126	22	CollectionMaterialization	RoslynSyntaxMutationRegressionTests.AssertNoErrors	ToArray	Open: coordinator review
@@ -3176,69 +3172,89 @@ RES-1C679F5E7130872B	src/SharpProof.Worker/Vc/EffectSummaryFixpoint.cs	91	29	Col
 RES-2E01F4E8D9CC6A80	src/SharpProof.Worker/Vc/EffectSummaryFixpoint.cs	118	26	CollectionMaterialization	EffectSummaryFixpoint.ComputeValidated	CreateBuilder	Verified: scoped immutable builder; owned construction and frozen publication reviewed (IMM-M026-M029)
 RES-28D460BCF6659842	src/SharpProof.Worker/Vc/EffectSummaryFixpoint.cs	199	22	CollectionMaterialization	EffectSummaryFixpoint.HasCycle	CreateBuilder	Verified: scoped immutable builder; owned construction and frozen publication reviewed (IMM-M026-M029)
 RES-82AAE08D20E0E041	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	20	26	CollectionMaterialization	LoopInvariantCandidates.Generate	CreateBuilder	Open: coordinator review
-RES-BB5819C48761B1F0	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	24	30	CollectionCreation	LoopInvariantCandidates.Generate	List<IrTerm>	Open: coordinator review
-RES-8DF993BFD8547E47	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	61	23	CollectionMaterialization	LoopInvariantCandidates.State	ToHashSet	Open: coordinator review
-RES-82A0E18D7D961933	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	62	20	CollectionCreation	LoopInvariantCandidates.State	HashSet<IrVarId>	Open: coordinator review
-RES-B351BAD83AEC3CA6	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	63	25	CollectionCreation	LoopInvariantCandidates.State	HashSet<IrTerm>	Open: coordinator review
-RES-877E1FFF1C482C53	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	64	23	CollectionCreation	LoopInvariantCandidates.State	List<IrTerm>	Open: coordinator review
-RES-7AD0CB106D7B5327	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	65	22	CollectionCreation	LoopInvariantCandidates.State	Dictionary<IrVarId, IrTerm?>	Open: coordinator review
-RES-B3B0584281C5BD20	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	113	24	CollectionCreation	LoopInvariantCandidates.State	HashSet<IrVarId>	Open: coordinator review
-RES-F4C21DADF48DB9B6	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	113	266	ArrayCreation	LoopInvariantCandidates.State	implicit[]	Open: coordinator review
-RES-5878086DA49E52EF	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	124	25	CollectionMaterialization	LoopInvariantCandidates.State	ToDictionary	Open: coordinator review
-RES-1E4F9FDB41657F43	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	124	246	ArrayCreation	LoopInvariantCandidates.State	implicit[]	Open: coordinator review
-RES-C5D64C410A78CFEB	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	130	24	CollectionMaterialization	LoopInvariantCandidates.State	ToDictionary	Open: coordinator review
-RES-01283670C10361B7	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	133	23	CollectionMaterialization	LoopInvariantCandidates.State	ToArray	Open: coordinator review
+RES-1292A83203816F0F	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	24	30	CollectionMaterialization	LoopInvariantCandidates.Generate	CreateBuilder	Open: coordinator review
+RES-14439BCFCC52ECEA	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	62	20	CollectionMaterialization	LoopInvariantCandidates.State	CreateBuilder	Open: coordinator review
+RES-9801B732CDE666DF	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	63	25	CollectionMaterialization	LoopInvariantCandidates.State	CreateBuilder	Open: coordinator review
+RES-DFC4738A4C21EEFF	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	64	23	CollectionMaterialization	LoopInvariantCandidates.State	CreateBuilder	Open: coordinator review
+RES-B6160A17A5D46B02	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	65	22	CollectionMaterialization	LoopInvariantCandidates.State	CreateBuilder	Open: coordinator review
+RES-AB0071F2BBAF5DDD	src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs	113	31	CollectionMaterialization	LoopInvariantCandidates.State	CreateBuilder	Open: coordinator review
 RES-5D41042A16878F1E	src/SharpProof.Worker/Vc/NativeExceptionEffectVerifier.cs	24	23	CollectionMaterialization	NativeExceptionEffectVerifier.VerifyClaimsAsync	CreateBuilder	Open: coordinator review
-RES-773DACD8F6B5CC4A	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	43	23	CollectionCreation	PassiveCallableCandidate.PassiveCallableCandidate	HashSet<IrVarId>	Open: coordinator review
-RES-1EFDEC9D246AA44F	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	44	26	CollectionCreation	PassiveCallableCandidate.PassiveCallableCandidate	HashSet<IrVarId>	Open: coordinator review
-RES-321E4F9F53B86CF4	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	60	23	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	ToHashSet	Open: coordinator review
-RES-E29A2553942F9E8E	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	60	234	ArrayCreation	PassiveCallableCandidate.PassiveCallableCandidate	implicit[]	Open: coordinator review
-RES-CF48155C8AA55153	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	80	27	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
-RES-5659E7B1A4FCD916	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	106	28	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	ToDictionary	Open: coordinator review
-RES-552E481767D39548	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	107	23	CollectionCreation	PassiveCallableCandidate.PassiveCallableCandidate	HashSet<IrInstructionId>	Open: coordinator review
-RES-11FDDAEC2B96569E	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	108	29	CollectionCreation	PassiveCallableCandidate.PassiveCallableCandidate	HashSet<IrVarId>	Open: coordinator review
-RES-92CCA59F1D3EA62E	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	109	23	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	ToDictionary	Open: coordinator review
-RES-DD9BB8E8B554560F	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	112	230	ArrayCreation	PassiveCallableCandidate.PassiveCallableCandidate	implicit[]	Open: coordinator review
-RES-BCF0993B445B9206	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	262	21	CollectionCreation	PassiveCallableSolver.VerifyCallPreconditionAsync	HashSet<string>	Open: coordinator review
-RES-0A7F203DBB4603DA	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	263	27	CollectionCreation	PassiveCallableSolver.VerifyCallPreconditionAsync	HashSet<OperationId>	Open: coordinator review
-RES-E4DD5614D4E74EEE	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	420	26	CollectionCreation	PassiveCallableSolver.HoudiniAsync	HashSet<int>	Open: coordinator review
-RES-17482CE092BA39F8	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	421	25	CollectionCreation	PassiveCallableSolver.HoudiniAsync	HashSet<string>	Open: coordinator review
-RES-BCD1ED60813B9D7B	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	422	31	CollectionCreation	PassiveCallableSolver.HoudiniAsync	HashSet<OperationId>	Open: coordinator review
-RES-2CCB8B5BDC0C51C5	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	454	22	CollectionCreation	PassiveCallableSolver.HornProposals	Dictionary<IrMemberId, ImmutableArray<IrTerm>>	Open: coordinator review
-RES-F298A0626A0E29BB	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	455	25	CollectionMaterialization	PassiveCallableSolver.HornProposals	CreateBuilder	Open: coordinator review
-RES-F0BEEA46DB8D0DDA	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	43	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<Assumption> _facts	Open: coordinator review
-RES-4840EAEFFA711326	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	44	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<IrBlockId, BigInteger> _blockAncestors	Open: coordinator review
-RES-B914A8DAAF770FEA	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	46	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<IrId, IrTerm> _entryFieldReferences	Open: coordinator review
-RES-EBC55A2ED079C3F4	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	47	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, IrTerm Value, OperationId Site)> _freshReferences	Open: coordinator review
-RES-3058C1C81B6D3F17	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	48	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<ProofJustification, string> _labels	Open: coordinator review
-RES-19A96AB9907AD19B	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	49	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<ProofJustification, OperationId> _assumes	Open: coordinator review
-RES-BD41659BDABC72A1	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	50	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<IrVarId> _model	Open: coordinator review
-RES-AF871DF6308E2DA1	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	51	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<IrBlockId, List<Edge>> _incoming	Open: coordinator review
-RES-C192C5E82A67D24B	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	52	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<Exit> _returns	Open: coordinator review
-RES-6E7DEC80A483FAFE	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	53	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, IrTerm Kind)> _exceptions	Open: coordinator review
-RES-9BCC640BF666454E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	54	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, OperationId Site)> _allocations	Open: coordinator review
-RES-B8478223BFD49177	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	55	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes	Open: coordinator review
-RES-9FD8A79A8286E401	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	56	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, OperationId Site)> _locks	Open: coordinator review
-RES-BF77FDF1EEA45674	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	57	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions	Open: coordinator review
-RES-5090C4B801D0B8A2	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	61	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints	Open: coordinator review
-RES-530044F2DEFAD61D	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	64	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<IrTerm> _potentialExceptionAllocations	Open: coordinator review
-RES-BF4B971A41842BB1	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	66	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Reach, IrOpaqueCallEffects Effects)> _opaqueCalls	Open: coordinator review
-RES-4E1852954979CAFB	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	68	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<IrTerm> _reads	Open: coordinator review
-RES-BA07D5937354F894	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	72	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<IrTerm> _ambientReads	Open: coordinator review
-RES-ABEDD1755B332E44	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	75	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<(IrTerm Predicate, OperationId Site)> _exceptionFacts	Open: coordinator review
-RES-1A29D751ACFF9902	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	76	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<IrVarId, IrVarId> _oldInputs	Open: coordinator review
-RES-3A0B8520B19E7942	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	77	5	FieldStorage	PassiveCallableVcBuilder.<type>	Dictionary<IrVarId, IrVarId> _inputBindings	Open: coordinator review
-RES-4CFC75D98C7EDD41	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	85	5	PropertyStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<Assumption> EntryAssumptions	Open: coordinator review
-RES-0A23459FCAA41499	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	99	5	PropertyStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrTerm> Goals	Open: coordinator review
-RES-91B1897674E3711E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	100	5	PropertyStorage	PassiveCallableVcBuilder.<type>	IrTerm NormalCompletion	Open: coordinator review
-RES-E3DF7E9FDC0B9E68	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	105	5	FieldStorage	PassiveCallableVcBuilder.<type>	List<OperationId> _explicitSites	Open: coordinator review
-RES-C202BE0CCF9E3043	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	226	39	ArrayCreation	PassiveCallableVcBuilder.Build	implicit[]	Open: coordinator review
-RES-F5FD864AFE55F535	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	233	23	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
-RES-CBF07DE76D015630	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	261	25	CollectionCreation	PassiveCallableVcBuilder.Build	Dictionary<IrVarId, IrTerm>	Open: coordinator review
-RES-7856BDD68492D753	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	517	41	CollectionCreation	PassiveCallableVcBuilder.Build	HashSet<int>	Open: coordinator review
-RES-1E89B043DB90550D	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	573	32	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
-RES-3320C358B7DCA3D6	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	594	21	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
-RES-0F7AAB55F8E225DB	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	683	29	CollectionCreation	PassiveCallableVcBuilder.TryRewrite	Dictionary<IrVarId, IrTerm>	Open: coordinator review
+RES-4ABDDCDDC8E6F014	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	43	23	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-3E3BF4B2A5583C5E	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	44	26	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-AF8663AACE9D7BEA	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	60	30	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-5954D5CDBBB402A3	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	82	27	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-5591AF46EE28B3A6	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	108	32	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-BD5A1313A9CF2991	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	118	23	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-C80A7B9A871B239C	src/SharpProof.Worker/Vc/PassiveCallableCandidate.cs	119	29	CollectionMaterialization	PassiveCallableCandidate.PassiveCallableCandidate	CreateBuilder	Open: coordinator review
+RES-15989BA28FB5CAB5	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	262	21	CollectionMaterialization	PassiveCallableSolver.VerifyCallPreconditionAsync	CreateBuilder	Open: coordinator review
+RES-83C27B4C27B596D0	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	263	27	CollectionMaterialization	PassiveCallableSolver.VerifyCallPreconditionAsync	CreateBuilder	Open: coordinator review
+RES-4A76F8C917E3B797	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	420	26	CollectionMaterialization	PassiveCallableSolver.HoudiniAsync	CreateBuilder	Open: coordinator review
+RES-E229CC93B963BF12	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	421	25	CollectionMaterialization	PassiveCallableSolver.HoudiniAsync	CreateBuilder	Open: coordinator review
+RES-88D6266015E3DBD3	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	422	31	CollectionMaterialization	PassiveCallableSolver.HoudiniAsync	CreateBuilder	Open: coordinator review
+RES-E46456DA49E3EE27	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	423	29	CollectionMaterialization	PassiveCallableSolver.HoudiniAsync	CreateBuilder	Open: coordinator review
+RES-3D496D7DA5D87B6D	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	424	35	CollectionMaterialization	PassiveCallableSolver.HoudiniAsync	CreateBuilder	Open: coordinator review
+RES-C4DF32712D70F179	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	464	22	CollectionMaterialization	PassiveCallableSolver.HornProposals	CreateBuilder	Open: coordinator review
+RES-B9FBBEEAC6804CEB	src/SharpProof.Worker/Vc/PassiveCallableSolver.cs	465	25	CollectionMaterialization	PassiveCallableSolver.HornProposals	CreateBuilder	Open: coordinator review
+RES-E3448BB9BD59A5F2	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	43	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<Assumption>.Builder _facts	Open: coordinator review
+RES-8C1CF14BA3005AA8	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	43	66	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-86E2F0FB0ED2EA32	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	44	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<IrBlockId, BigInteger>.Builder _blockAncestors	Open: coordinator review
+RES-4ED3A7E5B092135F	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	44	91	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-0F3CFC740A187121	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	46	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<IrId, IrTerm>.Builder _entryFieldReferences	Open: coordinator review
+RES-48D5A397017513F0	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	46	88	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-F6981235F119B3D9	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	47	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrId>.Builder _entryFieldReferenceOrder	Open: coordinator review
+RES-117D7CC154C632E4	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	47	79	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-94CB15064ECF0A0B	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	48	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, IrTerm Value, OperationId Site)>.Builder _freshReferences	Open: coordinator review
+RES-96593F9334812E1E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	48	112	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-6FFA1DA8F22221E1	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	49	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<ProofJustification, string>.Builder _labels	Open: coordinator review
+RES-EB8DA32169EC4311	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	49	88	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-F465FBF269C7F306	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	50	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<ProofJustification, OperationId>.Builder _assumes	Open: coordinator review
+RES-10E7E7D0C533C3B2	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	50	94	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-6C683AED6339C392	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	51	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrVarId>.Builder _model	Open: coordinator review
+RES-9C475E0C0D101852	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	51	63	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-B70063EEB8995A1E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	52	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<IrBlockId, ImmutableArray<Edge>.Builder>.Builder _incoming	Open: coordinator review
+RES-257CAF4D396AA4F3	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	52	103	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-2F49CB116060499F	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	53	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<Exit>.Builder _returns	Open: coordinator review
+RES-EC77D7E07F679680	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	53	62	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-8E3E150B1A77BC85	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	54	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, IrTerm Kind)>.Builder _exceptions	Open: coordinator review
+RES-1A956FEF47CC22AF	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	54	88	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-10DB988A60617DAD	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	55	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _allocations	Open: coordinator review
+RES-B1E4D48487F6667A	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	55	94	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-89D17AF9F1A1A280	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	56	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)>.Builder _writes	Open: coordinator review
+RES-E4E49D032A25EB61	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	56	152	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-0D914B736F4AE37C	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	57	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _locks	Open: coordinator review
+RES-7B018CFD353D165D	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	57	88	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-A66466A264E63E87	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	58	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>.Builder _callPreconditions	Open: coordinator review
+RES-0DA9D211D46E8F36	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	58	147	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-BB80C182C13F2B78	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	62	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>.Builder _checkpoints	Open: coordinator review
+RES-93F32ED14865D3E6	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	62	141	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-334AA5C0A0CB5484	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	65	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrTerm>.Builder _potentialExceptionAllocations	Open: coordinator review
+RES-7B6FEDDB25D85534	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	65	86	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-5E4A7B80CD1737B6	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	67	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)>.Builder _opaqueCalls	Open: coordinator review
+RES-E224FF5C44C74B5E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	67	105	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-2BD4343C9B0AF4DB	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	69	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrTerm>.Builder _reads	Open: coordinator review
+RES-C30E35737C567398	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	69	62	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-DBB57A6252233E0A	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	73	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrTerm>.Builder _ambientReads	Open: coordinator review
+RES-C434AB750AA7DABF	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	73	69	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-56F568F046BFC3D5	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	76	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<(IrTerm Predicate, OperationId Site)>.Builder _exceptionFacts	Open: coordinator review
+RES-3E857D4C46D6871E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	76	101	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-165637E505B40C5C	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	77	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<IrVarId, IrVarId>.Builder _oldInputs	Open: coordinator review
+RES-36C8DB1968A700A5	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	77	81	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-94BEC7FF9182E472	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	78	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableDictionary<IrVarId, IrVarId>.Builder _inputBindings	Open: coordinator review
+RES-838CD5CE8F57E9F7	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	78	85	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-532A97E1BA25B401	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	86	5	PropertyStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<Assumption> EntryAssumptions	Open: coordinator review
+RES-0AEB135085ADAE15	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	100	5	PropertyStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<IrTerm> Goals	Open: coordinator review
+RES-DC036942C721528F	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	101	5	PropertyStorage	PassiveCallableVcBuilder.<type>	IrTerm NormalCompletion	Open: coordinator review
+RES-9C76CE8FFB2A57B4	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	106	5	FieldStorage	PassiveCallableVcBuilder.<type>	ImmutableArray<OperationId>.Builder _explicitSites	Open: coordinator review
+RES-A89B23B78704AF21	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	106	75	CollectionMaterialization	PassiveCallableVcBuilder.<type>	CreateBuilder	Open: coordinator review
+RES-AAB813D1BFD085D8	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	234	23	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-EB756633C6AC3A98	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	252	26	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-8DE5959F04E140EB	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	264	25	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-82470F3D40CDB077	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	265	30	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-902B92DA8737FD59	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	531	41	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-EC934B3AE2322883	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	587	32	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-2B66C3FC238A896E	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	608	21	CollectionMaterialization	PassiveCallableVcBuilder.Build	CreateBuilder	Open: coordinator review
+RES-508CB3FEA515E79B	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	662	59	CollectionMaterialization	PassiveCallableVcBuilder.AddEdge	CreateBuilder	Open: coordinator review
+RES-946CEC8BA9158516	src/SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs	697	29	CollectionMaterialization	PassiveCallableVcBuilder.TryRewrite	CreateBuilder	Open: coordinator review
 RES-1D6BAC0D8F80F694	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	62	5	PropertyStorage	PassiveCallableVcPlan.<type>	bool HasUnmodeledAllocations	Open: coordinator review
 RES-94EB554C80CCE3A9	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	102	27	CollectionMaterialization	PassiveCallableVcPlan.CallPreconditionQueries	ToArray	Open: coordinator review
 RES-A41875BB34D57E70	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	121	29	CollectionMaterialization	PassiveCallableVcPlan.ReplayCallPrecondition	CreateBuilder	Verified: construction-owned immutable builder; local scratch or frozen publication; ordering reviewed
@@ -3247,48 +3263,53 @@ RES-870A2DA92E471D8B	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	293	29	Co
 RES-92215FBD0D9C0D9B	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	380	21	CollectionCreation	PassiveCallableVcPlan.ObserveDictionary	Dictionary<T, int>	Open: coordinator review
 RES-266B0247FE104724	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	439	24	CollectionMaterialization	PassiveCallableVcPlan.CreateReplay	CreateBuilder	Open: coordinator review
 RES-EF5A2F092C44957D	src/SharpProof.Worker/Vc/PassiveCallableVcPlan.cs	440	19	CollectionMaterialization	PassiveCallableVcPlan.CreateReplay	CreateBuilder	Open: coordinator review
-RES-E6085B80CDD63F3B	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	17	23	CollectionCreation	PassiveLoopCutter.FindExceptionComponents	HashSet<IrBlockId>	Open: coordinator review
-RES-F03CEBEFEAF44687	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	18	25	CollectionCreation	PassiveLoopCutter.FindExceptionComponents	HashSet<IrVarId>	Open: coordinator review
-RES-3C728CA722DF268A	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	27	25	CollectionCreation	PassiveLoopCutter.FindExceptionComponents	HashSet<IrBlockId>	Open: coordinator review
-RES-4C0CC04A46F49B01	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	28	27	CollectionCreation	PassiveLoopCutter.FindExceptionComponents	Stack<IrBlockId>	Open: coordinator review
+RES-43DB50351B2638C6	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	17	23	CollectionMaterialization	PassiveLoopCutter.FindExceptionComponents	CreateBuilder	Open: coordinator review
+RES-D967AFF1DE3FA150	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	18	25	CollectionMaterialization	PassiveLoopCutter.FindExceptionComponents	CreateBuilder	Open: coordinator review
+RES-89756F7183170E42	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	27	25	CollectionMaterialization	PassiveLoopCutter.FindExceptionComponents	CreateBuilder	Open: coordinator review
 RES-215F0972A459CED4	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	47	26	CollectionMaterialization	PassiveLoopCutter.FindExceptionComponents	CreateBuilder	Open: coordinator review
-RES-26F2031BB5B899AA	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	84	22	CollectionCreation	PassiveLoopCutter.WrittenVariables	HashSet<IrVarId>	Open: coordinator review
-RES-781F25F4E3733929	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	11	5	FieldStorage	PassiveLoopCutter.<type>	Dictionary<IrBlockId, List<IrBlockId>> _predecessors	Open: coordinator review
-RES-19242B861BA92F8C	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	12	5	FieldStorage	PassiveLoopCutter.<type>	HashSet<(IrBlockId From, IrBlockId To)> _backEdges	Open: coordinator review
-RES-7B9AF33DF0CA52F1	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	13	5	FieldStorage	PassiveLoopCutter.<type>	Dictionary<IrBlockId, HashSet<IrBlockId>> _loops	Open: coordinator review
-RES-353700BDEF116278	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	14	5	FieldStorage	PassiveLoopCutter.<type>	HashSet<IrBlockId> _reachable	Open: coordinator review
-RES-9FD1FBC9A9C4094B	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	15	5	FieldStorage	PassiveLoopCutter.<type>	List<IrBlockId> _finished	Open: coordinator review
-RES-53AEA034E2FB6F28	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	16	5	FieldStorage	PassiveLoopCutter.<type>	Dictionary<IrBlockId, ImmutableArray<IrVarId>> _havoc	Open: coordinator review
-RES-C4EECEA914A5D60C	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	20	5	FieldStorage	PassiveLoopCutter.<type>	Dictionary<IrBlockId, ImmutableArray<Cell>?> _cells	Open: coordinator review
-RES-89631CB7FD7CDCDA	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	21	5	FieldStorage	PassiveLoopCutter.<type>	HashSet<IrBlockId> _storesElements	Open: coordinator review
-RES-6319687BA74204DC	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	31	5	FieldStorage	PassiveLoopCutter.<type>	Dictionary<IrBlockId, ExceptionComponent> _exceptionComponents	Open: coordinator review
-RES-B04F8D6D3AAB80B1	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	129	22	CollectionCreation	PassiveLoopCutter.FindLoops	HashSet<IrBlockId>	Open: coordinator review
-RES-9F0815AFAC9D72CF	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	130	21	CollectionCreation	PassiveLoopCutter.FindLoops	Stack<(IrBlockId Block, bool Exit)>	Open: coordinator review
-RES-D244D791BA5F5B87	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	175	24	CollectionCreation	PassiveLoopCutter.FindLoops	HashSet<IrBlockId>	Open: coordinator review
-RES-4CF5CCCA8F769DD6	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	176	27	CollectionCreation	PassiveLoopCutter.FindLoops	Stack<IrBlockId>	Open: coordinator review
-RES-6CB7B8860E0F4BF2	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	202	22	CollectionMaterialization	PassiveLoopCutter.FindLoops	ToHashSet	Open: coordinator review
-RES-DB9D50BE57D478E1	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	202	244	ArrayCreation	PassiveLoopCutter.FindLoops	implicit[]	Open: coordinator review
-RES-F0E80207043C3E51	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	208	32	CollectionMaterialization	PassiveLoopCutter.FindLoops	ToArray	Open: coordinator review
-RES-288782A96418D1D8	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	212	26	CollectionCreation	PassiveLoopCutter.FindLoops	Dictionary<IrVarId, IrTerm>	Open: coordinator review
-RES-84BB6E7612FFB149	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	214	154	CollectionMaterialization	PassiveLoopCutter.FindLoops	ToArray	Open: coordinator review
-RES-1E1F53A1DBA95082	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	260	22	CollectionCreation	PassiveLoopCutter.Encode	Dictionary<(IrBlockId Block, int Layer), IrBlockId>	Open: coordinator review
-RES-675FD4B69349D78B	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	261	23	CollectionCreation	PassiveLoopCutter.Encode	Queue<(IrBlockId Block, int Layer)>	Open: coordinator review
-RES-4D4D77AD6495CC68	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	262	21	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
-RES-6A3C8963E0BF4D02	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	263	27	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
-RES-614F7DE63F19D95D	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	264	27	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
-RES-13AFBE3D66143D2F	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	265	29	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
-RES-4133B12C608565B7	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	266	31	CollectionMaterialization	PassiveLoopCutter.Encode	ToHashSet	Open: coordinator review
+RES-F90ED131DC92E011	src/SharpProof.Worker/Vc/PassiveLoopCutter.Components.cs	84	22	CollectionMaterialization	PassiveLoopCutter.WrittenVariables	CreateBuilder	Open: coordinator review
+RES-E2E5321707CA8E51	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	11	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ImmutableArray<IrBlockId>.Builder>.Builder _predecessors	Open: coordinator review
+RES-196A6FA590A8024F	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	11	112	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-F7DAE436C6747C59	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	12	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableHashSet<(IrBlockId From, IrBlockId To)>.Builder _backEdges	Open: coordinator review
+RES-D33C26EE34D68A31	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	12	92	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-E5458E0746532F16	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	13	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ImmutableHashSet<IrBlockId>.Builder>.Builder _loops	Open: coordinator review
+RES-04417E50B4B3147E	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	13	107	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-2A259D720700C28F	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	14	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ImmutableArray<IrBlockId>.Builder>.Builder _loopOrders	Open: coordinator review
+RES-0E51435C35591D99	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	14	110	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-02DC0F60E565CCEE	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	15	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableArray<IrBlockId>.Builder _loopHeaderOrder	Open: coordinator review
+RES-BF195DB59F3F5D0D	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	15	75	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-9650D9733F2221A2	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	16	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableArray<IrBlockId>.Builder _reachableOrder	Open: coordinator review
+RES-4C33A3165DC88C62	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	16	74	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-6A218C1DBA94E940	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	17	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableHashSet<IrBlockId>.Builder _reachable	Open: coordinator review
+RES-AD0F9208250DF22B	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	17	71	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-CBEE67FA99876C4B	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	18	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableArray<IrBlockId>.Builder _finished	Open: coordinator review
+RES-9CFF4452F78561CD	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	18	68	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-46296194FF4CBD6C	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	19	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ImmutableArray<IrVarId>>.Builder _havoc	Open: coordinator review
+RES-8E59074CC49CFEB3	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	19	95	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-49043E9ABEDA1233	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	23	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ImmutableArray<Cell>?>.Builder _cells	Open: coordinator review
+RES-3F6FB247DC05612A	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	23	93	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-229D480CED4E9EA2	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	24	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableHashSet<IrBlockId>.Builder _storesElements	Open: coordinator review
+RES-CB3D3AB520463FD0	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	24	76	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-AE5025CA1FE31653	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	34	5	FieldStorage	PassiveLoopCutter.<type>	ImmutableDictionary<IrBlockId, ExceptionComponent>.Builder _exceptionComponents	Open: coordinator review
+RES-19A2791B49F1D46D	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	34	104	CollectionMaterialization	PassiveLoopCutter.<type>	CreateBuilder	Open: coordinator review
+RES-7F580E374A9D3CC5	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	132	22	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-4F54B453A73B9E54	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	151	66	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-6BC4DBDA98875121	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	180	24	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-4C9B14F821C02FF4	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	196	25	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-F99F9B48128A2344	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	199	29	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-1F4C87438BFC970C	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	228	31	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-4AF42F691F8CD3DE	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	242	130	CollectionMaterialization	PassiveLoopCutter.FindLoops	CreateBuilder	Open: coordinator review
+RES-EA04757FAA45D0A8	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	277	22	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
+RES-54E612E67132AAF2	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	279	21	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
+RES-AB875B503769950F	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	280	27	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
+RES-E3783AD23D0C6471	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	281	27	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
+RES-2B8139D9A354D02C	src/SharpProof.Worker/Vc/PassiveLoopCutter.cs	282	29	CollectionMaterialization	PassiveLoopCutter.Encode	CreateBuilder	Open: coordinator review
 RES-D59D745DA922D1D4	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	39	27	CollectionMaterialization	TotalCallableVerifier.VerifyEntryAsync	CreateBuilder	Open: coordinator review
-RES-C7F78F2C8AEEC7FD	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	40	22	CollectionCreation	TotalCallableVerifier.VerifyEntryAsync	Dictionary<ProofJustification, string>	Open: coordinator review
-RES-AADA61634F13336E	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	41	19	CollectionCreation	TotalCallableVerifier.VerifyEntryAsync	Dictionary<string, string>	Open: coordinator review
-RES-25534F25FF1793BF	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	106	23	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	ToArray	Open: coordinator review
-RES-EA4C2521CB1F93F6	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	117	31	CollectionCreation	TotalCallableVerifier.VerifyAsync	Dictionary<string, string>	Open: coordinator review
-RES-9AADC571F6A04A88	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	129	36	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	ToArray	Open: coordinator review
-RES-3E369E9B90E21483	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	130	34	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	ToDictionary	Open: coordinator review
-RES-895121A1DE44D32A	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	145	24	CollectionCreation	TotalCallableVerifier.VerifyAsync	HashSet<string>	Open: coordinator review
-RES-7BE087C991C44D70	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	158	31	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	CreateBuilder	Open: coordinator review
-RES-2B94B8B30A20743A	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	189	20	CollectionMaterialization	TotalCallableVerifier.VerifyCandidateAsync	ToArray	Open: coordinator review
-RES-CB15E5E096CED6A8	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	280	20	CollectionMaterialization	TotalCallableVerifier.ProjectEntry	ToArray	Open: coordinator review
+RES-86D7406B7470AD6B	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	40	22	CollectionMaterialization	TotalCallableVerifier.VerifyEntryAsync	CreateBuilder	Open: coordinator review
+RES-BB2FB0CF2AE00989	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	41	19	CollectionMaterialization	TotalCallableVerifier.VerifyEntryAsync	CreateBuilder	Open: coordinator review
+RES-9064A78270CD3FD2	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	117	35	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	CreateBuilder	Open: coordinator review
+RES-ADDD5F2698A2EC20	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	147	24	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	CreateBuilder	Open: coordinator review
+RES-795427AE68A0C868	src/SharpProof.Worker/Vc/TotalCallableVerifier.cs	160	31	CollectionMaterialization	TotalCallableVerifier.VerifyAsync	CreateBuilder	Open: coordinator review
 RES-B11821BFBF61B8ED	src/SharpProof.Worker/VerificationCache.cs	18	5	PropertyStorage	VerificationCache.<type>	bool LastReadUnavailable	Open: coordinator review
 RES-364E39074024CF78	src/SharpProof.Worker/VerificationCache.cs	154	23	CollectionMaterialization	VerificationCache.EvictOldest	ToList	Open: coordinator review
 RES-62C459BDF6615C54	src/SharpProof.Worker/WorkerHost.cs	39	44	CollectionMaterialization	WorkerHost.Failure	ToArray	Open: coordinator review
