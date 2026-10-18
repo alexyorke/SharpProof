@@ -59,15 +59,16 @@ public sealed partial class TotalLoweringContext
     private readonly RoslynTypeMapper _types;
     private readonly Func<SyntaxTree, string> _document;
     private readonly bool _allowGenericContainer;
-    private readonly Dictionary<ISymbol, IrVarId> _locals = new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<CaptureId, IrVarId> _captures = [];
-    private readonly Dictionary<CaptureId, ImmutableArray<IrTerm>> _concatenationOperands = [];
-    private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
-    private readonly Dictionary<BasicBlock, ExactSpecificationContinuation> _exactSpecificationContinuations = [];
+    private ImmutableDictionary<ISymbol, IrVarId> _locals = ImmutableDictionary.Create<ISymbol, IrVarId>(SymbolEqualityComparer.Default);
+    private readonly ImmutableArray<ISymbol>.Builder _localOrder = ImmutableArray.CreateBuilder<ISymbol>();
+    private ImmutableDictionary<CaptureId, IrVarId> _captures = ImmutableDictionary<CaptureId, IrVarId>.Empty;
+    private ImmutableDictionary<CaptureId, ImmutableArray<IrTerm>> _concatenationOperands = ImmutableDictionary<CaptureId, ImmutableArray<IrTerm>>.Empty;
+    private ImmutableHashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = ImmutableHashSet<(SyntaxTree Tree, int Start, int Length)>.Empty;
+    private ImmutableDictionary<BasicBlock, ExactSpecificationContinuation> _exactSpecificationContinuations = ImmutableDictionary<BasicBlock, ExactSpecificationContinuation>.Empty;
     private ControlFlowGraph? _exactSpecificationGraph;
     private Compilation? _exactSpecificationCompilation;
-    private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
-    private readonly List<(IrTerm Condition, OperationId Site)> _entryAssumptions = [];
+    private ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)>.Empty;
+    private readonly ImmutableArray<(IrTerm Condition, OperationId Site)>.Builder _entryAssumptions = ImmutableArray.CreateBuilder<(IrTerm Condition, OperationId Site)>();
     private int _temporary;
 
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
@@ -243,7 +244,8 @@ public sealed partial class TotalLoweringContext
             var type = Type(_arrayReceivers.TryGetValue(local, out var array) ? array : local.Type);
             variable = string.IsNullOrEmpty(local.Name) && local.IsImplicitlyDeclared
                 ? Temporary(type) : Factory.CreateVariable(local.Name, type);
-            _locals.Add(symbol, variable);
+            _locals = _locals.AddUnique(symbol, variable);
+            _localOrder.Add(symbol);
         }
         return variable;
     }
@@ -254,33 +256,33 @@ public sealed partial class TotalLoweringContext
     internal void RecordConcatenationOperands(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, ImmutableArray<IrTerm> operands)
     {
         if (operands.IsDefault)
-        { _concatenationOperands.Remove(capture); }
+        { _concatenationOperands = _concatenationOperands.Remove(capture); }
         else
-        { _concatenationOperands[capture] = operands; }
+        { _concatenationOperands = _concatenationOperands.SetItem(capture, operands); }
     }
 
     // Roslyn captures `this` to keep evaluation order around a branching
     // right-hand side; such a capture stands for the never-null receiver.
-    private readonly HashSet<CaptureId> _thisCaptures = [];
+    private ImmutableHashSet<CaptureId> _thisCaptures = ImmutableHashSet<CaptureId>.Empty;
     internal void RecordThisCapture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */)
-    { _thisCaptures.Add(capture); }
+    { _thisCaptures = _thisCaptures.Add(capture); }
     internal bool IsThisCapture(CaptureId capture)
     { return _thisCaptures.Contains(capture); }
 
     // Roslyn also captures a field of `this` used as an assignment target. A
     // read through it is a fresh approximate field read, which
     // over-approximates the value at capture time.
-    private readonly Dictionary<CaptureId, IFieldReferenceOperation> _fieldCaptures = [];
+    private ImmutableDictionary<CaptureId, IFieldReferenceOperation> _fieldCaptures = ImmutableDictionary<CaptureId, IFieldReferenceOperation>.Empty;
     internal void RecordFieldCapture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, IFieldReferenceOperation field)
-    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); _fieldCaptures[capture] = field; }
+    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); _fieldCaptures = _fieldCaptures.SetItem(capture, field); }
     internal IFieldReferenceOperation? CapturedField(IOperation operation)
     { operation = RepositoryParameterGuard.NotNull(operation, nameof(operation)); return operation is IFlowCaptureReferenceOperation reference && _fieldCaptures.TryGetValue(reference.Id, out var field) ? field : null; }
 
     // A capture of a local or parameter, as an assignment target, is that
     // variable's storage.
-    private readonly Dictionary<CaptureId, ISymbol> _storageCaptures = [];
+    private ImmutableDictionary<CaptureId, ISymbol> _storageCaptures = ImmutableDictionary<CaptureId, ISymbol>.Empty;
     internal void RecordStorageCapture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, ISymbol variable)
-    { variable = RepositoryParameterGuard.NotNull(variable, nameof(variable)); _storageCaptures[capture] = variable; }
+    { variable = RepositoryParameterGuard.NotNull(variable, nameof(variable)); _storageCaptures = _storageCaptures.SetItem(capture, variable); }
     internal IrVarId? CapturedStorage(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
@@ -293,7 +295,7 @@ public sealed partial class TotalLoweringContext
         if (!_captures.TryGetValue(capture, out var variable))
         {
             variable = Temporary(Type(_arrayCaptures.TryGetValue(capture, out var array) ? array : type));
-            _captures.Add(capture, variable);
+            _captures = _captures.AddUnique(capture, variable);
         }
         return variable;
     }
@@ -351,10 +353,10 @@ public sealed partial class TotalLoweringContext
     {
         thrown = RepositoryParameterGuard.NotNull(thrown, nameof(thrown));
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        var hierarchy = new List<string>();
+        var hierarchy = ImmutableArray.CreateBuilder<string>();
         for (var current = type; current != null && current.SpecialType != SpecialType.System_Object; current = current.BaseType)
         { hierarchy.Add(CompilerIdentityBridge.CreateTypeDisplay(current)); }
-        return Factory.CreateOperation("explicit-throw:" + (exact ? "exact:" : "") + string.Join(";", hierarchy), Span(thrown.Syntax));
+        return Factory.CreateOperation("explicit-throw:" + (exact ? "exact:" : "") + string.Join(";", hierarchy.ToImmutable()), Span(thrown.Syntax));
     }
 
     internal OperationId OpaqueCallSite(IOperation call, IrOpaqueCallEffects effects, string member)
@@ -372,16 +374,24 @@ public sealed partial class TotalLoweringContext
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var syntax = invocation.Syntax;
-        if (_specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
-        { _exactSpecificationContinuations.Clear(); }
+        var key = (syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length);
+        if (!_specificationCalls.Contains(key))
+        {
+            _specificationCalls = _specificationCalls.Add(key);
+            _exactSpecificationContinuations = ImmutableDictionary<BasicBlock, ExactSpecificationContinuation>.Empty;
+        }
     }
 
     internal void RestoreSpecificationCall(IInvocationOperation invocation)
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var syntax = invocation.Syntax;
-        if (_specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
-        { _exactSpecificationContinuations.Clear(); }
+        var key = (syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length);
+        if (_specificationCalls.Contains(key))
+        {
+            _specificationCalls = _specificationCalls.Remove(key);
+            _exactSpecificationContinuations = ImmutableDictionary<BasicBlock, ExactSpecificationContinuation>.Empty;
+        }
     }
 
     // Entries are successes in the exact, same-region mode only. Classification
@@ -407,7 +417,7 @@ public sealed partial class TotalLoweringContext
         if (!ReferenceEquals(_exactSpecificationGraph, graph) ||
             !ReferenceEquals(_exactSpecificationCompilation, compilation))
         {
-            _exactSpecificationContinuations.Clear();
+            _exactSpecificationContinuations = ImmutableDictionary<BasicBlock, ExactSpecificationContinuation>.Empty;
             _exactSpecificationGraph = graph;
             _exactSpecificationCompilation = compilation;
         }
@@ -422,10 +432,10 @@ public sealed partial class TotalLoweringContext
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (ReferenceEquals(_exactSpecificationGraph, graph) &&
             ReferenceEquals(_exactSpecificationCompilation, compilation))
-        { _exactSpecificationContinuations[source] = continuation; }
+        { _exactSpecificationContinuations = _exactSpecificationContinuations.SetItem(source, continuation); }
     }
 
-    internal IReadOnlyList<(IrTerm Condition, OperationId Site)> EntrySpecificationAssumptions => _entryAssumptions;
+    internal ImmutableArray<(IrTerm Condition, OperationId Site)> EntrySpecificationAssumptions => _entryAssumptions.ToImmutable();
 
     internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site, bool atEntry = false)
     {
@@ -439,12 +449,12 @@ public sealed partial class TotalLoweringContext
             return;
         }
         var syntax = invocation.Syntax;
-        _assumptions.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), (condition, site));
+        _assumptions = _assumptions.AddUnique((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), (condition, site));
     }
 
     internal void DiscardSpecificationAssumptions()
     {
-        _assumptions.Clear();
+        _assumptions = ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)>.Empty;
         _entryAssumptions.Clear();
     }
 
@@ -479,6 +489,6 @@ public sealed partial class TotalLoweringContext
 
     internal ImmutableArray<FrontendVariableBinding> Variables =>
         [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new FrontendVariableBinding(binding.Parameter, binding.Current)))
-            .Concat(_locals.Select(pair => new FrontendVariableBinding(pair.Key, pair.Value)))];
+            .Concat(_localOrder.Select(symbol => symbol is null ? throw new ArgumentNullException(nameof(symbol)) : new FrontendVariableBinding(symbol, _locals[symbol])))];
     internal ImmutableArray<IrVarId> Captures => [.. _captures.Values.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))];
 }

@@ -38,7 +38,7 @@ internal sealed class CompilerSpecificationPackProvider
                 "The SharpProof specification-pack authority is not current.");
         }
 
-        var methods = ImmutableDictionary.Create<
+        var methods = ImmutableDictionary.CreateBuilder<
             string,
             CompilerSpecificationMethodEvidence>(StringComparer.Ordinal);
         foreach (var packId in selectedPacks!)
@@ -50,11 +50,15 @@ internal sealed class CompilerSpecificationPackProvider
                 var definition = new CompilerSpecificationMethodEvidence(
                     method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
                     method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
-                methods = methods.AddUnique(method.DocumentationCommentId, definition);
+                if (methods.ContainsKey(method.DocumentationCommentId))
+                {
+                    throw new ArgumentException("An item with the same key has already been added. Key: " + method.DocumentationCommentId);
+                }
+                methods.Add(method.DocumentationCommentId, definition);
             }
         }
 
-        _methods = methods;
+        _methods = methods.ToImmutable();
     }
 
     internal static CompilerSpecificationPackConfiguration ResolveConfiguration(
@@ -74,8 +78,8 @@ internal sealed class CompilerSpecificationPackProvider
         IEnumerable<string>? enabledPacks,
         RelationalSpecPackCatalog catalog)
     {
-        var values = ImmutableList<string>.Empty;
-        var seen = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var values = ImmutableArray.CreateBuilder<string>();
+        var seen = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var value in enabledPacks ?? [])
         {
             var normalized = value?.Trim() ?? string.Empty;
@@ -90,11 +94,11 @@ internal sealed class CompilerSpecificationPackProvider
                     "SharpProof specification-pack identifiers must be unique.");
             }
 
-            seen = seen.Add(normalized);
-            values = values.Add(normalized);
+            seen.Add(normalized);
+            values.Add(normalized);
         }
 
-        values = values.Sort(StringComparer.Ordinal);
+        values.Sort(StringComparer.Ordinal);
         foreach (var packId in values)
         {
             if (!catalog.Packs.ContainsKey(packId))
@@ -104,7 +108,7 @@ internal sealed class CompilerSpecificationPackProvider
             }
         }
 
-        return values.ToImmutableArray();
+        return values.ToImmutable();
     }
 
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)

@@ -17,7 +17,7 @@ function Resolve-SharpProofSourceDocument {
     $physicalRoot = Resolve-SharpProofPhysicalPath -Path $root
     $physicalPrefix = $physicalRoot + [IO.Path]::DirectorySeparatorChar
     $normalized = $DocumentPath.Replace('\', '/')
-    $candidates = [Collections.Generic.List[string]]::new()
+    $candidates = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $candidates.Add($normalized)
     if (-not [IO.Path]::IsPathRooted($normalized)) {
         foreach ($sourceRoot in $SourceRoots) {
@@ -66,7 +66,7 @@ function Assert-SharpProofSourceDocumentCompileMembership {
         [Parameter(Mandatory = $true)]
         [string]$RelativePath,
         [Parameter(Mandatory = $true)]
-        [Collections.Generic.HashSet[string]]$CompilePaths
+        [Collections.Generic.IReadOnlySet[string]]$CompilePaths
     )
 
     if (-not $CompilePaths.Contains($RelativePath)) {

@@ -126,14 +126,15 @@ internal static class ReferencedTypeSymbols
         CancellationToken cancellationToken)
     {
         container = RepositoryParameterGuard.NotNull(container, nameof(container));
-        var pending = new Stack<INamespaceOrTypeSymbol>();
-        pending.Push(container);
+        var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
+        pending = pending.Push(container);
 
-        while (pending.Count > 0)
+        while (!pending.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is INamedTypeSymbol type)
             {
                 yield return type;
@@ -145,14 +146,14 @@ internal static class ReferencedTypeSymbols
                     .ToImmutableArray();
                 for (var index = namespaces.Length - 1; index >= 0; index--)
                 {
-                    pending.Push(namespaces[index]);
+                    pending = pending.Push(namespaces[index]);
                 }
             }
 
             var types = current.GetTypeMembers();
             for (var index = types.Length - 1; index >= 0; index--)
             {
-                pending.Push(types[index]);
+                pending = pending.Push(types[index]);
             }
         }
     }

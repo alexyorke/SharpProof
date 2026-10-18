@@ -81,24 +81,25 @@ public static class CompilationModelProvider
         private readonly ImmutableDictionary<SyntaxTree, Compilation?> _owners;
 
         private TreeOwnershipIndex(
-            Dictionary<SyntaxTree, Compilation?> owners)
+            ImmutableDictionary<SyntaxTree, Compilation?> owners)
         {
             owners = RepositoryParameterGuard.NotNull(owners, nameof(owners));
-            _owners = owners.ToImmutableDictionary(ReferenceComparer<SyntaxTree>.Instance);
+            _owners = owners;
         }
 
         internal static TreeOwnershipIndex Create(Compilation root)
         {
             root = RepositoryParameterGuard.NotNull(root, nameof(root));
-            var owners = new Dictionary<SyntaxTree, Compilation?>(
+            var owners = ImmutableDictionary.CreateBuilder<SyntaxTree, Compilation?>(
                 ReferenceComparer<SyntaxTree>.Instance);
-            var pending = new Stack<Compilation>();
-            var visited = new HashSet<Compilation>(
+            var pending = ImmutableStack<Compilation>.Empty;
+            var visited = ImmutableHashSet.CreateBuilder<Compilation>(
                 ReferenceComparer<Compilation>.Instance);
-            pending.Push(root);
-            while (pending.Count != 0)
+            pending = pending.Push(root);
+            while (!pending.IsEmpty)
             {
-                var current = pending.Pop();
+                var current = pending.Peek();
+                pending = pending.Pop();
                 if (!visited.Add(current))
                 {
                     continue;
@@ -120,11 +121,11 @@ public static class CompilationModelProvider
                 foreach (var reference in current.References
                              .OfType<CompilationReference>())
                 {
-                    pending.Push(reference.Compilation);
+                    pending = pending.Push(reference.Compilation);
                 }
             }
 
-            return new TreeOwnershipIndex(owners);
+            return new TreeOwnershipIndex(owners.ToImmutable());
         }
 
         internal bool IsAmbiguous(SyntaxTree tree)

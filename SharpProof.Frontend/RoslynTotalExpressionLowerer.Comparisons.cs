@@ -10,7 +10,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var values = new GuardedExpression[2];
         foreach (var argument in invocation.Arguments)
         { values[argument.Parameter!.Ordinal] = LowerClause(argument.Value, state, depth + 1); }
-        var classification = First(values[0].Classification, values[1].Classification);
+        var classification = First([values[0].Classification, values[1].Classification]);
         return classification.IsExact ? new(_factory.Binary(IrBinaryOperator.Equal, values[0].Value, values[1].Value),
             And(values[0].SafeCondition, values[1].SafeCondition), classification) : Failed(invocation, classification.Abstention);
     }
@@ -42,14 +42,14 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return null; }
         var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 0)).Value, state, depth + 1);
         var right = LowerClause(invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == (primitive ? 0 : 1))).Value, state, depth + 1);
-        var classification = First(left.Classification, right.Classification);
+        var classification = First([left.Classification, right.Classification]);
         var safe = And(left.SafeCondition, right.SafeCondition);
         if (!primitive && !_context.IsDefaultIntegerComparer(invocation.Instance!))
         {
             var receiver = LowerClause(invocation.Instance!, state, depth + 1);
             if (!receiver.Classification.IsExact)
             { return Failed(invocation, receiver.Classification.Abstention); }
-            classification = First(classification, receiver.Classification);
+            classification = First([classification, receiver.Classification]);
             safe = And(receiver.SafeCondition, And(safe,
                 _factory.Binary(IrBinaryOperator.NotEqual, receiver.Value, _factory.Null(receiver.Value.Type))));
         }

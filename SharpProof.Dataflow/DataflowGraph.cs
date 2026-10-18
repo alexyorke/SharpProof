@@ -80,8 +80,8 @@ public sealed class DataflowGraph<T>
         var successors = CreateAdjacency(Blocks.Length);
         foreach (var edge in Edges)
         {
-            successors = successors.SetItem(edge.SourceId, successors[edge.SourceId].Add(edge.TargetId));
-            predecessors = predecessors.SetItem(edge.TargetId, predecessors[edge.TargetId].Add(edge.SourceId));
+            successors[edge.SourceId].Add(edge.TargetId);
+            predecessors[edge.TargetId].Add(edge.SourceId);
         }
         _predecessors = Freeze(predecessors);
         _successors = Freeze(successors);
@@ -140,19 +140,19 @@ public sealed class DataflowGraph<T>
             nameof(blockId));
     }
 
-    private static ImmutableList<ImmutableList<int>> CreateAdjacency(int count)
+    private static ImmutableArray<ImmutableArray<int>.Builder> CreateAdjacency(int count)
     {
         RepositoryParameterGuard.RequireInitialized(count < 0, nameof(count), "Value must be initialized.");
-        return Enumerable.Repeat(ImmutableList<int>.Empty, count).ToImmutableList();
+        return Enumerable.Range(0, count).Select(static _ => ImmutableArray.CreateBuilder<int>()).ToImmutableArray();
     }
 
     private static ImmutableArray<ImmutableArray<int>> Freeze(
-        ImmutableList<ImmutableList<int>> adjacency)
+        ImmutableArray<ImmutableArray<int>.Builder> adjacency)
     {
-        adjacency = RepositoryParameterGuard.NotNull(adjacency, nameof(adjacency));
+        RepositoryParameterGuard.RequireInitialized(adjacency.IsDefault, nameof(adjacency), "Array must be initialized.");
         return adjacency.Select(static neighbors => neighbors is null
             ? throw new ArgumentNullException(nameof(neighbors))
-            : neighbors.ToImmutableArray()).ToImmutableArray();
+            : neighbors.ToImmutable()).ToImmutableArray();
     }
 
     private static ImmutableArray<bool> FindCyclicBlocks(
@@ -160,17 +160,17 @@ public sealed class DataflowGraph<T>
     {
 
         RepositoryParameterGuard.RequireInitialized(successors.IsDefault, nameof(successors), "Array must be initialized.");
-        var discovery = Enumerable.Repeat(0, successors.Length).ToImmutableList();
-        var lowLink = Enumerable.Repeat(0, successors.Length).ToImmutableList();
-        var onStack = Enumerable.Repeat(false, successors.Length).ToImmutableList();
+        var discovery = Enumerable.Repeat(0, successors.Length).ToImmutableArray().ToBuilder();
+        var lowLink = Enumerable.Repeat(0, successors.Length).ToImmutableArray().ToBuilder();
+        var onStack = Enumerable.Repeat(false, successors.Length).ToImmutableArray().ToBuilder();
         for (var blockId = 0; blockId < discovery.Count; blockId++)
         {
-            discovery = discovery.SetItem(blockId, -1);
+            discovery[blockId] = -1;
         }
 
         var active = ImmutableStack<int>.Empty;
         var pending = ImmutableStack<(int BlockId, int NextSuccessor)>.Empty;
-        var result = Enumerable.Repeat(false, successors.Length).ToImmutableList();
+        var result = Enumerable.Repeat(false, successors.Length).ToImmutableArray().ToBuilder();
         var nextDiscovery = 0;
         for (var start = 0; start < successors.Length; start++)
         {
@@ -179,10 +179,10 @@ public sealed class DataflowGraph<T>
                 continue;
             }
 
-            discovery = discovery.SetItem(start, nextDiscovery);
-            lowLink = lowLink.SetItem(start, nextDiscovery++);
+            discovery[start] = nextDiscovery;
+            lowLink[start] = nextDiscovery++;
             active = active.Push(start);
-            onStack = onStack.SetItem(start, true);
+            onStack[start] = true;
             pending = pending.Push((start, 0));
             while (!pending.IsEmpty)
             {
@@ -194,15 +194,15 @@ public sealed class DataflowGraph<T>
                     var next = successors[current][nextSuccessor];
                     if (discovery[next] < 0)
                     {
-                        discovery = discovery.SetItem(next, nextDiscovery);
-                        lowLink = lowLink.SetItem(next, nextDiscovery++);
+                        discovery[next] = nextDiscovery;
+                        lowLink[next] = nextDiscovery++;
                         active = active.Push(next);
-                        onStack = onStack.SetItem(next, true);
+                        onStack[next] = true;
                         pending = pending.Push((next, 0));
                     }
                     else if (onStack[next] && discovery[next] < lowLink[current])
                     {
-                        lowLink = lowLink.SetItem(current, discovery[next]);
+                        lowLink[current] = discovery[next];
                     }
 
                     continue;
@@ -216,17 +216,17 @@ public sealed class DataflowGraph<T>
                     {
                         member = active.Peek();
                         active = active.Pop();
-                        onStack = onStack.SetItem(member, false);
+                        onStack[member] = false;
                         cyclic |= member != current;
                         if (member != current)
                         {
-                            result = result.SetItem(member, true);
+                            result[member] = true;
                         }
                     }
                     while (member != current);
 
-                    result = result.SetItem(current, cyclic ||
-                        successors[current].Contains(current));
+                    result[current] = cyclic ||
+                        successors[current].Contains(current);
                 }
 
                 if (!pending.IsEmpty)
@@ -234,12 +234,12 @@ public sealed class DataflowGraph<T>
                     var parent = pending.Peek().BlockId;
                     if (lowLink[current] < lowLink[parent])
                     {
-                        lowLink = lowLink.SetItem(parent, lowLink[current]);
+                        lowLink[parent] = lowLink[current];
                     }
                 }
             }
         }
 
-        return [.. result];
+        return result.ToImmutable();
     }
 }

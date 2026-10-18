@@ -1379,3 +1379,58 @@ Construction and compiler follow-up checkpoint:
   because extraction processed zero Python modules (GitHub job 117765993351).
   This is recorded as a CI configuration limitation, not a passing check.
   The comprehensive stopping condition remains open.
+
+## Scoped builder and lowering checkpoint
+
+The construction preference is implemented in protocol/portable JSON converters,
+dataflow adjacency and indexed cycle state, expression argument buffers, source
+call buffers, compiler metadata matching and specification-pack selection. All
+published collections freeze before leaving their construction owner. Persistent
+maps remain in recursive lowering caches and memoized results.
+
+Region/finally/filter lowering preserves insertion order with explicit ordered
+builders for finalization. Candidate unwind prefixes freeze at each capture;
+finally/filter transfer builders stay private to the construction phase. The
+continuation planner preserves prior HashSet slot-reuse priority with a bounded
+ordered construction helper and a regression test. Canonical contract variables
+are an explicit builder session: deferred pre-state creation remains live until
+the final bound-variable snapshot, while parameter/result properties expose no
+setters. Main checked the read-only peer reviews and traced cross-partial users.
+
+Production inventory and source-document resolution now use scoped immutable
+builders and frozen arrays. Ordered PowerShell objects remain JSON wire adapters,
+and native process argument/output arrays remain transient boundary adapters.
+A real SDK fixture compares exact prior/current JSON in source-only and portable
+PDB modes (one source project, eight sequence points). Both match. The source
+resolver's existing 20 regression checks pass. The final inventory fixture also
+passes after freezing SDK references, MSBuild results and CodeView records.
+
+Verification evidence for this checkpoint:
+
+- The ordinary solution suite completed with 11,601 passed, zero failed, and one
+  existing platform skip across 19 projects; performance, coverage and corpus
+  categories were excluded. Evidence: immutability-continuation-expression-all-tests2.log.
+- Subsequent region/call changes passed all 1,969 Frontend tests. The final
+  filter-prefix freeze passed 26 focused Total checks. Compiler IL/pack builders
+  passed 45 checks. Canonical variable builders passed all 640 Contracts checks.
+  Evidence: immutability-region-call-builders-frontend-tests.log,
+  immutability-region-filter-freeze-tests.log,
+  immutability-il-pack-builders-worker-tests.log,
+  immutability-canonical-variable-builder-tests.log.
+- The literal-preservation check verifies 2,592 original raw/interpolated tokens
+  across 538 changed C# files. The refreshed C# inventory contains 3,308 syntax
+  candidates across 1,810 files; 123 newly reviewed candidate rows were classified.
+  The PowerShell inventory contains 901 candidates across 58 scripts with zero
+  parse failures; all 48 current inventory/resolver rows are classified. Evidence:
+  immutability-region-contract-preservation.log,
+  immutability-inventory-final-residual-refresh.log,
+  immutability-inventory-final-builder-fixture-check2.log.
+- At pushed e1ad8413c9b1da199bbbeb2de45e713d812bc909, CodeQL C# and Actions
+  pass. Python CodeQL again fails with no Python source processed (exit 32,
+  run 39161811639/job 117776502533). No unrelated CI configuration was changed.
+
+The comprehensive stopping condition remains open. Outstanding work includes
+remaining production compiler/portable validation and construction state, replay
+configuration, helper input ownership, test fixture producers, and PowerShell
+orchestration. Syntax candidates still require individual classification; a
+permitted scoped builder is not counted as an unresolved mutability violation.

@@ -178,6 +178,25 @@ public sealed class CompilerElisionContinuationPlannerTests
         }
     }
 
+    [Test]
+    public void ReusedStopSlotsRetainContinuationRepairPriority()
+    {
+        var subject = Create("{ if (flag) return 1; if (other) return 2; return 3; }");
+        var blocks = subject.Graph.Blocks;
+        Assert.That(blocks.Length, Is.GreaterThanOrEqualTo(5));
+        var stops = new CompilerElisionContinuationPlanner.OrderedStops();
+        Assert.That(stops.Add(blocks[0]), Is.True);
+        Assert.That(stops.Add(blocks[1]), Is.True);
+        Assert.That(stops.Add(blocks[2]), Is.True);
+        Assert.That(stops.Add(blocks[2]), Is.False);
+        Assert.That(stops.Remove(blocks[1]), Is.True);
+        Assert.That(stops.Remove(blocks[0]), Is.True);
+        Assert.That(stops.Remove(blocks[1]), Is.False);
+        Assert.That(stops.Add(blocks[3]), Is.True);
+        Assert.That(stops.Add(blocks[4]), Is.True);
+        Assert.That(stops.Count, Is.EqualTo(3));
+        Assert.That(stops, Is.EqualTo(System.Collections.Immutable.ImmutableArray.Create(blocks[3], blocks[4], blocks[2])));
+    }
     private static BasicBlock ElidedBranch(Subject subject)
     {
         System.ArgumentNullException.ThrowIfNull(subject);

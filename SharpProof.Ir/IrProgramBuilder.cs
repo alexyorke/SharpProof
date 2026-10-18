@@ -150,6 +150,23 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 [.. arguments]));
     }
 
+    internal IrCallInstruction CallSnapshot(
+        IrBlockId block,
+        OperationId operation,
+        IrVarId? target,
+        IrMemberId member,
+        IrTerm? receiver,
+        ImmutableArray<IrTerm> arguments)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        return Append(
+            block,
+            new IrCallInstruction(
+                NextInstructionId(), operation, target, member, receiver, arguments));
+    }
     public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));

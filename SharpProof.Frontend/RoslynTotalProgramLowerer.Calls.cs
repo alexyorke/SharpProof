@@ -31,7 +31,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType))
         { return null; }
-        var ordinals = new HashSet<int>();
+        var ordinals = ImmutableHashSet.CreateBuilder<int>();
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
@@ -51,7 +51,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrTerm value = target is { } returned ? _context.Factory.Variable(returned) : _context.Factory.Boolean(false);
         if (target is { } storage)
         { _builder.Assign(block, _context.Site(invocation), storage, CSharpOperationSemantics.DefaultValue(_context.Factory, resultType)); }
-        var arguments = new IrTerm[method.Parameters.Length];
+        var arguments = ImmutableArray.CreateBuilder<IrTerm>(method.Parameters.Length);
+        arguments.Count = method.Parameters.Length;
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
@@ -70,12 +71,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(value, block, lowered.Classification); }
             arguments[argument.Parameter!.Ordinal] = lowered.Value;
         }
-        var member = _context.Factory.GetOrCreateMember(
+        var member = _context.Factory.GetOrCreateMemberSnapshot(
             CompilerIdentityBridge.InternSymbol(_context.Factory, method), _context.Type(method.ContainingType),
             "shadow-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
-            [.. method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (_context.Type(parameter.Type)))]);
-        var call = _builder.Call(block, _context.Site(invocation), target, member, null, arguments);
-        _preservedSourceCalls.Add(call, method.OriginalDefinition);
+            method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (_context.Type(parameter.Type))).ToImmutableArray());
+        var call = _builder.CallSnapshot(block, _context.Site(invocation), target, member, null, arguments.ToImmutable());
+        _preservedSourceCalls = _preservedSourceCalls.AddUnique(call, method.OriginalDefinition);
         return new(value, block, FrontendSubsetClassification.Exact);
     }
 
@@ -190,7 +191,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             var type = _context.Factory.GetVariableInfo(initialized).Type;
             _builder.Assign(block, site, initialized, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
         }
-        var arguments = new IrTerm[callee.Parameters.Length];
+        var argumentBuffer = ImmutableArray.CreateBuilder<IrTerm>(callee.Parameters.Length);
+        argumentBuffer.Count = callee.Parameters.Length;
         foreach (var argument in callArguments)
         {
             SpendRegion();
@@ -201,14 +203,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                     prepared.Model.Apply([]) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
                 { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
                 _expressions.RecordScalarEffects(argument, prepared.Method, prepared.Model, [], block);
-                arguments[parameter.Ordinal] = empty.Value;
+                argumentBuffer[parameter.Ordinal] = empty.Value;
                 continue;
             }
             var value = _expressions.LowerReceiverValue(argument.Value, block, depth + 1);
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
-            arguments[parameter.Ordinal] = Bridge(value.Value,
+            argumentBuffer[parameter.Ordinal] = Bridge(value.Value,
                 _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
         }
         if (assigned != null)
@@ -217,10 +219,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
-            arguments[arguments.Length - 1] = Bridge(value.Value,
+            argumentBuffer[argumentBuffer.Count - 1] = Bridge(value.Value,
                 _context.Factory.GetVariableInfo(callee.Parameters[callee.Parameters.Length - 1].Entry).Type);
             marker = value.Value;
         }
+        var arguments = argumentBuffer.ToImmutable();
         if (receiver != null)
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
         if (prelude != null)
@@ -265,7 +268,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 });
             composed.LowerSharedFrame(graph!);
             foreach (var obligation in composed._callPreconditions)
-            { _callPreconditions.Add(obligation.Key, obligation.Value); }
+            { _callPreconditions = _callPreconditions.AddUnique(obligation.Key, obligation.Value); }
             foreach (var parameter in callee.Parameters)
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
             _builder.Goto(block, site, composed._frame.Entry);
@@ -286,7 +289,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (!_calls.Spend(program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
         { throw new RegionIncompleteException(); }
         var continuation = _builder.CreateBlock("call:continued");
-        var blocks = program.Blocks.ToDictionary(source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (source.Id), source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (_builder.CreateBlock("call:body")));
+        var blocks = ImmutableDictionaryCapture.Create(program.Blocks, source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (source.Id), source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (_builder.CreateBlock("call:body")));
         foreach (var parameter in callee.Parameters)
         { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
         _builder.Goto(block, site, blocks[program.Entry]);
@@ -317,12 +320,12 @@ internal sealed partial class RoslynTotalProgramLowerer
                         _builder.Havoc(destination, havoc.Operation, havoc.HavocKind, havoc.Origin, [.. havoc.Variables]);
                         break;
                     case IrCallInstruction { Receiver: null, Target: null } opaque:
-                        _builder.Call(destination, opaque.Operation, null, opaque.Member, null, [.. opaque.Arguments]);
+                        _builder.CallSnapshot(destination, opaque.Operation, null, opaque.Member, null, opaque.Arguments);
                         break;
                     case IrAssignInstruction assign:
                         var copied = _builder.Assign(destination, assign.Operation, assign.Target, assign.Value);
                         if (lowering.CallPreconditions.TryGetValue(assign, out var obligation))
-                        { _callPreconditions.Add(copied, obligation); }
+                        { _callPreconditions = _callPreconditions.AddUnique(copied, obligation); }
                         break;
                     case IrBranchInstruction branch:
                         _builder.Branch(destination, branch.Operation, branch.Condition, Target(branch.WhenTrue), Target(branch.WhenFalse));
@@ -371,15 +374,15 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrTerm Bridge(IrTerm value, IrTypeId type)
     { value = RepositoryParameterGuard.NotNull(value, nameof(value)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return _context.BridgeValue(value, type); }
 
-    private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
+    private void RecordCallPreconditions(TotalLoweringContext callee, ImmutableArray<IrTerm> arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {
 
         RepositoryParameterGuard.RequireInitialized(ancestry.IsDefault, nameof(ancestry), "Array must be initialized.");
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (callee.SourceCallPreconditions.IsEmpty)
         { return; }
-        var replacements = callee.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+        var replacements = ImmutableDictionaryCapture.Create(callee.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
             parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
         for (var ordinal = 0; ordinal < callee.SourceCallPreconditions.Length; ordinal++)
         {
@@ -398,7 +401,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // imported assumption. The callee still executes normally.
             var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
                 _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
-            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe, ancestry: ancestry));
+            _callPreconditions = _callPreconditions.AddUnique(marker, new(identity, ordinal, clause.ClauseSite, value, safe, ancestry: ancestry));
         }
     }
 
@@ -426,7 +429,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Source frames use declaration symbols. An unresolved generic
             // throw type cannot exclude a caller's constructed catch type.
             if (CompilerIdentityBridge.IsClosedReferenceType(entry.Value.Type, _cancellationToken))
-            { _explicitThrowTypes[entry.Key] = entry.Value; }
+            { _explicitThrowTypes = _explicitThrowTypes.SetItem(entry.Key, entry.Value); }
         }
     }
 

@@ -39,12 +39,12 @@ internal sealed class ProtocolArrayJsonConverter : JsonConverterFactory
             { return default; }
             if (reader.TokenType != JsonTokenType.StartArray)
             { throw new JsonException(); }
-            var items = ImmutableList<T>.Empty;
+            var items = ImmutableArray.CreateBuilder<T>();
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndArray)
-                { return [.. items]; }
-                items = items.Add(JsonSerializer.Deserialize<T>(ref reader, options)!);
+                { return items.ToImmutable(); }
+                items.Add(JsonSerializer.Deserialize<T>(ref reader, options)!);
             }
             throw new JsonException();
         }

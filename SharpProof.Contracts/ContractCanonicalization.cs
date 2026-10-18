@@ -299,16 +299,16 @@ internal sealed class ContractCanonicalization(
         }
     }
 
-    internal ContractCanonicalVariables CreateVariables(
+    internal ContractCanonicalVariableBuilder CreateVariables(
         IMethodSymbol target,
         bool includeResult)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        var result = new ContractCanonicalVariables(factory);
+        var result = new ContractCanonicalVariableBuilder(factory);
         if (!target.IsStatic &&
             target.MethodKind != MethodKind.Constructor)
         {
-            result.Receiver = result.Add(
+            result.Add(
                 target.ContainingType,
                 BoundContractVariableRole.Receiver,
                 -1,
@@ -319,19 +319,19 @@ internal sealed class ContractCanonicalization(
         for (var index = 0; index < target.Parameters.Length; index++)
         {
             var parameter = target.Parameters[index];
-            result.AddParameter(result.Add(
+            result.Add(
                 parameter,
                 BoundContractVariableRole.Parameter,
                 index,
                 _types.GetTypeId(parameter.Type),
                 "parameter:" + index.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)));
+                    System.Globalization.CultureInfo.InvariantCulture));
         }
         if (includeResult &&
             !target.ReturnsVoid &&
             target.MethodKind != MethodKind.Constructor)
         {
-            result.Result = result.Add(
+            result.Add(
                 null,
                 BoundContractVariableRole.Result,
                 -1,
@@ -346,7 +346,7 @@ internal sealed class ContractCanonicalization(
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
-        ContractCanonicalVariables canonical)
+        ContractCanonicalVariableBuilder canonical)
     {
         ArgumentNullGuard.NotNull(source, nameof(source));
         ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
@@ -364,21 +364,17 @@ internal sealed class ContractCanonicalization(
     }
 }
 
-internal sealed class ContractCanonicalVariables(IrFactory factory)
+internal sealed class ContractCanonicalVariableBuilder(IrFactory factory)
 {
-    private ImmutableList<BoundContractVariable> _variables = factory is null
+    private readonly ImmutableArray<BoundContractVariable>.Builder _variables = factory is null
         ? throw new System.ArgumentNullException(nameof(factory))
-        : ImmutableList<BoundContractVariable>.Empty;
+        : ImmutableArray.CreateBuilder<BoundContractVariable>();
+    private readonly ImmutableArray<IrVarId>.Builder _parameters = ImmutableArray.CreateBuilder<IrVarId>();
 
-    internal IrVarId? Receiver { get; set; }
-    internal ImmutableArray<IrVarId> Parameters { get; private set; } = [];
-
-    internal void AddParameter(IrVarId variable)
-    {
-        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
-        Parameters = Parameters.Add(variable);
-    }
-    internal IrVarId? Result { get; set; }
+    internal ImmutableArray<IrVarId> Parameters => _parameters.ToImmutable();
+    internal IrVarId? Result => _variables.FirstOrDefault(variable => variable is null
+        ? throw new System.ArgumentNullException(nameof(variable))
+        : variable.Role == BoundContractVariableRole.Result)?.Variable;
 
     internal IrVarId Add(
         ISymbol? symbol,
@@ -390,12 +386,14 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var variable = factory.CreateVariable(name, type);
-        _variables = _variables.Add(new BoundContractVariable(
+        _variables.Add(new BoundContractVariable(
             symbol,
             role,
             ordinal,
             variable,
             null));
+        if (role == BoundContractVariableRole.Parameter)
+        { _parameters.Add(variable); }
         return variable;
     }
 
@@ -407,7 +405,7 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
             "pre:" + current.Value.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
             info.Type);
-        _variables = _variables.Add(new BoundContractVariable(
+        _variables.Add(new BoundContractVariable(
             null,
             BoundContractVariableRole.PreState,
             -1,
@@ -418,6 +416,6 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
 
     internal ImmutableArray<BoundContractVariable> ToBoundVariables()
     {
-        return [.. _variables];
+        return _variables.ToImmutable();
     }
 }

@@ -346,7 +346,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             { throw new RegionIncompleteException(); }
             var marker = _builder.Assign(block, site, _context.Temporary(_context.Factory.BooleanType, name),
                 _context.Factory.Binary(IrBinaryOperator.AndAlso, safe, value));
-            _callPreconditions.Add(marker, new(identity, ordinal, clause.ClauseSite, value, safe, clause));
+            _callPreconditions = _callPreconditions.AddUnique(marker, new(identity, ordinal, clause.ClauseSite, value, safe, clause));
         }
     }
 }

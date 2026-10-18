@@ -179,7 +179,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         paired = [];
         if (clauses.IsDefault || evidence.IsDefault || clauses.Length != evidence.Length || clauses.Length > 1024)
         { return false; }
-        var consumed = new HashSet<int>();
+        var consumed = ImmutableHashSet.CreateBuilder<int>();
         var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
         foreach (var clause in clauses)
         {
@@ -190,7 +190,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             var matches = evidence.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParameterOrdinal == clause.ParameterOrdinal &&
                 row.AttributeIdentity == attributeIdentity && row.ConstructorIdentity == constructorIdentity &&
                 row.Kind == kind && row.Minimum == clause.Validation.Minimum && row.Maximum == clause.Validation.Maximum))
-                .Take(2).ToArray();
+                .Take(2).ToImmutableArray();
             if (matches.Length != 1 || !consumed.Add(matches[0].AttributeToken))
             { return false; }
             result.Add(matches[0].WithClauseOrdinal(result.Count));
@@ -367,7 +367,7 @@ internal static class CompilerScalarIlDecoder
         ImmutableArray<TotalIlInstruction>.Builder decoded)
     {
         decoded = RepositoryParameterGuard.NotNull(decoded, nameof(decoded));
-        var offsets = decoded.Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Offset, index))).ToDictionary(item => item.Offset, item => item.index);
+        var offsets = ImmutableDictionaryCapture.Create(decoded.Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Offset, index))), item => item.Offset, item => item.index);
         for (var index = 0; index < decoded.Count; index++)
         {
             var instruction = decoded[index];

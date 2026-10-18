@@ -11,12 +11,12 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     private readonly TotalLoweringContext _context = context ?? throw new System.ArgumentNullException(nameof(context));
     private readonly CSharpInvocationEmissionPolicy? _emission = emission;
     private readonly Compilation? _emissionCompilation = emissionCompilation;
-    private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = [];
-    private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedPlans = [];
-    private readonly HashSet<BasicBlock> _compilerRestoredBlocks = [];
-    private readonly HashSet<BasicBlock> _regionSpecificationConditionals = [];
-    private readonly Queue<BasicBlock> _compilerRestorePending = [];
-    private Dictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>? _compilerOwnerBlocks;
+    private ImmutableDictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = ImmutableDictionary<BasicBlock, BasicBlock>.Empty;
+    private ImmutableDictionary<BasicBlock, BasicBlock> _compilerElidedPlans = ImmutableDictionary<BasicBlock, BasicBlock>.Empty;
+    private ImmutableHashSet<BasicBlock> _compilerRestoredBlocks = ImmutableHashSet<BasicBlock>.Empty;
+    private ImmutableHashSet<BasicBlock> _regionSpecificationConditionals = ImmutableHashSet<BasicBlock>.Empty;
+    private ImmutableQueue<BasicBlock> _compilerRestorePending = ImmutableQueue<BasicBlock>.Empty;
+    private ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>? _compilerOwnerBlocks;
 
     internal TotalLoweringContext.ExactSpecificationContinuation RegionSpecificationContinuation(BasicBlock source)
     {
@@ -41,15 +41,16 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         if (_compilerElidedPlans.ContainsKey(source) || source.BranchValue is not { } value)
         { return; }
         if (_context.IsSpecificationOperation(value) && source.ConditionKind != ControlFlowConditionKind.None)
-        { _regionSpecificationConditionals.Add(source); return; }
+        { _regionSpecificationConditionals = _regionSpecificationConditionals.Add(source); return; }
         if (!IsElidedSpecificationPart(value) || source.FallThroughSuccessor?.Destination == null)
         { return; }
         if (_compilerElidedContinuations.TryGetValue(source, out var cached))
         {
-            _compilerElidedPlans.Add(source, cached);
+            _compilerElidedPlans = _compilerElidedPlans.AddUnique(source, cached);
             return;
         }
-        _compilerElidedPlans.Add(source, RequireCompilerContinuation(source));
+        var continuation = RequireCompilerContinuation(source);
+        _compilerElidedPlans = _compilerElidedPlans.AddUnique(source, continuation);
     }
 
     // Validate a proposed compiler continuation and own its rejection action.
@@ -62,10 +63,10 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         return continuation;
     }
 
-    internal bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
+    internal bool TryRecoverCompilerElidedOwner(BasicBlock source, ImmutableArray<BasicBlock> omitted,
         out BasicBlock continuation)
     {
-        omitted = RepositoryParameterGuard.NotNull(omitted, nameof(omitted));
+        RepositoryParameterGuard.RequireInitialized(omitted.IsDefault, nameof(omitted), "Array must be initialized.");
         SpendRegion();
         continuation = null!;
         var value = source.BranchValue!;
@@ -117,7 +118,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     {
         if (_compilerOwnerBlocks != null)
         { return; }
-        _compilerOwnerBlocks = [];
+        _compilerOwnerBlocks = ImmutableDictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>.Empty;
         foreach (var block in _regionGraph.Blocks)
         {
             SpendRegion();
@@ -130,7 +131,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
                 { continue; }
                 var syntax = invocation.Syntax;
                 var key = (syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length);
-                _compilerOwnerBlocks[key] = _compilerOwnerBlocks.ContainsKey(key) ? (null, 0) : (block, ordinal);
+                _compilerOwnerBlocks = _compilerOwnerBlocks.SetItem(key, _compilerOwnerBlocks.ContainsKey(key) ? (null, 0) : (block, ordinal));
             }
         }
     }
@@ -149,17 +150,19 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     private void RestoreCompilerBlock(BasicBlock block)
     {
         block = RepositoryParameterGuard.NotNull(block, nameof(block));
-        if (!block.IsReachable && _compilerRestoredBlocks.Add(block))
-        { _compilerRestorePending.Enqueue(block); }
+        if (block.IsReachable || _compilerRestoredBlocks.Contains(block))
+        { return; }
+        _compilerRestoredBlocks = _compilerRestoredBlocks.Add(block);
+        _compilerRestorePending = _compilerRestorePending.Enqueue(block);
     }
 
-    internal void RestoreCompilerElidedReachability(HashSet<ControlFlowRegion> filterRegions)
+    internal void RestoreCompilerElidedReachability(ImmutableHashSet<ControlFlowRegion> filterRegions)
     {
         filterRegions = RepositoryParameterGuard.NotNull(filterRegions, nameof(filterRegions));
-        while (_compilerRestorePending.Count != 0)
+        while (!_compilerRestorePending.IsEmpty)
         {
             SpendRegion();
-            var source = _compilerRestorePending.Dequeue();
+            _compilerRestorePending = _compilerRestorePending.Dequeue(out var source);
             if (!filterRegions.Contains(source.EnclosingRegion))
             { PlanCompilerElidedTerminator(source); }
             if (_compilerElidedPlans.TryGetValue(source, out var plan))
@@ -244,26 +247,28 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     internal bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation, out int traversalWork,
         bool requireSameRegion = false, bool compilerMode = false)
     {
-        var compilerContinuations = compilerMode ? _compilerElidedContinuations : null;
         traversalWork = 0;
         // Short-circuit operands of a compiler-elided contract can have two
         // CFG successors. Both must reach the same owning call (or first
         // runtime block) without executing any non-elided operation.
         continuation = null!;
-        var pending = new Stack<BasicBlock>();
-        var visited = new HashSet<BasicBlock>();
-        var stops = new HashSet<BasicBlock>();
+        var pending = ImmutableStack<BasicBlock>.Empty;
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        var visitedOrder = ImmutableArray.CreateBuilder<BasicBlock>();
+        var stops = new OrderedStops();
         if (source.FallThroughSuccessor?.Destination == null || source.ConditionalSuccessor?.Destination == null ||
-            !EnqueueElidedEdge(source.FallThroughSuccessor, pending) || !EnqueueElidedEdge(source.ConditionalSuccessor, pending))
+            !EnqueueElidedEdge(source.FallThroughSuccessor, ref pending) || !EnqueueElidedEdge(source.ConditionalSuccessor, ref pending))
         { return false; }
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             SpendRegion();
             traversalWork++;
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (!visited.Add(current))
             { continue; }
-            if (compilerContinuations != null && compilerContinuations.TryGetValue(current, out var cached))
+            visitedOrder.Add(current);
+            if (compilerMode && _compilerElidedContinuations.TryGetValue(current, out var cached))
             {
                 stops.Add(cached);
                 if (stops.Count > 1 && !TryMergeCompilerElidedStops(stops))
@@ -278,7 +283,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
             {
                 var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                 if (_context.IsExcludedSpecificationCall(expression) ||
-                    expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: compilerContinuations != null) == true ||
+                    expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: compilerMode) == true ||
                     !IsElidedSpecificationPart(expression))
                 {
                     stop = true;
@@ -296,39 +301,39 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
             if (stop || !hasElidedPart)
             {
                 stops.Add(current);
-                if (stops.Count > 1 && (compilerContinuations == null || !TryMergeCompilerElidedStops(stops)))
+                if (stops.Count > 1 && (!compilerMode || !TryMergeCompilerElidedStops(stops)))
                 { return false; }
                 continue;
             }
             // Compiler-omitted throw arms have no runtime successor. Their
             // other omitted arms must still identify one continuation.
-            if (compilerContinuations != null && IsCompilerElidedThrow(current) &&
+            if (compilerMode && IsCompilerElidedThrow(current) &&
                 current.FallThroughSuccessor is { Destination: null } thrown && thrown.FinallyRegions.IsEmpty)
             { continue; }
-            if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
+            if (!EnqueueElidedEdge(current.FallThroughSuccessor, ref pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, ref pending))
             { return false; }
         }
-        if (stops.Count == 0 && compilerContinuations != null && _regionGraph != null &&
-            TryRecoverCompilerElidedOwner(source, visited, out var owner))
+        if (stops.Count == 0 && compilerMode && _regionGraph != null &&
+            TryRecoverCompilerElidedOwner(source, visitedOrder.ToImmutable(), out var owner))
         { stops.Add(owner); }
         if (stops.Count != 1)
         { return false; }
         continuation = stops.Single();
-        if (compilerContinuations != null)
+        if (compilerMode)
         {
-            compilerContinuations[source] = continuation;
-            foreach (var current in visited)
+            _compilerElidedContinuations = _compilerElidedContinuations.SetItem(source, continuation);
+            foreach (var current in visitedOrder)
             {
                 // A terminal arm alone cannot establish a continuation. Do
                 // not let a later scan mistake it for a converging path.
                 if (!stops.Contains(current) && current.FallThroughSuccessor?.Semantics != ControlFlowBranchSemantics.Throw)
-                { compilerContinuations[current] = continuation; }
+                { _compilerElidedContinuations = _compilerElidedContinuations.SetItem(current, continuation); }
             }
         }
         return true;
     }
 
-    private bool TryMergeCompilerElidedStops(HashSet<BasicBlock> stops)
+    private bool TryMergeCompilerElidedStops(OrderedStops stops)
     {
         // Only repair a previously rejected pair: an entirely omitted call
         // block can fall directly into the other stop without executing it.
@@ -357,15 +362,15 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         return redundant != null && stops.Remove(redundant);
     }
 
-    private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
+    private static bool EnqueueElidedEdge(ControlFlowBranch? edge, ref ImmutableStack<BasicBlock> pending)
     {
-        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
+        RepositoryParameterGuard.NotNull(pending, nameof(pending));
         if (edge == null)
         { return true; }
         if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
             !edge.FinallyRegions.IsEmpty || edge.Destination == null)
         { return false; }
-        pending.Push(edge.Destination);
+        pending = pending.Push(edge.Destination);
         return true;
     }
 
@@ -383,6 +388,60 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     {
         block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return _compilerElidedPlans.TryGetValue(block, out target!);
+    }
+    // Continuation repair chooses the first eligible stop. Preserve the old
+    // set's slot order, including reuse of removed slots, with scoped builders.
+    internal sealed class OrderedStops : IEnumerable<BasicBlock>
+    {
+        private readonly ImmutableHashSet<BasicBlock>.Builder _members = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        private readonly ImmutableArray<BasicBlock?>.Builder _slots = ImmutableArray.CreateBuilder<BasicBlock?>();
+        private ImmutableStack<int> _freeSlots = ImmutableStack<int>.Empty;
+
+        internal int Count => _members.Count;
+
+        internal bool Contains(BasicBlock block)
+        {
+            block = RepositoryParameterGuard.NotNull(block, nameof(block));
+            return _members.Contains(block);
+        }
+
+        internal bool Add(BasicBlock block)
+        {
+            block = RepositoryParameterGuard.NotNull(block, nameof(block));
+            if (!_members.Add(block))
+            { return false; }
+            if (_freeSlots.IsEmpty)
+            { _slots.Add(block); }
+            else
+            {
+                var slot = _freeSlots.Peek();
+                _freeSlots = _freeSlots.Pop();
+                _slots[slot] = block;
+            }
+            return true;
+        }
+
+        internal bool Remove(BasicBlock block)
+        {
+            block = RepositoryParameterGuard.NotNull(block, nameof(block));
+            if (!_members.Remove(block))
+            { return false; }
+            var slot = _slots.IndexOf(block);
+            _slots[slot] = null;
+            _freeSlots = _freeSlots.Push(slot);
+            return true;
+        }
+
+        public IEnumerator<BasicBlock> GetEnumerator()
+        {
+            foreach (var block in _slots)
+            {
+                if (block != null)
+                { yield return block; }
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { return GetEnumerator(); }
     }
     private void SpendRegion()
     { _work.Spend(); }

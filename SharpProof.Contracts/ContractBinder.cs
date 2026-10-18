@@ -343,7 +343,7 @@ public sealed partial class ContractBinder
 
     private ContractBindingFailure BindClosedAttributes(
         IMethodSymbol target,
-        ContractCanonicalVariables variables,
+        ContractCanonicalVariableBuilder variables,
         bool requiresOnly,
         Action<BoundContractClause> clauses)
     {

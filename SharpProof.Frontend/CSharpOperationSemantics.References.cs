@@ -173,7 +173,7 @@ internal static partial class CSharpOperationSemantics
                 csharp.ClassifyConversion(operandType, testedType) is { IsImplicit: true, IsBoxing: true })
         { return true; }
         var remainingWork = 4096;
-        var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+        var visited = ImmutableDictionary.CreateBuilder<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool ContainsOpenType(ITypeSymbol current, int depth)
         {
             spend?.Invoke();

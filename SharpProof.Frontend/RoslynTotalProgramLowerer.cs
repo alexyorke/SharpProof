@@ -10,15 +10,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private readonly ImmutableArray<TotalShadowCallHop> _shadowAncestry = shadowAncestry.IsDefault ? [] : shadowAncestry;
     private readonly bool _captureShadowCallAncestry = captureShadowCallAncestry ?? context.CaptureShadowCallAncestry;
     private IrProgramBuilder _builder = new(context.Factory);
-    private readonly List<FrontendProgramAbstention> _abstentions = [];
-    private readonly Dictionary<BasicBlock, IrBlockId> _blocks = [];
+    private readonly ImmutableArray<FrontendProgramAbstention>.Builder _abstentions = ImmutableArray.CreateBuilder<FrontendProgramAbstention>();
+    private ImmutableDictionary<BasicBlock, IrBlockId> _blocks = ImmutableDictionary<BasicBlock, IrBlockId>.Empty;
     private RoslynTotalExpressionLowerer _expressions = null!;
     private readonly CancellationToken _cancellationToken = cancellationToken;
     private readonly TotalSourceCallSession? _calls = calls;
     private readonly bool _externalFilterSearch = externalFilterSearch;
     private readonly Func<IMethodSymbol, bool>? _preserveSourceCall = preserveSourceCall;
-    private readonly Dictionary<IrCallInstruction, IMethodSymbol> _preservedSourceCalls = [];
-    private readonly Dictionary<IrAssignInstruction, TotalCallPrecondition> _callPreconditions = [];
+    private ImmutableDictionary<IrCallInstruction, IMethodSymbol> _preservedSourceCalls = ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
+    private ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> _callPreconditions = ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Empty;
     private SourceCallFrame? _frame;
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
@@ -104,7 +104,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in selected)
         {
-            _blocks.Add(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            _blocks = _blocks.AddUnique(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
         }
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _ordinaryExceptionalExit = exceptionalExit;
@@ -209,23 +209,24 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToArray();
+        var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToImmutableArray();
         if (bindings.Length == 0)
         { return; }
-        var owned = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
+        var owned = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(graph.Root);
+        while (!pending.IsEmpty)
         {
             SpendRegion();
-            var region = pending.Pop();
+            var region = pending.Peek();
+            pending = pending.Pop();
             foreach (var local in region.Locals)
             {
                 SpendRegion();
                 owned.Add(local);
             }
             foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
+            { pending = pending.Push(nested); }
         }
         foreach (var binding in bindings)
         {
@@ -243,11 +244,12 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private bool HasOwnIteratorBody(IOperation root)
     {
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        var pending = new Stack<IOperation>();
-        pending.Push(root);
-        while (pending.Count > 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var operation = pending.Pop();
+            var operation = pending.Peek();
+            pending = pending.Pop();
             _cancellationToken.ThrowIfCancellationRequested();
             if (operation != root &&
                 (operation is ILocalFunctionOperation or IAnonymousFunctionOperation))
@@ -256,7 +258,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { return true; }
             foreach (var child in operation.ChildOperations)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
         return false;
@@ -451,34 +453,35 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             instructions += block.Instructions.Length;
         }
         return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
-            _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
+            _context.Variables, _context.Captures, _abstentions.ToImmutable(), _context.Origin)
         {
             SourceInitializationEffectsComplete = _calls?.SourceInitializationEffectsComplete ?? true,
             IsShadowCallSkeleton = _preserveSourceCall != null,
-            PreservedSourceCalls = _preservedSourceCalls.ToImmutableDictionary(),
-            CallPreconditions = _callPreconditions.ToImmutableDictionary()
+            PreservedSourceCalls = _preservedSourceCalls,
+            CallPreconditions = _callPreconditions
         };
     }
 
     private bool HasUnsupportedRegion(ControlFlowRegion region)
     {
         region = RepositoryParameterGuard.NotNull(region, nameof(region));
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(region);
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(region);
         var remaining = MaximumRegionSteps;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             _cancellationToken.ThrowIfCancellationRequested();
             if (_calls != null)
             { SpendRegion(); }
             if (--remaining < 0)
             { return true; }
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime))
             { return true; }
             foreach (var child in current.NestedRegions)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
         return false;
@@ -487,16 +490,17 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
     {
         entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
-        var visited = new HashSet<BasicBlock>();
-        var active = new HashSet<BasicBlock>();
-        var order = new List<BasicBlock>();
-        var pending = new Stack<(BasicBlock Block, bool Exit)>();
-        pending.Push((entry, false));
+        var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        var active = ImmutableHashSet.CreateBuilder<BasicBlock>();
+        var order = ImmutableArray.CreateBuilder<BasicBlock>();
+        var pending = ImmutableStack<(BasicBlock Block, bool Exit)>.Empty;
+        pending = pending.Push((entry, false));
         selected = default;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
             SpendRegion();
-            var (block, exit) = pending.Pop();
+            var (block, exit) = pending.Peek();
+            pending = pending.Pop();
             if (exit)
             {
                 active.Remove(block);
@@ -510,20 +514,19 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (!visited.Add(block))
             { continue; }
             active.Add(block);
-            pending.Push((block, true));
+            pending = pending.Push((block, true));
             // LIFO reproduces the old fall-through-then-conditional DFS order.
-            foreach (var branch in new[] { block.ConditionalSuccessor, block.FallThroughSuccessor })
+            foreach (var branch in ImmutableArray.Create(block.ConditionalSuccessor, block.FallThroughSuccessor))
             {
                 if (branch == null)
                 { continue; }
                 if (!branch.FinallyRegions.IsEmpty || branch.Semantics is not (ControlFlowBranchSemantics.Regular or ControlFlowBranchSemantics.Return))
                 { return false; }
                 if (branch.Destination is { } destination)
-                { pending.Push((destination, false)); }
+                { pending = pending.Push((destination, false)); }
             }
         }
-        order.Reverse();
-        selected = [.. order];
+        selected = order.ToImmutable().Reverse().ToImmutableArray();
         return true;
     }
 }

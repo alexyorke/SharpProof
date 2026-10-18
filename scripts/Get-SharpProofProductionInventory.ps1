@@ -134,9 +134,9 @@ function Get-MsBuildQueries {
             throw "Production inventory SDK host input is missing: '$required'."
         }
     }
-    $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
-            Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
-    if ($references.Count -eq 0) {
+    $references = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
+                Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName }))
+    if ($references.Length -eq 0) {
         throw 'Production inventory SDK reference pack is empty.'
     }
     $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -144,30 +144,37 @@ function Get-MsBuildQueries {
     [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
     try {
         $hostPath = Join-Path $temporaryPath 'SharpProof.ProductionMsBuildHost.dll'
-        $compilerArguments = @($compilerPath, '-nologo', '-noconfig', '-nostdlib+',
-            '-target:exe', ('-out:' + $hostPath)) + $references + @($sourcePath)
-        $compilerArguments += (Join-Path $PSScriptRoot '../eng/logging/RepositoryLogger.cs')
-        $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
+        $compilerArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        [void]$compilerArguments.AddRange([string[]]@($compilerPath, '-nologo', '-noconfig', '-nostdlib+',
+                '-target:exe', ('-out:' + $hostPath)))
+        foreach ($reference in $references) { [void]$compilerArguments.Add($reference) }
+        [void]$compilerArguments.Add($sourcePath)
+        [void]$compilerArguments.Add((Join-Path $PSScriptRoot '../eng/logging/RepositoryLogger.cs'))
+        $nativeCompilerArguments = @($compilerArguments.ToImmutable())
+        $compilerOutput = @(& $dotnetPath @nativeCompilerArguments 2>&1)
         if ($LASTEXITCODE -ne 0) {
             throw ('Production inventory SDK host compilation failed: ' +
                 ($compilerOutput -join [Environment]::NewLine))
         }
-        $queries = foreach ($projectRelativePath in $ProjectRelativePaths) {
+        $queries = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        foreach ($projectRelativePath in $ProjectRelativePaths) {
             $projectPath = Join-Path $resolvedRepositoryRoot (
                 $projectRelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
-            [pscustomobject][ordered]@{
-                projectRelativePath = $projectRelativePath
-                projectPath         = $projectPath
-                arguments           = @($projectPath, '-nologo', "-p:Configuration=$Configuration",
+            $queryArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    $projectPath, '-nologo', "-p:Configuration=$Configuration",
                     '-p:DesignTimeBuild=false',
                     '-getProperty:MSBuildProjectName,SharpProofProductionProject,AssemblyName,TargetFramework,TargetPath,LangVersion,DefineConstants,Nullable,ImplicitUsings,AllowUnsafeBlocks,DebugType,EnableDefaultCompileItems',
-                    '-getItem:Compile,Analyzer,AdditionalFiles')
-            }
+                    '-getItem:Compile,Analyzer,AdditionalFiles'))
+            [void]$queries.Add([pscustomobject][ordered]@{
+                    projectRelativePath = $projectRelativePath
+                    projectPath         = $projectPath
+                    arguments           = $queryArguments
+                })
         }
         $requestPath = Join-Path $temporaryPath 'request.json'
         $responsePath = Join-Path $temporaryPath 'response.json'
         [IO.File]::WriteAllText($requestPath, ([pscustomobject]@{
-                    sdkPath = $sdkPath; dotnetPath = $dotnetPath; queries = @($queries)
+                    sdkPath = $sdkPath; dotnetPath = $dotnetPath; queries = $queries.ToImmutable()
                 } | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
         $hostOutput = @(& $dotnetPath exec --runtimeconfig $runtimeConfigPath `
                 $hostPath $requestPath $responsePath 2>&1)
@@ -176,8 +183,8 @@ function Get-MsBuildQueries {
                 ($hostOutput -join [Environment]::NewLine))
         }
         $response = Get-Content -LiteralPath $responsePath -Raw | ConvertFrom-Json
-        $results = @($response.queries)
-        if ($results.Count -ne $ProjectRelativePaths.Count) {
+        $results = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($response.queries))
+        if ($results.Length -ne $ProjectRelativePaths.Count) {
             throw 'Production inventory MSBuild evaluation returned an incomplete query set.'
         }
         return @($results | Sort-Object projectRelativePath)
@@ -198,7 +205,7 @@ function Get-ItemPath {
 }
 
 function Get-GeneratorSourceRecords {
-    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $paths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
     $scriptDirectory = Join-Path $resolvedRepositoryRoot 'scripts'
     foreach ($file in @(Get-ChildItem -LiteralPath $scriptDirectory -Filter 'Generate-*.ps1' -File -ErrorAction Stop)) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
     foreach ($file in @(Get-ChildItem -LiteralPath $resolvedRepositoryRoot -Filter '*.catalog.json' -File -ErrorAction Stop)) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
@@ -215,7 +222,7 @@ function Get-SolutionProjectPaths {
     catch {
         throw "SharpProof.slnx is not valid XML: $($_.Exception.Message)"
     }
-    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $paths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
     foreach ($project in @($solution.SelectNodes('/Solution//Project'))) {
         $pathAttribute = $project.Attributes['Path']
         if ($null -eq $pathAttribute -or
@@ -305,7 +312,7 @@ function Test-CompilerGeneratedMethod {
 }
 
 function Get-PortablePdbModule {
-    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths, [Parameter(Mandatory = $true)] [ref]$SequencePointCount)
+    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.IReadOnlySet[string]]$CompilePaths, [Parameter(Mandatory = $true)] [ref]$SequencePointCount)
     if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) { throw "Production inventory assembly is missing: '$AssemblyPath'." }
     if (-not (Test-Path -LiteralPath $PdbPath -PathType Leaf)) { throw "Production inventory PDB is missing: '$PdbPath'." }
     $assemblyStream = [IO.File]::OpenRead($AssemblyPath)
@@ -320,14 +327,14 @@ function Get-PortablePdbModule {
         $assembly = $metadata.GetAssemblyDefinition()
         $assemblyName = $metadata.GetString($assembly.Name)
         $mvid = Get-SharpProofMetadataModuleVersionId -Reader $metadata
-        $codeViewEntries = @($peReader.ReadDebugDirectory() | Where-Object { $_.Type -eq [System.Reflection.PortableExecutable.DebugDirectoryEntryType]::CodeView })
-        if ($codeViewEntries.Count -ne 1 -or -not $codeViewEntries[0].IsPortableCodeView) { throw "Production inventory assembly must contain exactly one portable CodeView entry: '$AssemblyPath'." }
+        $codeViewEntries = [Collections.Immutable.ImmutableArray]::CreateRange[Reflection.PortableExecutable.DebugDirectoryEntry]([Reflection.PortableExecutable.DebugDirectoryEntry[]]@($peReader.ReadDebugDirectory() | Where-Object { $_.Type -eq [System.Reflection.PortableExecutable.DebugDirectoryEntryType]::CodeView }))
+        if ($codeViewEntries.Length -ne 1 -or -not $codeViewEntries[0].IsPortableCodeView) { throw "Production inventory assembly must contain exactly one portable CodeView entry: '$AssemblyPath'." }
         $codeView = $peReader.ReadCodeViewDebugDirectoryData($codeViewEntries[0])
         $pdbStream = [IO.File]::OpenRead($PdbPath)
         $pdbProvider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($pdbStream)
         $pdb = $pdbProvider.GetMetadataReader()
-        $documentStates = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-        $documentPaths = [Collections.Generic.Dictionary[System.Reflection.Metadata.DocumentHandle, string]]::new()
+        $documentStates = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder()
+        $documentPaths = [Collections.Immutable.ImmutableDictionary[System.Reflection.Metadata.DocumentHandle, string]]::Empty.ToBuilder()
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
             $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
                 [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber(
@@ -359,42 +366,41 @@ function Get-PortablePdbModule {
                 $sourceHashAlgorithm = $pdb.GetGuid($pdbDocument.HashAlgorithm).ToString('D')
                 $sourceHash = [Convert]::ToHexString($pdb.GetBlobBytes($pdbDocument.Hash)).ToLowerInvariant()
                 if (-not $documentStates.TryGetValue($relativePath, [ref]$documentState)) {
-                    $documentState = [pscustomobject]@{
-                        SequencePoints      = [Collections.Generic.HashSet[int]]::new()
-                        SequencePointRanges = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-                        SourceHashAlgorithm = $sourceHashAlgorithm
-                        SourceHash          = $sourceHash
-                    }
+                    $documentState = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder()
+                    [void]$documentState.Add('SequencePoints', [Collections.Immutable.ImmutableHashSet[int]]::Empty.ToBuilder())
+                    [void]$documentState.Add('SequencePointRanges', [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::Ordinal).ToBuilder())
+                    [void]$documentState.Add('SourceHashAlgorithm', $sourceHashAlgorithm)
+                    [void]$documentState.Add('SourceHash', $sourceHash)
                     $documentStates.Add($relativePath, $documentState)
                 }
-                elseif ($documentState.SourceHashAlgorithm -cne $sourceHashAlgorithm -or
-                    $documentState.SourceHash -cne $sourceHash) {
+                elseif ($documentState['SourceHashAlgorithm'] -cne $sourceHashAlgorithm -or
+                    $documentState['SourceHash'] -cne $sourceHash) {
                     # Conflicting PDB documents for one physical source cannot
                     # authorize declaration omission. Preserve ordinary ranges.
-                    $documentState.SourceHashAlgorithm = ''
-                    $documentState.SourceHash = ''
+                    $documentState['SourceHashAlgorithm'] = ''
+                    $documentState['SourceHash'] = ''
                 }
                 if (-not $isCompilerGenerated -and
-                    $documentState.SequencePoints.Add($point.StartLine)) {
+                    $documentState['SequencePoints'].Add($point.StartLine)) {
                     $SequencePointCount.Value++
                 }
                 $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
-                if (-not $documentState.SequencePointRanges.ContainsKey($rangeKey)) {
-                    $documentState.SequencePointRanges[$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
+                if (-not $documentState['SequencePointRanges'].ContainsKey($rangeKey)) {
+                    $documentState['SequencePointRanges'][$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
                 }
             }
         }
         if ($SequencePointCount.Value -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
-        $documents = foreach ($path in @($documentStates.Keys | Sort-Object)) {
-            $documentState = $documentStates[$path]
-            [pscustomobject][ordered]@{
-                path                = $path
-                sourceHashAlgorithm = $documentState.SourceHashAlgorithm
-                sourceHash          = $documentState.SourceHash
-                sequencePoints      = @($documentState.SequencePoints | Sort-Object)
-                sequencePointRanges = @($documentState.SequencePointRanges.Values | Sort-Object startLine, endLine)
-            }
-        }
+        $documents = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(foreach ($path in @($documentStates.Keys | Sort-Object)) {
+                    $documentState = $documentStates[$path]
+                    [pscustomobject][ordered]@{
+                        path                = $path
+                        sourceHashAlgorithm = $documentState['SourceHashAlgorithm']
+                        sourceHash          = $documentState['SourceHash']
+                        sequencePoints      = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]@($documentState['SequencePoints'].ToImmutable() | Sort-Object))
+                        sequencePointRanges = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($documentState['SequencePointRanges'].ToImmutable().Values | Sort-Object startLine, endLine))
+                    }
+                }))
         return [pscustomobject][ordered]@{
             project         = $ProjectName
             assemblyName    = $assemblyName
@@ -402,7 +408,7 @@ function Get-PortablePdbModule {
             moduleMvid      = $mvid
             pdbPath         = Resolve-RepositoryPath -Candidate $PdbPath -Description 'PDB'
             pdbCodeViewGuid = $codeView.Guid.ToString('D')
-            documents       = @($documents)
+            documents       = $documents
         }
     }
     finally {
@@ -421,12 +427,11 @@ $commit = Invoke-SharpProofGitText `
     -MergeErrorOutput `
     -TrimOutput
 if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Production inventory commit is not an exact SHA-1: '$commit'." }
-$generatorSourceRecords = Get-GeneratorSourceRecords
-$projects = [Collections.Generic.List[object]]::new()
-$compileUnion = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-$seenProjectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-$analyzerRecords = [Collections.Generic.List[object]]::new()
-$additionalFileRecords = [Collections.Generic.List[object]]::new()
+$generatorSourceRecords = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(Get-GeneratorSourceRecords))
+$projects = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$seenProjectNames = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
+$analyzerRecords = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$additionalFileRecords = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
 foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProjectPaths)) {
     $projectRelativePath = [string]$result.projectRelativePath
@@ -445,23 +450,22 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     if ($production -ne 'true') { continue }
     if (-not $seenProjectNames.Add($projectName)) { throw "Production inventory has duplicate project '$projectName'." }
     $projectDirectory = Split-Path -Parent $projectPath
-    $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $compilePaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
     foreach ($item in @($query.Items.Compile)) {
         $path = Get-ItemPath -Item $item -ProjectDirectory $projectDirectory
         if (-not $compilePaths.Add($path)) { throw "Production inventory Compile item is duplicated: '$path'." }
-        [void]$compileUnion.Add($path)
     }
     if ($compilePaths.Count -eq 0) { throw "Production inventory project has no evaluated Compile items: '$projectName'." }
-    $compileRecords = foreach ($path in @($compilePaths | Sort-Object)) {
-        $fullPath = Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))
-        $source = Get-Content -LiteralPath $fullPath -Raw
-        $headerGenerated = $source -match '(?im)^\s*//\s*<auto-generated(?:\s*/>|>)'
-        $nameGenerated = $path -match '\.(g|generated)\.cs$'
-        $generated = $headerGenerated -or $nameGenerated
-        $reason = if ($generated) { 'generated-marker' } else { '' }
-        Get-CanonicalFileRecord -RelativePath $path -Generated $generated -GeneratedReason $reason
-    }
-    $constants = @((Get-PropertyValue -Properties $query.Properties -Name 'DefineConstants').Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $compileRecords = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(foreach ($path in @($compilePaths.ToImmutable() | Sort-Object)) {
+                $fullPath = Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))
+                $source = Get-Content -LiteralPath $fullPath -Raw
+                $headerGenerated = $source -match '(?im)^\s*//\s*<auto-generated(?:\s*/>|>)'
+                $nameGenerated = $path -match '\.(g|generated)\.cs$'
+                $generated = $headerGenerated -or $nameGenerated
+                $reason = if ($generated) { 'generated-marker' } else { '' }
+                Get-CanonicalFileRecord -RelativePath $path -Generated $generated -GeneratedReason $reason
+            }))
+    $constants = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@((Get-PropertyValue -Properties $query.Properties -Name 'DefineConstants').Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique))
     $projectRecord = [pscustomobject][ordered]@{
         name             = $projectName
         projectPath      = Resolve-RepositoryPath -Candidate $projectPath -Description 'project'
@@ -469,12 +473,12 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         targetFramework  = Get-PropertyValue -Properties $query.Properties -Name 'TargetFramework'
         parseOptions     = [pscustomobject][ordered]@{
             languageVersion     = Get-PropertyValue -Properties $query.Properties -Name 'LangVersion'
-            preprocessorSymbols = @($constants)
+            preprocessorSymbols = $constants
             nullable            = Get-PropertyValue -Properties $query.Properties -Name 'Nullable'
             implicitUsings      = Get-PropertyValue -Properties $query.Properties -Name 'ImplicitUsings'
             allowUnsafeBlocks   = Get-PropertyValue -Properties $query.Properties -Name 'AllowUnsafeBlocks'
         }
-        compile          = @($compileRecords)
+        compile          = $compileRecords
         generatorOptions = [pscustomobject][ordered]@{
             debugType                 = Get-PropertyValue -Properties $query.Properties -Name 'DebugType'
             enableDefaultCompileItems = Get-PropertyValue -Properties $query.Properties -Name 'EnableDefaultCompileItems'
@@ -513,25 +517,25 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path })
     }
 }
-$sortedProjects = @($projects | Sort-Object name)
+$sortedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($projects.ToImmutable() | Sort-Object name))
 $generatorInputs = [pscustomobject][ordered]@{
-    sourceScripts   = @($generatorSourceRecords)
-    analyzers       = @($analyzerRecords | Sort-Object project, identity, path)
-    additionalFiles = @($additionalFileRecords | Sort-Object project, path)
+    sourceScripts   = $generatorSourceRecords
+    analyzers       = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($analyzerRecords.ToImmutable() | Sort-Object project, identity, path))
+    additionalFiles = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($additionalFileRecords.ToImmutable() | Sort-Object project, path))
 }
-$modules = [Collections.Generic.List[object]]::new()
+$modules = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $sequencePointCount = 0
 if ($RequirePdb) {
     foreach ($project in $sortedProjects) {
         $targetPath = [string]$project.targetPath
         if ([string]::IsNullOrWhiteSpace($targetPath)) { throw "Production inventory project has no TargetPath: '$($project.name)'." }
         if (-not [IO.Path]::IsPathRooted($targetPath)) { $targetPath = Join-Path $resolvedRepositoryRoot $targetPath }
-        $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $compilePaths = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()
         foreach ($file in @($project.compile)) { [void]$compilePaths.Add([string]$file.path) }
-        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths -SequencePointCount ([ref]$sequencePointCount)))
+        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths.ToImmutable() -SequencePointCount ([ref]$sequencePointCount)))
     }
 }
-$sortedModules = @($modules | Sort-Object project)
+$sortedModules = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($modules.ToImmutable() | Sort-Object project))
 $authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
 $json = $authority | ConvertTo-Json -Depth 30
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { Write-Output $json } else {

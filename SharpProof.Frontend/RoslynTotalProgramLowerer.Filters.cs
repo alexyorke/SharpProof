@@ -10,10 +10,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         internal IrVarId Selector { get; } = (selector.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(selector)) : selector);
         internal IrBlockId Accepted { get; } = (accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(accepted)) : accepted);
         internal IrBlockId Rejected { get; } = (rejected.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(rejected)) : rejected);
-        internal List<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)> Transfers { get; } = [];
+        internal ImmutableArray<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)>.Builder Transfers { get; } = ImmutableArray.CreateBuilder<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)>();
     }
 
-    private readonly Dictionary<ControlFlowRegion, RegionFilter> _regionFilters = [];
+    private ImmutableDictionary<ControlFlowRegion, RegionFilter> _regionFilters = ImmutableDictionary<ControlFlowRegion, RegionFilter>.Empty;
 
     private RegionFilter? EnclosingRegionFilter(ControlFlowRegion source)
     {
@@ -62,8 +62,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         // Search all matching filters before leaving any try. Each selected
         // handler owns the precise prefix of finally regions being left.
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        var unwind = new List<ControlFlowRegion>();
-        var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
+        var unwind = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var candidates = ImmutableArray.CreateBuilder<(ControlFlowRegion Catch, RegionFilter? Filter, ImmutableArray<ControlFlowRegion> Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
         var complete = false;
         // Declaration ancestors beyond a nested CFG root are not caller frames.
@@ -92,7 +92,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ? _regionFilters[handler.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Filter))] : null;
                 foreach (var _ in unwind)
                 { SpendRegion(); }
-                candidates.Add((caught, filter, unwind.ToArray(), catches == null));
+                candidates.Add((caught, filter, unwind.ToImmutable(), catches == null));
                 if (filter == null && catches == true)
                 { complete = true; break; }
             }
@@ -103,7 +103,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // caller's captured lexical point with this immutable unwind prefix.
         foreach (var _ in unwind)
         { SpendRegion(); }
-        var escapingUnwind = unwind.ToArray();
+        var escapingUnwind = unwind.ToImmutable();
         var next = complete ? default : _frame != null
             ? _frame.Search(token.Kind, token.Site, target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (Unwind(escapingUnwind, target)))
             : Resume(Unwind(escapingUnwind, _regionExceptionalExit));
