@@ -1893,3 +1893,25 @@ Evidence: immutability-second-master-tests.log, immutability-second-master-liter
 immutability-second-master-inventory.log and immutability-second-master-whitespace.log.
 The main coordinator inspected both sides of each conflict and all auto-merged
 List/source-specialization changes. Status: resolved and verified; ready to push.
+## Analyzer and effect fixpoint construction inventory
+
+IMM-M026: EffectSummaryFixpoint.ComputeValidated/HasCycle owns body/edge/predecessor/
+summary maps, DFS/SCC lists and worklists. Coordinator inspected the full algorithm.
+Use immutable builders, explicit body encounter order, frozen adjacency and component
+arrays, immutable DFS stacks/FIFO queues and Ordinal identity sets. Preserve strict
+body duplicates, duplicate predecessor edges, sorted callee/component order, callback
+and cancellation ordering, and summary overwrites. CompilerExceptionTypeIdentity can
+append recursive generic-assembly identities to one scoped array builder and freeze;
+retain containing-type-before-argument order and ordinal hierarchy sorting. Reject the
+agent's unproven MoveToImmutable suggestion; use ToImmutable. Status: open before edits.
+
+IMM-M027: Coordinator inspected scoped rebinding in AnalyzerGeneratedCodePolicy scopes,
+OverridePreconditionDiagnostics substitutions, ContractForValidationEngine diagnostics/
+candidates/overlaps, AdvisoryRequiresDiagnostics report identities/variables/callee
+candidates, and AdvisoryEffectSites visited sets. Use builders with original comparers,
+preserve first-report/candidate/traversal ordering, and freeze before deferred LINQ or
+publication. Retain immutable traversal stacks and callback lifecycle. Status: open.
+
+The read-only conflict review also found no defect in pushed merge f0e3b6fc8;
+GitHub confirms its exact head is MERGEABLE. Campaign runtime verification uses a
+private clean clone of that exact commit, independently of subsequent edits.
