@@ -12,9 +12,9 @@ function Get-SharpProofPackageMethodsFromDiscovery {
     foreach ($className in $ClassNames) {
         $pattern = '^' + [regex]::Escape($className) + '\.(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|$)'
         [string[]]$methods = @($FullyQualifiedNames | ForEach-Object {
-            $match = [regex]::Match($_, $pattern)
-            if ($match.Success) { $match.Groups['method'].Value }
-        } | Sort-Object -Unique -CaseSensitive)
+                $match = [regex]::Match($_, $pattern)
+                if ($match.Success) { $match.Groups['method'].Value }
+            } | Sort-Object -Unique -CaseSensitive)
         if ($methods.Count -lt [int]$MinimumCounts[$className]) {
             throw ([string]$Descriptions[$className] + ' discovery returned only ' +
                 $methods.Count + ' test methods.')

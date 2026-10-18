@@ -7,7 +7,7 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
+if [[ "$(id -u)" = "0" ]] && id sharpproof > /dev/null 2>&1; then
   install -d -o sharpproof -g sharpproof \
     /home/sharpproof/.nuget \
     /home/sharpproof/.nuget/NuGet \
@@ -44,7 +44,7 @@ fi
 
 source_has_git=false
 if git_directory="$(git -c safe.directory="${repo_root}" -C "${repo_root}" \
-  rev-parse --absolute-git-dir 2>/dev/null)"; then
+  rev-parse --absolute-git-dir 2> /dev/null)"; then
   source_has_git=true
   git config --global --add safe.directory "${repo_root}"
   git config --global --add safe.directory "${git_directory}"
@@ -62,7 +62,7 @@ if [[ "${command_name}" = "doctor" ]]; then
 fi
 
 case "${command_name}" in
-  test|test-changed|semantic-tests|portable-tests|worker-tests|package-tests)
+  test | test-changed | semantic-tests | portable-tests | worker-tests | package-tests)
     golden_source_root="$(realpath -e "${SHARPPROOF_LOOP_SOURCE_ROOT:-${repo_root}}")"
     if [[ ! -f "${golden_source_root}/SharpProof.slnx" ||
       ! -f "${golden_source_root}/SharpProof.Release.props" ]]; then
@@ -78,7 +78,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly|fuzz-nightly|pack)
+    nightly | fuzz-nightly | pack)
       return 0
       ;;
     *)
@@ -92,7 +92,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    lint|quick|pr|security|pr-gates|test-changed|package-consumers|coverage|coverage-shard|coverage-gate)
+    lint | quick | pr | security | pr-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate)
       return 0
       ;;
     *)
@@ -139,7 +139,7 @@ mkdir -p "${repo_root}/artifacts"
 if [[ "${source_has_git}" = "true" ]]; then
   git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
   git config --global --add safe.directory "${task_root}"
-  source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
+  source_origin="$(git -C "${repo_root}" remote get-url origin 2> /dev/null || true)"
   if [[ -n "${source_origin}" ]]; then
     git -C "${task_root}" remote set-url origin "${source_origin}"
   fi

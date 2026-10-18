@@ -65,7 +65,7 @@ $$
     $powershell = Write-Probe 'invalid.ps1' '$PID = 1'
     Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
     $findings = @(Invoke-ScriptAnalyzer -Path $powershell -Settings (Join-Path $repositoryRoot 'eng/lint/PSScriptAnalyzerSettings.psd1'))
-    if (@($findings | Where-Object RuleName -eq 'PSAvoidAssignmentToAutomaticVariable').Count -eq 0) {
+    if (@($findings | Where-Object RuleName -EQ 'PSAvoidAssignmentToAutomaticVariable').Count -eq 0) {
         throw 'PSScriptAnalyzer accepted assignment to an automatic variable.'
     }
     Write-Host 'PSScriptAnalyzer rejects its negative fixture.'

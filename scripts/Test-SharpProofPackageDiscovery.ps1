@@ -7,9 +7,9 @@ $ErrorActionPreference = 'Stop'
 
 $className = 'Fixture.PackageTests'
 $arguments = @{
-    ClassNames = @($className)
+    ClassNames    = @($className)
     MinimumCounts = @{ $className = 1 }
-    Descriptions = @{ $className = 'Fixture' }
+    Descriptions  = @{ $className = 'Fixture' }
 }
 $methods = Get-SharpProofPackageMethodsFromDiscovery @arguments -FullyQualifiedNames @(
     'Fixture.PackageTests.First',

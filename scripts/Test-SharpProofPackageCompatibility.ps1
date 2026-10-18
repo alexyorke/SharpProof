@@ -32,9 +32,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the baseline source repository.' }
     Invoke-CompatibilityNative 'git' @('-C', $baselineRoot, 'remote', 'set-url', 'origin', $origin)
     foreach ($entry in @(
-        @{ root = $baselineRoot; output = (Join-Path $packageRoot 'baseline'); validation = 'false' },
-        @{ root = $repositoryRoot; output = (Join-Path $packageRoot 'current'); validation = 'true' }
-    )) {
+            @{ root = $baselineRoot; output = (Join-Path $packageRoot 'baseline'); validation = 'false' },
+            @{ root = $repositoryRoot; output = (Join-Path $packageRoot 'current'); validation = 'true' }
+        )) {
         Invoke-CompatibilityNative 'dotnet' @(
             'restore', (Join-Path $entry.root $project), '--locked-mode',
             '--configfile', (Join-Path $repositoryRoot 'NuGet.Config'))

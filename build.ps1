@@ -28,7 +28,7 @@ Set-StrictMode -Version Latest
 $repositoryRoot = (Resolve-Path $PSScriptRoot).Path
 Set-Location $repositoryRoot
 Import-Module (Join-Path `
-    $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') -Force
+        $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') -Force
 
 function Invoke-Docker([string[]]$Arguments) {
     Invoke-SharpProofCheckedCommand `
@@ -71,9 +71,9 @@ function Invoke-Container(
 }
 
 $forcedConfigurations = @{
-    quick = 'Debug'
-    pr = 'Release'
-    nightly = 'Release'
+    quick    = 'Debug'
+    pr       = 'Release'
+    nightly  = 'Release'
     security = 'Release'
 }
 if ($forcedConfigurations.ContainsKey($BuildProfile)) {
@@ -119,7 +119,7 @@ switch ($BuildProfile) {
             @('-Target', $Target)
         }
         elseif ($BuildProfile -ceq 'samples' -and
-                -not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            -not [string]::IsNullOrWhiteSpace($PackageSource)) {
             @('-PackageSource', $PackageSource)
         }
         else { @() }

@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$selectedCategory = $Category
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
@@ -24,8 +25,8 @@ function Invoke-LintNative([string]$Executable, [string[]]$Arguments) {
 }
 
 function Invoke-LintCheck([string]$Name, [scriptblock]$Check) {
-    if ($Category -ne 'All' -and $Category -ne $Name -and
-        -not ($Category -eq 'Workflows' -and $Name -eq 'WorkflowSecurity')) { return }
+    if ($selectedCategory -ne 'All' -and $selectedCategory -ne $Name -and
+        -not ($selectedCategory -eq 'Workflows' -and $Name -eq 'WorkflowSecurity')) { return }
     $passed = $true
     try {
         & { & $Check; Write-Output "$Name passed." } *>&1 |
@@ -48,8 +49,8 @@ Invoke-LintCheck 'PowerShell' {
     $paths = @($sourceFiles | Where-Object { $_ -match '\.ps[md]?1$' })
     if ($paths.Count -eq 0) { throw 'No PowerShell inputs found.' }
     $findings = @($paths | ForEach-Object {
-        Invoke-ScriptAnalyzer -Path $_ -Settings eng/lint/PSScriptAnalyzerSettings.psd1
-    })
+            Invoke-ScriptAnalyzer -Path $_ -Settings eng/lint/PSScriptAnalyzerSettings.psd1
+        })
     $findings | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $reportRoot 'powershell.json')
     if ($findings.Count -gt 0) {
         $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -Wrap
