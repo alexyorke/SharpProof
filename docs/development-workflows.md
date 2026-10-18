@@ -72,7 +72,7 @@ The changed-TCB percentage measures changed lines with an authenticated PDB span
 
 ## CI runner setup and telemetry
 
-Every container job builds the tooling image through [prepare-qualified-packages](../.github/actions/prepare-qualified-packages/action.yml). It restores image layers from the GitHub Actions cache (scope `sharpproof-tooling`) instead of pulling the pinned base images from MCR. Only default-branch runs write that cache; pull requests read it. The Dockerfile, base-image digests, and build arguments are unchanged, so a cache miss builds the same image from scratch.
+Every container job builds the tooling image through [prepare-qualified-packages](../.github/actions/prepare-qualified-packages/action.yml). It builds with a `docker-container` buildx builder that restores image layers from the GitHub Actions cache (scope `sharpproof-tooling`) instead of pulling the pinned base images from MCR. The repository allows only `actions/*` and owner actions, so the build is a plain `docker buildx build` step and `actions/github-script` exports the cache service variables BuildKit needs. Only default-branch runs write that cache; pull requests read it. The Dockerfile, base-image digests, and build arguments are unchanged, so a cache miss builds the same image from scratch.
 
 The same action starts a temporary [runner telemetry](../.github/actions/runner-telemetry/action.yml) sampler. Each job's last step stops it and adds host CPU, I/O wait, memory, swap, pressure-stall, and per-container peaks plus a per-minute timeline to the job summary. The raw samples are uploaded as `runner-telemetry-<job>-<attempt>`. It only observes the runner from outside the container and changes no limits. Remove it once runner sizing is settled.
 
