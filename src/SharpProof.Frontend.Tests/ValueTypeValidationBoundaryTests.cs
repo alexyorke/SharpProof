@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.CodeAnalysis.VisualBasic.Syntax;
 using NUnit.Framework;
@@ -83,6 +84,32 @@ public sealed class ValueTypeValidationBoundaryTests
         var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
             RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable)));
         Assert.That(rejection!.Reason, Is.EqualTo(FrontendAbstention.UnsupportedType));
+    }
+
+    [Test]
+    public void ProgramLoweringRetainsTypeRefusalForBoundErrorLocalStorage()
+    {
+        var compilation = CompileVisualBasic("Module Subject\n Sub F()\n Dim broken As Missing\n System.GC.KeepAlive(broken)\n End Sub\nEnd Module");
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : d.Severity == DiagnosticSeverity.Error)
+            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : d.Id), Is.EqualTo(VisualBasicError));
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
+        var graph = ControlFlowGraph.Create(method, model)!;
+        var target = (IMethodSymbol)model.GetDeclaredSymbol(method.SubOrFunctionStatement)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, target);
+        var local = Local(compilation, "broken");
+        Assert.That(local.Type.TypeKind, Is.EqualTo(TypeKind.Error));
+        // Retain an authentic compiler local already bound in the lowering
+        // context, so the whole-program route must refuse its default storage.
+        context.Variable(local);
+
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+
+        Assert.That(lowered.IsExact, Is.False);
+        Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
+        Assert.That(lowered.ConstructionLimitExceeded, Is.False);
     }
 
     [Test]
