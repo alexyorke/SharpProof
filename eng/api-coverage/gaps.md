@@ -71,13 +71,15 @@ static-cache/capability and fault uncertainty. Native replay observes only a fix
 set of real primitive CoreLib dictionary operations before choosing an already
 initialized normal path. Failed observations cannot certify that path.
 
-Local verification: 148 selected worker/artifact/replay controls, 477 IR tests,
-1,888 frontend tests, 356 SMT tests, 28 inventory/evidence tests and six ranking
-tests pass. A broader
-965-worker run passed before the final escape and malformed-key controls. The SDK,
-reference assembly bytes and catalog digest are unchanged. Exactly five evidence
-rows changed; four previously unmodeled declarations now have partial evidence.
-Trusted-code coverage and exact-head CI remain required before merge readiness.
+Verification on commit `a80a22ad2`: all 314 changed trusted-code lines are covered
+(100%, no uncovered lines), with comparison master `4d456246a`. The canonical
+container run passes 1,979 frontend tests, 998 selected worker tests, 477 IR tests,
+357 SMT tests, 56 verification tests, 28 inventory/evidence tests and six ranking
+tests. This filtered cohort certifies changed-code coverage; the full aggregate
+coverage and exact-head CI gates still determine merge readiness. No coverage
+floor changed. The SDK, reference assembly bytes and catalog digest are unchanged.
+Exactly five evidence rows changed; four previously unmodeled declarations now
+have partial evidence.
 
 Follow-up commit `5a794ca6c` closes alias escape propagation for this slice.
 Escape exclusions follow every alias definition and CFG capture/join through a
@@ -89,7 +91,7 @@ All 177 selected worker/loop/artifact/replay controls, eight keyed IR controls a
 the mathematical-integer-key SMT rejection test pass. Keyed loop cuts forget
 memory and replay preserves 32/64-bit keys. Framework observations that disagree
 with the expected state now decline replay authority instead of throwing.
-Fresh changed-trusted-code coverage and exact-head CI are still pending.
+Changed trusted-code coverage is verified above; exact-head CI remains pending.
 
 This closes a semantic slice, not the Dictionary work item or its corpus sites.
 The 40 ranked index reads span 13 source files. Representative declarations in
