@@ -38,8 +38,8 @@ internal static partial class CSharpOperationSemantics
 
 public sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _defaultDictionaries = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _defaultDictionaryCaptures = [];
+    private ImmutableHashSet<ISymbol> _defaultDictionaries = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
+    private ImmutableHashSet<CaptureId> _defaultDictionaryCaptures = ImmutableHashSet<CaptureId>.Empty;
 
     // The comparer is a constructor-established invariant. A dictionary-typed
     // incoming value, callback, ref escape or cyclic definition supplies no proof.

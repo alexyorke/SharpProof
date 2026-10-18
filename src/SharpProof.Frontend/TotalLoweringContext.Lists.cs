@@ -42,8 +42,8 @@ internal static partial class CSharpOperationSemantics
 
 public sealed partial class TotalLoweringContext
 {
-    private readonly HashSet<ISymbol> _freshLists = new(SymbolEqualityComparer.Default);
-    private readonly HashSet<CaptureId> _freshListCaptures = [];
+    private ImmutableHashSet<ISymbol> _freshLists = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
+    private ImmutableHashSet<CaptureId> _freshListCaptures = ImmutableHashSet<CaptureId>.Empty;
 
     internal void TrackFreshLists(ControlFlowGraph graph)
     { TrackFreshCollections(RepositoryParameterGuard.NotNull(graph, nameof(graph)), true); }

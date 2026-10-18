@@ -134,7 +134,7 @@ internal sealed class CompilerConfiguration
     {
         option = RepositoryParameterGuard.NotNull(option, nameof(option));
         options = RepositoryParameterGuard.NotNull(options, nameof(options));
-        var candidates = ImmutableList<(string Key, string Value)>.Empty;
+        var candidateBuffer = ImmutableArray.CreateBuilder<(string Key, string Value)>(3);
         foreach (var key in ImmutableArray.Create(
                      option.Key,
                      "build_property." + option.Key,
@@ -145,9 +145,10 @@ internal sealed class CompilerConfiguration
             {
                 continue;
             }
-            candidates = candidates.Add((key, candidate));
+            candidateBuffer.Add((key, candidate));
         }
 
+        var candidates = candidateBuffer.ToImmutable();
         var hasExplicitAnalyzerValue = candidates.Any(
             candidate => string.Equals(
                 candidate.Key,
@@ -174,13 +175,13 @@ internal sealed class CompilerConfiguration
             .ToImmutableArray();
         var effective = hasExplicitAnalyzerValue
             ? explicitAnalyzerValue
-            : candidates.Count == 0
+            : candidates.Length == 0
                 ? string.Empty
                 : candidates[0].Value;
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
             .ToImmutableArray();
         return (
-            candidates.Count != 0,
+            candidates.Length != 0,
             effective,
             distinct.Length > 1,
             string.Join(" / ", distinct));

@@ -1582,13 +1582,13 @@ The coordinator traced the following new-master findings before implementation:
 
 | ID | Current file / member | Confirmed correction | Status |
 | --- | --- | --- | --- |
-| IMM-M001 | ToolApplication.ExplainAsync | Replace duplicate-option set and entry/map accumulation with scoped immutable builders; freeze publication, retain strict duplicate checks and rendered order. | Open |
-| IMM-M002 | ToolApplication.ExplanationEntry | Preserve validating constructor and JSON property names in a sealed record. | Open |
-| IMM-M003 | CompilerConfiguration.ReadOptionAliases | Replace repeated candidates = candidates.Add with a scoped immutable array builder and frozen read phase. | Open |
-| IMM-M004 | TotalLoweringContext.TrackFreshCollections | Build definitions/captures and exclusion sets immutably; preserve explicit insertion order, symbol identity comparer, FIFO escape propagation, LIFO traversal and shared work budget. | Open |
-| IMM-M005 | TotalLoweringContext dictionary/list tracking fields | Publish persistent immutable freshness sets after each insertion, preserving partial-state visibility and accumulation across both tracking passes. | Open |
-| IMM-M006 | RoslynTotalExpressionLowerer dictionary/list field caches | Use persistent immutable maps with existing tuple equality and strict duplicate behavior. | Open |
-| IMM-M007 | RoslynTotalExpressionLowerer dictionary/list argument assembly | Build positional arguments through scoped builders and freeze before IR publication; retain evaluation order and immutable CallSnapshot/member signature APIs. | Open |
+| IMM-M001 | ToolApplication.ExplainAsync | Replace duplicate-option set and entry/map accumulation with scoped immutable builders; freeze publication, retain strict duplicate checks and rendered order. | Implemented; focused checks passed |
+| IMM-M002 | ToolApplication.ExplanationEntry | Preserve validating constructor and JSON property names in a sealed record. | Implemented; focused checks passed |
+| IMM-M003 | CompilerConfiguration.ReadOptionAliases | Replace repeated candidates = candidates.Add with a scoped immutable array builder and frozen read phase. | Implemented; focused checks passed |
+| IMM-M004 | TotalLoweringContext.TrackFreshCollections | Build definitions/captures and exclusion sets immutably; preserve explicit insertion order, symbol identity comparer, FIFO escape propagation, LIFO traversal and shared work budget. | Implemented; focused checks passed |
+| IMM-M005 | TotalLoweringContext dictionary/list tracking fields | Publish persistent immutable freshness sets after each insertion, preserving partial-state visibility and accumulation across both tracking passes. | Implemented; focused checks passed |
+| IMM-M006 | RoslynTotalExpressionLowerer dictionary/list field caches | Use persistent immutable maps with existing tuple equality and strict duplicate behavior. | Implemented; focused checks passed |
+| IMM-M007 | RoslynTotalExpressionLowerer dictionary/list argument assembly | Build positional arguments through scoped builders and freeze before IR publication; retain evaluation order and immutable CallSnapshot/member signature APIs. | Implemented; focused checks passed |
 
 Read-only review of the seven compiler semantics session/model/effect files found
 no unsafe retained mutable data. Lazy caches and the identity allocating IrFactory
@@ -1616,3 +1616,41 @@ fixture is an API consumer adapter, not a mutable program subject.
 CodeQL C#, Actions and Python checks succeeded on exact pushed commit 77f76ca97.
 The previous Python no-code failure is therefore historical and does not describe
 the current head.
+
+
+## Builder follow-up validation checkpoint
+
+IMM-M001 through IMM-M007 are implemented. Tool/configuration selection: 103
+tests passed across seven matching projects. Dictionary/list/freshness frontend:
+83 passed. Worker dictionary/list oracles: 193 passed. The initial frontend
+attempt reported four IDE0055 formatting errors; the canonical whitespace patch
+was applied before the successful rerun. An independent read-only review checked
+comparers, explicit encounter ordering, FIFO/LIFO behavior, positional builder
+capacity, and incremental publication of freshness sets.
+
+Evidence: immutability-master-tool-config-builders-tests.log,
+immutability-master-fresh-collections-frontend-tests2.log and
+immutability-master-fresh-collections-worker-tests.log.
+Script formatting: 87 PowerShell files / 19 shell files, zero changes required.
+
+The first merged ordinary solution run built without warnings/errors and recorded
+12,062 passed, one failed and one platform skip across 20 projects. Its sole
+failure was StrictPublicPackageBuildRejectsOpaqueDoubleEqualityProof: expected
+one recorded claim, observed zero. Both exact master e97c6c56 and the current
+merged tree pass that test in isolation. Full baseline and current package runs
+are in progress to distinguish test ordering/build provenance from a migration
+regression. This failure is not waived or represented as a successful suite.
+The failed run copied merged source while HEAD was fab1ec540, so that version in
+its artifact is expected; a pre-merge version label alone does not prove stale
+source. Evidence: immutability-master-ordinary-tests.log,
+immutability-master-baseline-nan-test.log and
+immutability-master-current-nan-test.log.
+
+Follow-up audits identified additional scoped fixture accumulators in Frontend
+and Worker tests, corpus/fuzz production accumulation and new script producers.
+Those remain open for coordinator tracing and implementation. In particular, a
+fake backend queue, fuzz statistics maps and fixture construction lists are not
+automatically exclusions: immutable roots or builders can preserve their behavior.
+Reference/alias identity must be retained at the element level, which does not by
+itself require a mutable outer cache. No broad agent exclusion is accepted
+without coordinator evidence.

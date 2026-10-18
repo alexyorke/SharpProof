@@ -70,13 +70,19 @@ var response = new WorkerVerifyResponse
     InputHash = new string('a', 64),
     RunStatus = WorkerRunStatus.Failed,
     FailureReason = WorkerRunFailureReason.InputUnavailable,
-    Errors = [new() { Code = "input.unavailable", Message = "Stored reader fixture; no verification was performed." }]
+    Errors = [new() { Code = "input.unavailable", Message = "Stored reader fixture; no verification was performed." }],
+    Summary = new()
+    {
+        CacheStatus = WorkerCacheStatus.Disabled,
+        Versions = new()
+        {
+            WorkerVersion = "tool-consumer-fixture",
+            ApiSpecVersion = "tool-consumer-fixture",
+            WorkerBinarySha256 = new string('a', 64),
+            ApiSpecContentSha256 = new string('b', 64)
+        }
+    }
 };
-response.Summary.CacheStatus = WorkerCacheStatus.Disabled;
-response.Summary.Versions.WorkerVersion = "tool-consumer-fixture";
-response.Summary.Versions.ApiSpecVersion = "tool-consumer-fixture";
-response.Summary.Versions.WorkerBinarySha256 = new string('a', 64);
-response.Summary.Versions.ApiSpecContentSha256 = new string('b', 64);
 WorkerProtocolJson.SealManifest(response.Manifest);
 if (!WorkerProtocolJson.Validate(response).IsValid)
     throw new InvalidDataException("The stored reader fixture violates the protocol.");

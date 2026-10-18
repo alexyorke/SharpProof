@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
-    private readonly Dictionary<(string Name, IrTypeId Value), IrMemberId> _listFields = [];
+    private ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId> _listFields = ImmutableDictionary<(string Name, IrTypeId Value), IrMemberId>.Empty;
 
     private IrMemberId ListField(string name, IrTypeId value)
     {
@@ -12,9 +12,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (_listFields.TryGetValue(storage, out var field))
         { return field; }
         var identity = _factory.InternExternalIdentity(("list", name, value), EqualityComparer<(string, string, IrTypeId)>.Default);
-        field = _factory.GetOrCreateMember(identity, _factory.ObjectType, IrFieldSites.Prefix + "list:" + name, value,
+        field = _factory.GetOrCreateMemberSnapshot(identity, _factory.ObjectType, IrFieldSites.Prefix + "list:" + name, value,
             false, name == "count" ? [] : [_factory.IntegerType]);
-        _listFields.Add(storage, field);
+        _listFields = _listFields.AddUnique(storage, field);
         return field;
     }
 
@@ -77,14 +77,15 @@ internal sealed partial class RoslynTotalExpressionLowerer
         receiver = Pin(operation, receiver);
         block = receiver.Continuation;
         var arguments = invocation?.Arguments ?? property!.Arguments;
-        var values = new IrTerm[arguments.Length + (assigned == null ? 0 : 1)];
+        var valueBuffer = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned == null ? 0 : 1));
+        valueBuffer.Count = valueBuffer.Capacity;
         foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
         {
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
             value = Pin(operation, value);
-            values[argument.Parameter!.Ordinal] = value.Value;
+            valueBuffer[argument.Parameter!.Ordinal] = value.Value;
             block = value.Continuation;
         }
         if (assigned != null)
@@ -92,9 +93,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
             var value = LowerBodyValue(assigned, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
-            values[values.Length - 1] = value.Value;
+            valueBuffer[valueBuffer.Count - 1] = value.Value;
             block = value.Continuation;
         }
+        var values = valueBuffer.MoveToImmutable();
         block = CheckReceiver(operation, receiver.Value, block);
         var owner = AsObject(receiver.Value);
         var countField = ListField("count", _factory.IntegerType);
@@ -129,11 +131,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
         return new(_factory.PureOpaque(contents, owner, index), block, FrontendSubsetClassification.Exact);
     }
 
-    private IrBlockId ListRuntimeEffects(IOperation operation, IMethodSymbol method, IrTerm[] values, IrTerm full, IrBlockId block, bool initialization = false)
+    private IrBlockId ListRuntimeEffects(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrTerm full, IrBlockId block, bool initialization = false)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         full = RepositoryParameterGuard.NotNull(full, nameof(full));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(operation);
@@ -145,7 +147,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
             full), failure, normal);
         // Preserve independently reviewed effect facets just as an ordinary
         // bound call does. Missing facets still use the opaque fallback.
-        var effects = EmitOpaqueCall(operation, method, values.ToImmutableArray(), failure, null,
+        var effects = EmitOpaqueCall(operation, method, values, failure, null,
             OpaqueEffects?.Invoke(method) ?? IrOpaqueCallEffects.All).Continuation;
         _builder.Throw(effects, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
