@@ -1563,3 +1563,40 @@ Evidence: immutability-master-layout.log,
 immutability-master-literals.log and immutability-master-script-format.log.
 The comprehensive residual inventories still describe the preceding checkpoint;
 current-path coverage must be refreshed after master integration.
+
+
+## Current master follow-up coverage
+
+After the conflict integration, inventories were regenerated against the current
+tracked tree. Verified Git renames mapped 3,270 C# rows, 860 PowerShell rows and
+all 17 const rows before regeneration. Status transfers require the same mapped
+path, line, column, kind and detail; changed candidates return to open review.
+
+Current syntax inventory: 1,865 non-vendored C# files / 3,376 candidates and
+84 PowerShell scripts / 1,139 candidates, with zero PowerShell parse failures.
+There are 3,174 open C# candidates and 1,023 open PowerShell candidates.
+These are syntax candidates, including builders, subject arrays and native
+adapters, rather than a claim that every row is a confirmed violation.
+
+The coordinator traced the following new-master findings before implementation:
+
+| ID | Current file / member | Confirmed correction | Status |
+| --- | --- | --- | --- |
+| IMM-M001 | ToolApplication.ExplainAsync | Replace duplicate-option set and entry/map accumulation with scoped immutable builders; freeze publication, retain strict duplicate checks and rendered order. | Open |
+| IMM-M002 | ToolApplication.ExplanationEntry | Preserve validating constructor and JSON property names in a sealed record. | Open |
+| IMM-M003 | CompilerConfiguration.ReadOptionAliases | Replace repeated candidates = candidates.Add with a scoped immutable array builder and frozen read phase. | Open |
+| IMM-M004 | TotalLoweringContext.TrackFreshCollections | Build definitions/captures and exclusion sets immutably; preserve explicit insertion order, symbol identity comparer, FIFO escape propagation, LIFO traversal and shared work budget. | Open |
+| IMM-M005 | TotalLoweringContext dictionary/list tracking fields | Publish persistent immutable freshness sets after each insertion, preserving partial-state visibility and accumulation across both tracking passes. | Open |
+| IMM-M006 | RoslynTotalExpressionLowerer dictionary/list field caches | Use persistent immutable maps with existing tuple equality and strict duplicate behavior. | Open |
+| IMM-M007 | RoslynTotalExpressionLowerer dictionary/list argument assembly | Build positional arguments through scoped builders and freeze before IR publication; retain evaluation order and immutable CallSnapshot/member signature APIs. | Open |
+
+Read-only review of the seven compiler semantics session/model/effect files found
+no unsafe retained mutable data. Lazy caches and the identity allocating IrFactory
+remain intentional resource/state contracts. The new compiler compilation models
+already use records, init properties and immutable arrays. Tool process handles,
+console subscriptions, cancellation sources and bounded stream buffers remain
+native/resource adapters. Numeric literals alone are immutable and are not counted
+as violations merely because they could be given a named constant.
+
+The tool review's suggested MoveToImmutable for an unconstrained entry builder
+was rejected: capacity need not equal count. Publication must use ToImmutable.
