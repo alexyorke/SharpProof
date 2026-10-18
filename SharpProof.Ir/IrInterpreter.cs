@@ -359,9 +359,11 @@ public sealed class IrInterpreter(IrFactory factory)
 
             receiverValue = receiver.Value;
         }
+        IrValue? keyValue = null;
         foreach (var argument in opaque.Arguments)
         {
             var argumentResult = EvaluateCore(argument, state);
+            keyValue = argumentResult.Value;
             if (argumentResult.Status != IrEvaluationStatus.Value)
             {
                 return argumentResult;
@@ -379,10 +381,10 @@ public sealed class IrInterpreter(IrFactory factory)
             { return failure!; }
             if (heap != null)
             {
-                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? ValidateFieldValue(opaque, stored)
+                return heap.TryReadField(_factory, owner, opaque.Member, out var stored, keyValue) ? ValidateFieldValue(opaque, stored)
                     : Unsupported(IrUnsupportedReason.OpaqueTerm, "The current field has no concrete value.");
             }
-            if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
+            if (opaque.Arguments.IsEmpty && owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
             { return ValidateFieldValue(opaque, initial); }
         }
 

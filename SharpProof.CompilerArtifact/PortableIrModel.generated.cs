@@ -727,15 +727,15 @@ internal static class PortableIrGraphCodecProjections
                 {
                     var write = (IrWriteInstruction)instruction;
                     return context.Row(instruction, context.OperationIndex(instruction.Operation),
-                        (int)write.Region, write.Field == null ? context.OptionalTermIndex(write.Target) : -1, context.OptionalTermIndex(write.Index),
+                        (int)write.Region, write.Field == null ? context.OptionalTermIndex(write.Target) : -1, write.Field == null ? context.OptionalTermIndex(write.Index) : -1,
                         write.Value == null ? null : context.TermIndices([write.Value]),
-                        write.Field is { } field ? context.Location(new IrMemberLocation(write.Value!.Type, field, write.Target, [])) : null);
+                        write.Field is { } field ? context.Location(new IrMemberLocation(write.Value!.Type, field, write.Target, write.Index is { } key ? [key] : [])) : null);
                 },
                 static (row, context) =>
                 {
                     return row.Location != null
-                        ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && context.Location(row.Location) is IrMemberLocation { Receiver: { } receiver } field
-                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0])
+                        ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && context.Location(row.Location) is IrMemberLocation { Receiver: { } receiver, Arguments.Length: <= 1 } field
+                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0], field.Arguments.IsEmpty ? null : field.Arguments[0])
                             : throw context.Invalid()
                         : context.OptionalTerm(row.B) is { } stored
                         ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index

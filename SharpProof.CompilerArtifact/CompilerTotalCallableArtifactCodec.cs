@@ -244,7 +244,9 @@ internal static class CompilerTotalCallableArtifactCodec
             return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
                 name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
                 graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
-                term.Items is not { Length: > 0 } && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
+                (term.Items is not { Length: > 0 } || term.Items is { Length: 1 } &&
+                    term.Items[0] >= 0 && term.Items[0] < graph.Terms.Length &&
+                    graph.Types[graph.Terms[term.Items[0]].Type].Kind == IrTypeKind.Integer) && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
                 PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure &&
                 graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.Reference or IrTypeKind.String or
                     IrTypeKind.Sequence;
