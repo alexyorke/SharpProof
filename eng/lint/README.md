@@ -18,7 +18,7 @@ For host Git worktrees or older Compose releases, use the wrapper. It builds the
 images explicitly and mounts resolved worktree Git metadata read-only:
 
 ```powershell
-pwsh -File scripts/Invoke-SharpProof.ps1 lint
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint
 ```
 
 Docker Compose builds the canonical toolchain and its lint layer in dependency order,
@@ -39,7 +39,7 @@ ApiCompat version are pinned in this directory.
 | --- | --- |
 | actionlint | All GitHub Actions workflows; all reported errors fail. |
 | zizmor | Offline audits of workflows, composite actions, and Dependabot; findings fail. |
-| PSScriptAnalyzer | All tracked and unignored PowerShell scripts/modules; every diagnostic from the selected correctness/security rules fails. |
+| PSScriptAnalyzer | All tracked and unignored PowerShell eng/scripts/modules; every diagnostic from the selected correctness/security rules fails. |
 | ShellCheck | All tracked and unignored shell scripts; all reported findings fail. |
 | markdownlint | Authored Markdown; enabled rule violations fail. |
 | CSpell | Authored Markdown prose; unknown words fail. |

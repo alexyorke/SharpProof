@@ -4,7 +4,7 @@ Maintainers: see [configuration ownership](configuration-ownership.md) for runti
 
 The standard SDK-style consumer needs one `SharpProof` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 
-The implementation authority is [the consumer contract](../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
+The implementation authority is [the consumer contract](../src/SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../src/SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
 
 ## Activation and claim selection
 
@@ -83,7 +83,7 @@ is_global = true
 sharpproof_features = contracts
 ```
 
-An explicit analyzer feature value can replace the package's defaulted `all`. Conflicting explicit aliases are invalid. An analyzer profile must agree with the effective MSBuild profile, including its default, because MSBuild controls package activation and verification. A per-file option that changes compilation-global selection is invalid; a redundant matching value is accepted. Invalid global analyzer configuration reports SP0025 and disables semantic analysis. These rules are exercised by [configuration regression tests](../SharpProof.Analyzer.Test/ConfigurationDiagnosticsRegressionTests.cs), [package-default tests](../SharpProof.Analyzer.Test/AnalyzerConfigurationPackageDefaultTests.cs), and [unit tests](../SharpProof.Analyzer.Test/AnalyzerConfigurationUnitTests.cs).
+An explicit analyzer feature value can replace the package's defaulted `all`. Conflicting explicit aliases are invalid. An analyzer profile must agree with the effective MSBuild profile, including its default, because MSBuild controls package activation and verification. A per-file option that changes compilation-global selection is invalid; a redundant matching value is accepted. Invalid global analyzer configuration reports SP0025 and disables semantic analysis. These rules are exercised by [configuration regression tests](../src/SharpProof.Analyzer.Tests/ConfigurationDiagnosticsRegressionTests.cs), [package-default tests](../src/SharpProof.Analyzer.Tests/AnalyzerConfigurationPackageDefaultTests.cs), and [unit tests](../src/SharpProof.Analyzer.Tests/AnalyzerConfigurationUnitTests.cs).
 
 Normal Roslyn severity configuration belongs in `.editorconfig`, for example:
 

@@ -49,10 +49,10 @@ From a clean committed SharpProof checkout with Docker Compose v2 and Linux cont
 
 ```text
 docker compose build tooling
-pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 pack -Configuration Release
 ```
 
-The host wrapper supplies read-only external Git metadata mounts for worktrees. Packed artifacts are exported under `artifacts/container-packages`. Configure your consumer's NuGet sources to include that local feed using a path visible inside its build environment. The standard SharpProof reference restores the exact-version `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes` dependency graph automatically. [SharpProof.Release.props](../SharpProof.Release.props) owns the package version.
+The host wrapper supplies read-only external Git metadata mounts for worktrees. Packed artifacts are exported under `artifacts/container-packages`. Configure your consumer's NuGet sources to include that local feed using a path visible inside its build environment. The standard SharpProof reference restores the exact-version `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes` dependency graph automatically. [eng/Versions.props](../eng/Versions.props) owns the package version.
 
 `pack` requires clean exact-commit source. For development validation with uncommitted changes, use `docker compose run --rm tooling samples -Configuration Release`; its harness builds an isolated feed and validates actual consumer diagnostics and proof records.
 

@@ -294,3 +294,11 @@ FodyWeavers.xsd
 /*_audit*.json
 /symbol-equality-audit.json
 **/Engine/Rules/findings.json
+
+# Arcade bootstrap and tool caches
+.dotnet/
+.tools/
+.packages/
+
+# Keep the complete pinned Arcade tree, including cross/arm patches.
+!/eng/common/**

@@ -46,9 +46,9 @@ also supports Git worktrees by mounting their Git metadata. Packing requires a
 clean committed checkout so the source receipt describes the shipped code.
 
 ```powershell
-pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
-pwsh -File scripts/Invoke-SharpProof.ps1 package-consumers -Configuration Release -PackageSource artifacts/container-packages
-pwsh -File scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File scripts/Test-SharpProofOfflineStackTraces.ps1 -PackageSource artifacts/container-packages'
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 package-consumers -Configuration Release -PackageSource artifacts/container-packages
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File eng/scripts/Test-SharpProofOfflineStackTraces.ps1 -PackageSource artifacts/container-packages'
 ```
 
 The last check copies actual packaged DLLs into an isolated directory without
@@ -76,7 +76,7 @@ API inventory or the default verifier's SDK requirement.
 After committing all source and harness changes, run the smaller experiment:
 
 ```powershell
-pwsh -File scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File scripts/Test-SharpProofReproduciblePackages.ps1 -Scope Representative'
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File eng/scripts/Test-SharpProofReproduciblePackages.ps1 -Scope Representative'
 ```
 
 It sequentially creates two independent exact-commit Git clones at different
@@ -90,7 +90,7 @@ claim that the whole package graph was reproduced.
 For the complete shipped managed payload set, use:
 
 ```powershell
-pwsh -File scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File scripts/Test-SharpProofReproduciblePackages.ps1 -Scope Full'
+pwsh -File eng/scripts/Invoke-SharpProof.ps1 dev -lc 'cd /workspace/SharpProof && pwsh -NoProfile -File eng/scripts/Test-SharpProofReproduciblePackages.ps1 -Scope Full'
 ```
 
 Full mode runs the existing pack and package-source qualification flow twice,

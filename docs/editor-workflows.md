@@ -10,7 +10,7 @@ The code-fix assembly is a design-time payload so command-line compilation does 
 
 ## Repository tasks
 
-Open the repository in a compatible Dev Container client using [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json). Its container-owned persistent workspace is separate from the host checkout; choose and inspect the correct branch before editing. Use **SharpProof: targeted tests (Dev Container)** for focused tests inside that workspace. The host **targeted tests (Docker)** and **pack (Docker)** tasks run finite canonical tasks through the [host wrapper](../scripts/Invoke-SharpProof.ps1), which supplies read-only metadata mounts for Git worktrees as needed.
+Open the repository in a compatible Dev Container client using [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json). Its container-owned persistent workspace is separate from the host checkout; choose and inspect the correct branch before editing. Use **SharpProof: targeted tests (Dev Container)** for focused tests inside that workspace. The host **targeted tests (Docker)** and **pack (Docker)** tasks run finite canonical tasks through the [host wrapper](../eng/scripts/Invoke-SharpProof.ps1), which supplies read-only metadata mounts for Git worktrees as needed.
 
 Do not run concurrent builds against the same bind-mounted outputs. A targeted test is feedback for that selected case, not full qualification. See [contributing](../CONTRIBUTING.md) for the broader gates.
 

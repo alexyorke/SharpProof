@@ -9,19 +9,19 @@ effective defaults, limits, wire formats, and explicit caller overrides.
 
 | Configuration | Owner | Consumers |
 | --- | --- | --- |
-| Analyzer keys, MSBuild property names, profile/features tokens and defaults | [SharpProofConfigurationCatalog](../SharpProof.Contracts/SharpProofConfigurationCatalog.cs) | Compiler-semantics option registry and parsing, analyzer policy adapter, package-default alias handling |
+| Analyzer keys, MSBuild property names, profile/features tokens and defaults | [SharpProofConfigurationCatalog](../src/SharpProof.Contracts/SharpProofConfigurationCatalog.cs) | Compiler-semantics option registry and parsing, analyzer policy adapter, package-default alias handling |
 | Solver query resource default | [SolverDefaults](../eng/shared/SolverDefaults.cs) | Source-linked into SMT options and worker protocol; existing public constants remain available |
-| Worker budgets, request expression-depth ceiling, cache defaults, launcher publication deadline | [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) | Request validation, launcher, compiler collector and artifact admission |
-| Convenience-operation deadline | [AnalysisDefaults](../SharpProof.Ir/AnalysisDefaults.cs) | Analyzer, compiler capture, contract binding, frontend queries, IR interpretation; explicit caller-token overloads keep caller deadlines |
-| Dataflow widening and iteration defaults | [ForwardDataflowAnalysisOptions](../SharpProof.Dataflow/ForwardDataflowAnalysis.cs) | General analysis and advisory analysis; advisory analysis retains its separate iteration budget |
-| Advisory iteration, term-work and synthetic-edge defaults | [CoreIrAdvisoryInterpreter](../SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs) | Both Run overloads |
-| Optional tool SDK-discovery limits | [SdkProbe](../SharpProof.Tool/SdkProbe.cs) | Tool doctor discovery: 15-second timeout, 5-second process cleanup wait, and 4096 characters per stdout/stderr stream; separate from solver budgets and analysis deadlines |
-| Host contract environment names | [HostEnvironmentVariables](../SharpProof.Host/HostEnvironmentVariables.cs) | Contract readers and trusted child environment allowlist |
-| Atomic publication retry count | [AtomicFile](../SharpProof.Ir/AtomicFile.cs) | Staging-name allocation and publication retries |
-| Fuzz case, seed and parallelism settings | [FuzzOptions](../Tools/SharpProof.Fuzz/FuzzOptions.cs) | CLI parsing/help, runner validation and summary admission |
-| Gate child-process cleanup deadline | [GateProcess](../SharpProof.Gates/GateProcess.cs) | Captured processes and corpus Git importer |
-| Fuzz source replay step budget | [FuzzExecutionDefaults](../Tools/SharpProof.Fuzz/FuzzExecutionDefaults.cs) | Metadata and total-program replay oracles |
-| Corpus execution and evidence presentation | [CorpusExecutionDefaults](../SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs) | Wall-time threshold/message, diagnostic caps, IL body bound and allocation observation loops |
+| Worker budgets, request expression-depth ceiling, cache defaults, launcher publication deadline | [ProtocolModel.generated.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) | Request validation, launcher, compiler collector and artifact admission |
+| Convenience-operation deadline | [AnalysisDefaults](../src/SharpProof.Ir/AnalysisDefaults.cs) | Analyzer, compiler capture, contract binding, frontend queries, IR interpretation; explicit caller-token overloads keep caller deadlines |
+| Dataflow widening and iteration defaults | [ForwardDataflowAnalysisOptions](../src/SharpProof.Dataflow/ForwardDataflowAnalysis.cs) | General analysis and advisory analysis; advisory analysis retains its separate iteration budget |
+| Advisory iteration, term-work and synthetic-edge defaults | [CoreIrAdvisoryInterpreter](../src/SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs) | Both Run overloads |
+| Optional tool SDK-discovery limits | [SdkProbe](../src/SharpProof.Tool/SdkProbe.cs) | Tool doctor discovery: 15-second timeout, 5-second process cleanup wait, and 4096 characters per stdout/stderr stream; separate from solver budgets and analysis deadlines |
+| Host contract environment names | [HostEnvironmentVariables](../src/SharpProof.Host/HostEnvironmentVariables.cs) | Contract readers and trusted child environment allowlist |
+| Atomic publication retry count | [AtomicFile](../src/SharpProof.Ir/AtomicFile.cs) | Staging-name allocation and publication retries |
+| Fuzz case, seed and parallelism settings | [FuzzOptions](../src/SharpProof.Fuzz/FuzzOptions.cs) | CLI parsing/help, runner validation and summary admission |
+| Gate child-process cleanup deadline | [GateProcess](../src/SharpProof.Gates/GateProcess.cs) | Captured processes and corpus Git importer |
+| Fuzz source replay step budget | [FuzzExecutionDefaults](../src/SharpProof.Fuzz/FuzzExecutionDefaults.cs) | Metadata and total-program replay oracles |
+| Corpus execution and evidence presentation | [CorpusExecutionDefaults](../src/SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs) | Wall-time threshold/message, diagnostic caps, IL body bound and allocation observation loops |
 
 These are implementation defaults, not new public configuration switches.
 Consumer overrides remain documented in [consumer configuration](configuration.md).
@@ -31,17 +31,17 @@ Consumer overrides remain documented in [consumer configuration](configuration.m
 [toolchain.json](../eng/container/toolchain.json) owns the container toolchain
 versions, image pins, native payload identities and platform. Dockerfile and
 SDK-policy copies are intentional format-specific representations checked by
-[Test-SharpProofContainerContract.ps1](../scripts/Test-SharpProofContainerContract.ps1).
+[Test-SharpProofContainerContract.ps1](../eng/scripts/Test-SharpProofContainerContract.ps1).
 
 [The acceptance contract](../eng/acceptance/contract.json) owns acceptance
 thresholds, automation CPU/wall budgets, and independently frozen worker/cache
-expectations. [ContainerExecution](../scripts/SharpProof.ContainerExecution.psm1)
+expectations. [ContainerExecution](../eng/scripts/SharpProof.ContainerExecution.psm1)
 interprets automation settings. Its named missing-contract timeout fallback is
 retained for minimal changed-test fixtures.
 
-[Verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props)
+[Verifier defaults](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props)
 are the conditional MSBuild representation of worker defaults. The
-[MSBuild integration tests](../SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs)
+[MSBuild integration tests](../src/SharpProof.Package.IntegrationTests/WorkerMsBuildIntegrationTests.cs)
 evaluate those defaults and compare them with runtime constants. Keep both the
 independent acceptance assertions and these parity checks when changing policy.
 No build-time code generator or runtime configuration-file dependency is added.
@@ -60,8 +60,8 @@ The initial inventory was the complete tracked tree at master
 f10651eaeb7efb531263e7e5ae5158b07507411d: 2,275 files, including 1,846 C#,
 PowerShell and shell source files. Ten parallel audits partitioned analyzer,
 worker, host/package/protocol, SMT/dataflow, compiler/frontend, models/contracts,
-gates/fuzz/tools, scripts/engineering, root/build/CI, and
-fixtures/samples/templates/documentation. Project configuration also received
+gates/fuzz/tools, eng/scripts/engineering, root/build/CI, and
+fixtures/src/samples/templates/documentation. Project configuration also received
 a cross-cutting scan.
 
 The review inventoried every tracked path, searched source/configuration files

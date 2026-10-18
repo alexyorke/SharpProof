@@ -5,7 +5,7 @@
 1. The package job runs `tooling pack -Configuration Release` in the canonical Linux amd64 container and uploads the packed three-package graph.
 2. Linux container and native Windows, macOS, and glibc Linux x64/ARM64 verifier consumers download those artifacts and run real proof and payload-integrity checks.
 3. Branches, pull requests, and tags run portable consumers on Linux, Windows, macOS ARM64, and macOS Intel against the exact packed artifacts. Tags additionally run exact-SHA security.
-4. A `v*` tag must exactly match `SharpProofPackageVersion` in [SharpProof.Release.props](../../SharpProof.Release.props).
+4. A `v*` tag must exactly match `SharpProofPackageVersion` in [eng/Versions.props](../../eng/Versions.props).
 5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the qualified package artifacts and signed evidence, verifies them before requesting feed credentials, and applies the destination feed's duplicate policy.
 
 `v1.0.0-preview.1` selects the private-preview environment/feed. Other matching release tags select nuget.org and NuGet OIDC login. Feed credentials stay in the configured secret/environment mechanism.
@@ -38,7 +38,7 @@ Run the [project template smoke check](../../templates/README.md#maintainer-vali
 
 Public tag publication authenticates the existing three main packages and two
 symbol packages, then generates `sbom.spdx.json`, `release-manifest.json`, and
-`SHA256SUMS` with [New-SharpProofReleaseEvidence.ps1](../../scripts/New-SharpProofReleaseEvidence.ps1).
+`SHA256SUMS` with [New-SharpProofReleaseEvidence.ps1](../../eng/scripts/New-SharpProofReleaseEvidence.ps1).
 The SPDX 2.3 document describes the shipped payload: all reviewed inventory
 components (currently 18), every distinct third-party binary and its archive
 entry hash, static runtime relationships, and the five complete archive hashes.
@@ -48,7 +48,7 @@ packages; it is not a complete source/build dependency SBOM or vulnerability sca
 Custom license references include the distributed notice bundle rather than an
 invented SPDX license classification.
 
-[Test-SharpProofReleaseEvidence.ps1](../../scripts/Test-SharpProofReleaseEvidence.ps1)
+[Test-SharpProofReleaseEvidence.ps1](../../eng/scripts/Test-SharpProofReleaseEvidence.ps1)
 regenerates the evidence from the actual archives and reviewed inventory and
 rejects any changed bytes or missing component. Synthetic regression fixtures
 exercise altered archives, omitted SBOM components, provenance mismatch and
@@ -58,7 +58,7 @@ After consumer and security qualification, the separate least-privilege provenan
 [actions/attest](https://github.com/actions/attest) action twice for the core subjects: release workflow
 provenance for the packages/SBOM/manifest, and an SPDX SBOM attestation for the
 same five packages. The optional tool receives its own workflow provenance. The job retains the signed bundles and evidence as an immutable artifact; the publisher downloads that exact artifact without recreating attestations. Before requesting NuGet credentials,
-[Test-SharpProofReleaseAttestations.sh](../../scripts/Test-SharpProofReleaseAttestations.sh)
+[Test-SharpProofReleaseAttestations.sh](../../eng/scripts/Test-SharpProofReleaseAttestations.sh)
 uses `gh attestation verify` to check each subject against its signed bundle,
 the canonical repository, exact signer workflow, source commit, predicate type
 and hosted-runner policy. Its fixture tests policy propagation and rejection of

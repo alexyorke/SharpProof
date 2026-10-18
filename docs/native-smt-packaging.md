@@ -12,7 +12,7 @@ Attributes supplies the application API. SharpProof is the standard entrypoint; 
 
 The Verifier implementation package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`, alongside its native verification payload. Main SharpProof restores that complete implementation transitively. Advisory/off opt-outs change execution rather than installing a separate portable package graph.
 
-The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net10`. It puts architecture-specific native libraries under `tools/native/linux-x64`, `tools/native/linux-arm64`, `tools/native/win-x64`, `tools/native/win-arm64`, `tools/native/osx-arm64`, and `tools/native/osx-x64`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
+The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net10`. It puts architecture-specific native libraries under `tools/native/linux-x64`, `tools/native/linux-arm64`, `tools/native/win-x64`, `tools/native/win-arm64`, `tools/native/osx-arm64`, and `tools/native/osx-x64`. The authoritative layouts are [SharpProof.nuspec](../src/SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../src/SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
 
 Implementation assemblies are tool payloads, not supported application compile APIs.
 

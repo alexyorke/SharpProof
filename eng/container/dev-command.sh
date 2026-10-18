@@ -9,5 +9,5 @@ fi
 
 cd "${repo_root}"
 exec pwsh -NoLogo -NoProfile -File \
-  ./scripts/Invoke-SharpProofContainer.ps1 \
+  ./eng/scripts/Invoke-SharpProofContainer.ps1 \
   -Command "${command_name}" "$@"

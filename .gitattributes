@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# Preserve byte-for-byte upstream Arcade bootstrapper files.
+eng/common/** -text -whitespace

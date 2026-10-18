@@ -2,10 +2,18 @@
   "version": "0.2",
   "language": "en",
   "useGitignore": true,
-  "files": ["**/*.md"],
+  "files": [
+    "**/*.md"
+  ],
   "ignorePaths": [
-    "**/bin/**", "**/obj/**", "artifacts/**", "**/node_modules/**",
-    "docs/generated/**", "**/*.generated.md", "**/Corpus/third-party/**"
+    "**/bin/**",
+    "**/obj/**",
+    "artifacts/**",
+    "**/node_modules/**",
+    "docs/generated/**",
+    "**/*.generated.md",
+    "**/Corpus/third-party/**",
+    "eng/common/**"
   ],
   "ignoreRegExpList": [
     "/```[\\s\\S]*?```/g",
@@ -13,7 +21,13 @@
     "/https?:\\/\\/[^\\s)<>]+/g"
   ],
   "dictionaryDefinitions": [
-    { "name": "sharpproof", "path": "./eng/lint/project-words.txt", "addWords": true }
+    {
+      "name": "sharpproof",
+      "path": "./eng/lint/project-words.txt",
+      "addWords": true
+    }
   ],
-  "dictionaries": ["sharpproof"]
+  "dictionaries": [
+    "sharpproof"
+  ]
 }

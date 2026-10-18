@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_DATAFLOW_ARGUMENT_GUARD</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
+             Link="ArgumentNullGuard.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
+             Link="Polyfills\NotNullAttribute.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Dataflow.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Effects" />
+  </ItemGroup>
+</Project>

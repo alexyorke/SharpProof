@@ -59,7 +59,7 @@ cancellation, and process-tree termination. Native runs do not have Docker's
 CPU/memory isolation or an OS memory quota. The caller must provision sufficient
 resources or supply an external execution boundary for untrusted workloads.
 
-The Windows CI matrix runs `scripts/Test-SharpProofWindowsProofs.ps1` against packages built
+The Windows CI matrix runs `eng/scripts/Test-SharpProofWindowsProofs.ps1` against packages built
 by the canonical container for x64 and ARM64. This maintainer acceptance helper requires native
 architecture-matched Windows PowerShell 7.6 or later running on .NET 10 or later because its path
 and lease checks load the packaged .NET 10 host assembly into PowerShell.

@@ -5,7 +5,8 @@ extensions = [
 ]
 # Include .github and other hidden source directories, but never Git metadata.
 hidden = true
-exclude_path = ['(^|/)\.git(/|$)']
+# The layout gate verifies every pinned Arcade vendor checksum.
+exclude_path = ['(^|/)\.git(/|$)', '(^|/)eng/common(/|$)']
 # Respect ignore files so build outputs and the report do not become inputs.
 no_ignore = false
 

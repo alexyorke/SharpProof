@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\eng\Packaging.props" />
+  <Import Project="..\..\eng\CustomNuspec.props" />
+  <PropertyGroup>
+    <NuspecFile>SharpProof.nuspec</NuspecFile>
+    <PackageId>SharpProof</PackageId>
+    <IncludeSymbols>false</IncludeSymbols>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Verifier\SharpProof.Verifier.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+  </ItemGroup>
+  <Target Name="_SharpProofPreparePackageNuspecProperties"
+          BeforeTargets="GenerateNuspec"
+          DependsOnTargets="_SharpProofPrepareCommonNuspecProperties">
+    <PropertyGroup>
+      <NuspecProperties>$(_SharpProofNuspecPrefix);$(_SharpProofNuspecSuffix)</NuspecProperties>
+    </PropertyGroup>
+  </Target>
+</Project>
