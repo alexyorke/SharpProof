@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -625,7 +626,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(requestValidation.IsValid, Is.True, string.Join(", ", requestValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             await File.WriteAllTextAsync(Path.Combine(output, "request.json"), WorkerProtocolJson.SerializeRequest(request), new UTF8Encoding(false));
             var artifactBytes = await File.ReadAllBytesAsync(request.CompilerManifest.Path, TestContext.CurrentContext.CancellationToken);
-            Assert.That(WorkerProtocolJson.ComputeSha256(artifactBytes), Is.EqualTo(request.CompilerManifest.Sha256));
+            Assert.That(WorkerProtocolJson.ComputeSha256((artifactBytes).ToImmutableArray()), Is.EqualTo(request.CompilerManifest.Sha256));
             evidence["ownedArtifactSha256"] = Hash(artifactBytes);
             await File.WriteAllBytesAsync(Path.Combine(output, "compiler-artifact.json"), artifactBytes);
             var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);

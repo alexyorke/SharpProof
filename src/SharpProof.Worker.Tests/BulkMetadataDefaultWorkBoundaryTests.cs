@@ -178,7 +178,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(body, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(body.Method, method), Is.True);
-        Assert.That(body.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image.ToArray())));
+        Assert.That(body.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
         Assert.That(body.ModuleMvid, Is.Not.Empty);
         Assert.That(body.Locals, Is.Empty);
         Assert.That(body.ParameterAttributes, Has.Length.EqualTo(1));

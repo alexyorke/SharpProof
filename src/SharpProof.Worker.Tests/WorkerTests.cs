@@ -1420,7 +1420,7 @@ public sealed partial class WorkerTests
         json = root.ToJsonString(WorkerProtocolJson.Options) + "\n";
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
 
         var deserializeException = CaptureJson(() =>
             CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken));
@@ -1519,7 +1519,7 @@ public sealed partial class WorkerTests
             StringComparison.Ordinal);
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
         using var worker = new SharpProofWorker(
             () => throw new AssertionException(
                 "An invalid manifest must fail before backend creation."));
@@ -1576,7 +1576,7 @@ public sealed partial class WorkerTests
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
-        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
+        { request = request with { CompilerManifest = request.CompilerManifest with { Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
         var factoryCalls = 0;
         using var worker = new SharpProofWorker(() =>
         {
@@ -1783,7 +1783,7 @@ public sealed partial class WorkerTests
         var artifactBytes = await File.ReadAllBytesAsync(
             request.CompilerManifest.Path);
         var sharedHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute(artifactBytes), baselineIdentity.ToolIdentity,
+            request, ArtifactDigest.Compute((artifactBytes).ToImmutableArray()), baselineIdentity.ToolIdentity,
             baselineIdentity.ToolVersion, baselineIdentity.WorkerBinarySha256,
             baselineIdentity.ApiSpecIdentity, baselineIdentity.ApiSpecVersion,
             baselineIdentity.ApiSpecContentSha256);
@@ -6398,7 +6398,7 @@ public sealed partial class WorkerTests
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = Path.GetFullPath(path),
-                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
+                    Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
                 },
                 Cache = new WorkerCacheOptions
                 {

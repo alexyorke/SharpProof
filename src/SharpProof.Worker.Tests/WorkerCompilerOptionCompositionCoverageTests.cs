@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -34,7 +35,7 @@ public sealed partial class WorkerTests
         var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(differentOptions, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var path = Path.Combine(project.DirectoryPath, "different-compiler-options.json");
         await File.WriteAllBytesAsync(path, bytes);
-        { request = request with { CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) } }; }
+        { request = request with { CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) } }; }
         var rejected = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {

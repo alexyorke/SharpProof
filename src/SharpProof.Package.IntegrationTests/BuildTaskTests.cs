@@ -476,7 +476,7 @@ public sealed class BuildTaskTests
             CompilerManifest = new WorkerFileReference
             {
                 Path = manifestPath,
-                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+                Sha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())
             }
         };
         var responseManifest = new WorkerClaimManifest();
@@ -571,7 +571,7 @@ public sealed class BuildTaskTests
             CompilerManifest = new WorkerFileReference
             {
                 Path = manifest,
-                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+                Sha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())
             }
         };
         var responseManifest = new WorkerClaimManifest();

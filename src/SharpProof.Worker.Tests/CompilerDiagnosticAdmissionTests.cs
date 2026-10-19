@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -35,7 +36,7 @@ public sealed class CompilerDiagnosticAdmissionTests
             CompilerManifest = new WorkerFileReference
             {
                 Path = path,
-                Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
+                Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
             },
             Cache = new WorkerCacheOptions { Enabled = false },
             Budgets = new WorkerBudgets()

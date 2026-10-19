@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Text;
 using NUnit.Framework;
@@ -67,8 +68,8 @@ public sealed class FloatingPredicateSoundnessAuditTests
             var argument = valueType == "object" ? "same non-null object reference" : "NaN";
             runtimeObservation = $"type={valueType}; argument={argument}; CLR={actual}; " +
                 $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
-                $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
+                $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
+                $"PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}";
             TestContext.WriteLine(runtimeObservation);
             await File.WriteAllTextAsync(Path.Combine(evidence, valueType + ".clr.txt"), runtimeObservation + "\n");
             Assert.That(actual, Is.EqualTo(expectedRuntime), runtimeObservation);

@@ -404,7 +404,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                WorkerProtocolJson.ComputeSha256(manifestBytes),
+                WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray()),
                 Is.EqualTo(request.CompilerManifest.Sha256));
             JsonAssert.Equal(manifestDocument.RootElement, "manifest.hash", response.Manifest.Hash);
             Assert.That(
@@ -2921,13 +2921,13 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         var artifact = await CompilerManifestArtifact.ReadAsync(
             request.CompilerManifest.Path);
-        var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes.ToArray());
+        var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes);
         workerPath ??= WorkerOutputPath();
         var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(
             workerPath,
             ContainerContract.GetZ3LibrarySha256Required());
         var expectedInputHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute(artifact.Bytes.ToArray()), WorkerCacheIdentity.CurrentToolIdentity,
+            request, ArtifactDigest.Compute(artifact.Bytes), WorkerCacheIdentity.CurrentToolIdentity,
             WorkerCacheIdentity.Current.ToolVersion, workerBinarySha256,
             WorkerCacheIdentity.Current.ApiSpecIdentity,
             WorkerCacheIdentity.Current.ApiSpecVersion,

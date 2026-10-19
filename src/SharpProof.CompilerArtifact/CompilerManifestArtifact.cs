@@ -445,7 +445,7 @@ internal static class CompilerManifestArtifactFile
     // so they need a larger bounded envelope than ordinary worker JSON files.
     internal const int MaximumBytes = 32 * 1024 * 1024;
 
-    internal static byte[] ReadAllBytes(
+    internal static ImmutableArray<byte> ReadAllBytes(
         string path,
         int maximumBytes,
         CancellationToken cancellationToken)
@@ -457,7 +457,7 @@ internal static class CompilerManifestArtifactFile
 
     // A directory entry may already have an observed length. Keep that snapshot
     // through admission so opening a replaced or resized file fails closed.
-    internal static byte[] ReadAllBytes(
+    internal static ImmutableArray<byte> ReadAllBytes(
         FileInfo file,
         int maximumBytes,
         CancellationToken cancellationToken)
@@ -473,7 +473,7 @@ internal static class CompilerManifestArtifactFile
             cancellationToken);
     }
 
-    internal static byte[] ReadExact(
+    internal static ImmutableArray<byte> ReadExact(
         FileStream stream,
         int length,
         string changedMessage,
@@ -501,7 +501,7 @@ internal static class CompilerManifestArtifactFile
         cancellationToken.ThrowIfCancellationRequested();
         EnsureEndOfFile(stream.ReadByte());
         cancellationToken.ThrowIfCancellationRequested();
-        return bytes;
+        return bytes.ToImmutableArray();
     }
 
     private static FileStream Open(

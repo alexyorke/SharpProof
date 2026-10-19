@@ -47,7 +47,7 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(project.Artifact.Compilation, Is.Not.SameAs(compilation));
             Assert.That(project.Artifact.Compilation.ProjectDirectory,
                 Is.EqualTo(Path.GetDirectoryName(project.Request.CompilerManifest.Path)));
-            Assert.That(WorkerProtocolJson.ComputeSha256(bytes),
+            Assert.That(WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()),
                 Is.EqualTo(project.Request.CompilerManifest.Sha256));
         }
     }
@@ -219,7 +219,7 @@ public sealed class CompilerManifestArtifactTests
             Assert.That(
                 tree.Sha256,
                 Is.EqualTo(WorkerProtocolJson.ComputeSha256(
-                    Encoding.UTF8.GetBytes(source))));
+                    (Encoding.UTF8.GetBytes(source)).ToImmutableArray())));
             Assert.That(tree.TextLength, Is.EqualTo(source.Length));
             Assert.That(
                 tree.Features.Select(static feature =>

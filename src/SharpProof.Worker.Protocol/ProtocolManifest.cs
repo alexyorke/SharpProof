@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
@@ -53,7 +54,7 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest manifest)
     {
         _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        return ComputeSha256(System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
+        return ComputeSha256((System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest))).ToImmutableArray());
     }
 
     public static void SealManifest(WorkerClaimManifest manifest)

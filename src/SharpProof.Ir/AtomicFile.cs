@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Ir;
 
 internal static class AtomicFile
@@ -119,7 +120,7 @@ internal static class AtomicFile
     {
         content = RepositoryParameterGuard.NotNull(content, nameof(content));
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
-        return WriteBytesAsync(path, Utf8.GetBytes(content), cancellationToken);
+        return WriteBytesAsync(path, (Utf8.GetBytes(content)).ToImmutableArray(), cancellationToken);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -127,15 +128,15 @@ internal static class AtomicFile
         "CA1849",
         Justification = "Flush(true) is required before publishing staged output.")]
     internal static async Task WriteBytesAsync(
-        string path, byte[] content, CancellationToken cancellationToken)
+        string path, ImmutableArray<byte> content, CancellationToken cancellationToken)
     {
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
-        ArgumentNullGuard.NotNull(content, nameof(content));
+        RepositoryParameterGuard.ThrowIfMissing(content.IsDefault, nameof(content));
         using var staged = new StagedFile(PrepareStaged(path));
         using (var stream = new FileStream(staged.Temporary.FullName, FileMode.CreateNew,
                    FileAccess.Write, FileShare.None, 4096, useAsync: true))
         {
-            await stream.WriteAsync(content, 0, content.Length, cancellationToken)
+            await stream.WriteAsync(content.ToArray(), 0, content.Length, cancellationToken)
                 .ConfigureAwait(false);
             stream.Flush(true);
         }

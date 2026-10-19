@@ -239,7 +239,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, (artifactBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var nativeWrites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new

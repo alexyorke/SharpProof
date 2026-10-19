@@ -219,9 +219,9 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
             JsonSerializer.Serialize(rows, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
             $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
-            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
-            $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(SubjectSource))}; " +
-            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(BoundarySource))}; " +
+            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256((boundaryBytes).ToImmutableArray())}; " +
+            $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(SubjectSource)).ToImmutableArray())}; " +
+            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}; " +
             $"compiler={typeof(CSharpCompilation).Assembly.GetName().Version}; optimization={compilation.Options.OptimizationLevel}; " +
             $"language={((CSharpParseOptions)tree.Options).LanguageVersion}; warmup={WarmupIterations}; measured={MeasuredIterations}; rounds={MeasurementRounds}; " +
             $"framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; " +

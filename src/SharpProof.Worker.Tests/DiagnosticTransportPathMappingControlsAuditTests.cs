@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -130,7 +131,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         {
             Assert.That(WorkerProtocolJson.ValidateForRequest(response,
                 WorkerProtocolJson.ComputeRequestHash(request),
-                Program.ComputeExpectedInputHash(request, publishedBytes), publishedArtifact.Manifest,
+                Program.ComputeExpectedInputHash(request, (publishedBytes).ToImmutableArray()), publishedArtifact.Manifest,
                 request, Program.ExpectedVersions()).IsValid, Is.True);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));

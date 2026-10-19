@@ -84,7 +84,7 @@ public sealed class ClosedClassMetadataTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source);
         var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken));
-        var expected = SharpProof.Worker.Protocol.WorkerProtocolJson.ComputeSha256(bytes);
+        var expected = SharpProof.Worker.Protocol.WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray());
         var graph = artifact.Callables.Single().Total!.Graph;
         var types = graph.Types.ToBuilder();
         for (var index = 0; index < types.Count; index++)
@@ -96,7 +96,7 @@ public sealed class ClosedClassMetadataTests
         }
         artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph with { Types = types.ToImmutable() } } }) };
         var changed = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken));
-        Assert.Throws<InvalidDataException>((Action)(() => ArtifactValidator.Decode(changed, expected, TestContext.CurrentContext.CancellationToken)));
+        Assert.Throws<InvalidDataException>((Action)(() => ArtifactValidator.Decode((changed).ToImmutableArray(), expected, TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]

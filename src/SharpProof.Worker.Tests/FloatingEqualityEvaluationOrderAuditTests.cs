@@ -95,8 +95,8 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
                 var result = (int)method.Invoke(null, [witness])!;
                 var observation = $"type={valueType}; witness={witness}; CLR={result}; " +
                     $"IL={Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!)}; " +
-                    $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
-                    $"PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}";
+                    $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
+                    $"PE_SHA256={WorkerProtocolJson.ComputeSha256((imageBytes).ToImmutableArray())}";
                 observationBuilder.Add(observation);
                 Assert.That(result, Is.EqualTo(1234), observation);
             }

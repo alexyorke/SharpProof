@@ -60,7 +60,7 @@ internal static class Program
         WorkerVerifyRequest request;
         var operationStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         CompilerManifestArtifact artifact;
-        byte[] artifactBytes;
+        ImmutableArray<byte> artifactBytes;
         WorkerInputSnapshot preparedInput;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
@@ -228,9 +228,9 @@ internal static class Program
 
     internal static string ComputeExpectedInputHash(
         WorkerVerifyRequest request,
-        byte[] artifactBytes)
+        ImmutableArray<byte> artifactBytes)
     {
-        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
+        RepositoryParameterGuard.ThrowIfMissing(artifactBytes.IsDefault, nameof(artifactBytes));
         System.ArgumentNullException.ThrowIfNull(request);
         var identity = WorkerCacheIdentity.Current;
         return CompilerArtifactInputHash.Compute(
@@ -493,11 +493,11 @@ internal static class Program
     // leases through invocation validation.
     internal static async Task PublishOutputsAsync(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
+        CompilerManifestArtifact artifact, ImmutableArray<byte> artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
         WorkerVerifyResponse response, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(artifactBytes, nameof(artifactBytes));
+        RepositoryParameterGuard.ThrowIfMissing(artifactBytes.IsDefault, nameof(artifactBytes));
         if (arguments.PublishRequestPath == null)
         {
             return;
@@ -735,13 +735,13 @@ internal sealed partial class LauncherArguments
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes, CancellationToken cancellationToken)
+        out CompilerManifestArtifact artifact, out ImmutableArray<byte> artifactBytes, CancellationToken cancellationToken)
     {
         return CreateRequest(out artifact, out artifactBytes, out _, cancellationToken);
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes,
+        out CompilerManifestArtifact artifact, out ImmutableArray<byte> artifactBytes,
         out WorkerInputSnapshot preparedInput, CancellationToken cancellationToken)
     {
         ValidateDistinctPaths(
@@ -805,7 +805,7 @@ internal sealed partial class LauncherArguments
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
-        out ValidatedArtifact artifact, out byte[] bytes, CancellationToken cancellationToken)
+        out ValidatedArtifact artifact, out ImmutableArray<byte> bytes, CancellationToken cancellationToken)
     {
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path, cancellationToken);
@@ -813,7 +813,7 @@ internal sealed partial class LauncherArguments
         return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
-    internal static byte[] ReadCompilerManifest(string path, CancellationToken cancellationToken)
+    internal static ImmutableArray<byte> ReadCompilerManifest(string path, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, cancellationToken);

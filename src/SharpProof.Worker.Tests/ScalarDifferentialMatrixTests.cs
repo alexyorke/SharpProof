@@ -1177,7 +1177,7 @@ public sealed class ScalarDifferentialMatrixTests
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = artifactPath,
-                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
+                    Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
                 },
                 Cache = new WorkerCacheOptions
                 {

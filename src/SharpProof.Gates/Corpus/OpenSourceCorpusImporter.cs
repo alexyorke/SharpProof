@@ -167,7 +167,7 @@ SOFTWARE.
             ? licenseText
             : licenseText + "\n";
         var licenseHash = HashEncoding.ComputeSha256Hex(
-            Encoding.UTF8.GetBytes(licenseContent));
+            (Encoding.UTF8.GetBytes(licenseContent)).ToImmutableArray());
         var source = new OpenSourceCorpusSource(
             SourceId,
             RepositoryUrl,

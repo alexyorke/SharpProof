@@ -405,7 +405,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             WorkerProtocolJson.SerializeResponse(response));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(project.Request);
         var validation = WorkerProtocolJson.ValidateForRequest(response, requestHash,
-            WorkerProgram.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest,
+            WorkerProgram.ComputeExpectedInputHash(project.Request, (artifactBytes).ToImmutableArray()), artifact.Manifest,
             project.Request, WorkerProgram.ExpectedVersions());
         var workerClaim = response.ClaimResults.Single();
         var callableResult = response.CallableResults.Single();

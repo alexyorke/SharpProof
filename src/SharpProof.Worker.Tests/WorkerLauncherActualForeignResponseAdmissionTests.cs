@@ -48,7 +48,7 @@ public sealed partial class WorkerTests
         var privateResultBytes = Encoding.UTF8.GetBytes(WorkerProtocolJson.SerializeCanonicalResponse(actual));
         await File.WriteAllBytesAsync(privateResult, privateResultBytes);
         var positive = Arguments("accepted");
-        await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, artifactBytes,
+        await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, (artifactBytes).ToImmutableArray(),
             snapshot.InputHash, Launcher.Program.ExpectedVersions(), actual, TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllBytesAsync(positive.PublishCompilerManifestPath!), Is.EqualTo(artifactBytes));
         var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(positive.PublishResultPath!))
@@ -63,7 +63,7 @@ public sealed partial class WorkerTests
         var negative = Arguments("rejected");
         // Wrong actual owner at the raw binding boundary; never admitted as first-project evidence.
         Func<Task> reject = () => Launcher.Program.PublishOutputsAsync(negative, negativeRequest,
-            snapshot.CompilerManifest, artifactBytes, snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, TestContext.CurrentContext.CancellationToken);
+            snapshot.CompilerManifest, (artifactBytes).ToImmutableArray(), snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<IOException>(reject);
         Assert.That(File.Exists(negative.PublishRequestPath!), Is.False);
         Assert.That(File.Exists(negative.PublishResultPath!), Is.False);

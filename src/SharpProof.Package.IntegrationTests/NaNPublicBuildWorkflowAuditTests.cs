@@ -38,7 +38,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
             "A public workflow observation must not replace earlier evidence.");
         Directory.CreateDirectory(evidence);
         var sourceBytes = Encoding.UTF8.GetBytes(Source);
-        Assert.That(WorkerProtocolJson.ComputeSha256(sourceBytes), Is.EqualTo(SourceSha256));
+        Assert.That(WorkerProtocolJson.ComputeSha256((sourceBytes).ToImmutableArray()), Is.EqualTo(SourceSha256));
         await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.cs"), sourceBytes);
 
         var feed = await PackagedProductFeed.GetAsync();
@@ -102,7 +102,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         Assert.That(File.Exists(assemblyPath), Is.True, "The ordinary build must compile the exact consumer.");
         await SaveFileAsync(assemblyPath, Path.Combine(evidence, "Consumer.dll"));
         Assert.That(WorkerProtocolJson.ComputeSha256(
-            await File.ReadAllBytesAsync(Path.Combine(consumer, "Subject.cs"))), Is.EqualTo(SourceSha256));
+            (await File.ReadAllBytesAsync(Path.Combine(consumer, "Subject.cs"))).ToImmutableArray()), Is.EqualTo(SourceSha256));
         var manifestBytes = await File.ReadAllBytesAsync(Path.Combine(publication, "compiler-manifest.json"));
         using var manifestDocument = JsonDocument.Parse(manifestBytes);
         var manifestRoot = manifestDocument.RootElement;
@@ -115,11 +115,11 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         var packageRoot = Path.Combine(packageCache, "sharpproof.verifier", feed.Version);
         var packageWorker = Path.Combine(packageRoot, "tools", "net10", "SharpProof.Worker.dll");
         var packageNative = Path.Combine(packageRoot, "tools", "native", "linux-x64", "libz3.so");
-        var nativeSha256 = WorkerProtocolJson.ComputeSha256(await File.ReadAllBytesAsync(packageNative));
+        var nativeSha256 = WorkerProtocolJson.ComputeSha256((await File.ReadAllBytesAsync(packageNative)).ToImmutableArray());
         var workerSha256 = WorkerBinaryIdentity.ComputeSha256(packageWorker, nativeSha256);
         var identity = WorkerCacheIdentity.Current;
         var expectedInputHash = CompilerArtifactInputHash.Compute(
-            request, ArtifactDigest.Compute(manifestBytes), identity.ToolIdentity,
+            request, ArtifactDigest.Compute((manifestBytes).ToImmutableArray()), identity.ToolIdentity,
             identity.ToolVersion, workerSha256, identity.ApiSpecIdentity,
             identity.ApiSpecVersion, identity.ApiSpecContentSha256);
         var validation = WorkerProtocolJson.ValidateForRequest(
@@ -138,8 +138,8 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         {
             BuildExitCode = build.ExitCode,
             SourceSha256,
-            AssemblySha256 = WorkerProtocolJson.ComputeSha256(await File.ReadAllBytesAsync(assemblyPath)),
-            CompilerManifestSha256 = WorkerProtocolJson.ComputeSha256(manifestBytes),
+            AssemblySha256 = WorkerProtocolJson.ComputeSha256((await File.ReadAllBytesAsync(assemblyPath)).ToImmutableArray()),
+            CompilerManifestSha256 = WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray()),
             WorkerSha256 = workerSha256,
             response.RequestHash,
             response.InputHash,
@@ -150,7 +150,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         }, WorkerProtocolJson.Options));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(manifestBytes)));
+            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256((manifestBytes).ToImmutableArray())));
             Assert.That(request.VerifyPolicy, Is.EqualTo(WorkerVerifyPolicy.RequireProven));
             Assert.That(request.AssumptionPolicy, Is.EqualTo(WorkerAssumptionPolicy.Error));
             Assert.That(request.Cache.Enabled, Is.False);

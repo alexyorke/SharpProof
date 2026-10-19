@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Worker;
 
 // The only file-to-prepared-callables boundary. The compiler artifact is
@@ -6,19 +7,19 @@ namespace SharpProof.Worker;
 internal static class ArtifactValidator
 {
     internal static ValidatedArtifact Decode(
-        byte[] bytes,
+        ImmutableArray<byte> bytes,
         string? expectedDigest,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        bytes = ArgumentNullGuard.NotNull(bytes, nameof(bytes));
+        RepositoryParameterGuard.ThrowIfMissing(bytes.IsDefault, nameof(bytes));
         var digest = ArtifactDigest.Compute(bytes);
         if (expectedDigest != null && digest != expectedDigest)
         {
             throw new InvalidDataException("The compiler artifact digest does not match the request.");
         }
         var artifact = CompilerManifestArtifactJson.DeserializePrepared(
-            new UTF8Encoding(false, true).GetString(bytes), out var callables, cancellationToken);
+            new UTF8Encoding(false, true).GetString(bytes.AsSpan()), out var callables, cancellationToken);
         return new ValidatedArtifact(artifact, callables, digest);
     }
 

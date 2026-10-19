@@ -267,7 +267,7 @@ public static partial class WorkerProtocolJson
                 $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        return ComputeSha256(json);
+        return ComputeSha256((json).ToImmutableArray());
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
@@ -1334,9 +1334,9 @@ public static partial class WorkerProtocolJson
         return ProtocolHashEncoding.IsSha256(value);
     }
 
-    internal static string ComputeSha256(byte[] bytes)
+    internal static string ComputeSha256(ImmutableArray<byte> bytes)
     {
-        bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
+        RepositoryParameterGuard.ThrowIfMissing(bytes.IsDefault, nameof(bytes));
         return ProtocolHashEncoding.ComputeSha256Hex(bytes);
     }
     internal static bool IsDefined<T>(T value, T unspecified) where T : struct, Enum

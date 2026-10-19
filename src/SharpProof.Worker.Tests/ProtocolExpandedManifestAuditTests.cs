@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public sealed class ProtocolExpandedManifestAuditTests
         var decoded = WorkerProtocolJson.DeserializeResponse(json)!;
         Assert.That(decoded.Manifest.Callables.Single().Location.Path.Length,
             Is.EqualTo(WorkerProtocolJson.MaximumJsonBytes / 6 + 1));
-        await TestContext.Out.WriteLineAsync($"compactBytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(json))}");
+        await TestContext.Out.WriteLineAsync($"compactBytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(json)).ToImmutableArray())}");
 
         if (boundary == "launcher")
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using System.Reflection.Metadata;
@@ -488,7 +489,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             throw new InvalidDataException(
                 "Compiler text contains ill-formed UTF-16.");
         }
-        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(value));
+        return HashEncoding.ComputeSha256Hex((Encoding.UTF8.GetBytes(value)).ToImmutableArray());
     }
 
     private static string Identity(MetadataReader reader)

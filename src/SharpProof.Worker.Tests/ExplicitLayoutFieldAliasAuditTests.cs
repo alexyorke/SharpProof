@@ -331,7 +331,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request,
+            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request,
             Program.ExpectedVersions());
         var callable = artifact.Callables.Single();
         var manifestClaim = artifact.Manifest.Claims.Single();

@@ -97,7 +97,7 @@ internal static class OpenSourceCorpusCatalog
     internal static string ComputeNormalizedSha256(string normalizedValue)
     {
         System.ArgumentNullException.ThrowIfNull(normalizedValue);
-        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
+        return HashEncoding.ComputeSha256Hex((Encoding.UTF8.GetBytes(normalizedValue)).ToImmutableArray());
     }
 
     internal static string NormalizeLineEndings(string value)
@@ -477,7 +477,7 @@ internal static class OpenSourceCorpusCatalog
                 $"OSS corpus source {source.Id} license file is missing.");
         }
 
-        var actualHash = HashEncoding.ComputeSha256Hex(File.ReadAllBytes(licensePath));
+        var actualHash = HashEncoding.ComputeSha256Hex((File.ReadAllBytes(licensePath)).ToImmutableArray());
         if (!string.Equals(
                 actualHash,
                 source.LicenseSha256,

@@ -56,7 +56,7 @@ public sealed class Wave8ProtocolEffectWitnessContractMatrixTests
         };
         var response = CreateResponse(request, contract, effects, capabilities);
         var json = WorkerProtocolJson.SerializeResponse(response);
-        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} capabilities={capabilities} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(json))}");
+        await TestContext.Out.WriteLineAsync($"contract={contract} effects={effects} capabilities={capabilities} boundary={boundary} bytes={Encoding.UTF8.GetByteCount(json)} sha256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(json)).ToImmutableArray())}");
         if (boundary == "validation")
         {
             var decoded = WorkerProtocolJson.DeserializeResponse(json)!;

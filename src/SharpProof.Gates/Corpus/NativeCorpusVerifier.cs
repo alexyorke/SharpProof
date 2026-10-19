@@ -37,7 +37,7 @@ internal static class NativeCorpusVerifier
             await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
             var request = new WorkerVerifyRequest
             {
-                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
+                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
                 Cache = new WorkerCacheOptions { Enabled = false, Directory = Path.Combine(directory.FullName, "cache") },
                 Budgets = new WorkerBudgets()
             };

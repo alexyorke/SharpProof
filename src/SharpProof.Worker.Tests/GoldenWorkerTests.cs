@@ -856,7 +856,7 @@ public sealed class GoldenWorkerTests
         await File.WriteAllBytesAsync(path, bytes);
         var request = new WorkerVerifyRequest
         {
-            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
+            CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
             Cache = new WorkerCacheOptions { Enabled = false },
             Budgets = new WorkerBudgets { ProjectWallTimeMilliseconds = 30000, MethodWallTimeMilliseconds = 10000, MaxParallelism = 1 }
         };
@@ -901,7 +901,7 @@ public sealed class GoldenWorkerTests
             Assert.That(timeoutExit, Is.Zero);
             var timeoutRequest = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(stableRequest))!;
             var timeoutResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(stableResult))!;
-            var inputHash = Program.ComputeExpectedInputHash(timeoutRequest, bytes);
+            var inputHash = Program.ComputeExpectedInputHash(timeoutRequest, (bytes).ToImmutableArray());
             var timeoutBinding = WorkerProtocolJson.ValidateForRequest(timeoutResponse, WorkerProtocolJson.ComputeRequestHash(timeoutRequest),
                 inputHash, artifact.Manifest, timeoutRequest, Program.ExpectedVersions());
             Assert.That(timeoutBinding.IsValid, Is.True);

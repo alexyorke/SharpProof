@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -36,7 +37,7 @@ internal sealed class ShadowTestProject : IDisposable
             File.WriteAllBytes(path, bytes);
             Request = new WorkerVerifyRequest
             {
-                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
+                CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray()) },
                 Cache = new WorkerCacheOptions { Enabled = cacheEnabled, Directory = Path.Combine(_directory.FullName, "cache") },
                 Budgets = new WorkerBudgets()
             };

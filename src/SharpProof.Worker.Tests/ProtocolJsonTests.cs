@@ -16,6 +16,24 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ProtocolJsonTests
 {
+    [Test]
+    public void ImmutableHashInputsRejectDefaultAndRetainTheEmptyPayloadDigest()
+    {
+        ImmutableArray<byte> bytes = default;
+        var protocolException = Assert.Throws<ArgumentNullException>((Action)(() =>
+            WorkerProtocolJson.ComputeSha256(bytes)));
+        var sharedException = Assert.Throws<ArgumentNullException>((Action)(() =>
+            ProtocolHashEncoding.ComputeSha256Hex(bytes)));
+        var artifactException = Assert.Throws<ArgumentNullException>((Action)(() =>
+            ArtifactDigest.Compute(bytes)));
+        Assert.That(protocolException!.ParamName, Is.EqualTo(nameof(bytes)));
+        Assert.That(sharedException!.ParamName, Is.EqualTo(nameof(bytes)));
+        Assert.That(artifactException!.ParamName, Is.EqualTo("canonicalArtifactBytes"));
+        const string emptyDigest = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        Assert.That(WorkerProtocolJson.ComputeSha256(ImmutableArray<byte>.Empty), Is.EqualTo(emptyDigest));
+        Assert.That(ArtifactDigest.Compute(ImmutableArray<byte>.Empty), Is.EqualTo(emptyDigest));
+    }
+
     private const string InputHash =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static readonly ImmutableArray<string> s_requestProperties = [
@@ -511,7 +529,7 @@ public sealed class ProtocolJsonTests
                     .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
                 Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
             Assert.That(roundTrip.Compilation.SyntaxTrees, Is.Empty);
-            Assert.That(ArtifactDigest.Compute(Encoding.UTF8.GetBytes(json)), Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(ArtifactDigest.Compute((Encoding.UTF8.GetBytes(json)).ToImmutableArray()), Does.Match("^[0-9a-f]{64}$"));
             Assert.That(WorkerProtocolJson.ManifestsEqual(
                 roundTrip.Manifest, manifest), Is.True);
         }

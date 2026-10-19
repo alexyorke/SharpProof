@@ -233,7 +233,7 @@ public sealed class TypedMetadataCallTests
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, captured);
         var owned = provider.Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(owned, Is.Not.Null);
-        Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image.ToArray())));
+        Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
         subject.MutateImage((bytes, _, il) => { System.ArgumentNullException.ThrowIfNull(bytes); if ((uint)il >= (uint)bytes.Length) { throw new ArgumentOutOfRangeException(nameof(il)); } bytes[il] = 0x26; });
         Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(owned));
         Assert.That(owned.Instructions[0].Code, Is.EqualTo("Ldarg"));

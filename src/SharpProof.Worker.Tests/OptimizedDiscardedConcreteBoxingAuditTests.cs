@@ -124,8 +124,8 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             $"shape={shape}; assembly={compilation.Assembly.Identity}; optimization={compilation.Options.OptimizationLevel}; " +
             $"compiler={typeof(CSharpCompilation).Assembly.GetName().Version}; cast={cast.Syntax}; " +
             $"operand={cast.Operand.Type}; target={cast.Type}; explicit={!cast.IsImplicit}; " +
-            $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(source))}; " +
-            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(BoundarySource))}\n");
+            $"sourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(source)).ToImmutableArray())}; " +
+            $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256((Encoding.UTF8.GetBytes(BoundarySource)).ToImmutableArray())}\n");
 
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
@@ -176,7 +176,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             JsonSerializer.Serialize(observations, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
             $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
-            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
+            $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256((boundaryBytes).ToImmutableArray())}; " +
             $"warmup={WarmupIterations}; measured={MeasuredIterations}; rounds={MeasurementRounds}; " +
             $"framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; " +
             $"architecture={System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}; " +

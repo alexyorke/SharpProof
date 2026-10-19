@@ -533,7 +533,7 @@ public sealed class FinalCompilationProbeTests
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             var compilationSha256 =
-                WorkerProtocolJson.ComputeSha256(bytes);
+                WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray());
             var claimPaths = root.GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()

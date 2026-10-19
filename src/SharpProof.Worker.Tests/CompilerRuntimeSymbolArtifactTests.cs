@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
@@ -78,7 +79,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             CompilerManifest = new WorkerFileReference
             {
                 Path = path,
-                Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
+                Sha256 = WorkerProtocolJson.ComputeSha256((bytes).ToImmutableArray())
             },
             Cache = new WorkerCacheOptions
             {

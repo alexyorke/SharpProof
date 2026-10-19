@@ -335,7 +335,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, manifestBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, (manifestBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
         await Save(evidenceDirectory, "native-observations.json", new
         {
             SourceSha256 = sourceHash,

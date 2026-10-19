@@ -1749,7 +1749,7 @@ public sealed class FinalCompilationCollectorTests
     private static string Digest(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        return ArtifactDigest.Compute((System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken))).ToImmutableArray());
     }
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,

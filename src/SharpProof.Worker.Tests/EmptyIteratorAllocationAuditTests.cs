@@ -199,7 +199,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
-            Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
+            Program.ComputeExpectedInputHash(project.Request, (artifactBytes).ToImmutableArray()), artifact.Manifest, project.Request, Program.ExpectedVersions());
         var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAllocationInstruction>().ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
