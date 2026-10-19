@@ -1422,14 +1422,14 @@ System.Collections	M:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCo
 System.Collections	M:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Enumerator.Dispose	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Enumerator.MoveNext	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.GetEnumerator	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Queue`1.#ctor	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Queue`1.#ctor	Method	partially-modeled	intrinsic=concrete-queue-state
 System.Collections	M:System.Collections.Generic.Queue`1.#ctor(System.Collections.Generic.IEnumerable{`0})	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Queue`1.#ctor(System.Int32)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Queue`1.#ctor(System.Int32)	Method	partially-modeled	intrinsic=concrete-queue-state
 System.Collections	M:System.Collections.Generic.Queue`1.Clear	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Queue`1.Contains(`0)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Queue`1.CopyTo(`0[],System.Int32)	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Queue`1.Dequeue	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Queue`1.Enqueue(`0)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Queue`1.Dequeue	Method	partially-modeled	intrinsic=concrete-queue-state
+System.Collections	M:System.Collections.Generic.Queue`1.Enqueue(`0)	Method	partially-modeled	intrinsic=concrete-queue-state
 System.Collections	M:System.Collections.Generic.Queue`1.EnsureCapacity(System.Int32)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Queue`1.Enumerator.#ctor	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Queue`1.Enumerator.Dispose	Method	unmodeled	-
@@ -1601,7 +1601,7 @@ System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItems	P
 System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Count	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Queue`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Queue`1.Count	Property	partially-modeled	catalog=bcl.queue.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
+System.Collections	P:System.Collections.Generic.Queue`1.Count	Property	partially-modeled	catalog=bcl.queue.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=concrete-queue-state
 System.Collections	P:System.Collections.Generic.Queue`1.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.ReferenceEqualityComparer.Instance	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.SortedDictionary`2.Comparer	Property	unmodeled	-

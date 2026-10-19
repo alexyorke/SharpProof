@@ -30,7 +30,7 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
-            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is "field:list:count" or "field:stack:count")
+            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
             {
                 foreach (var observed in field.Value.Values)
                 {

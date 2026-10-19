@@ -62,6 +62,10 @@ public sealed partial class DotnetApiInventoryTests
                     () => CheckStackStateIntrinsic(compilation, false) && CheckStackStateIntrinsic(compilation, false, incoming: true) && CheckStackStateIntrinsic(compilation, false, opaque: true),
                     () => CheckStackStateIntrinsic(compilation, true) || CheckStackStateIntrinsic(compilation, true, incoming: true) || CheckStackStateIntrinsic(compilation, true, opaque: true));
             }
+            if (row.Evidence.Contains("intrinsic=concrete-queue-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));
+            }
 
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
             {

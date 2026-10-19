@@ -77,6 +77,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IPropertyReferenceOperation stackProperty &&
             StackClause(stackProperty, state, depth) is { } stackClause)
         { return stackClause; }
+        if (depth < 256 && operation is IPropertyReferenceOperation queueProperty &&
+            QueueClause(queueProperty, state, depth) is { } queueClause)
+        { return queueClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation listProperty &&
             ListClause(listProperty, state, depth) is { } listClause)
         { return listClause; }
@@ -259,6 +262,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return AllocateValue(operation, block); }
         if (depth < 256 && StackBody(operation, block, depth) is { } stack)
         { return Capture(operation, stack); }
+        if (depth < 256 && QueueBody(operation, block, depth) is { } queue)
+        { return Capture(operation, queue); }
         if (depth < 256 && ListBody(operation, block, depth) is { } list)
         { return Capture(operation, list); }
         if (depth < 256 && DictionaryBody(operation, block, depth) is { } dictionary)

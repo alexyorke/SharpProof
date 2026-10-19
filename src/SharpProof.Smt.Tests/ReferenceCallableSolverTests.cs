@@ -256,16 +256,22 @@ public sealed class ReferenceCallableSolverTests
         Assert.That(await new ProofKernel(session).VerifyAsync(nullQuery, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
 
-    [TestCase(0)]
-    [TestCase(64)]
-    [TestCase(65)]
-    [TestCase(257)]
-    [TestCase(int.MaxValue)]
-    public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum)
+    [TestCase(0, "list")]
+    [TestCase(64, "list")]
+    [TestCase(65, "list")]
+    [TestCase(257, "list")]
+    [TestCase(int.MaxValue, "list")]
+    [TestCase(0, "queue")]
+    [TestCase(64, "queue")]
+    [TestCase(65, "queue")]
+    [TestCase(257, "queue")]
+    [TestCase(int.MaxValue, "queue")]
+    public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum, string collection = "list")
     {
+        ArgumentNullException.ThrowIfNull(collection);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var input = factory.CreateVariable("list", factory.ObjectType);
-        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:list:count", factory.IntegerType, false);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         var count = factory.Binary(IrBinaryOperator.BitwiseAnd,
             factory.PureOpaque(field, factory.Variable(input)), factory.Integer(int.MaxValue));
         var assumptions = ImmutableArray.Create(NotNull(factory, input),
