@@ -552,7 +552,7 @@ public sealed class IrFactory
         {
             EmptyArray(type);
             if (!_emptyArrays.TryGetValue(type, out var value))
-            { _emptyArrays = _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            { _emptyArrays = _emptyArrays.Add(type, value = CreateSequenceValue(type, ImmutableArray<IrValue>.Empty)); }
             return value;
         }
     }

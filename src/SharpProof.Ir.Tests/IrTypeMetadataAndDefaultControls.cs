@@ -58,7 +58,7 @@ public sealed class IrTypeMetadataAndDefaultControls
         var strings = factory.GetOrCreateSequenceType(factory.StringType);
         var variable = factory.CreateVariable("empty", strings);
         var nullable = interpreter.Evaluate(factory.SequenceAccess(factory.Variable(variable), factory.Integer(0)),
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateSequenceValue(strings, Array.Empty<IrValue>())));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateSequenceValue(strings, ImmutableArray<IrValue>.Empty)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(boolean.Status, Is.EqualTo(IrEvaluationStatus.Value));

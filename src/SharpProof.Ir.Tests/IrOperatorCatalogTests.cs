@@ -18,7 +18,7 @@ public sealed class IrOperatorCatalogTests
         var expected = expectedBuilder.ToImmutable();
 
         Assert.That(
-            Enum.GetValues<IrTypeKind>(),
+            Enum.GetValues<IrTypeKind>().ToImmutableArray(),
             Is.EquivalentTo(expected.Keys));
         Assert.That(
             expected.Keys.Select(static kind => (int)kind),
@@ -76,7 +76,7 @@ public sealed class IrOperatorCatalogTests
 
         AssertOperatorMetadata(
             expected,
-            Enum.GetValues<IrUnaryOperator>(),
+            Enum.GetValues<IrUnaryOperator>().ToImmutableArray(),
             static @operator => (int)@operator,
             static metadata => metadata.Key,
             static @operator => IrOperatorCatalog.Get(@operator),
@@ -116,7 +116,7 @@ public sealed class IrOperatorCatalogTests
 
         AssertOperatorMetadata(
             expected,
-            Enum.GetValues<IrBinaryOperator>(),
+            Enum.GetValues<IrBinaryOperator>().ToImmutableArray(),
             static @operator => (int)@operator,
             static metadata => metadata.Key,
             static @operator => IrOperatorCatalog.Get(@operator),
@@ -125,14 +125,15 @@ public sealed class IrOperatorCatalogTests
 
     private static void AssertOperatorMetadata<TEnum, TMetadata>(
         IReadOnlyDictionary<TEnum, TMetadata> expected,
-        TEnum[] values,
+        ImmutableArray<TEnum> values,
         Func<TEnum, int> numericValue,
         Func<TMetadata, int> expectedNumericValue,
         Func<TEnum, TMetadata> getMetadata,
         TEnum invalidValue)
         where TEnum : struct, Enum
     {
-        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        if (values.IsDefault)
+        { throw new ArgumentNullException(nameof(values)); }
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(expectedNumericValue);
         System.ArgumentNullException.ThrowIfNull(getMetadata);

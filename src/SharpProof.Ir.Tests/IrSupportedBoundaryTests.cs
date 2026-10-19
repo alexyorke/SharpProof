@@ -53,9 +53,9 @@ public sealed class IrSupportedBoundaryTests
         var second = factory.CreateVariable("second", factory.IntegerType);
         var sum = factory.Binary(IrBinaryOperator.Add, factory.Variable(first), factory.Variable(second));
         Assert.That(IrSubstitution.TrySubstitute(factory, sum,
-            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), new HashSet<IrVarId> { second }, out var valid), Is.True);
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), ImmutableHashSet.Create(second), out var valid), Is.True);
         Assert.That(IrSubstitution.TrySubstitute(factory, sum,
-            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), new HashSet<IrVarId>(), out _), Is.False);
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(first, factory.Integer(2)), ImmutableHashSet<IrVarId>.Empty, out _), Is.False);
         var result = new IrInterpreter(factory).Evaluate(valid, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(second, factory.CreateIntegerValue(3)));
         Assert.That(result.Value!.Integer, Is.EqualTo(5));
     }

@@ -22,10 +22,10 @@ public sealed class Pr275InstructionFactsCoverageTests
         var location = builder.MemberLocation(member, isStatic ? null : receiver, argument);
         var load = builder.Load(entry, factory.CreateOperation("load"), target, location);
         var store = builder.Store(entry, factory.CreateOperation("store"), location, value);
-        IrTerm[] expectedRead = isStatic ? [argument] : [receiver, argument];
+        ImmutableArray<IrTerm> expectedRead = isStatic ? [argument] : [receiver, argument];
 
         Assert.That(IrInstructionFacts.ReadTerms(load), Is.EqualTo(expectedRead));
-        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(expectedRead.Concat([value])));
+        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(expectedRead.Add(value)));
         Assert.That(IrInstructionFacts.WrittenVariables(load), Is.EqualTo(ImmutableArray.Create(target)));
         Assert.That(IrInstructionFacts.WrittenVariables(store), Is.Empty);
     }
@@ -67,7 +67,7 @@ public sealed class Pr275InstructionFactsCoverageTests
             member, isStatic ? null : receiver, argument);
         var discarded = builder.Call(entry, factory.CreateOperation("discard result"), null,
             member, isStatic ? null : receiver, argument);
-        IrTerm[] expectedRead = isStatic ? [argument] : [receiver, argument];
+        ImmutableArray<IrTerm> expectedRead = isStatic ? [argument] : [receiver, argument];
 
         Assert.That(IrInstructionFacts.ReadTerms(withResult), Is.EqualTo(expectedRead));
         Assert.That(IrInstructionFacts.ReadTerms(discarded), Is.EqualTo(expectedRead));

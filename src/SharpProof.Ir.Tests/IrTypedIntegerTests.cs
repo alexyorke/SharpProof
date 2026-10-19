@@ -12,7 +12,8 @@ public sealed class IrTypedIntegerTests
     public void TypedInterningIncludesWidthAndSignAndKeepsLegacySeparate()
     {
         var factory = new IrFactory();
-        var types = new HashSet<IrTypeId> { factory.IntegerType };
+        var types = ImmutableHashSet.CreateBuilder<IrTypeId>();
+        types.Add(factory.IntegerType);
         foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
             foreach (var isSigned in ImmutableArray.Create(false, true))

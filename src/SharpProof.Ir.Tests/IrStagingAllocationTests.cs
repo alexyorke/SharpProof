@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -10,13 +11,13 @@ public sealed class IrStagingAllocationTests
     public void AllocationSkipsRealFileAndDirectoryCollisions()
     {
         using var temporary = new TempDirectory("SharpProof.Ir.StagingAllocation.");
-        var identities = new Queue<Guid>(Enumerable.Range(1, 3).Select(Identity));
+        var identities = ImmutableQueue.CreateRange(Enumerable.Range(1, 3).Select(Identity));
         var existingFile = Name(temporary.FullName, Identity(1));
         var existingDirectory = Name(temporary.FullName, Identity(2));
         File.WriteAllText(existingFile, "original");
         Directory.CreateDirectory(existingDirectory);
         var destination = Path.Combine(temporary.FullName, "output.txt");
-        var allocated = AtomicFile.PrepareStaged(destination, identities.Dequeue);
+        var allocated = AtomicFile.PrepareStaged(destination, () => { var identity = identities.Peek(); identities = identities.Dequeue(); return identity; });
         Assert.That(allocated, Is.EqualTo(Name(temporary.FullName, Identity(3))));
         Assert.That(identities, Is.Empty);
         Assert.That(File.Exists(allocated), Is.False);
@@ -30,11 +31,11 @@ public sealed class IrStagingAllocationTests
     public void AllocationExhaustsExactlyEightRealCollisions()
     {
         using var temporary = new TempDirectory("SharpProof.Ir.StagingExhaustion.");
-        var identities = new Queue<Guid>(Enumerable.Range(1, 8).Select(Identity));
+        var identities = ImmutableQueue.CreateRange(Enumerable.Range(1, 8).Select(Identity));
         foreach (var identity in identities)
         { File.WriteAllText(Name(temporary.FullName, identity), "original"); }
         var destination = Path.Combine(temporary.FullName, "output.txt");
-        var failure = Assert.Throws<IOException>((Action)(() => AtomicFile.PrepareStaged(destination, identities.Dequeue)));
+        var failure = Assert.Throws<IOException>((Action)(() => AtomicFile.PrepareStaged(destination, () => { var identity = identities.Peek(); identities = identities.Dequeue(); return identity; })));
         Assert.That(failure!.Message, Is.EqualTo("Could not allocate a SharpProof staging path."));
         Assert.That(identities, Is.Empty);
         foreach (var identity in Enumerable.Range(1, 8).Select(Identity))
