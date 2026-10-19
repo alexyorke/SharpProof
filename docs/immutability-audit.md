@@ -3091,3 +3091,11 @@ compiler constants and identity/default callbacks. Replace all three configuring
 retaining callback observation builders. Keep RoslynTypeMapper's separate runtime
 receiver specialization contract unchanged. Validate Frontend lowering/replay and Contracts.
 Status: open before edits.
+
+IMM-M095: Main traced the container command dispatcher's eleven argv += sites plus
+solution build concatenation. Use separate scoped string builders and freeze at the
+required-dotnet native argv boundary. Preserve restore/build/export order, Fast flags,
+NoBuild behavior, package exclusion/filter branches, project parallelism and explicit
+null/empty additional build arguments. Compare AST-extracted baseline/current functions
+and default test dispatch with recorded native calls before accepting changes.
+Status: open before edits.
