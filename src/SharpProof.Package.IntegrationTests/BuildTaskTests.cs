@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Microsoft.CodeAnalysis;
@@ -375,7 +376,7 @@ public sealed class BuildTaskTests
         using var directory = new TempDirectory("sharpproof-publication-count-");
         var paths = Enumerable.Range(0, count)
             .Select(index => Path.Combine(directory.FullName, $"member-{index}.json"))
-            .ToArray();
+            .ToImmutableArray();
 
         var exception = Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.Acquire(paths, TestContext.CurrentContext.CancellationToken)));
@@ -1300,7 +1301,7 @@ public sealed class BuildTaskTests
         System.ArgumentNullException.ThrowIfNull(option);
         using var directory = new TempDirectory("sharpproof-publication-incomplete-");
         string[] arguments = ["verify", option, Path.Combine(directory.FullName, "stable.json")];
-        var original = arguments.ToArray();
+        var original = arguments.ToImmutableArray();
         Action prepare = () => { VerificationPublication.Prepare(arguments, directory.FullName); };
 
         Assert.That(prepare, Throws.ArgumentException);
@@ -1520,7 +1521,7 @@ public sealed class BuildTaskTests
             "--publish-request", Path.Combine(directory.FullName, "request.json"),
             "--publish-result", Path.Combine(directory.FullName, "result.json"),
             "--publish-compiler-manifest", manifest, "--compiler-manifest", manifest];
-        var original = arguments.ToArray();
+        var original = arguments.ToImmutableArray();
         Action prepare = () => { VerificationPublication.Prepare(arguments, directory.FullName); };
 
         Assert.That(prepare, Throws.ArgumentException);

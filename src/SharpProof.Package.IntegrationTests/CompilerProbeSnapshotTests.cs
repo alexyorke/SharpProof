@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -44,7 +45,7 @@ public sealed class CompilerProbeSnapshotTests
         var kinds = document.RootElement.GetProperty("syntaxTrees")
             .EnumerateArray()
             .Select(static tree => ((tree.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(tree)) : (tree.GetProperty("generatedKind").GetString())))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(kinds, Is.EqualTo(["Unknown", "Unknown"]));
     }

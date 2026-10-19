@@ -108,7 +108,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         using var project = ConsumerProject.Create(IdentitySource);
         var document = XDocument.Load(project.ProjectPath);
-        var elements = document.Root?.Elements().ToArray() ??
+        var elements = document.Root?.Elements().ToImmutableArray() ??
             throw new InvalidDataException(
                 "The generated consumer project has no root.");
 
@@ -1190,7 +1190,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     claim.Kind,
                     result.Outcome,
                     result.Reason
-                })).ToArray();
+                })).ToImmutableArray();
             Assert.That(
                 outcomesByKind.Single(static result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Kind == WorkerClaimKind.Postcondition)).Outcome,
@@ -2618,14 +2618,14 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static onError =>
                 onError is null ? throw new System.ArgumentNullException(nameof(onError)) : (onError.Attribute("ExecuteTargets")?.Value ==
                 "_SharpProofCleanupInvocation"));
-        var cleanupElements = cleanup.Elements().ToList();
+        var cleanupElements = cleanup.Elements().ToImmutableArray();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
-        var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
-        var verifyCoreElements = verifyCore.Elements().ToList();
+        var cleanupSafetyErrors = cleanup.Elements("Error").ToImmutableArray();
+        var verifyCoreElements = verifyCore.Elements().ToImmutableArray();
         var runnerTasks = targets.Descendants("UsingTask")
             .Where(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("TaskName")?.Value ==
                 "SharpProof.BuildTasks.RunVerifier"))
-            .ToArray();
+            .ToImmutableArray();
         var coreRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Condition")?.Value ==
             "'$(MSBuildRuntimeType)' == 'Core'"));
         var fullRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Runtime")?.Value ==

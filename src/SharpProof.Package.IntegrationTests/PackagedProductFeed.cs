@@ -301,7 +301,7 @@ internal sealed class PackagedProductFeed : IDisposable
         return new PackagedPackage(id, version, path);
     }
 
-    private static string[] ReadPackageProjects(string repositoryRoot)
+    private static ImmutableArray<string> ReadPackageProjects(string repositoryRoot)
     {
         System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         var path = Path.Combine(
@@ -321,12 +321,11 @@ internal sealed class PackagedProductFeed : IDisposable
             .Select(static value => value.GetString() ??
                 throw new InvalidDataException(
                     "A package project path is null."))
-            .ToArray();
-        var expectedProjects = new[] {
+            .ToImmutableArray();
+        var expectedProjects = ImmutableArray.Create(
             "src/SharpProof.Attributes/SharpProof.Attributes.csproj",
             "src/SharpProof.Verifier/SharpProof.Verifier.csproj",
-            "src/SharpProof.Package/SharpProof.Package.csproj"
-        };
+            "src/SharpProof.Package/SharpProof.Package.csproj");
         if (!projects.SequenceEqual(
                 expectedProjects,
                 StringComparer.Ordinal))

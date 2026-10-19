@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Worker.Launcher;
@@ -236,7 +237,7 @@ public sealed class SarifProjectionTests
     public void AbsolutePathsInsideSourceRootAreRelativeAndOutsidePathsStayAbsolute()
     {
         const string projectDirectory = "/workspace/consumer project";
-        (string CallableId, string ClaimId, string Path)[] sources =
+        ImmutableArray<(string CallableId, string ClaimId, string Path)> sources =
         [
             ("Consumer.Subject.Root()", "claim-root", projectDirectory),
             ("Consumer.Subject.Inside()", "claim-inside",
@@ -254,7 +255,7 @@ public sealed class SarifProjectionTests
                 Length = 1,
                 Line = 1,
                 Column = 1
-            }).ToArray();
+            }).ToImmutableArray();
         var manifest = new WorkerClaimManifest
         {
             Callables = [.. sources.Select((source, index) =>

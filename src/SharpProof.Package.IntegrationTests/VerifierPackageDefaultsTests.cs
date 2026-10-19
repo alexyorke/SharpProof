@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -184,7 +185,7 @@ public sealed class VerifierPackageDefaultsTests
         var references = document.RootElement.GetProperty("Items").GetProperty("PackageReference").EnumerateArray()
             .Where(static reference => !reference.TryGetProperty("IsImplicitlyDefined", out var implicitReference) ||
                 !string.Equals(implicitReference.GetString(), "true", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(1));
         Assert.That(references[0].GetProperty("Identity").GetString(), Is.EqualTo(packageId));
     }

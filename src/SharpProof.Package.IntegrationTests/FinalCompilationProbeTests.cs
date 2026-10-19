@@ -326,23 +326,27 @@ public sealed class FinalCompilationProbeTests
         private ProbeArtifact(
             string targetFramework,
             string options,
-            string[] syntaxTrees,
-            SyntaxTreeRow[] syntaxTreeRows,
-            string[] portableReferences,
-            string[] additionalFiles)
+            ImmutableArray<string> syntaxTrees,
+            ImmutableArray<SyntaxTreeRow> syntaxTreeRows,
+            ImmutableArray<string> portableReferences,
+            ImmutableArray<string> additionalFiles)
         {
-            System.ArgumentNullException.ThrowIfNull(additionalFiles, nameof(additionalFiles));
-            System.ArgumentNullException.ThrowIfNull(portableReferences, nameof(portableReferences));
-            System.ArgumentNullException.ThrowIfNull(syntaxTreeRows, nameof(syntaxTreeRows));
-            System.ArgumentNullException.ThrowIfNull(syntaxTrees, nameof(syntaxTrees));
+            if (additionalFiles.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(additionalFiles)); }
+            if (portableReferences.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(portableReferences)); }
+            if (syntaxTreeRows.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(syntaxTreeRows)); }
+            if (syntaxTrees.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(syntaxTrees)); }
             System.ArgumentNullException.ThrowIfNull(options);
             System.ArgumentNullException.ThrowIfNull(targetFramework);
             TargetFramework = targetFramework;
             Options = options;
-            SyntaxTrees = syntaxTrees.ToImmutableArray();
-            _syntaxTreeRows = syntaxTreeRows.ToImmutableArray();
-            PortableReferences = portableReferences.ToImmutableArray();
-            AdditionalFiles = additionalFiles.ToImmutableArray();
+            SyntaxTrees = syntaxTrees;
+            _syntaxTreeRows = syntaxTreeRows;
+            PortableReferences = portableReferences;
+            AdditionalFiles = additionalFiles;
         }
 
         internal string TargetFramework
@@ -435,7 +439,7 @@ public sealed class FinalCompilationProbeTests
                 .Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path.EndsWith(
                     pathSuffix,
                     StringComparison.OrdinalIgnoreCase)))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 matches,
                 Has.Length.EqualTo(1),
@@ -443,7 +447,7 @@ public sealed class FinalCompilationProbeTests
             return matches[0].TextSha256;
         }
 
-        private static SyntaxTreeRow[] GetCanonicalSyntaxTrees(
+        private static ImmutableArray<SyntaxTreeRow> GetCanonicalSyntaxTrees(
             JsonElement root,
             string path)
         {
@@ -458,7 +462,7 @@ public sealed class FinalCompilationProbeTests
                     tree.GetProperty("ordinal").GetInt32(),
                     tree.GetProperty("textSha256").GetString() ?? string.Empty,
                     tree.GetRawText()))))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 trees.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree.Path, tree.Ordinal))),
                 Is.EqualTo(trees
@@ -475,7 +479,7 @@ public sealed class FinalCompilationProbeTests
             return trees;
         }
 
-        private static string[] GetCanonicalRawRows(
+        private static ImmutableArray<string> GetCanonicalRawRows(
             JsonElement root,
             string propertyName,
             string path)
@@ -488,7 +492,7 @@ public sealed class FinalCompilationProbeTests
             var rows = root.GetProperty(propertyName)
                 .EnumerateArray()
                 .Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetRawText())))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 rows,
                 Is.Ordered.Using<string>(StringComparer.Ordinal),
@@ -534,7 +538,7 @@ public sealed class FinalCompilationProbeTests
                 .EnumerateArray()
                 .Select(static claim => ((claim.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(claim)) : (claim.GetProperty("location")
                     .GetProperty("path").GetString() ?? string.Empty)))
-                .ToArray();
+                .ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -553,7 +557,7 @@ public sealed class FinalCompilationProbeTests
             return new CompilerManifestArtifact(
                 bytes.ToImmutableArray(),
                 compilationSha256!,
-                claimPaths.ToImmutableArray());
+                claimPaths);
         }
 
         public ImmutableArray<byte> Bytes { get; init; } = Bytes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Bytes)) : Bytes;
@@ -840,13 +844,13 @@ public sealed class FinalCompilationProbeTests
                 Guid.NewGuid().ToString("N");
         }
 
-        internal string[] GetArtifactPaths()
+        internal ImmutableArray<string> GetArtifactPaths()
         {
             return Directory.Exists(ArtifactDirectory)
                 ? Directory.GetFiles(
                     ArtifactDirectory,
                     "*.json",
-                    SearchOption.AllDirectories)
+                    SearchOption.AllDirectories).ToImmutableArray()
                 : [];
         }
 

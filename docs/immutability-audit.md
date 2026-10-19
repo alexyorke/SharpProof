@@ -3258,3 +3258,9 @@ parser mutations and measurement timing as mutable test subjects. Backend factor
 created serially and renewal is under the existing lane lock. Validate real launcher,
 resource, backend disposal and native precision controls through Worker/semantic tests.
 Status: open before edits.
+
+IMM-M101 verified: full ordinary package integration suite passes 384 tests, zero failures,
+one expected unsupported-host platform skip, zero build warnings/errors. Main reviewed
+all 39 nodes and helper couplings, ZIP/JSON lifetime, pre-Prepare snapshots, native
+adapters and XML IndexOf assertions. First compilation identified a redundant claim-path
+copy after helper narrowing; direct immutable publication fixed it before this full run.

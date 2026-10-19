@@ -173,7 +173,7 @@ public sealed class PackageLayoutSmokeTests
             .SelectMany(static library => library.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(library)) : (library.Value.GetProperty("runtimeTargets").EnumerateObject()))
             .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
                 asset.Value.GetProperty("rid").GetString() is "win" or "win-x64" or "win-arm64")
-            .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToArray();
+            .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToImmutableArray();
         Assert.That(windowsAssets, Is.Empty,
             "The .NET 10 worker uses framework libraries rather than redundant Windows runtime copies.");
         foreach (var asset in windowsAssets)
@@ -850,7 +850,7 @@ public sealed class PackageLayoutSmokeTests
                 ExpectedCollectorDependencyFileNames.Contains(
                     Path.GetFileName(path),
                     StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var sourceProjects = GetEvaluatedItemIdentities(
             sourceEvaluation.Output,
             "ProjectReference");
@@ -909,7 +909,7 @@ public sealed class PackageLayoutSmokeTests
             .Where(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ExpectedAnalyzerDependencyFileNames.Contains(
                 Path.GetFileName(path),
                 StringComparer.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             dependencyPaths.Select(Path.GetFileName),
             Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
@@ -1115,7 +1115,7 @@ public sealed class PackageLayoutSmokeTests
                             .GetString() ?? string.Empty,
                         Claim = claim
                     }))))))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(effectClaims, Has.Length.EqualTo(2));
             Assert.That(
                 effectClaims.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Claim
@@ -1131,7 +1131,7 @@ public sealed class PackageLayoutSmokeTests
         var claims = result.RootElement
             .GetProperty("claimResults")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(claims, Has.Length.EqualTo(2));
@@ -1202,7 +1202,7 @@ public sealed class PackageLayoutSmokeTests
                 .GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(claims, Has.Length.EqualTo(1));
             var location = claims[0].GetProperty("location");
             JsonAssert.Equal(location, "path", expectedMappedPath);
@@ -1236,7 +1236,7 @@ public sealed class PackageLayoutSmokeTests
             feed.GetPackagePath(PackagedProductFeed.VerifierPackageId), TestContext.CurrentContext.CancellationToken);
         var targets = XDocument.Parse(ReadArchiveText(archive, "buildTransitive/SharpProof.Verifier.targets"));
         var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
-        var registrations = root.Elements("UsingTask").ToArray();
+        var registrations = root.Elements("UsingTask").ToImmutableArray();
         Assert.That(registrations, Has.Length.EqualTo(8));
         foreach (var taskName in new[]
                  {
@@ -1741,7 +1741,7 @@ public sealed class PackageLayoutSmokeTests
 
         var syntaxTrees = root.GetProperty("syntaxTrees")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             syntaxTrees,
             Has.Some.Matches<JsonElement>(tree =>
@@ -1814,7 +1814,7 @@ public sealed class PackageLayoutSmokeTests
 
         var consumedOptions = root.GetProperty("consumedOptions")
             .EnumerateArray()
-            .ToArray();
+            .ToImmutableArray();
         var globalOption = consumedOptions.Single(option =>
             option.GetProperty("key").GetString() ==
                 CompilerProbeContract.GlobalValueOptionKey &&
@@ -1945,7 +1945,7 @@ public sealed class PackageLayoutSmokeTests
             var dependencies = metadata.Descendants()
                 .Where(element =>
                     element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "dependency"))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 dependencies.Select(static dependency => dependency is null ? throw new System.ArgumentNullException(nameof(dependency)) : ((
                     Id: dependency.Attribute("id")?.Value,
@@ -2034,8 +2034,8 @@ public sealed class PackageLayoutSmokeTests
             using var archive = ZipFile.OpenRead(package.Path);
             return archive.Entries
                 .Select(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : ((package.Id, entry.FullName)))
-                .ToArray();
-        }).ToArray();
+                .ToImmutableArray();
+        }).ToImmutableArray();
         Assert.That(
             allEntries.Where(static entry =>
                 entry.FullName.EndsWith(
@@ -2055,15 +2055,16 @@ public sealed class PackageLayoutSmokeTests
 
     private static void AssertArchiveLayout(
         string packagePath,
-        string[] expectedEntries)
+        ImmutableArray<string> expectedEntries)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedEntries, nameof(expectedEntries));
+        if (expectedEntries.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(expectedEntries)); }
         System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry =>
                 entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (NormalizeGeneratedPackageEntry(entry.FullName)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             entries,
             Is.EquivalentTo(expectedEntries),
@@ -2083,7 +2084,7 @@ public sealed class PackageLayoutSmokeTests
         using var package = ZipFile.OpenRead(packagePath);
         var packageEntries = package.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             packageEntries,
             Has.None.EndsWith(".pdb"),
@@ -2096,7 +2097,7 @@ public sealed class PackageLayoutSmokeTests
                     StringComparison.Ordinal)))
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry[..^".dll".Length] + ".pdb"))
             .Order(StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             expectedPdbEntries,
             Is.Not.Empty,
@@ -2160,7 +2161,7 @@ public sealed class PackageLayoutSmokeTests
             .Select(reader.GetCustomDebugInformation)
             .Where(information =>
                 reader.GetGuid(information.Kind) == SourceLinkKind)
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             sourceLinks,
             Has.Length.EqualTo(1),
@@ -2180,7 +2181,7 @@ public sealed class PackageLayoutSmokeTests
             entry.FullName);
         var mappings = documents
             .EnumerateObject()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(mappings, Is.Not.Empty, entry.FullName);
         var expectedUrl =
             "https://raw.githubusercontent.com/alexyorke/" +
@@ -2258,27 +2259,27 @@ public sealed class PackageLayoutSmokeTests
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         var analyzerEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "analyzers/dotnet/cs/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var conditionalAnalyzerEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/analyzers/dotnet/cs/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var collectorEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/collector/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var sharedEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/shared/netstandard2.0/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(analyzerEntries, Is.Empty);
         Assert.That(
             conditionalAnalyzerEntries,
@@ -2357,12 +2358,12 @@ public sealed class PackageLayoutSmokeTests
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
-            .ToArray();
+            .ToImmutableArray();
         var toolEntries = entries
             .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
                 "tools/net10/",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             toolEntries,
             Is.EquivalentTo(ExpectedToolEntries));
@@ -2611,7 +2612,7 @@ public sealed class PackageLayoutSmokeTests
         return new(entryNames, dependencyNames);
     }
 
-    private static string[] GetEvaluatedItemIdentities(
+    private static ImmutableArray<string> GetEvaluatedItemIdentities(
         string output,
         string itemName,
         string? requiredMetadata = null)
