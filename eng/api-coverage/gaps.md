@@ -60,7 +60,7 @@ access kind and value domains satisfy the production guard.
 ## Stack shared-state slice
 
 Framework `Stack<T>` default and capacity constructors, Push, Pop and Count now
-share LIFO heap storage. Bound nonvirtual framework members use the same storage
+share LIFO heap storage. Bound framework members use fixed dispatch and the same storage
 for concrete incoming parameters, aliases, derived receivers, rebinding and mixed
 joins. Source helpers preserve scalar/reference/opaque element representations;
 Push/Pop copy opaque values without interpreting their payload or invoking value
