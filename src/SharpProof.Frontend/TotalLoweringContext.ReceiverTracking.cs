@@ -387,7 +387,7 @@ public sealed partial class TotalLoweringContext
             { return Substitute(direct, depth + 1); }
             if (value is IArrayTypeSymbol array && Substitute(array.ElementType, depth + 1) is { } element &&
                 !SymbolEqualityComparer.Default.Equals(element, array.ElementType))
-            { return array.IsSZArray || array.Rank != 1 ? Compilation?.CreateArrayTypeSymbol(element, array.Rank, array.NullableAnnotation) ?? throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType) : throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType); }
+            { return array.IsSZArray || array.Rank != 1 ? (Compilation ?? _sourceTypeCompilation)?.CreateArrayTypeSymbol(element, array.Rank, array.NullableAnnotation) ?? throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType) : throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType); }
             if (value is INamedTypeSymbol named)
             {
                 var definition = named.ConstructedFrom;
