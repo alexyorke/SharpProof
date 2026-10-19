@@ -3142,3 +3142,12 @@ failures/skips/warnings/errors. Main traced constructor short-circuit payload re
 known-pure/default/replay callback paths and all configuring callers; independent
 read-only review found no concrete defect. Explicit configured-factory guards satisfy
 the repository defensive analyzer. Public lowering APIs and runtime mapper state remain.
+
+IMM-M098: ContractExpressionBinder owns six sequential accumulation roots: bound and
+receiver membership, pre-state mapping/value membership and two first-seen ordered
+vectors. Main traced recursive old() binding, source-result tracking and publication.
+Use readonly immutable builders; freeze receiver/pre-state snapshots in getters so
+previously published views remain stable across later Bind calls. Keep map lookup then
+Add, exact variable naming, callback order and partial-failure accumulation unchanged.
+Validate the full Contracts suite and generic/flow-capture materialization controls.
+Status: open before edits.
