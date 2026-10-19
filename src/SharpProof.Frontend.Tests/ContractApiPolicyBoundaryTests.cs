@@ -48,7 +48,7 @@ public sealed class ContractApiPolicyBoundaryTests
     public void IdenticalShaMetadataRemainOneExpectedValue()
     {
         var hash = AttributesHash();
-        var policy = CreatePolicy((ShaKey, hash), (ShaKey, hash), (MvidKey, AttributesMvid()));
+        var policy = CreatePolicy([(ShaKey, hash), (ShaKey, hash), (MvidKey, AttributesMvid())]);
         AssertPayloadAccepted(policy);
     }
 
@@ -57,7 +57,7 @@ public sealed class ContractApiPolicyBoundaryTests
     {
         var lowercaseHash = string.Concat(Convert.FromHexString(AttributesHash())
             .Select(static value => value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)));
-        var policy = CreatePolicy((ShaKey, lowercaseHash), (MvidKey, AttributesMvid()));
+        var policy = CreatePolicy([(ShaKey, lowercaseHash), (MvidKey, AttributesMvid())]);
         AssertPayloadAccepted(policy);
     }
 
@@ -83,7 +83,7 @@ public sealed class ContractApiPolicyBoundaryTests
     public void IdenticalMvidMetadataRemainOneExpectedValue()
     {
         var mvid = AttributesMvid();
-        var policy = CreatePolicy((ShaKey, AttributesHash()), (MvidKey, mvid), (MvidKey, mvid));
+        var policy = CreatePolicy([(ShaKey, AttributesHash()), (MvidKey, mvid), (MvidKey, mvid)]);
         AssertPayloadAccepted(policy);
     }
 
@@ -135,7 +135,7 @@ public sealed class ContractApiPolicyBoundaryTests
     public void DifferentRealExpectedHashRejectsTheSameBoundFile()
     {
         Assert.That(AttributesHash(), Is.Not.EqualTo(OtherAssemblyHash()));
-        var policy = CreatePolicy((ShaKey, OtherAssemblyHash()), (MvidKey, AttributesMvid()));
+        var policy = CreatePolicy([(ShaKey, OtherAssemblyHash()), (MvidKey, AttributesMvid())]);
         Assert.That(policy.MatchesBoundFilePayload(AttributesPath, AttributesReference(), out var reason), Is.False);
         Assert.That(reason, Is.Null);
     }
@@ -272,9 +272,10 @@ public sealed class ContractApiPolicyBoundaryTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static void AssertPayloadMetadataRejected((string Key, string Value)[] facts)
+    private static void AssertPayloadMetadataRejected(ImmutableArray<(string Key, string Value)> facts)
     {
-        System.ArgumentNullException.ThrowIfNull(facts);
+        if (facts.IsDefault)
+        { throw new System.ArgumentNullException(nameof(facts)); }
         var policy = CreatePolicy(facts);
         var consumer = Consumer(AttributesReference());
         var assembly = consumer.GetTypeByMetadataName(ContractApiMetadata.Contract)!.ContainingAssembly;
@@ -282,9 +283,10 @@ public sealed class ContractApiPolicyBoundaryTests
         Assert.That(reason, Is.Null);
     }
 
-    private static void AssertImageMetadataRejected((string Key, string Value)[] facts)
+    private static void AssertImageMetadataRejected(ImmutableArray<(string Key, string Value)> facts)
     {
-        System.ArgumentNullException.ThrowIfNull(facts);
+        if (facts.IsDefault)
+        { throw new System.ArgumentNullException(nameof(facts)); }
         var policy = CreatePolicy(facts);
         Assert.That(policy.MatchesImagePayload(AttributesReference(), out var reason), Is.False);
         Assert.That(reason, Is.Null);
@@ -306,9 +308,10 @@ public sealed class ContractApiPolicyBoundaryTests
         Assert.That(reason, Is.Null);
     }
 
-    private static ContractApiPayloadPolicy CreatePolicy(params (string Key, string Value)[] facts)
+    private static ContractApiPayloadPolicy CreatePolicy(ImmutableArray<(string Key, string Value)> facts)
     {
-        System.ArgumentNullException.ThrowIfNull(facts);
+        if (facts.IsDefault)
+        { throw new System.ArgumentNullException(nameof(facts)); }
         var attributes = facts.Select(fact =>
             "[assembly: System.Reflection.AssemblyMetadata(" +
             Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(fact.Key, quote: true) + ", " +

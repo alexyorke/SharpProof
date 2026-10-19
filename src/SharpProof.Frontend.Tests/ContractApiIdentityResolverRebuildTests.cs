@@ -30,9 +30,9 @@ public sealed class ContractApiIdentityResolverRebuildTests
         Assert.That(configuration, Is.EqualTo("Debug").Or.EqualTo("Release"));
         var rebuiltConfiguration = configuration == "Release" ? "Debug" : "Release";
         using var temporary = new TempDirectory("SharpProofAuthenticRebuild-");
-        var artifacts = PrivatePath(temporary.FullName, "artifacts");
-        var output = PrivatePath(temporary.FullName, "artifacts", "bin", "SharpProof.Attributes",
-            rebuiltConfiguration, "netstandard2.0", "SharpProof.Attributes.dll");
+        var artifacts = PrivatePath(temporary.FullName, ["artifacts"]);
+        var output = PrivatePath(temporary.FullName, ["artifacts", "bin", "SharpProof.Attributes",
+            rebuiltConfiguration, "netstandard2.0", "SharpProof.Attributes.dll"]);
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
         await File.WriteAllBytesAsync(output, original);
         var reference = MetadataReference.CreateFromImage(original, filePath: output);
@@ -41,15 +41,15 @@ public sealed class ContractApiIdentityResolverRebuildTests
         Assert.That(before.ResolveAttribute(ContractApiMetadata.NotNull), Is.Not.Null);
         Assert.That(before.UnreadableContractApiReason, Is.Null);
 
-        var packages = PrivatePath(temporary.FullName, "packages");
+        var packages = PrivatePath(temporary.FullName, ["packages"]);
         StageLockedPackages(lockBytes, temporary.FullName);
         var start = ProcessRunner.CreateStartInfo(root, "dotnet",
             ["build", project, "--configuration", rebuiltConfiguration,
                 "-p:ArtifactsDir=" + artifacts + Path.DirectorySeparatorChar, "--nologo", "-p:RunAnalyzersDuringBuild=false"]);
         start.Environment["NUGET_PACKAGES"] = packages;
-        start.Environment["NUGET_HTTP_CACHE_PATH"] = PrivatePath(temporary.FullName, "http-cache");
-        start.Environment["NUGET_SCRATCH"] = PrivatePath(temporary.FullName, "nuget-scratch");
-        start.Environment["DOTNET_CLI_HOME"] = PrivatePath(temporary.FullName, "dotnet-home");
+        start.Environment["NUGET_HTTP_CACHE_PATH"] = PrivatePath(temporary.FullName, ["http-cache"]);
+        start.Environment["NUGET_SCRATCH"] = PrivatePath(temporary.FullName, ["nuget-scratch"]);
+        start.Environment["DOTNET_CLI_HOME"] = PrivatePath(temporary.FullName, ["dotnet-home"]);
         var clock = Stopwatch.StartNew();
         var build = await ProcessRunner.RunCapturedAsync(start, TestContext.CurrentContext.CancellationToken);
         clock.Stop();
@@ -109,9 +109,10 @@ public sealed class ContractApiIdentityResolverRebuildTests
         return reader.GetGuid(reader.GetModuleDefinition().Mvid);
     }
 
-    private static string PrivatePath(string root, params string[] parts)
+    private static string PrivatePath(string root, ImmutableArray<string> parts)
     {
-        System.ArgumentNullException.ThrowIfNull(parts, nameof(parts));
+        if (parts.IsDefault)
+        { throw new System.ArgumentNullException(nameof(parts)); }
         System.ArgumentNullException.ThrowIfNull(root);
         var prefix = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
         var path = Path.GetFullPath(Path.Combine([root, .. parts]));
@@ -142,7 +143,7 @@ public sealed class ContractApiIdentityResolverRebuildTests
                 var suffix = Path.Combine(Path.GetFileName(packageDirectories[0]), Path.GetFileName(source));
                 foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
                 {
-                    var target = PrivatePath(privateRoot, "packages", suffix, Path.GetRelativePath(source, file));
+                    var target = PrivatePath(privateRoot, ["packages", suffix, Path.GetRelativePath(source, file)]);
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     File.Copy(file, target);
                 }
