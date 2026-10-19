@@ -448,14 +448,16 @@ public sealed class ApiUsageRankingTests
             }
             """, TestContext.CurrentContext.CancellationToken);
         var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
-        var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
-            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor })
-            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
+        var inventory = ImmutableDictionaryCapture.Create(dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor }),
+                member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
                 member => member is null ? throw new ArgumentNullException(nameof(member)) : CSharpOperationSemantics.IsDictionaryStateDeclaration(member) ? "partially-modeled" : "unmodeled", StringComparer.Ordinal);
         var tree = compilation.SyntaxTrees.Single();
-        var sites = new List<Site>();
-        var gaps = new List<string>();
-        Scan(compilation, tree.GetRoot(), "test", "capacity", inventory, sites, gaps);
+        var siteBuilder = ImmutableArray.CreateBuilder<Site>();
+        var gapBuilder = ImmutableArray.CreateBuilder<string>();
+        Scan(compilation, tree.GetRoot(), "test", "capacity", inventory, siteBuilder, gapBuilder);
+        var sites = siteBuilder.ToImmutable();
+        var gaps = gapBuilder.ToImmutable();
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(4));
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(2));
