@@ -187,7 +187,7 @@ internal static class OpenSourceCorpusCatalog
             ValidateSource(source, corpusDirectory);
         }
 
-        var files = ImmutableDictionary.Create<string, CompilationUnitSyntax>(StringComparer.Ordinal);
+        var fileBuilder = ImmutableDictionary.CreateBuilder<string, CompilationUnitSyntax>(StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
             if (file is null)
@@ -205,7 +205,7 @@ internal static class OpenSourceCorpusCatalog
 
             ValidateRelativePath(file.Path, $"source file {file.Path}");
             var key = GetSourceFileKey(file.SourceId, file.Path);
-            if (files.ContainsKey(key))
+            if (fileBuilder.ContainsKey(key))
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source file: {key}.");
@@ -232,16 +232,17 @@ internal static class OpenSourceCorpusCatalog
                     AnalyzerGateHost.ParseOptions,
                     file.Path)
                 .GetCompilationUnitRoot();
-            files = files.Add(key, root);
+            fileBuilder.Add(key, root);
         }
 
+        var files = fileBuilder.ToImmutable();
         var declarationIndexes = files.ToImmutableDictionary(
             static pair => pair.Key,
             static pair => BuildDeclarationIndex(pair.Value),
             StringComparer.Ordinal);
 
-        var locations = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
-        var declarations = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var locations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var declarations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var index = 0; index < document.Methods.Length; index++)
         {
             var method = document.Methods[index];
@@ -281,7 +282,7 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus source location: {location}.");
             }
 
-            locations = locations.Add(location);
+            locations.Add(location);
             var declaration = FindDeclaration(
                 declarationIndexes[fileKey],
                 method);
@@ -302,7 +303,7 @@ internal static class OpenSourceCorpusCatalog
                     $"OSS corpus method {method.Id} duplicates another declaration.");
             }
 
-            declarations = declarations.Add(declarationHash);
+            declarations.Add(declarationHash);
             if (!string.Equals(
                     declaration.Identifier.ValueText,
                     method.MethodName,
@@ -367,7 +368,7 @@ internal static class OpenSourceCorpusCatalog
         IEnumerable<OpenSourceCorpusSource> sources)
     {
         System.ArgumentNullException.ThrowIfNull(sources);
-        var sourceIds = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var sourceIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
             if (source is null)
@@ -387,10 +388,10 @@ internal static class OpenSourceCorpusCatalog
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source ID: {source.Id}.");
             }
-            sourceIds = sourceIds.Add(source.Id);
+            sourceIds.Add(source.Id);
         }
 
-        return sourceIds;
+        return sourceIds.ToImmutable();
     }
 
     internal static ImmutableDictionary<

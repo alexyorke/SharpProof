@@ -30,15 +30,15 @@ internal static class NativeStaticWriteWitnessOracle
         { return Gap("UnsupportedWriteInvocationShape"); }
         // Native source writes retain their captured SDK span through replay.
         var span = preparation.Program.Factory.GetOperationInfo(evidence.WriteWitness!.Value).SourceSpan!;
-        var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {
             // The native solver projects every parameter from this owned preparation.
             var input = evidence.EntryModel[parameter.Entry];
-            initial = initial.SetItem(parameter.Entry, input);
-            initial = initial.SetItem(parameter.Current, input);
+            initial[parameter.Entry] = input;
+            initial[parameter.Current] = input;
         }
-        var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial,
+        var replay = new IrProgramInterpreter(preparation.Program.Factory).Execute(preparation.Program, initial.ToImmutable(),
             PassiveCallableVcBuilder.MaximumSteps, cancellationToken: cancellationToken);
         if (replay.ConsumedApproximation || replay.Status is not (IrProgramExecutionStatus.Returned or IrProgramExecutionStatus.Exception))
         { return Gap("NonTerminatingOrIncompleteWriteWitness"); }

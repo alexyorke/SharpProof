@@ -3177,3 +3177,9 @@ order, native reflected argv and all actual mutable SUT buffers. Verifier callba
 awaited serially and replay observers run inline; no new synchronization is required.
 Validate affected classes, preserving raw source literals and measurement boundaries.
 Status: open before edits.
+
+IMM-M097 verified: all 473 ordinary Gates/corpus-catalog workflow tests pass, zero
+failures/skips/warnings/errors. Main and independent review checked ordinal duplicate
+diagnostics, frozen parsed-file publication, round-robin selection guards, and static
+write replay overwrites. The first build caught a redundant Contains/Add guard in the
+concurrent M098 binder edit; using Add's boolean result preserved first-seen order.

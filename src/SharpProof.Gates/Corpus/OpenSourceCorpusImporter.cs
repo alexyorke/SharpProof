@@ -289,7 +289,7 @@ SOFTWARE.
 
         var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
-        var declarationHashes = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var declarationHashes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
                 ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
@@ -338,7 +338,7 @@ SOFTWARE.
                     continue;
                 }
 
-                declarationHashes = declarationHashes.Add(hash);
+                declarationHashes.Add(hash);
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
@@ -386,7 +386,7 @@ SOFTWARE.
             if (capacity < 0)
             { throw new ArgumentOutOfRangeException(nameof(capacity)); }
         }
-        var selected = ImmutableList<ImportCandidate>.Empty;
+        var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
         for (var offset = 0; selected.Count < count; offset++)
         {
             var addedThisRound = false;
@@ -397,7 +397,7 @@ SOFTWARE.
                     continue;
                 }
 
-                selected = selected.Add(group[offset]);
+                selected.Add(group[offset]);
                 addedThisRound = true;
                 if (selected.Count == count)
                 {
@@ -427,7 +427,7 @@ SOFTWARE.
                 $"{OpenSourceCorpusCatalog.MinimumSourceFileCount} are required.");
         }
 
-        return selected.ToImmutableArray();
+        return selected.ToImmutable();
     }
 
     internal static async Task<string> ReadGitAsync(
