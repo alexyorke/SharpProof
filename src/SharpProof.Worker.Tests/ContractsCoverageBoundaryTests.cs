@@ -384,7 +384,7 @@ public sealed class ContractsCoverageBoundaryTests
             : TestMetadataReferences.WithoutSharpProof;
         var compilation = CSharpCompilation.Create("ContractsMetadataBoundaryConsumer",
             [CSharpSyntaxTree.ParseText("public static class Consumer { }")],
-            references.Add(MetadataReference.CreateFromImage(image.ToArray())),
+            references.Add(MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))))),
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         TestCompilation.AssertNoErrors(compilation);
         return compilation;

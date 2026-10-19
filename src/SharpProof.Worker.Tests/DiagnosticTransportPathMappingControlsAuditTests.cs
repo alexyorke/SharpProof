@@ -78,7 +78,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
             var target = assembly.GetType("Subject")!.GetMethod("Target")!.CreateDelegate<Func<int, int>>();
             Assert.That(target(-1), Is.EqualTo(-1));
         });
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), image.ToArray());
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, input.ProjectDirectory, "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);

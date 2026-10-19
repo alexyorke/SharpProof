@@ -44,7 +44,7 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
         var moduleEmit = moduleCompilation.Emit(moduleImage);
         Assert.That(moduleEmit.Success, Is.True, string.Join(Environment.NewLine, moduleEmit.Diagnostics));
         var moduleName = moduleCompilation.Assembly.Modules.Single().Name;
-        var moduleReference = MetadataReference.CreateFromImage(moduleImage.ToArray(),
+        var moduleReference = MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(moduleImage.GetBuffer().AsSpan(0, checked((int)moduleImage.Length))),
             MetadataReferenceProperties.Module, filePath: moduleName);
         Assert.That(moduleReference.Properties.Kind, Is.EqualTo(MetadataImageKind.Module));
 

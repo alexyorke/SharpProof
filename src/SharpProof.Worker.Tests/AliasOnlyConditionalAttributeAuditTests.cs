@@ -160,7 +160,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             var emitted = producer.Emit(image);
             await Save(directory, "producer-emit-diagnostics.json", Diagnostics(emitted.Diagnostics));
             Assert.That(emitted.Success, Is.True);
-            await File.WriteAllBytesAsync(producerPath, image.ToArray());
+            await File.WriteAllBytesAsync(producerPath, image.GetBuffer().AsMemory(0, checked((int)image.Length)));
         }
         var producerBytes = await File.ReadAllBytesAsync(producerPath);
         var producerPe = DescribePe(producerBytes);

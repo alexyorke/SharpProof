@@ -588,7 +588,7 @@ public sealed class ClaimManifestBuilderTests
             var emitted = compilation.Emit(stream);
             Assert.That(emitted.Success, Is.True,
                 string.Join(Environment.NewLine, emitted.Diagnostics));
-            return MetadataReference.CreateFromImage(stream.ToArray().ToImmutableArray(),
+            return MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
                 new MetadataReferenceProperties(aliases: [alias]));
         }
         var references = TestMetadataReferences.WithSharpProof
@@ -1528,9 +1528,7 @@ public sealed class ClaimManifestBuilderTests
 
         AssertUnsupportedEffectTargets(
             targets,
-            "Async",
-            "DelegateCall",
-            "Generic");
+            ["Async", "DelegateCall", "Generic"]);
     }
 
     [Test]
@@ -1590,8 +1588,7 @@ public sealed class ClaimManifestBuilderTests
 
         AssertUnsupportedEffectTargets(
             targets,
-            ".cctor",
-            "get_Value");
+            [".cctor", "get_Value"]);
     }
 
     [Test]
@@ -2265,9 +2262,10 @@ public sealed class ClaimManifestBuilderTests
 
     private static void AssertUnsupportedEffectTargets(
         ImmutableDictionary<string, ManifestCallableTarget> targets,
-        params string[] expectedNames)
+        ImmutableArray<string> expectedNames)
     {
-        System.ArgumentNullException.ThrowIfNull(expectedNames, nameof(expectedNames));
+        if (expectedNames.IsDefault)
+        { throw new ArgumentNullException(nameof(expectedNames)); }
         System.ArgumentNullException.ThrowIfNull(targets);
         using (Assert.EnterMultipleScope())
         {

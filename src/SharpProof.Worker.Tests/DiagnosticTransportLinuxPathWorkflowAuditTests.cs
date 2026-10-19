@@ -70,7 +70,7 @@ public sealed class DiagnosticTransportLinuxPathWorkflowAuditTests
                     .CreateDelegate<Func<int, int>>();
                 Assert.That(target(-1), Is.EqualTo(-1), "CLR contradicts the positive return contract.");
             });
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), assemblyImage.ToArray());
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), assemblyImage.GetBuffer().AsMemory(0, checked((int)assemblyImage.Length)));
 
         var artifact = CompilerManifestArtifactProducer.Create(compilation, ProjectDirectory, "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),

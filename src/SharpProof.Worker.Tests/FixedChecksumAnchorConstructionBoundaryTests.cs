@@ -603,8 +603,8 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             using var image = new MemoryStream();
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            observation["imageSha256"] = Hash(image.ToArray());
-            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.ToArray());
+            observation["imageSha256"] = Hash(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+            await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
             // The runtime image has the same source; only the shipped Conditional symbol is absent.
             var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
                 ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
@@ -614,7 +614,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             using var runtimeImage = new MemoryStream();
             var runtimeEmitted = runtimeCompilation.Emit(runtimeImage);
             Assert.That(runtimeEmitted.Success, Is.True, string.Join("\n", runtimeEmitted.Diagnostics));
-            observation["runtimeImageSha256"] = Hash(runtimeImage.ToArray());
+            observation["runtimeImageSha256"] = Hash(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length)));
             var runtimeTarget = Assembly.Load(runtimeImage.ToArray()).GetType("Subject")!.GetMethod("Target")!;
             Assert.That(runtimeTarget.GetParameters(), Has.Length.EqualTo(16));
             var controls = Controls();
@@ -752,9 +752,8 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         }
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans hash the empty payload */ bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 

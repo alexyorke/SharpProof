@@ -185,7 +185,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         {
             sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             artifactSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(artifactJson))),
-            imageSha256 = Convert.ToHexString(SHA256.HashData(image.ToArray())),
+            imageSha256 = Convert.ToHexString(SHA256.HashData(image.GetBuffer().AsSpan(0, checked((int)image.Length)))),
             controlKind = control.Kind.ToString(),
             controlReason = control.Reason.ToString(),
             algorithm = "Manually constructed IR/Smt API lemmas over compiler-decoded bindings",
@@ -205,7 +205,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             beforeEntry,
             afterEntry,
             finalOutcome = finalOutcome.GetType().Name,
-            runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeImage.ToArray()))
+            runtimeImageSha256 = Convert.ToHexString(SHA256.HashData(runtimeImage.GetBuffer().AsSpan(0, checked((int)runtimeImage.Length))))
         }));
     }
 

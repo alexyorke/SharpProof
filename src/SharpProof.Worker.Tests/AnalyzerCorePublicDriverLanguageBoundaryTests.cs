@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -37,7 +38,7 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
         using var externalImage = new MemoryStream();
         var externalEmit = external.Emit(externalImage);
         Assert.That(externalEmit.Success, Is.True, string.Join(Environment.NewLine, externalEmit.Diagnostics));
-        var reference = MetadataReference.CreateFromImage(externalImage.ToArray());
+        var reference = MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(externalImage.GetBuffer().AsSpan(0, checked((int)externalImage.Length))));
         var references = TestMetadataReferences.WithSharpProof.Add(reference);
         Compilation compilation = visualBasic
             ? VisualBasicCompilation.Create("PublicDriverVisualBasicBoundary",
