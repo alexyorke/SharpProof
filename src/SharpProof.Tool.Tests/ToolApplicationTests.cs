@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -90,7 +91,7 @@ public sealed class ToolApplicationTests
         ArgumentNullException.ThrowIfNull(command);
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.That(await ToolApplication.RunAsync(command.Split(' '), output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
+        Assert.That(await ToolApplication.RunAsync(command.Split(' ').ToImmutableArray(), output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
         Assert.That(output.ToString(), Is.Empty);
         Assert.That(error.ToString(), Does.StartWith("SharpProof: "));
     }

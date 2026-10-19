@@ -23,10 +23,11 @@ internal static class ToolApplication
         """;
 
     internal static async Task<int> RunAsync(
-        string[] args, TextWriter output, TextWriter error, Func<CancellationToken, Task<string>> discoverSdk,
+        ImmutableArray<string> args, TextWriter output, TextWriter error, Func<CancellationToken, Task<string>> discoverSdk,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        if (args.IsDefault)
+        { throw new ArgumentNullException(nameof(args)); }
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(discoverSdk);
@@ -74,9 +75,10 @@ internal static class ToolApplication
         }
     }
 
-    private static async Task<int> ExplainAsync(string[] args, TextWriter output, CancellationToken cancellationToken)
+    private static async Task<int> ExplainAsync(ImmutableArray<string> args, TextWriter output, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        if (args.IsDefault)
+        { throw new ArgumentNullException(nameof(args)); }
         ArgumentNullException.ThrowIfNull(output);
         string? file = null;
         int? line = null;
