@@ -9,6 +9,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RuntimeTypeIdentityTests
 {
+    [TestCase("(int x, int y)", "System.ValueTuple<int, int>", true)]
     [TestCase("int", "int", true)]
     [TestCase("int", "uint", false)]
     [TestCase("Box<dynamic>", "Box<object>", true)]
@@ -48,6 +49,32 @@ public sealed class RuntimeTypeIdentityTests
         Assert.That(CompilerIdentityBridge.SameRuntimeType(left, right), Is.True);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         Assert.That(CompilerIdentityBridge.InternType(factory, left), Is.Not.EqualTo(CompilerIdentityBridge.InternType(factory, right)));
+    }
+
+    [Test]
+    public void RuntimeIdentityComparerRetainsItsDefensiveNullableContract()
+    {
+        var (symbol, _) = Types("int", "int");
+        var comparerType = typeof(CompilerIdentityBridge).GetNestedType("RuntimeTypeComparer", System.Reflection.BindingFlags.NonPublic)!;
+        var comparer = (IEqualityComparer<ITypeSymbol>)comparerType.GetField("Instance", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.GetValue(null)!;
+        Assert.That(comparer.Equals(null, null), Is.True);
+        Assert.That(comparer.Equals(null, symbol), Is.False);
+        Assert.That(comparer.Equals(symbol, null), Is.False);
+        Assert.That(comparer.Equals(symbol, symbol), Is.True);
+    }
+
+    [Test]
+    public void DeepClassAncestryDoesNotEarnAnIncompleteCertificate()
+    {
+        var source = "public class Base0 { } " + string.Concat(Enumerable.Range(1, 66).Select(index =>
+            "public class Base" + index + " : Base" + (index - 1) + " { } "));
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("DeepAncestry", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var mapped = new RoslynTypeMapper(factory).GetTypeId(compilation.GetTypeByMetadataName("Base66")!);
+        var certificate = typeof(IrFactory).GetMethod("TryGetClosedClassReferenceBase", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        Assert.That(certificate.Invoke(factory, [mapped, null]), Is.False);
     }
 
     private static (ITypeSymbol First, ITypeSymbol Second) Types(string first, string second)
