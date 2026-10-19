@@ -5,13 +5,27 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.HmInference;
 
-public sealed record MethodResult(string Method, string Status, string Message, string? Signature = null);
+public sealed record MethodResult(string Method, string Status, string Message, string? Signature = null)
+{
+    public string Method { get; } = Method ?? throw new ArgumentNullException(nameof(Method));
+    public string Status { get; } = Status ?? throw new ArgumentNullException(nameof(Status));
+    public string Message { get; } = Message ?? throw new ArgumentNullException(nameof(Message));
+}
 
 public static class Inference
 {
-    public static MethodResult Analyze(MethodDeclarationSyntax method, SemanticModel model,
-        CancellationToken cancellationToken = default)
+    public static MethodResult Analyze(MethodDeclarationSyntax method, SemanticModel model, CancellationToken cancellationToken)
     {
+        if (method is null)
+        {
+            throw new global::System.ArgumentNullException(nameof(method));
+        }
+
+        if (model is null)
+        {
+            throw new global::System.ArgumentNullException(nameof(model));
+        }
+
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -25,63 +39,192 @@ public static class Inference
 
     private sealed class Session(SemanticModel model, CancellationToken cancellationToken)
     {
+        private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
-
         public MethodResult Analyze(MethodDeclarationSyntax method)
         {
-            var symbol = model.GetDeclaredSymbol(method, cancellationToken)
-                ?? throw new InferenceException("Method has no symbol.");
-            if (!symbol.IsStatic || symbol.IsGenericMethod || symbol.ReturnsVoid ||
-                symbol.IsExtern || symbol.IsAsync || method.AttributeLists.Count != 0 ||
-                symbol.ContainingType.TypeParameters.Length != 0 ||
-                method.Modifiers.Any(SyntaxKind.PartialKeyword) ||
-                method.DescendantNodes().OfType<NullableTypeSyntax>().Any())
-                throw new InferenceException("Only non-generic, static, synchronous value-returning methods without attributes or nullable annotations are supported.");
-            if (method.Parameters().Any(p => p.Modifiers.Count != 0 || p.Default is not null || p.AttributeLists.Count != 0))
-                throw new InferenceException("Parameter modifiers, attributes and defaults are unsupported.");
-            var parameters = symbol.Parameters.Select(p => CSharpTypes.Erase(p.Type)).ToArray();
+            var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
+            if (symbol.ReturnsVoid || symbol.IsExtern || symbol.IsAsync || method.Modifiers.Any(SyntaxKind.PartialKeyword) || method.DescendantNodes().OfType<NullableTypeSyntax>().Any())
+            {
+                throw new InferenceException("Extern, async, partial, void and nullable-annotated root methods are unsupported.");
+            }
+
+            var parameters = symbol.Parameters.Select(p =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                return CSharpTypes.Erase(p.Type);
+            }).ToArray();
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                if (method.Parameters()[i].Default is not null)
+                {
+                    HmType.Unify(parameters[i], CSharpTypes.Rigid(symbol.Parameters[i].Type));
+                }
+            }
+
             currentMethod = symbol;
             var recursiveReturn = HmType.Variable();
             currentFunction = HmType.Function(parameters, recursiveReturn);
-            for (var i = 0; i < parameters.Length; i++) environment.Add(symbol.Parameters[i], parameters[i]);
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                environment.Add(symbol.Parameters[i], parameters[i]);
+            }
+
             HmType result;
-            if (method.ExpressionBody is not null) result = Expression(method.ExpressionBody.Expression);
-            else if (method.Body is not null) result = Block(method.Body);
-            else throw new InferenceException("No method body.");
+            if (method.ExpressionBody is not null)
+            {
+                result = Expression(method.ExpressionBody.Expression);
+            }
+            else if (method.Body is not null)
+            {
+                result = Block(method.Body);
+            }
+            else
+            {
+                throw new InferenceException("No method body.");
+            }
+
             HmType.Unify(recursiveReturn, result);
+            var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
 
-            var inferable = parameters.SelectMany(p => p.FreeVariables()).ToHashSet();
+                return p.FreeVariables();
+            }));
             PreserveResultOnly(result, CSharpTypes.Rigid(symbol.ReturnType), inferable);
-
             var variables = new Dictionary<HmType, string>();
-            var parameterNames = parameters.Select((t, i) => CSharpTypes.Render(t, symbol.Parameters[i].Type, variables)).ToArray();
+            var reserved = new HashSet<string>(method.DescendantTokens().Where((SyntaxToken /* SPINT001: all values valid - IsKind accepts every SyntaxToken including default. */ token) => token.IsKind(SyntaxKind.IdentifierToken)).Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.ValueText));
+            for (var owner = symbol.ContainingType; owner is not null; owner = owner.ContainingType)
+            {
+                foreach (var parameter in owner.TypeParameters)
+                {
+                    reserved.Add(parameter.Name);
+                }
+            }
+
+            var nextName = 1;
+            void NameVariables(HmType type)
+            {
+                if (type is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(type));
+                }
+
+                type = type.Root;
+                if (type.IsVariable && !variables.ContainsKey(type))
+                {
+                    string name;
+                    do
+                    {
+                        name = "T" + nextName++;
+                    }
+                    while (reserved.Contains(name));
+                    variables.Add(type, name);
+                }
+
+                foreach (var argument in type.Arguments)
+                {
+                    NameVariables(argument);
+                }
+            }
+
+            foreach (var parameter in parameters)
+            {
+                NameVariables(parameter);
+            }
+
+            NameVariables(result);
+            var parameterNames = parameters.Select((t, i) =>
+            {
+                if (t is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(t));
+                }
+
+                if (i < 0)
+                {
+                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
+                }
+
+                return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables);
+            }).ToArray();
             var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables);
             if (variables.Count == 0)
+            {
                 return new(symbol.Name, "Concrete", "Body requires concrete types; no generic suggestion.");
+            }
+
             // A type variable only present in the result cannot be inferred by C# callers.
             var inputVariables = new Dictionary<HmType, string>();
-            foreach (var parameter in parameters) parameter.Format(inputVariables);
-            if (variables.Keys.Any(v => !inputVariables.ContainsKey(v)))
-                throw new InferenceException("A result-only type variable cannot be inferred at a C# call site.");
+            foreach (var parameter in parameters)
+            {
+                parameter.Format(inputVariables);
+            }
 
-            var candidate = method.WithReturnType(SyntaxFactory.ParseTypeName(returnName))
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(
-                    variables.Values.Select(SyntaxFactory.TypeParameter))))
-                .WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(
-                    method.Parameters().Select((p, i) => p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]))))));
+            if (variables.Keys.Any(v =>
+            {
+                if (v is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(v));
+                }
+
+                return !inputVariables.ContainsKey(v);
+            }))
+            {
+                throw new InferenceException("A result-only type variable cannot be inferred at a C# call site.");
+            }
+
+            var candidate = method.WithReturnType(SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                if (i < 0)
+                {
+                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
+                }
+
+                return p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]));
+            }))));
             // Recheck the original compilation with just this signature changed. This catches
             // explicit local types, conversions, name collisions and broken call sites.
             var tree = method.SyntaxTree;
             var changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
             var changedCompilation = model.Compilation.ReplaceSyntaxTree(tree, changed);
-            if (changedCompilation.GetDiagnostics(cancellationToken)
-                .Any(d => d.Severity == DiagnosticSeverity.Error))
+            if (changedCompilation.GetDiagnostics(cancellationToken).Any(d =>
+            {
+                if (d is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(d));
+                }
+
+                return d.Severity == DiagnosticSeverity.Error;
+            }))
+            {
                 return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site.");
+            }
+
             var originalCalls = method.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
-            var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Single(m => m.SpanStart == method.SpanStart);
+            var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
+            {
+                if (m is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(m));
+                }
+
+                return m.SpanStart == method.SpanStart;
+            });
             var changedCalls = changedMethod.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
             var changedModel = changedCompilation.GetSemanticModel(changed);
             for (var i = 0; i < originalCalls.Length; i++)
@@ -89,18 +232,79 @@ public static class Inference
                 var before = model.GetSymbolInfo(originalCalls[i], cancellationToken).Symbol as IMethodSymbol;
                 var after = changedModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
                 if (SymbolEqualityComparer.Default.Equals(before, symbol) && after?.DeclaringSyntaxReferences.Any(r =>
-                    r.SyntaxTree == changed && r.Span.Start == changedMethod.SpanStart) == true) continue;
-                if (before?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) !=
-                    after?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                {
+                    if (r is null)
+                    {
+                        throw new global::System.ArgumentNullException(nameof(r));
+                    }
+
+                    return r.SyntaxTree == changed && r.Span.Start == changedMethod.SpanStart;
+                }) == true)
+                {
+                    continue;
+                }
+
+                if (before?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != after?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                {
                     return new(symbol.Name, "Rejected", "Generalization changes a selected method overload.");
+                }
             }
+
             var originalCreations = method.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
             var changedCreations = changedMethod.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
             for (var i = 0; i < originalCreations.Length; i++)
-                if (model.GetSymbolInfo(originalCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) !=
-                    changedModel.GetSymbolInfo(changedCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+            {
+                if (model.GetSymbolInfo(originalCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != changedModel.GetSymbolInfo(changedCreations[i], cancellationToken).Symbol?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                {
                     return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
-            var signature = $"{returnName} {method.Identifier.Text}<{string.Join(", ", variables.Values)}>({string.Join(", ", method.Parameters().Select((p, i) => parameterNames[i] + " " + p.Identifier.Text))})";
+                }
+            }
+
+            var typeParameterNames = (method.TypeParameterList?.Parameters.Select(p =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                return p.Identifier.Text;
+            }) ?? Enumerable.Empty<string>()).Concat(variables.Values);
+            var renderedParameters = method.Parameters().Select((p, i) =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                if (i < 0)
+                {
+                    throw new global::System.ArgumentOutOfRangeException(nameof(i));
+                }
+
+                return (p.AttributeLists.Count == 0 ? "" : string.Join(" ", p.AttributeLists.Select(attribute =>
+                {
+                    if (attribute is null)
+                    {
+                        throw new global::System.ArgumentNullException(nameof(attribute));
+                    }
+
+                    return attribute.NormalizeWhitespace().ToFullString();
+                })) + " ") + (p.Modifiers.Count == 0 ? "" : string.Join(" ", p.Modifiers.Select((SyntaxToken /* SPINT001: all values valid - Text accepts every SyntaxToken including default. */ token) => token.Text)) + " ") + parameterNames[i] + " " + p.Identifier.Text + (p.Default is null ? "" : " = " + p.Default.Value.NormalizeWhitespace().ToFullString());
+            });
+            var signature = $"{returnName} {method.Identifier.Text}<{string.Join(", ", typeParameterNames)}>({string.Join(", ", renderedParameters)})";
+            if (method.ConstraintClauses.Count != 0)
+            {
+                signature += " " + string.Join(" ", method.ConstraintClauses.Select(clause =>
+                {
+                    if (clause is null)
+                    {
+                        throw new global::System.ArgumentNullException(nameof(clause));
+                    }
+
+                    return clause.NormalizeWhitespace().ToFullString();
+                }));
+            }
+
             return new(symbol.Name, "Suggestion", "Review as an API change; the candidate compiles in the current compilation.", signature);
         }
 
@@ -108,19 +312,32 @@ public static class Inference
         {
             var flow = Scoped(() => Statements(block.Statements.ToArray()));
             if (flow.FallsThrough || flow.Breaks || flow.Continues)
+            {
                 throw new InferenceException("Body has no structurally complete value return.");
+            }
+
             return flow.ReturnType ?? HmType.Variable();
         }
 
         private readonly record struct Flow(HmType? ReturnType, bool FallsThrough, bool Breaks = false, bool Continues = false);
-
         private Flow Scoped(Func<Flow> analyze)
         {
-            var locals = environment.Keys.ToHashSet(SymbolEqualityComparer.Default);
-            try { return analyze(); }
+            if (analyze is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(analyze));
+            }
+
+            var locals = new HashSet<ISymbol>(environment.Keys, SymbolEqualityComparer.Default);
+            try
+            {
+                return analyze();
+            }
             finally
             {
-                foreach (var local in environment.Keys.Where(k => !locals.Contains(k)).ToArray()) environment.Remove(local);
+                foreach (var local in environment.Keys.Where((ISymbol /* SPINT001: all values valid - Dictionary keys are nonnull symbols from the semantic model. */ k) => !locals.Contains(k)).ToArray())
+                {
+                    environment.Remove(local);
+                }
             }
         }
 
@@ -132,7 +349,11 @@ public static class Inference
             var continues = false;
             for (var index = 0; index < statements.Length; index++)
             {
-                if (!fallsThrough) throw new InferenceException("Unreachable statements are unsupported.");
+                if (!fallsThrough)
+                {
+                    throw new InferenceException("Unreachable statements are unsupported.");
+                }
+
                 var statement = statements[index];
                 cancellationToken.ThrowIfCancellationRequested();
                 var flow = new Flow(null, true);
@@ -155,12 +376,12 @@ public static class Inference
                     case IfStatementSyntax conditional:
                         HmType.Unify(Expression(conditional.Condition), new("bool"));
                         var yes = Branch(conditional.Statement);
-                        var no = conditional.Else is not null ? Branch(conditional.Else.Statement)
-                            : new Flow(null, true);
-                        flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough,
-                            yes.Breaks || no.Breaks, yes.Continues || no.Continues);
+                        var no = conditional.Else is not null ? Branch(conditional.Else.Statement) : new Flow(null, true);
+                        flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough, yes.Breaks || no.Breaks, yes.Continues || no.Continues);
                         break;
-                    case BlockSyntax nested: flow = Scoped(() => Statements(nested.Statements.ToArray())); break;
+                    case BlockSyntax nested:
+                        flow = Scoped(() => Statements(nested.Statements.ToArray()));
+                        break;
                     case WhileStatementSyntax loop:
                         HmType.Unify(Expression(loop.Condition), new("bool"));
                         flow = LoopFlow(Branch(loop.Statement));
@@ -172,19 +393,34 @@ public static class Inference
                     case ForStatementSyntax loop:
                         flow = Scoped(() =>
                         {
-                            if (loop.Declaration is not null) Declare(loop.Declaration);
-                            foreach (var initializer in loop.Initializers) Expression(initializer);
-                            if (loop.Condition is not null) HmType.Unify(Expression(loop.Condition), new("bool"));
+                            if (loop.Declaration is not null)
+                            {
+                                Declare(loop.Declaration);
+                            }
+
+                            foreach (var initializer in loop.Initializers)
+                            {
+                                Expression(initializer);
+                            }
+
+                            if (loop.Condition is not null)
+                            {
+                                HmType.Unify(Expression(loop.Condition), new("bool"));
+                            }
+
                             var body = Branch(loop.Statement);
-                            foreach (var increment in loop.Incrementors) Expression(increment);
+                            foreach (var increment in loop.Incrementors)
+                            {
+                                Expression(increment);
+                            }
+
                             return LoopFlow(body);
                         });
                         break;
                     case ForEachStatementSyntax loop when loop.AwaitKeyword == default:
                         flow = Scoped(() =>
                         {
-                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol
-                                ?? throw new InferenceException("Only array foreach is supported.");
+                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array foreach is supported.");
                             var element = HmType.Variable();
                             HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
                             var iteration = element;
@@ -194,6 +430,7 @@ public static class Inference
                                 HmType.Unify(element, CSharpTypes.Rigid(source.ElementType));
                                 iteration = CSharpTypes.Rigid(model.GetTypeInfo(loop.Type, cancellationToken).Type!);
                             }
+
                             environment.Add(model.GetDeclaredSymbol(loop, cancellationToken)!, iteration);
                             return LoopFlow(Branch(loop.Statement));
                         });
@@ -201,19 +438,27 @@ public static class Inference
                     case ForEachVariableStatementSyntax loop when loop.AwaitKeyword == default:
                         flow = Scoped(() =>
                         {
-                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol
-                                ?? throw new InferenceException("Only array foreach deconstruction is supported.");
+                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array foreach deconstruction is supported.");
                             if (source.ElementType is not INamedTypeSymbol { IsTupleType: true })
+                            {
                                 throw new InferenceException("Only tuple array elements can be deconstructed.");
+                            }
+
                             var element = HmType.Variable();
                             HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
                             BindDeconstruction(loop.Variable, element, source.ElementType);
                             return LoopFlow(Branch(loop.Statement));
                         });
                         break;
-                    case BreakStatementSyntax: flow = new(null, false, Breaks: true); break;
-                    case ContinueStatementSyntax: flow = new(null, false, Continues: true); break;
-                    case SwitchStatementSyntax switched: flow = Switch(switched); break;
+                    case BreakStatementSyntax:
+                        flow = new(null, false, Breaks: true);
+                        break;
+                    case ContinueStatementSyntax:
+                        flow = new(null, false, Continues: true);
+                        break;
+                    case SwitchStatementSyntax switched:
+                        flow = Switch(switched);
+                        break;
                     case CheckedStatementSyntax checkedStatement:
                         flow = Scoped(() => Statements(checkedStatement.Block.Statements.ToArray()));
                         break;
@@ -221,21 +466,33 @@ public static class Inference
                         Anchor(thrown.Expression);
                         flow = new(null, false);
                         break;
-                    case EmptyStatementSyntax: break;
-                    default: throw new InferenceException($"Unsupported statement: {statement.Kind()}.");
+                    case EmptyStatementSyntax:
+                        break;
+                    default:
+                        throw new InferenceException($"Unsupported statement: {statement.Kind()}.");
                 }
+
                 returns = MergeReturns(returns, flow.ReturnType);
                 fallsThrough = flow.FallsThrough;
                 breaks |= flow.Breaks;
                 continues |= flow.Continues;
             }
+
             return new(returns, fallsThrough, breaks, continues);
         }
 
-        private static Flow LoopFlow(Flow body) => new(body.ReturnType, true);
+        private static Flow LoopFlow(Flow /* SPINT001: all values valid - Every flow flag combination is valid input to loop exit normalization. */ body)
+        {
+            return new(body.ReturnType, true);
+        }
 
         private Flow Switch(SwitchStatementSyntax statement)
         {
+            if (statement is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(statement));
+            }
+
             Anchor(statement.Expression);
             return Scoped(() =>
             {
@@ -249,14 +506,23 @@ public static class Inference
                     {
                         switch (label)
                         {
-                            case DefaultSwitchLabelSyntax: hasDefault = true; break;
-                            case CaseSwitchLabelSyntax: break;
-                            case CasePatternSwitchLabelSyntax { Pattern: ConstantPatternSyntax or DiscardPatternSyntax } pattern:
-                                if (pattern.WhenClause is not null) HmType.Unify(Expression(pattern.WhenClause.Condition), new("bool"));
+                            case DefaultSwitchLabelSyntax:
+                                hasDefault = true;
                                 break;
-                            default: throw new InferenceException("Only constant/discard switch labels are supported.");
+                            case CaseSwitchLabelSyntax:
+                                break;
+                            case CasePatternSwitchLabelSyntax { Pattern: ConstantPatternSyntax or DiscardPatternSyntax } pattern:
+                                if (pattern.WhenClause is not null)
+                                {
+                                    HmType.Unify(Expression(pattern.WhenClause.Condition), new("bool"));
+                                }
+
+                                break;
+                            default:
+                                throw new InferenceException("Only constant/discard switch labels are supported.");
                         }
                     }
+
                     // Switch sections share a C# declaration scope. Retain their
                     // bindings until the entire switch has been analyzed.
                     var sectionFlow = Statements(section.Statements.ToArray());
@@ -264,35 +530,61 @@ public static class Inference
                     fallsThrough |= sectionFlow.FallsThrough || sectionFlow.Breaks;
                     continues |= sectionFlow.Continues;
                 }
+
                 return new Flow(returns, !hasDefault || fallsThrough, Continues: continues);
             });
         }
 
         private static HmType? MergeReturns(HmType? first, HmType? second)
         {
-            if (first is null) return second;
-            if (second is not null) HmType.Unify(first, second);
+            if (first is null)
+            {
+                return second;
+            }
+
+            if (second is not null)
+            {
+                HmType.Unify(first, second);
+            }
+
             return first;
         }
 
         private void Declare(VariableDeclarationSyntax declaration)
         {
+            if (declaration is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(declaration));
+            }
+
             foreach (var variable in declaration.Variables)
             {
-                if (variable.Initializer is null) throw new InferenceException("Uninitialized local.");
+                if (variable.Initializer is null)
+                {
+                    throw new InferenceException("Uninitialized local.");
+                }
+
                 environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, Expression(variable.Initializer.Value));
             }
         }
 
-        private Flow Branch(StatementSyntax statement) => Scoped(() => statement is BlockSyntax block
-            ? Statements(block.Statements.ToArray()) : Statements([statement]));
+        private Flow Branch(StatementSyntax statement)
+        {
+            if (statement is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(statement));
+            }
+
+            return Scoped(() => statement is BlockSyntax block ? Statements(block.Statements.ToArray()) : Statements([statement]));
+        }
 
         private HmType Expression(ExpressionSyntax expression)
         {
             cancellationToken.ThrowIfCancellationRequested();
             switch (expression)
             {
-                case ParenthesizedExpressionSyntax parentheses: return Expression(parentheses.Expression);
+                case ParenthesizedExpressionSyntax parentheses:
+                    return Expression(parentheses.Expression);
                 case ThrowExpressionSyntax thrown:
                     Anchor(thrown.Expression);
                     return HmType.Variable();
@@ -303,16 +595,23 @@ public static class Inference
                         {
                             var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type;
                             if (original is not INamedTypeSymbol { IsTupleType: true })
+                            {
                                 throw new InferenceException("Only tuple-based deconstruction is supported.");
+                            }
+
                             var assignedTuple = Expression(assignment.Right);
                             BindDeconstruction(assignment.Left, assignedTuple, original);
                             return assignedTuple;
                         }
+
                         return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
-                    if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) ||
-                        model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
+
+                    if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) || model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
+                    {
                         throw new InferenceException("User-defined and coalescing assignments are unsupported.");
+                    }
+
                     AssignmentTarget(assignment.Left);
                     Anchor(assignment.Left);
                     Anchor(assignment.Right);
@@ -323,8 +622,24 @@ public static class Inference
                     return Increment(increment, increment.Operand);
                 case IdentifierNameSyntax identifier:
                     var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
-                    if (symbol is not null && environment.TryGetValue(symbol, out var type)) return type;
+                    if (symbol is not null && environment.TryGetValue(symbol, out var type))
+                    {
+                        return type;
+                    }
+
+                    if (symbol is IFieldSymbol field)
+                    {
+                        return CSharpTypes.Rigid(field.Type);
+                    }
+
+                    if (symbol is IPropertySymbol property)
+                    {
+                        return CSharpTypes.Rigid(property.Type);
+                    }
+
                     throw new InferenceException("Only local and parameter references are supported.");
+                case ThisExpressionSyntax or BaseExpressionSyntax:
+                    return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type!);
                 case LiteralExpressionSyntax literal when !literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression):
                     return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).Type!);
                 case ConditionalExpressionSyntax conditional:
@@ -333,103 +648,227 @@ public static class Inference
                     HmType.Unify(yes, Expression(conditional.WhenFalse));
                     return yes;
                 case TupleExpressionSyntax tuple:
-                    return new("Tuple", tuple.Arguments.Select(a => Expression(a.Expression)).ToArray());
+                    return new("Tuple", tuple.Arguments.Select(a =>
+                    {
+                        if (a is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(a));
+                        }
+
+                        return Expression(a.Expression);
+                    }).ToArray());
                 case ImplicitArrayCreationExpressionSyntax implicitArray:
                     var inferredElement = HmType.Variable();
-                    foreach (var item in implicitArray.Initializer.Expressions) HmType.Unify(inferredElement, Expression(item));
+                    foreach (var item in implicitArray.Initializer.Expressions)
+                    {
+                        HmType.Unify(inferredElement, Expression(item));
+                    }
+
                     return new("[" + new string(',', implicitArray.Commas.Count) + "]", inferredElement);
                 case ArrayCreationExpressionSyntax explicitArray:
                     var createdArray = (IArrayTypeSymbol)model.GetTypeInfo(explicitArray, cancellationToken).Type!;
                     foreach (var rank in explicitArray.Type.RankSpecifiers)
-                    foreach (var size in rank.Sizes.Where(size => size is not OmittedArraySizeExpressionSyntax))
-                        HmType.Unify(Expression(size), new("int"));
-                    if (explicitArray.Initializer is not null) AnchorInitializer(explicitArray.Initializer, createdArray.ElementType);
+                    {
+                        foreach (var size in rank.Sizes.Where(size =>
+                        {
+                            if (size is null)
+                            {
+                                throw new global::System.ArgumentNullException(nameof(size));
+                            }
+
+                            return size is not OmittedArraySizeExpressionSyntax;
+                        }))
+                        {
+                            HmType.Unify(Expression(size), new("int"));
+                        }
+                    }
+
+                    if (explicitArray.Initializer is not null)
+                    {
+                        AnchorInitializer(explicitArray.Initializer, createdArray.ElementType);
+                    }
+
                     return CSharpTypes.Rigid(createdArray);
                 case LambdaExpressionSyntax lambda:
                     var lambdaParameters = lambda switch
                     {
-                        SimpleLambdaExpressionSyntax simple => new[] { simple.Parameter },
+                        SimpleLambdaExpressionSyntax simple => new[]
+                        {
+                            simple.Parameter
+                        },
                         ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.ParameterList.Parameters.ToArray(),
                         _ => throw new InferenceException("Unsupported lambda.")
                     };
-                    if (lambda.AsyncKeyword != default || lambdaParameters.Any(p => p.Modifiers.Count != 0 || p.AttributeLists.Count != 0) || lambda.AttributeLists.Count != 0)
+                    if (lambda.AsyncKeyword != default || lambdaParameters.Any(p =>
+                    {
+                        if (p is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(p));
+                        }
+
+                        return p.Modifiers.Count != 0 || p.AttributeLists.Count != 0;
+                    }) || lambda.AttributeLists.Count != 0)
+                    {
                         throw new InferenceException("Only synchronous lambdas without modifiers or attributes are supported.");
-                    var inputs = lambdaParameters.Select(p => p.Type is null ? HmType.Variable()
-                        : CSharpTypes.Rigid(model.GetTypeInfo(p.Type, cancellationToken).Type!)).ToArray();
-                    for (var i = 0; i < inputs.Length; i++) environment.Add(model.GetDeclaredSymbol(lambdaParameters[i], cancellationToken)!, inputs[i]);
+                    }
+
+                    var inputs = lambdaParameters.Select(p =>
+                    {
+                        if (p is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(p));
+                        }
+
+                        return p.Type is null ? HmType.Variable() : CSharpTypes.Rigid(model.GetTypeInfo(p.Type, cancellationToken).Type!);
+                    }).ToArray();
+                    for (var i = 0; i < inputs.Length; i++)
+                    {
+                        environment.Add(model.GetDeclaredSymbol(lambdaParameters[i], cancellationToken)!, inputs[i]);
+                    }
+
                     var output = lambda.Body is ExpressionSyntax body ? Expression(body) : Block((BlockSyntax)lambda.Body);
-                    foreach (var parameter in lambdaParameters) environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
+                    foreach (var parameter in lambdaParameters)
+                    {
+                        environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
+                    }
+
                     return HmType.Function(inputs, output);
                 case InvocationExpressionSyntax invocation:
-                    if (model.GetOperation(invocation, cancellationToken) is INameOfOperation) return new("string");
+                    if (model.GetOperation(invocation, cancellationToken) is INameOfOperation)
+                    {
+                        return new("string");
+                    }
+
                     return MethodCall(invocation);
                 case BaseObjectCreationExpressionSyntax creation:
-                    var constructed = model.GetOperation(creation, cancellationToken) as IObjectCreationOperation
-                        ?? throw new InferenceException("Unsupported object construction.");
-                    if (creation.Initializer is not null || constructed.Constructor is null || constructed.Constructor.Parameters.Any(p => p.RefKind != RefKind.None))
+                    var constructed = model.GetOperation(creation, cancellationToken) as IObjectCreationOperation ?? throw new InferenceException("Unsupported object construction.");
+                    if (creation.Initializer is not null || constructed.Constructor is null || constructed.Constructor.Parameters.Any(p =>
+                    {
+                        if (p is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(p));
+                        }
+
+                        return p.RefKind != RefKind.None;
+                    }))
+                    {
                         throw new InferenceException("Object initializers and ref constructors are unsupported.");
-                    BindArguments(constructed.Arguments, constructed.Constructor.Parameters.Select(p => CSharpTypes.Rigid(p.Type)).ToArray());
+                    }
+
+                    BindArguments(constructed.Arguments, constructed.Constructor.Parameters.Select(p =>
+                    {
+                        if (p is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(p));
+                        }
+
+                        return CSharpTypes.Rigid(p.Type);
+                    }).ToArray());
                     return CSharpTypes.Rigid(constructed.Type!);
                 case InterpolatedStringExpressionSyntax interpolated:
                     // Keep original hole types to preserve overloads and formatting;
                     // custom interpolation-handler conversions remain unsupported.
                     var converted = model.GetTypeInfo(interpolated, cancellationToken).ConvertedType;
                     if (converted?.SpecialType != SpecialType.System_String)
+                    {
                         throw new InferenceException("Only string-targeted interpolation is supported.");
+                    }
+
                     foreach (var hole in interpolated.Contents.OfType<InterpolationSyntax>())
                     {
                         Anchor(hole.Expression);
-                        if (hole.AlignmentClause is not null) HmType.Unify(Expression(hole.AlignmentClause.Value), new("int"));
+                        if (hole.AlignmentClause is not null)
+                        {
+                            HmType.Unify(Expression(hole.AlignmentClause.Value), new("int"));
+                        }
                     }
+
                     return new("string");
-                case BinaryExpressionSyntax binary: return Binary(binary);
+                case BinaryExpressionSyntax binary:
+                    return Binary(binary);
                 case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
                     if (model.GetSymbolInfo(unary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+                    {
                         throw new InferenceException("User-defined operators are unsupported.");
+                    }
+
                     Anchor(unary.Operand);
                     return CSharpTypes.Rigid(model.GetTypeInfo(unary, cancellationToken).Type!);
                 case ElementAccessExpressionSyntax element:
-                    var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol
-                        ?? throw new InferenceException("Only array indexing is supported.");
+                    var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array indexing is supported.");
                     var elementType = HmType.Variable();
                     HmType.Unify(Expression(element.Expression), new("[" + new string(',', array.Rank - 1) + "]", elementType));
-                    if (element.ArgumentList.Arguments.Count != array.Rank) throw new InferenceException("Array index count mismatch.");
-                    foreach (var index in element.ArgumentList.Arguments) HmType.Unify(Expression(index.Expression), new("int"));
+                    if (element.ArgumentList.Arguments.Count != array.Rank)
+                    {
+                        throw new InferenceException("Array index count mismatch.");
+                    }
+
+                    foreach (var index in element.ArgumentList.Arguments)
+                    {
+                        HmType.Unify(Expression(index.Expression), new("int"));
+                    }
+
                     return elementType;
-                case MemberAccessExpressionSyntax member: return Member(member);
+                case MemberAccessExpressionSyntax member:
+                    return Member(member);
                 case CastExpressionSyntax cast:
                     Anchor(cast.Expression);
                     return CSharpTypes.Rigid(model.GetTypeInfo(cast.Type, cancellationToken).Type!);
-                case DefaultExpressionSyntax @default: return CSharpTypes.Rigid(model.GetTypeInfo(@default.Type, cancellationToken).Type!);
-                case CheckedExpressionSyntax checkedExpression: return Expression(checkedExpression.Expression);
+                case DefaultExpressionSyntax @default:
+                    return CSharpTypes.Rigid(model.GetTypeInfo(@default.Type, cancellationToken).Type!);
+                case CheckedExpressionSyntax checkedExpression:
+                    return Expression(checkedExpression.Expression);
                 case SwitchExpressionSyntax switched:
                     Anchor(switched.GoverningExpression);
                     var switchedResult = HmType.Variable();
                     foreach (var arm in switched.Arms)
                     {
                         if (arm.Pattern is not ConstantPatternSyntax and not DiscardPatternSyntax)
+                        {
                             throw new InferenceException("Only constant/discard switch patterns are supported.");
-                        if (arm.WhenClause is not null) HmType.Unify(Expression(arm.WhenClause.Condition), new("bool"));
+                        }
+
+                        if (arm.WhenClause is not null)
+                        {
+                            HmType.Unify(Expression(arm.WhenClause.Condition), new("bool"));
+                        }
+
                         HmType.Unify(switchedResult, Expression(arm.Expression));
                     }
+
                     return switchedResult;
-                default: throw new InferenceException($"Unsupported expression: {expression.Kind()}.");
+                default:
+                    throw new InferenceException($"Unsupported expression: {expression.Kind()}.");
             }
         }
 
-        private void Anchor(ExpressionSyntax expression) => HmType.Unify(Expression(expression),
-            CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type
-                ?? throw new InferenceException("Untyped expression.")));
+        private void Anchor(ExpressionSyntax expression)
+        {
+            HmType.Unify(Expression(expression), CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? throw new InferenceException("Untyped expression.")));
+        }
 
         private HmType AssignmentTarget(ExpressionSyntax target)
         {
             if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax)
+            {
                 throw new InferenceException("Only local, parameter and array-element assignment targets are supported.");
+            }
+
             return Expression(target);
         }
 
         private HmType AssignValue(ExpressionSyntax targetSyntax, HmType value, ITypeSymbol? sourceType)
         {
+            if (targetSyntax is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(targetSyntax));
+            }
+
+            if (value is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(value));
+            }
+
             var target = AssignmentTarget(targetSyntax);
             var targetType = model.GetTypeInfo(targetSyntax, cancellationToken).Type!;
             if (sourceType is not null && !SymbolEqualityComparer.Default.Equals(targetType, sourceType))
@@ -439,14 +878,26 @@ public static class Inference
                 HmType.Unify(target, CSharpTypes.Rigid(targetType));
                 HmType.Unify(value, CSharpTypes.Rigid(sourceType));
             }
-            else HmType.Unify(target, value);
+            else
+            {
+                HmType.Unify(target, value);
+            }
+
             return target;
         }
 
         private HmType Increment(ExpressionSyntax expression, ExpressionSyntax operand)
         {
+            if (operand is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(operand));
+            }
+
             if (model.GetOperation(expression, cancellationToken) is not IIncrementOrDecrementOperation { OperatorMethod: null })
+            {
                 throw new InferenceException("User-defined increments are unsupported.");
+            }
+
             AssignmentTarget(operand);
             Anchor(operand);
             return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type!);
@@ -454,70 +905,139 @@ public static class Inference
 
         private void BindDeconstruction(ExpressionSyntax target, HmType value, ITypeSymbol original)
         {
+            if (value is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(value));
+            }
+
             switch (target)
             {
                 case DeclarationExpressionSyntax declaration:
-                    if (!declaration.Type.IsVar) HmType.Unify(value, CSharpTypes.Rigid(model.GetTypeInfo(declaration.Type, cancellationToken).Type!));
+                    if (!declaration.Type.IsVar)
+                    {
+                        HmType.Unify(value, CSharpTypes.Rigid(model.GetTypeInfo(declaration.Type, cancellationToken).Type!));
+                    }
+
                     BindDesignation(declaration.Designation, value, original);
                     break;
                 case TupleExpressionSyntax tuple:
                     var source = original as INamedTypeSymbol;
                     if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Arguments.Count)
+                    {
                         throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
+                    }
+
                     var elements = tuple.Arguments.Select(_ => HmType.Variable()).ToArray();
                     HmType.Unify(value, new("Tuple", elements));
-                    for (var i = 0; i < elements.Length; i++) BindDeconstruction(tuple.Arguments[i].Expression, elements[i], source.TupleElements[i].Type);
+                    for (var i = 0; i < elements.Length; i++)
+                    {
+                        BindDeconstruction(tuple.Arguments[i].Expression, elements[i], source.TupleElements[i].Type);
+                    }
+
                     break;
                 case IdentifierNameSyntax identifier:
                     if (model.GetOperation(identifier, cancellationToken) is not IDiscardOperation)
+                    {
                         AssignValue(identifier, value, original);
+                    }
+
                     break;
-                default: throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");
+                default:
+                    throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");
             }
         }
 
         private void BindDesignation(VariableDesignationSyntax designation, HmType value, ITypeSymbol original)
         {
+            if (value is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(value));
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             switch (designation)
             {
                 case SingleVariableDesignationSyntax variable:
                     environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, value);
                     break;
-                case DiscardDesignationSyntax: break;
+                case DiscardDesignationSyntax:
+                    break;
                 case ParenthesizedVariableDesignationSyntax tuple:
                     var source = original as INamedTypeSymbol;
                     if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Variables.Count)
+                    {
                         throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
+                    }
+
                     var elements = tuple.Variables.Select(_ => HmType.Variable()).ToArray();
                     HmType.Unify(value, new("Tuple", elements));
-                    for (var i = 0; i < elements.Length; i++) BindDesignation(tuple.Variables[i], elements[i], source.TupleElements[i].Type);
+                    for (var i = 0; i < elements.Length; i++)
+                    {
+                        BindDesignation(tuple.Variables[i], elements[i], source.TupleElements[i].Type);
+                    }
+
                     break;
-                default: throw new InferenceException("Unsupported deconstruction designation.");
+                default:
+                    throw new InferenceException("Unsupported deconstruction designation.");
             }
         }
 
         private void AnchorInitializer(InitializerExpressionSyntax initializer, ITypeSymbol element)
         {
+            if (initializer is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(initializer));
+            }
+
+            if (element is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(element));
+            }
+
             foreach (var item in initializer.Expressions)
-                if (item is InitializerExpressionSyntax nested) AnchorInitializer(nested, element);
-                else HmType.Unify(Expression(item), CSharpTypes.Rigid(element));
+            {
+                if (item is InitializerExpressionSyntax nested)
+                {
+                    AnchorInitializer(nested, element);
+                }
+                else
+                {
+                    HmType.Unify(Expression(item), CSharpTypes.Rigid(element));
+                }
+            }
         }
 
         private static void PreserveResultOnly(HmType inferred, HmType declared, HashSet<HmType> inferable)
         {
+            if (declared is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(declared));
+            }
+
             inferred = inferred.Root;
             declared = declared.Root;
-            if (inferred.IsVariable && !inferable.Contains(inferred)) { HmType.Unify(inferred, declared); return; }
+            if (inferred.IsVariable && !inferable.Contains(inferred))
+            {
+                HmType.Unify(inferred, declared);
+                return;
+            }
+
             if (inferred.Name == declared.Name && inferred.Arguments.Length == declared.Arguments.Length)
-                for (var i = 0; i < inferred.Arguments.Length; i++) PreserveResultOnly(inferred.Arguments[i], declared.Arguments[i], inferable);
+            {
+                for (var i = 0; i < inferred.Arguments.Length; i++)
+                {
+                    PreserveResultOnly(inferred.Arguments[i], declared.Arguments[i], inferable);
+                }
+            }
         }
 
         private HmType Binary(BinaryExpressionSyntax binary)
         {
-            if (binary.Kind() is SyntaxKind.CoalesceExpression or SyntaxKind.AsExpression or SyntaxKind.IsExpression ||
-                model.GetSymbolInfo(binary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+            if (binary.Kind() is SyntaxKind.CoalesceExpression or SyntaxKind.AsExpression or SyntaxKind.IsExpression || model.GetSymbolInfo(binary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+            {
                 throw new InferenceException("User-defined, null-coalescing and type-test operators are unsupported.");
+            }
+
             // Retain original operand types so numeric promotion, boxing and string
             // concatenation keep their C# meaning. Equality is not unconstrained HM equality.
             Anchor(binary.Left);
@@ -528,70 +1048,149 @@ public static class Inference
         private HmType Member(MemberAccessExpressionSyntax member)
         {
             var receiverType = model.GetTypeInfo(member.Expression, cancellationToken).Type;
-            if (receiverType is INamedTypeSymbol { IsTupleType: true } tuple &&
-                model.GetSymbolInfo(member, cancellationToken).Symbol is IFieldSymbol tupleField)
+            if (receiverType is INamedTypeSymbol { IsTupleType: true } tuple && model.GetSymbolInfo(member, cancellationToken).Symbol is IFieldSymbol tupleField)
             {
                 var index = tuple.TupleElements.IndexOf(tupleField);
-                if (index < 0) index = tuple.TupleElements.IndexOf(tupleField.CorrespondingTupleField!);
                 if (index < 0)
-                    index = tuple.TupleElements.Select((field, i) => (field, i)).First(p => p.field.CorrespondingTupleField?.Name == tupleField.Name).i;
+                {
+                    index = tuple.TupleElements.IndexOf(tupleField.CorrespondingTupleField!);
+                }
+
+                if (index < 0)
+                {
+                    index = tuple.TupleElements.Select((field, i) =>
+                    {
+                        if (field is null)
+                        {
+                            throw new global::System.ArgumentNullException(nameof(field));
+                        }
+
+                        return (field, i);
+                    }).First(p => p.field.CorrespondingTupleField?.Name == tupleField.Name).i;
+                }
+
                 var items = tuple.TupleElements.Select(_ => HmType.Variable()).ToArray();
                 HmType.Unify(Expression(member.Expression), new("Tuple", items));
                 return items[index];
             }
+
             if (receiverType is IArrayTypeSymbol array && member.Name.Identifier.ValueText is "Length" or "LongLength" or "Rank")
             {
                 HmType.Unify(Expression(member.Expression), new("[" + new string(',', array.Rank - 1) + "]", HmType.Variable()));
                 return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);
             }
+
             var selected = model.GetSymbolInfo(member, cancellationToken).Symbol;
             if (selected is not IPropertySymbol and not IFieldSymbol)
+            {
                 throw new InferenceException("Unsupported member access.");
-            if (selected is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false }) Anchor(member.Expression);
+            }
+
+            if (selected is IPropertySymbol { IsStatic: false } or IFieldSymbol { IsStatic: false })
+            {
+                Anchor(member.Expression);
+            }
+
             return CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!);
         }
 
         private HmType MethodCall(InvocationExpressionSyntax invocation)
         {
-            var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation
-                ?? throw new InferenceException("Unresolved or dynamic invocation.");
+            var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation ?? throw new InferenceException("Unresolved or dynamic invocation.");
             var called = operation.TargetMethod;
-            if (called.Parameters.Any(p => p.RefKind != RefKind.None))
+            if (called.Parameters.Any(p =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                return p.RefKind != RefKind.None;
+            }))
+            {
                 throw new InferenceException("Ref calls are unsupported.");
+            }
+
             if (called.MethodKind == MethodKind.DelegateInvoke)
             {
-                if (called.ReturnsVoid) throw new InferenceException("Void delegate calls are unsupported.");
+                if (called.ReturnsVoid)
+                {
+                    throw new InferenceException("Void delegate calls are unsupported.");
+                }
+
                 var inputs = called.Parameters.Select(_ => HmType.Variable()).ToArray();
                 var output = HmType.Variable();
                 HmType.Unify(Expression(invocation.Expression), HmType.Function(inputs, output));
                 BindArguments(operation, inputs);
                 return output;
             }
+
             if (SymbolEqualityComparer.Default.Equals(called, currentMethod))
             {
-                BindArguments(operation, currentFunction!.Arguments[..^1]);
-                return currentFunction.Arguments[^1];
+                BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray());
+                return currentFunction.Arguments[currentFunction.Arguments.Length - 1];
             }
+
             if (!called.IsStatic && called.MethodKind != MethodKind.LocalFunction)
             {
-                if (invocation.Expression is not MemberAccessExpressionSyntax member)
+                if (invocation.Expression is MemberAccessExpressionSyntax member)
+                {
+                    Anchor(member.Expression);
+                }
+                else if (operation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance })
+                {
                     throw new InferenceException("Implicit instance calls are unsupported.");
-                Anchor(member.Expression);
+                }
             }
+
             // Imported generic schemes are instantiated per call. Constraints are
             // checked by Roslyn after rewriting; no C# constraint language is invented.
             var definition = called.IsGenericMethod ? called.ConstructedFrom : called;
             var variables = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
-            foreach (var parameter in definition.TypeParameters) variables.Add(parameter, HmType.Variable());
-            BindArguments(operation, definition.Parameters.Select(p => CSharpTypes.Rigid(p.Type, variables)).ToArray());
+            foreach (var parameter in definition.TypeParameters)
+            {
+                variables.Add(parameter, HmType.Variable());
+            }
+
+            BindArguments(operation, definition.Parameters.Select(p =>
+            {
+                if (p is null)
+                {
+                    throw new global::System.ArgumentNullException(nameof(p));
+                }
+
+                return CSharpTypes.Rigid(p.Type, variables);
+            }).ToArray());
             return CSharpTypes.Rigid(definition.ReturnType, variables);
         }
 
         private void BindArguments(IInvocationOperation operation, HmType[] parameters)
-            => BindArguments(operation.Arguments, parameters);
+        {
+            if (operation is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(operation));
+            }
+
+            if (parameters is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(parameters));
+            }
+
+            BindArguments(operation.Arguments, parameters);
+        }
 
         private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters)
         {
+            if (arguments is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(arguments));
+            }
+
+            if (parameters is null)
+            {
+                throw new global::System.ArgumentNullException(nameof(parameters));
+            }
+
             foreach (var argument in arguments)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -600,25 +1199,50 @@ public static class Inference
                 // Omitted defaults are independent of the caller's expressions.
                 // In particular, default(T) must not pin a generic T to the type
                 // from the original constructed call.
-                if (argument.ArgumentKind == ArgumentKind.DefaultValue) continue;
+                if (argument.ArgumentKind == ArgumentKind.DefaultValue)
+                {
+                    continue;
+                }
+
                 if (parameter.IsParams && argument.ArgumentKind is not ArgumentKind.Explicit and not ArgumentKind.ParamArray)
+                {
                     throw new InferenceException("Expanded non-array params collections are unsupported.");
+                }
+
                 if (argument.ArgumentKind == ArgumentKind.ParamArray)
                 {
                     if (argument.Value is not IArrayCreationOperation { Initializer: not null } array)
+                    {
                         throw new InferenceException("Only array-based expanded params are supported.");
+                    }
+
                     var element = HmType.Variable();
                     HmType.Unify(expected, new("[]", element));
                     foreach (var value in array.Initializer.ElementValues)
+                    {
                         HmType.Unify(BoundExpression(value), element);
+                    }
                 }
-                else HmType.Unify(BoundExpression(argument.Value), expected);
+                else
+                {
+                    HmType.Unify(BoundExpression(argument.Value), expected);
+                }
             }
         }
 
-        private HmType BoundExpression(IOperation value) => value.Syntax is ExpressionSyntax expression
-            ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");
+        private HmType BoundExpression(IOperation value)
+        {
+            return value.Syntax is ExpressionSyntax expression ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");
+        }
     }
 
-    private static SeparatedSyntaxList<ParameterSyntax> Parameters(this MethodDeclarationSyntax method) => method.ParameterList.Parameters;
+    private static SeparatedSyntaxList<ParameterSyntax> Parameters(this MethodDeclarationSyntax method)
+    {
+        if (method is null)
+        {
+            throw new global::System.ArgumentNullException(nameof(method));
+        }
+
+        return method.ParameterList.Parameters;
+    }
 }

@@ -4,10 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <SharpProofProductionProject>false</SharpProofProductionProject>
     <IsShipping>false</IsShipping>
+    <PackageId>SharpProof.HmInference.Cli</PackageId>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CodeAnalysis" HintPath="$(RoslynTargetsPath)/bincore/Microsoft.CodeAnalysis.dll" Private="true" />
-    <Reference Include="Microsoft.CodeAnalysis.CSharp" HintPath="$(RoslynTargetsPath)/bincore/Microsoft.CodeAnalysis.CSharp.dll" Private="true" />
+    <ProjectReference Include="../SharpProof.HmInference.Core/SharpProof.HmInference.Core.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <ProjectReference Include="../SharpProof.HmInference.Analyzer/SharpProof.HmInference.Analyzer.csproj" />
+    <ProjectReference Include="../SharpProof.HmInference.CodeFixes/SharpProof.HmInference.CodeFixes.csproj" />
+    <Compile Remove="Inference.cs;CSharpTypes.cs;Types.cs;HmInferenceAnalyzer.cs;HmCore.cs" />
     <None Update="Samples/*.cs.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

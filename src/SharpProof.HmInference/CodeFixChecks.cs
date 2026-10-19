@@ -1,0 +1,242 @@
+using System.Composition;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.HmInference.CodeFixes;
+
+namespace SharpProof.HmInference;
+
+internal static class CodeFixChecks
+{
+    public static async Task<int> Run(CancellationToken cancellationToken)
+    {
+        using var exports = new System.Composition.Hosting.ContainerConfiguration().WithAssembly(typeof(HmSignatureCodeFixProvider).Assembly).CreateContainer();
+        if (exports.GetExports<CodeFixProvider>().Single().GetType() != typeof(HmSignatureCodeFixProvider))
+        { throw new InvalidOperationException("MEF code-fix discovery failed."); }
+        Program.Log.Info("PASS IDEMefCodeFixDiscovery");
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "FixChecks", "FixChecks", LanguageNames.CSharp, compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), parseOptions: CSharpParseOptions.Default, metadataReferences: Program.Compile([]).References));
+        var document = project.AddDocument("Input.cs", """
+            // Keep the public contract comment.
+            class C {
+                // Identity body must survive.
+                public static int Id(int value) => value;
+                static int Other(int value) { var copy=value; return copy; }
+                static int Concrete(int value) => value+1;
+            }
+            """);
+        var diagnostics = await (Diagnostics(document, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var originalRoot = (await (document.GetSyntaxRootAsync(cancellationToken: cancellationToken)).ConfigureAwait(false))!;
+        var idDiagnostic = diagnostics.Single(d =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(d);
+            return d.Location.SourceSpan == originalRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
+            {
+                global::System.ArgumentNullException.ThrowIfNull(m);
+                return m.Identifier.ValueText == "Id";
+            }).Identifier.Span;
+        });
+        var provider = new HmSignatureCodeFixProvider();
+        var actions = new List<CodeAction>();
+        await (provider.RegisterCodeFixesAsync(new CodeFixContext(document, idDiagnostic, (action, _) =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(action);
+            actions.Add(action);
+        }, cancellationToken))).ConfigureAwait(false);
+        if (actions.Count != 1)
+        {
+            throw new InvalidOperationException("Expected one HM code fix.");
+        }
+
+        var solution = await (ChangedSolution(actions.Single(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var changed = solution.GetDocument(document.Id)!;
+        await (CheckCompilation(changed, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var text = (await (changed.GetTextAsync(cancellationToken: cancellationToken)).ConfigureAwait(false)).ToString();
+        if (!text.Contains("Id<T1>", StringComparison.Ordinal) || !text.Contains("Identity body must survive.", StringComparison.Ordinal) || !text.Contains("=> value;", StringComparison.Ordinal) || !text.Contains("Other(int value)", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Code fix lost body/trivia or changed an unrelated method.");
+        }
+
+        Program.Log.Info("PASS IDECodeFixApplication");
+        var concrete = document.WithText(Microsoft.CodeAnalysis.Text.SourceText.From((await (document.GetTextAsync(cancellationToken: cancellationToken)).ConfigureAwait(false)).ToString().Replace("=> value;", "=> value+1;", StringComparison.Ordinal)));
+        actions.Clear();
+        await (provider.RegisterCodeFixesAsync(new CodeFixContext(concrete, idDiagnostic, (action, _) =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(action);
+            actions.Add(action);
+        }, cancellationToken))).ConfigureAwait(false);
+        if (actions.Count != 0)
+        {
+            throw new InvalidOperationException("Stale diagnostic produced an unsafe fix.");
+        }
+
+        Program.Log.Info("PASS IDEStaleDiagnostic");
+        var context = new FixAllContext(document, provider, FixAllScope.Document, "HM.GeneralizeSignature", provider.FixableDiagnosticIds, new DiagnosticSource(), cancellationToken);
+        var allAction = await (provider.GetFixAllProvider().GetFixAsync(context)).ConfigureAwait(false);
+        changed = (await (ChangedSolution(allAction!, cancellationToken: cancellationToken)).ConfigureAwait(false)).GetDocument(document.Id)!;
+        await (CheckCompilation(changed, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var methods = (await (changed.GetSyntaxRootAsync(cancellationToken: cancellationToken)).ConfigureAwait(false))!.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        if (methods.Count(m => m.TypeParameterList is not null) != 2 || methods.Single(m =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(m);
+            return m.Identifier.ValueText == "Concrete";
+        }).TypeParameterList is not null)
+        {
+            throw new InvalidOperationException("Fix All failed to generalize just the eligible methods.");
+        }
+
+        Program.Log.Info("PASS IDESequentialFixAll");
+        var solutionProject = document.Project;
+        var another = solutionProject.AddDocument("Second.cs", "class D { static int Second(int x) => x; }");
+        var projectContext = new FixAllContext(another.Project, provider, FixAllScope.Project, "HM.GeneralizeSignature", provider.FixableDiagnosticIds, new DiagnosticSource(), cancellationToken);
+        var projectFix = await (provider.GetFixAllProvider().GetFixAsync(projectContext)).ConfigureAwait(false);
+        var fixedProject = (await (ChangedSolution(projectFix!, cancellationToken: cancellationToken)).ConfigureAwait(false)).GetProject(project.Id)!;
+        foreach (var fixedDocument in fixedProject.Documents)
+        {
+            await (CheckCompilation(fixedDocument, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        if ((await (Diagnostics(fixedProject.Documents.Single(d =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(d);
+            return d.Name == "Second.cs";
+        }), cancellationToken: cancellationToken)).ConfigureAwait(false)).Length != 0)
+        {
+            throw new InvalidOperationException("Project Fix All missed the second document.");
+        }
+
+        Program.Log.Info("PASS IDEProjectFixAll");
+        var overloads = document.WithText(Microsoft.CodeAnalysis.Text.SourceText.From("class C { static int Same(int x)=>x; static string Same(string x)=>x; }"));
+        var overloadContext = new FixAllContext(overloads, provider, FixAllScope.Document, "HM.GeneralizeSignature", provider.FixableDiagnosticIds, new DiagnosticSource(), cancellationToken);
+        var overloadAction = await (provider.GetFixAllProvider().GetFixAsync(overloadContext)).ConfigureAwait(false);
+        changed = (await (ChangedSolution(overloadAction!, cancellationToken: cancellationToken)).ConfigureAwait(false)).GetDocument(overloads.Id)!;
+        await (CheckCompilation(changed, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if ((await (changed.GetSyntaxRootAsync(cancellationToken: cancellationToken)).ConfigureAwait(false))!.DescendantNodes().OfType<MethodDeclarationSyntax>().Count(m => m.TypeParameterList is not null) != 1)
+        {
+            throw new InvalidOperationException("Fix All should reject the second conflicting generic overload.");
+        }
+
+        Program.Log.Info("PASS IDEFixAllOverloadConflict");
+        var deleted = document.WithText(Microsoft.CodeAnalysis.Text.SourceText.From("class C {}"));
+        actions.Clear();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(deleted, idDiagnostic, (action, _) => { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+        if (actions.Count != 0)
+        { throw new InvalidOperationException("Deleted method retained a code fix."); }
+        Program.Log.Info("PASS IDEDeletedMethodDiagnostic");
+
+        var invalid = document.WithText(Microsoft.CodeAnalysis.Text.SourceText.From("class C { static int Id(int value) => missing; }"));
+        actions.Clear();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(invalid, idDiagnostic, (action, _) => { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+        if (actions.Count != 0)
+        { throw new InvalidOperationException("Invalid compilation retained a code fix."); }
+        Program.Log.Info("PASS IDEInvalidCompilationDiagnostic");
+
+        var declaration = document.WithText(Microsoft.CodeAnalysis.Text.SourceText.From("""
+            class G<T1> {
+                [System.Obsolete("retained")]
+                static T M<T /* generic */>(T value, /* separator */ [System.Runtime.InteropServices.In] ref int ignored, bool optional=true) where T:class => value;
+            }
+            """));
+        var declarationDiagnostic = (await Diagnostics(declaration, cancellationToken).ConfigureAwait(false)).Single();
+        actions.Clear();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(declaration, declarationDiagnostic, (action, _) => { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+        changed = (await ChangedSolution(actions.Single(), cancellationToken).ConfigureAwait(false)).GetDocument(document.Id)!;
+        await CheckCompilation(changed, cancellationToken).ConfigureAwait(false);
+        text = (await changed.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString();
+        foreach (var retained in new[] { "/* generic */", "/* separator */", "ref T2 ignored", "where T : class", "optional = true", "Obsolete", "InteropServices.In" })
+        {
+            if (!text.Contains(retained, StringComparison.Ordinal))
+            { throw new InvalidOperationException("Code fix lost declaration element: " + retained); }
+        }
+        Program.Log.Info("PASS IDEGenericDeclarationTrivia");
+
+        var secondProjectId = ProjectId.CreateNewId();
+        var secondDocumentId = DocumentId.CreateNewId(secondProjectId);
+        var multiSolution = another.Project.Solution.AddProject(secondProjectId, "OtherProject", "OtherProject", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(secondProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(secondProjectId, Program.Compile([]).References)
+            .AddDocument(secondDocumentId, "Other.cs", "class E { static int Third(int x) => x; }");
+        var solutionContext = new FixAllContext(multiSolution.GetProject(project.Id)!, provider, FixAllScope.Solution, "HM.GeneralizeSignature", provider.FixableDiagnosticIds, new DiagnosticSource(), cancellationToken);
+        var solutionAction = await provider.GetFixAllProvider().GetFixAsync(solutionContext).ConfigureAwait(false);
+        var fixedSolution = await ChangedSolution(solutionAction!, cancellationToken).ConfigureAwait(false);
+        foreach (var fixedDocument in fixedSolution.Projects.SelectMany(p => { ArgumentNullException.ThrowIfNull(p); return p.Documents; }))
+        {
+            await CheckCompilation(fixedDocument, cancellationToken).ConfigureAwait(false);
+            if ((await Diagnostics(fixedDocument, cancellationToken).ConfigureAwait(false)).Length != 0)
+            { throw new InvalidOperationException("Solution Fix All missed an eligible method."); }
+        }
+        Program.Log.Info("PASS IDESolutionFixAll");
+
+        using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await cancelled.CancelAsync().ConfigureAwait(false);
+        try
+        {
+            await provider.RegisterCodeFixesAsync(new CodeFixContext(document, idDiagnostic, (action, _) => { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancelled.Token)).ConfigureAwait(false);
+            throw new InvalidOperationException("Code fix ignored cancellation.");
+        }
+        catch (OperationCanceledException) when (cancelled.IsCancellationRequested) { }
+        Program.Log.Info("PASS IDECodeFixCancellation");
+        return 11;
+    }
+
+    private static async Task<Solution> ChangedSolution(CodeAction action, CancellationToken cancellationToken)
+    {
+        global::System.ArgumentNullException.ThrowIfNull(action);
+        return (await (action.GetOperationsAsync(cancellationToken)).ConfigureAwait(false)).OfType<ApplyChangesOperation>().Single().ChangedSolution;
+    }
+
+    private static async Task CheckCompilation(Document document, CancellationToken cancellationToken)
+    {
+        var compilation = (await (document.Project.GetCompilationAsync(cancellationToken: cancellationToken)).ConfigureAwait(false))!;
+        var errors = compilation.GetDiagnostics(cancellationToken: cancellationToken).Where(d =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(d);
+            return d.Severity == DiagnosticSeverity.Error;
+        }).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException(string.Join("\n", errors.Select(d =>
+            {
+                global::System.ArgumentNullException.ThrowIfNull(d);
+                return d.ToString();
+            })));
+        }
+    }
+
+    private static async Task<Diagnostic[]> Diagnostics(Document document, CancellationToken cancellationToken)
+    {
+        global::System.ArgumentNullException.ThrowIfNull(document);
+        var compilation = (await (document.Project.GetCompilationAsync(cancellationToken: cancellationToken)).ConfigureAwait(false))!;
+        var tree = await (document.GetSyntaxTreeAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return (await (compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), onAnalyzerException: null, concurrentAnalysis: true, logAnalyzerExecutionTime: false)).GetAnalyzerDiagnosticsAsync(cancellationToken: cancellationToken)).ConfigureAwait(false)).Where(d =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(d);
+            return d.Location.SourceTree == tree;
+        }).ToArray();
+    }
+
+    private sealed class DiagnosticSource : FixAllContext.DiagnosticProvider
+    {
+        public override async Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken cancellationToken)
+        {
+            global::System.ArgumentNullException.ThrowIfNull(document);
+            return await (Diagnostics(document, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        public override Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(Project project, CancellationToken cancellationToken)
+        {
+            global::System.ArgumentNullException.ThrowIfNull(project);
+            return Task.FromResult(Enumerable.Empty<Diagnostic>());
+        }
+
+        public override async Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(Project project, CancellationToken cancellationToken)
+        {
+            global::System.ArgumentNullException.ThrowIfNull(project);
+            var compilation = (await (project.GetCompilationAsync(cancellationToken)).ConfigureAwait(false))!;
+            return await (compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), onAnalyzerException: null, concurrentAnalysis: true, logAnalyzerExecutionTime: false)).GetAnalyzerDiagnosticsAsync(cancellationToken)).ConfigureAwait(false);
+        }
+    }
+}

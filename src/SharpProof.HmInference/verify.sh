@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd /workspace/SharpProof
+export SHARPPROOF_HM_SOURCE_COMMIT
+SHARPPROOF_HM_SOURCE_COMMIT=$(git rev-parse HEAD)
 task_root=$(mktemp -d /tmp/hm-inference.XXXXXX)
 tar --exclude=.git --exclude=artifacts -cf - . | tar -C "$task_root" -xf -
 cd "$task_root"
 dotnet restore SharpProof.HmInference.slnx
-dotnet build SharpProof.HmInference.slnx --no-restore -p:RunAnalyzersDuringBuild=false > build.log 2>&1 || { tail -60 build.log; exit 1; }
+dotnet build SharpProof.HmInference.slnx --no-restore > build.log 2>&1 || {
+  mkdir -p /workspace/SharpProof/artifacts/hm-inference
+  cp build.log /workspace/SharpProof/artifacts/hm-inference/build.log
+  grep -oE 'error [A-Z]+[0-9]+' build.log | sort | uniq -c || true
+  head -45 build.log
+  exit 1
+}
+mkdir -p /workspace/SharpProof/artifacts/hm-inference
+cp build.log /workspace/SharpProof/artifacts/hm-inference/build.log
+tail -5 build.log
 output=$(find artifacts/bin/SharpProof.HmInference -name SharpProof.HmInference.dll -path '*/net10.0/*' | head -1)
 test -n "$output"
 mkdir -p /workspace/SharpProof/artifacts/hm-inference
@@ -14,3 +25,7 @@ dotnet "$output" --samples | tee /workspace/SharpProof/artifacts/hm-inference/sa
 dotnet "$output" --hm-samples | tee /workspace/SharpProof/artifacts/hm-inference/hm-samples.txt
 # Lock files are source inputs. Export only the new project's restore result.
 cp src/SharpProof.HmInference/packages.lock.json /workspace/SharpProof/src/SharpProof.HmInference/packages.lock.json
+cp src/SharpProof.HmInference.Analyzer/packages.lock.json /workspace/SharpProof/src/SharpProof.HmInference.Analyzer/packages.lock.json
+cp src/SharpProof.HmInference.CodeFixes/packages.lock.json /workspace/SharpProof/src/SharpProof.HmInference.CodeFixes/packages.lock.json
+cp src/SharpProof.HmInference.Core/packages.lock.json /workspace/SharpProof/src/SharpProof.HmInference.Core/packages.lock.json
+bash src/SharpProof.HmInference/verify-package.sh

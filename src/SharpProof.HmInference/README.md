@@ -2,22 +2,26 @@
 
 The standalone `SharpProof.HmInference.slnx` contains a rank-1 Hindley-Milner
 inference core, a C# generic-signature adapter, a Roslyn analyzer (`HM0001`),
-a CLI, samples, and executable regression checks. It is separate from the
+a CLI, an IDE code-fix package, samples, and executable regression checks. It is separate from the
 production analyzer and main solution.
 
 ## Run
 
 From the repository root, in the canonical Linux amd64 tooling container:
 
-```sh
-docker compose run --rm tooling dev src/SharpProof.HmInference/verify.sh
+```powershell
+./eng/scripts/Invoke-SharpProof.ps1 dev src/SharpProof.HmInference/verify.sh
 ```
 
 The script restores and builds in a private container workspace, runs regression
 checks and C#/HM samples, and exports evidence under `artifacts/hm-inference/`.
-Compiler outputs remain private. It retains the pinned SDK and Arcade imports
-and adds no NuGet dependencies. As in the initial prototype, the exploratory
-build disables repository style analyzers; this is not production CI acceptance.
+Compiler outputs remain private. The portable analyzer and code-fix assemblies
+use netstandard2.0 and Roslyn 4.14; the reusable core and CLI target net10.0. Dependency versions
+and lock files follow repository conventions. The verification also packs the
+analyzer and runs an isolated net8.0 consumer build with a fresh package cache.
+
+Normal repository analyzers stay enabled; the build must pass with zero warnings
+and errors.
 
 Run layout validation with `docker compose run --rm tooling layout`. For a host
 Git worktree, use `./eng/scripts/Invoke-SharpProof.ps1 layout` instead; that host
@@ -56,9 +60,9 @@ preserve aliases without mutating caller state.
 ```csharp
 var id = new HmLambda("x", new HmVariable("x"));
 var expression = new HmLet("id", id, new HmTuple(
-    new HmApply(new HmVariable("id"), new HmLiteral(HmLiteralKind.Int)),
+    new HmApply(new HmVariable("id"), new HmLiteral(HmLiteralKind.Number)),
     new HmApply(new HmVariable("id"), new HmLiteral(HmLiteralKind.Bool))));
-var type = HmCore.PrincipalType(expression); // (int, bool)
+var type = HmCore.PrincipalType(expression, cancellationToken); // (int, bool)
 ```
 
 HmLiteral carries a type, not a runtime value. This API infers types; it is not
@@ -118,13 +122,16 @@ method definitions inside the body are compared before/after to reject overload
 rebinding. Selected constructors are checked too. Roslyn validates C# constraints;
 the engine does not invent them. Escaped source identifiers are retained in signatures.
 
-The adapter explicitly skips async, ref/out, nullable
-annotations, user-defined operators, expanded non-array params collections, null and
-coalescing, existing generic root methods, instance root methods, attributes,
-unsupported patterns and other unimplemented syntax. It does not infer mutually
-recursive C# method groups or synthesize generic constraints. Imported signatures
-and retained annotations can make inference conservative.
+Instance methods, existing generic methods and containing generic types are
+supported. Existing type parameters are rigid; their constraints are retained.
+New names avoid identifiers already in the declaration. Attributes and
+ref/out/in/params modifiers are preserved; optional parameter types remain
+concrete to retain their defaults. Ref arguments at call sites remain unsupported.
 
+The adapter skips async, nullable annotations, custom operators, expanded
+non-array params collections, null/coalescing, unsupported patterns and other
+unimplemented syntax. It does not infer mutually recursive C# method groups or
+synthesize generic constraints. See [the completion ledger](LIMITATIONS.md).
 Tuple deconstruction supports declarations, reassignment and mixed targets for
 local/parameter identifiers and discards. Custom Deconstruct methods (including
 nested ones) remain unsupported. Object
@@ -148,13 +155,27 @@ an all-throw body retains declared result information when producing a C# signat
 The suite exercises nested exit ownership, tuple iteration, thrown exceptions and
 checked overflow versus unchecked wrapping at runtime.
 
-Candidates are checked independently. Applying multiple suggestions requires
-another compile. Public APIs, binary consumers, reflection and external callers
-need review. No source is rewritten and no automatic fix is offered. The analyzer
-is exercised through Compilation.WithAnalyzers in the SDK-targeted CLI; it is
-not a portable IDE NuGet package. Recompilation per candidate targets small
-experiments, not large-solution performance.
+## IDE installation and fixes
 
+Verification exports `SharpProof.HmInference.*.nupkg` under
+`artifacts/hm-inference/packages/`. Install from that local NuGet source into a
+C# project using `PackageReference` with `PrivateAssets="all"`. The package
+contains only the analyzer and code-fix assemblies under `analyzers/dotnet/cs`;
+Roslyn and MEF dependencies are supplied by the IDE host. Use an IDE supporting
+Roslyn 4.14 or newer. The package has not been published to a public feed.
+
+HM0001 offers "Generalize method signature (API change)". The fix preserves the
+body, documentation, attributes, defaults and modifiers. It recomputes inference
+before offering or applying changes. Document, project and solution Fix All
+revalidate each candidate against the updated solution, skipping suggestions
+that cease to be valid after another edit (for example, conflicting overloads).
+
+Public APIs, binary consumers, reflection and absent external callers still
+need review. Compiler validation does not establish behavioral equivalence.
+Recompilation per candidate targets small experiments; solution-scale cost has
+not yet been measured. An automated AdhocWorkspace test checks application and
+Fix All; a fresh consumer build checks loading of the packaged analyzer. Manual
+interactive IDE acceptance remains open.
 ## Validation scope
 
 The suite checks C# signatures, analyzer agreement, rejected/skipped cases, and

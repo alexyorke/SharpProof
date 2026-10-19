@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="src/SharpProof.HmInference.Core/SharpProof.HmInference.Core.csproj" />
   <Project Path="src/SharpProof.HmInference/SharpProof.HmInference.csproj" />
+  <Project Path="src/SharpProof.HmInference.Analyzer/SharpProof.HmInference.Analyzer.csproj" />
+  <Project Path="src/SharpProof.HmInference.CodeFixes/SharpProof.HmInference.CodeFixes.csproj" />
 </Solution>

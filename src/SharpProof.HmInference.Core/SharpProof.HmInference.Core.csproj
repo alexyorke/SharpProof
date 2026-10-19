@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <SharpProofProductionProject>false</SharpProofProductionProject>
+    <IsShipping>false</IsShipping>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SharpProof.HmInference.Analyzer/SharpProof.HmInference.Analyzer.csproj" />
+    <Compile Include="../SharpProof.HmInference/HmCore.cs" Link="HmCore.cs" />
+    <Compile Include="../../eng/logging/RepositoryLogger.cs" Link="RepositoryLogger.cs" />
+  </ItemGroup>
+</Project>

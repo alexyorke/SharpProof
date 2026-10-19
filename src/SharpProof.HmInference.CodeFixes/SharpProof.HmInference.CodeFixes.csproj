@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <SharpProofProductionProject>false</SharpProofProductionProject>
+    <IsShipping>false</IsShipping>
+    <IsPackable>true</IsPackable>
+    <PackageId>SharpProof.HmInference</PackageId>
+    <Description>HM type inference diagnostics and compiler-validated generic signature code fixes.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
+    <PackageReference Include="System.Composition.AttributedModel" PrivateAssets="all" />
+    <ProjectReference Include="../SharpProof.HmInference.Analyzer/SharpProof.HmInference.Analyzer.csproj" />
+    <None Include="$(OutputPath)SharpProof.HmInference.Analyzer.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)SharpProof.HmInference.CodeFixes.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="../SharpProof.HmInference/README.md" Pack="true" PackagePath="/README.md" />
+  </ItemGroup>
+</Project>
