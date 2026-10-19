@@ -45,7 +45,7 @@ public sealed class NativeAliasingBoundaryTests
     [Test]
     public async Task DistinctSealedRootAndFieldCannotProduceAnImpossibleAliasRefutation()
     {
-        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
+        const string source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
             "public sealed class Holder { public B Value; } public static class C { public static bool Target(A first, Holder holder) { " +
             "Contract.Requires(first != null && holder != null && holder.Value != null); Contract.Ensures(Contract.Result<bool>()); " +
             "object left = first; object right = holder.Value; return left != right; } }";
@@ -55,7 +55,7 @@ public sealed class NativeAliasingBoundaryTests
     [Test]
     public async Task CertifiedSameTypeCyclesRetainValidRefutations()
     {
-        var source = "using SharpProof.Attributes; public sealed class Node { public Node Next; public int Value; } " +
+        const string source = "using SharpProof.Attributes; public sealed class Node { public Node Next; public int Value; } " +
             "public static class C { public static int Target(Node node) { Contract.Requires(node != null && node.Next == node && node.Value == 1); " +
             "Contract.Ensures(Contract.Result<int>() == 2); return node.Next.Value; } }";
         Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -69,7 +69,7 @@ public sealed class NativeAliasingBoundaryTests
     [TestCase(true, true)]
     public void EntryIdentityIsValidatedBeforeEffectReplay(bool alias, bool nullInputs)
     {
-        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
+        const string source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
             "public static int Target(A a, B b) { Contract.Ensures(Contract.Result<int>() == 1); var allocated = new object(); return 1; } }";
         using var project = new ShadowTestProject(source);
         var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
@@ -95,7 +95,7 @@ public sealed class NativeAliasingBoundaryTests
     [Test]
     public async Task DisjointEntryIdentityDoesNotForbidLaterNullAssignments()
     {
-        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
+        const string source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } public static class C { " +
             "public static bool Target(A a, B b) { Contract.Requires(a != null && b != null); Contract.Ensures(Contract.Result<bool>()); " +
             "a = null; b = null; object left = a; object right = b; return left == right; } }";
         Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Proven));

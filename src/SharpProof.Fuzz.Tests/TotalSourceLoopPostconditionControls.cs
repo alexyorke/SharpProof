@@ -83,7 +83,7 @@ public sealed class TotalSourceLoopPostconditionControls
             Assert.That(result.Agreements, Is.Zero);
             Assert.That(result.Failures, Has.Length.EqualTo(1));
             Assert.That(result.Failures[0].Detail, Does.StartWith("Target0: native agreement "));
-            var reproducer = Member + "\n// inputs: [7]";
+            const string reproducer = Member + "\n// inputs: [7]";
             Assert.That(result.Failures[0].Original, Is.EqualTo(reproducer));
             Assert.That(result.Failures[0].Minimized, Is.EqualTo(reproducer));
         }

@@ -503,6 +503,54 @@ public sealed class ContractClauseInventoryTests
             .IsSuccess, Is.False);
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ClauseValidityPreservesDeferredFailuresAndShortCircuiting(int shape)
+    {
+        var original = CreateInventory(
+            "using SharpProof.Attributes; public static class Target { public static void Analyze(bool value) { Contract.Requires(value); } }",
+            "Target", "Analyze");
+        var valid = original.Clauses[0];
+        var invalid = new ContractClauseOccurrence(
+            valid.Kind, ContractClausePlacement.Conditional,
+            valid.Ordinal, valid.SourceOrdinal, valid.Invocation);
+        ImmutableArray<ContractClauseOccurrence> clauses = shape switch
+        {
+            0 => default,
+            1 => [],
+            2 => [null!],
+            3 => [invalid],
+            4 => [valid],
+            5 => [invalid, null!, valid],
+            6 => [valid, null!],
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var inventory = new ContractClauseInventory(
+            original.Callable, true, false, original.ImplementationBody, clauses);
+        Action read = () => _ = inventory.HasValidClause;
+        for (var iteration = 0; iteration < 4; iteration++)
+        {
+            if (shape == 0)
+            {
+                Assert.Throws<NullReferenceException>(read);
+            }
+            else if (shape is 2 or 5)
+            {
+                Assert.That(Assert.Throws<ArgumentNullException>(read)!.ParamName,
+                    Is.EqualTo("clause"));
+            }
+            else
+            {
+                Assert.That(inventory.HasValidClause, Is.EqualTo(shape is 4 or 6));
+            }
+        }
+    }
+
     private static (CSharpCompilation Owner, CSharpCompilation Foreign)
         CreateForeignFixture()
     {

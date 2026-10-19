@@ -804,7 +804,7 @@ public sealed class FinalCompilationCollectorTests
         using var workspace = new CollectorWorkspace();
         var pairPath = workspace.SealPath("pair");
         var replacementPath = workspace.SealPath("replacement");
-        var prefix =
+        const string prefix =
             "using SharpProof.Attributes; internal static class Subject { " +
             "internal static string Identity(string value) { " +
             "Contract.Ensures(Contract.Result<string>() == \"";

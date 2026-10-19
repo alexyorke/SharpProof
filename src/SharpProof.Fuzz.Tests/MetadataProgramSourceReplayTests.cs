@@ -56,7 +56,7 @@ public sealed class MetadataProgramSourceReplayTests
         Assert.That(replay.Result.Agreements, Is.Zero);
         Assert.That(replay.Result.NativeProofs, Is.Zero);
         Assert.That(replay.Result.NativeRefutations, Is.Zero);
-        var reproducer = library + "\n" + PositiveSubject + "\n// input: 7";
+        const string reproducer = library + "\n" + PositiveSubject + "\n// input: 7";
         Assert.That(replay.Result.Failures, Has.Length.EqualTo(1));
         Assert.That(replay.Result.Failures[0], Is.EqualTo(new FuzzFailure(0, 12346,
             "metadata-program", reproducer, reproducer,
@@ -108,7 +108,7 @@ public sealed class MetadataProgramSourceReplayTests
         Assert.That(replay.Result.Agreements, Is.Zero);
         Assert.That(replay.Result.NativeProofs, Is.Zero);
         Assert.That(replay.Result.NativeRefutations, Is.Zero);
-        var reproducer = PositiveLibrary + "\n" + subject + "\n// input: 7";
+        const string reproducer = PositiveLibrary + "\n" + subject + "\n// input: 7";
         Assert.That(replay.Result.Failures, Has.Length.EqualTo(1));
         Assert.That(replay.Result.Failures[0], Is.EqualTo(new FuzzFailure(0, 12348,
             "metadata-program", reproducer, reproducer, "Target0: incomplete metadata artifact")));

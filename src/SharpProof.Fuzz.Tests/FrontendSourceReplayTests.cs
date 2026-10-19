@@ -20,7 +20,7 @@ public sealed class FrontendSourceReplayTests
     [Test]
     public void ActualExpressionBodyReplaysItsCompiledArgument()
     {
-        var source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
+        const string source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
         AssertActualCompilation(source, [First], [7], [true]);
         var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
@@ -30,7 +30,7 @@ public sealed class FrontendSourceReplayTests
     [Test]
     public void ActualBlockBodyKeepsTheOperationRejection()
     {
-        var source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
+        const string source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
         AssertActualCompilation(source, [First], [7], [false]);
         var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));

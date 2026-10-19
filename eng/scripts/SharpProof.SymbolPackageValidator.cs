@@ -255,9 +255,10 @@ internal static class SharpProofSymbolPackageValidator
             throw new InvalidDataException(
                 $"Portable PDB '{pdbEntry.FullName}' has no debug metadata header.");
         var pdbId = debugMetadataHeader.Id;
-        var expectedId = new byte[20];
-        codeView.Guid.ToByteArray().CopyTo(expectedId, 0);
-        BitConverter.GetBytes(codeViewEntry.Stamp).CopyTo(expectedId, 16);
+        var expectedIdBuilder = ImmutableArray.CreateBuilder<byte>(20);
+        expectedIdBuilder.AddRange(codeView.Guid.ToByteArray());
+        expectedIdBuilder.AddRange(BitConverter.GetBytes(codeViewEntry.Stamp));
+        var expectedId = expectedIdBuilder.MoveToImmutable();
         if (pdbId.Length != expectedId.Length ||
             !pdbId.SequenceEqual(expectedId))
         {

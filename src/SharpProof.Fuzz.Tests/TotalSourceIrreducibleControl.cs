@@ -78,7 +78,7 @@ public sealed class TotalSourceIrreducibleControl
         Assert.That(result.NativeRefutations, Is.Zero);
         Assert.That(result.Failures, Has.Length.EqualTo(1));
         Assert.That(result.Failures[0].Detail, Is.EqualTo("Target0: native admission UnsupportedBody"));
-        var reproducer = Member + "\n// inputs: [7]";
+        const string reproducer = Member + "\n// inputs: [7]";
         Assert.That(result.Failures[0].Original, Is.EqualTo(reproducer));
         Assert.That(result.Failures[0].Minimized, Is.EqualTo(reproducer));
     }

@@ -292,8 +292,8 @@ public static class FuzzRunner
         }
         var frontendResults = frontendResultBuffer.ToImmutable();
         var frontendCoverage = CreateFrontendCoverage(
-            frontendCases,
-            frontendResults);
+            frontendCases.AsSpan(),
+            frontendResults.AsSpan());
         var coverageSatisfied =
             options.Cases < PullRequestCoverageBudget ||
             HasRequiredFrontendCoverage(frontendCoverage);
@@ -551,13 +551,9 @@ public static class FuzzRunner
     }
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(
-        ImmutableArray<GeneratedCSharpCase> cases,
-        ImmutableArray<FrontendDifferentialResult> results)
+        ReadOnlySpan<GeneratedCSharpCase> cases /* SPINT001: all values valid - default and empty spans represent zero generated cases */,
+        ReadOnlySpan<FrontendDifferentialResult> results /* SPINT001: all values valid - default and empty spans represent zero oracle observations */)
     {
-        if (cases.IsDefault)
-        { throw new ArgumentNullException(nameof(cases)); }
-        if (results.IsDefault)
-        { throw new ArgumentNullException(nameof(results)); }
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;

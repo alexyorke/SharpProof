@@ -392,7 +392,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase(1, IrExceptionKind.Argument)]
     public void InstanceDelegateEvaluatesReceiverBeforeNullCheckAndAllocation(int x, IrExceptionKind expected)
     {
-        var source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
+        const string source = "using SharpProof.Attributes; public class Receiver { public void Sink() {} } public static class C { " +
             "private static Receiver Pass(Receiver receiver, int value) { return receiver; } " +
             "[ZeroAllocations] public static System.Action Target(Receiver instance, int x) { " +
             "return new System.Action(Pass(instance, 10 / x).Sink); } }";

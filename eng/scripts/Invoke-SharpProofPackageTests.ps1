@@ -166,7 +166,9 @@ function Get-SharpProofBucketMaximum {
     return $maximum
 }
 
-$script:SharpProofTrxTimingRowsCache = @{}
+$script:SharpProofTrxTimingRowsCache =
+[Collections.Immutable.ImmutableDictionary]::Create[string, object](
+    [StringComparer]::OrdinalIgnoreCase)
 
 function Get-TestMethodTimings {
     param(
@@ -175,8 +177,8 @@ function Get-TestMethodTimings {
     )
 
     if (-not $script:SharpProofTrxTimingRowsCache.ContainsKey($ResultsRoot)) {
-        $rowsByClass = [Collections.Generic.Dictionary[string,
-        Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+        $rowBuilders = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+            [StringComparer]::Ordinal)
         foreach ($trx in Get-ChildItem `
                 -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
             [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
@@ -184,18 +186,20 @@ function Get-TestMethodTimings {
             $namespace.AddNamespace(
                 'trx',
                 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
-            $definitions = @{}
+            $definitionBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+                [StringComparer]::OrdinalIgnoreCase)
             foreach ($definition in @($document.SelectNodes(
                         '//trx:UnitTest', $namespace))) {
                 $method = $definition.SelectSingleNode(
                     'trx:TestMethod', $namespace)
                 if ($null -ne $method) {
-                    $definitions[[string]$definition.id] = [pscustomobject]@{
-                        ClassName  = [string]$method.className
-                        MethodName = [string]$method.name
-                    }
+                    $definitionBuilder[[string]$definition.id] = ([ordered]@{
+                            ClassName  = [string]$method.className
+                            MethodName = [string]$method.name
+                        }).AsReadOnly()
                 }
             }
+            $definitions = $definitionBuilder.ToImmutable()
             foreach ($result in @($document.SelectNodes(
                         '//trx:UnitTestResult', $namespace))) {
                 $testId = [string]$result.testId
@@ -204,22 +208,29 @@ function Get-TestMethodTimings {
                 }
                 $definition = $definitions[$testId]
                 $classRows = $null
-                if (-not $rowsByClass.TryGetValue(
+                if (-not $rowBuilders.TryGetValue(
                         $definition.ClassName,
                         [ref]$classRows)) {
-                    $classRows = [Collections.Generic.List[object]]::new()
-                    $rowsByClass.Add(
+                    $classRows = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                    $rowBuilders.Add(
                         $definition.ClassName,
                         $classRows)
                 }
-                $classRows.Add([pscustomobject]@{
-                        ClassName  = $definition.ClassName
-                        MethodName = $definition.MethodName
-                        Duration   = [string]$result.duration
-                    })
+                $classRows.Add(([ordered]@{
+                            ClassName  = $definition.ClassName
+                            MethodName = $definition.MethodName
+                            Duration   = [string]$result.duration
+                        }).AsReadOnly())
             }
         }
-        $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rowsByClass
+        $rowsByClassBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object](
+            [StringComparer]::Ordinal)
+        foreach ($entry in $rowBuilders.GetEnumerator()) {
+            $rowsByClassBuilder.Add($entry.Key, $entry.Value.ToImmutable())
+        }
+        $cacheBuilder = $script:SharpProofTrxTimingRowsCache.ToBuilder()
+        $cacheBuilder[$ResultsRoot] = $rowsByClassBuilder.ToImmutable()
+        $script:SharpProofTrxTimingRowsCache = $cacheBuilder.ToImmutable()
     }
 
     $rowsByClass = $script:SharpProofTrxTimingRowsCache[$ResultsRoot]
@@ -227,7 +238,8 @@ function Get-TestMethodTimings {
     if (-not $rowsByClass.TryGetValue($ClassName, [ref]$rows)) {
         return @()
     }
-    $milliseconds = @{}
+    $milliseconds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long](
+        [StringComparer]::OrdinalIgnoreCase)
     foreach ($row in $rows) {
         $match = [regex]::Match(
             $row.MethodName,
@@ -239,18 +251,22 @@ function Get-TestMethodTimings {
         $elapsed = [TimeSpan]::Parse(
             $row.Duration,
             [Globalization.CultureInfo]::InvariantCulture)
-        if (-not $milliseconds.ContainsKey($name)) {
+        $canonicalName = $null
+        if ($milliseconds.TryGetKey($name, [ref]$canonicalName)) {
+            $name = $canonicalName
+        }
+        else {
             $milliseconds[$name] = 0L
         }
         $milliseconds[$name] += [long][Math]::Ceiling(
             $elapsed.TotalMilliseconds)
     }
-    return @($milliseconds.GetEnumerator() | ForEach-Object {
-            [pscustomobject]@{
+    return @($milliseconds.ToImmutable().GetEnumerator() | ForEach-Object {
+            ([ordered]@{
                 name                = [string]$_.Key
                 elapsedMilliseconds = [long]$_.Value
-            }
-        } | Sort-Object name)
+            }).AsReadOnly()
+        } | Sort-Object { $_.name })
 }
 
 function Get-DiscoveredTestMethods {

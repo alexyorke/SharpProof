@@ -1022,7 +1022,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [Test]
     public void SameSpanTreesKeepDistinctCapturedDocumentsAndMappedReporting()
     {
-        var source = "#line 100 \"mapped.cs\"\n" + DiamondSource;
+        const string source = "#line 100 \"mapped.cs\"\n" + DiamondSource;
         var compilation = TestCompilation.Create("MultipleDocuments", ("shared.cs", source),
             ("shared.cs", source.Replace("class Subject", "class Another", StringComparison.Ordinal)));
         TestCompilation.AssertNoErrors(compilation);

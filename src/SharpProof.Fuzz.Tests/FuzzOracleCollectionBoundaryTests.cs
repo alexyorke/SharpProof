@@ -7,6 +7,68 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzOracleCollectionBoundaryTests
 {
+    [TestCase(0, "frontend")]
+    [TestCase(1, "smt")]
+    [TestCase(2, "partial")]
+    public void FailureSelectionRejectsDefaultCohortBeforeLengthComparison(
+        int defaultOracle, string parameterName)
+    {
+        ImmutableArray<FuzzOracleStatus> frontend = defaultOracle == 0 ? default : [];
+        ImmutableArray<FuzzOracleStatus> smt = defaultOracle == 1 ? default : [];
+        ImmutableArray<FuzzOracleStatus> partial = defaultOracle == 2 ? default : [];
+        ArgumentNullException.ThrowIfNull(parameterName);
+        Action select = () => FuzzRunner.SelectFailureKeys(frontend, smt, partial);
+        var error = Assert.Throws<ArgumentNullException>(select);
+        Assert.That(error!.ParamName, Is.EqualTo(parameterName));
+    }
+
+    [Test]
+    public void SourceCampaignRejectsDefaultCases()
+    {
+        Func<Task> replay = async () =>
+            await FuzzRunner.ReplaySourceCasesAsync(default,
+                cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var error = Assert.ThrowsAsync<ArgumentNullException>(replay);
+        Assert.That(error!.ParamName, Is.EqualTo("sourceCases"));
+    }
+
+    [Test]
+    public void MetadataCompilationRejectsDefaultCasesBeforeResourceCreation()
+    {
+        Action create = () =>
+        {
+            using var compilation = new MetadataSourceCompilation(default);
+        };
+        var error = Assert.Throws<ArgumentNullException>(create);
+        Assert.That(error!.ParamName, Is.EqualTo("cases"));
+    }
+
+    [Test]
+    public void MetadataReplayRejectsDefaultCasesWithoutChangingResults()
+    {
+        var replay = new MetadataProgramSourceReplay(12345);
+        var before = replay.Result;
+        Func<Task> compare = async () =>
+            await replay.CompareBatchAsync(default, 0,
+                TestContext.CurrentContext.CancellationToken);
+        var error = Assert.ThrowsAsync<ArgumentNullException>(compare);
+        Assert.That(error!.ParamName, Is.EqualTo("cases"));
+        Assert.That(replay.Result, Is.EqualTo(before));
+    }
+
+    [Test]
+    public void TotalReplayRejectsDefaultCasesWithoutChangingResults()
+    {
+        var replay = new TotalProgramSourceReplay(12345);
+        var before = replay.Result;
+        Func<Task> compare = async () =>
+            await replay.CompareBatchAsync(default, 0,
+                TestContext.CurrentContext.CancellationToken);
+        var error = Assert.ThrowsAsync<ArgumentNullException>(compare);
+        Assert.That(error!.ParamName, Is.EqualTo("cases"));
+        Assert.That(replay.Result, Is.EqualTo(before));
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

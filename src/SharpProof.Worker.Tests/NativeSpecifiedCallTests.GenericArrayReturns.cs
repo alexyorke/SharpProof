@@ -52,7 +52,7 @@ public sealed partial class NativeSpecifiedCallTests
     {
         const string helper = "static T Read<T>(System.Collections.Generic.IList<T> list, int index) => list[index];";
         const string requires = "Contract.Requires(values != null && index >= 0 && index < values.Length); ";
-        var body = "return Read<int>(values as System.Collections.Generic.IList<int>, index); " + helper;
+        const string body = "return Read<int>(values as System.Collections.Generic.IList<int>, index); " + helper;
         await CheckInterfaceArrayContract("int[] values, int index", requires +
             "Contract.Ensures(Contract.Result<int>() " + (correct ? "==" : "!=") + " values[index]); " + body,
             correct ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Refuted);

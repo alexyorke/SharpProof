@@ -39,7 +39,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         if (!valid)
         {
             Assert.That(File.ReadAllText(result), Is.EqualTo("prior result"));
-            Assert.That(engine.Errors, Has.Count.EqualTo(1));
+            Assert.That(engine.Errors, Has.Length.EqualTo(1));
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         Assert.That(File.ReadAllText(result), Is.EqualTo("prior result"));
         Assert.That(File.ReadAllText(companion), Is.EqualTo("preserved companion"));
         Assert.That(File.ReadAllText(worker), Is.EqualTo("preserved worker"));
-        Assert.That(engine.Errors, Has.Count.EqualTo(1));
+        Assert.That(engine.Errors, Has.Length.EqualTo(1));
     }
 
     [TestCase("RunAnalyzers")]

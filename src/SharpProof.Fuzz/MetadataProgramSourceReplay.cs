@@ -46,8 +46,8 @@ internal sealed record MetadataSourceCompilationResult(Type Subject,
 
 internal sealed class MetadataSourceCompilation : IDisposable
 {
-    private readonly DirectoryInfo directory = Directory.CreateTempSubdirectory("sharpproof-metadata-fuzz-");
-    private readonly AssemblyLoadContext runtime = new("MetadataProgramFuzz", isCollectible: true);
+    private readonly DirectoryInfo directory;
+    private readonly AssemblyLoadContext runtime;
     private readonly ImmutableArray<string> libraryMembers;
     private readonly ImmutableArray<string> sourceMembers;
     private MemoryStream? libraryImage;
@@ -59,6 +59,8 @@ internal sealed class MetadataSourceCompilation : IDisposable
         { throw new ArgumentNullException(nameof(cases)); }
         libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
         sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
+        directory = Directory.CreateTempSubdirectory("sharpproof-metadata-fuzz-");
+        runtime = new("MetadataProgramFuzz", isCollectible: true);
     }
 
     internal async Task<MetadataSourceCompilationResult> CompileAsync(CancellationToken cancellationToken,

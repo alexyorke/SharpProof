@@ -184,7 +184,7 @@ public sealed class CompilerManifestArtifactTests
                     "sharp-proof-test-feature",
                     "enabled")
             ]);
-        var source =
+        const string source =
             "internal sealed class Subject { private const string Value = \"" +
             SourceMarker +
             "\"; }\n";

@@ -40,7 +40,7 @@ public sealed class MetadataSourceNativeProducerControls
         {
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, deterministic: true);
-            var librarySource = "public static class MetadataLibrary { " + Library + " }";
+            const string librarySource = "public static class MetadataLibrary { " + Library + " }";
             var library = CSharpCompilation.Create("MetadataLibrary", [Parse(librarySource, "Library.cs")],
                 TestMetadataReferences.SortedDistinctPlatform, options);
             libraryImage = EmitActual(library);

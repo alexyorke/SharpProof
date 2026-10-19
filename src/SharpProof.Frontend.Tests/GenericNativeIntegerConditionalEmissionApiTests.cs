@@ -63,7 +63,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var options = new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: enabled ? EnabledSymbols : []);
         const string core = CoreSource;
         const string call = "((nint)default(System.IntPtr)).Trace();";
-        var source = "public static class Subject { public static int Target() { " + call + " return 7; } }";
+        const string source = "public static class Subject { public static int Target() { " + call + " return 7; } }";
         var coreTree = CSharpSyntaxTree.ParseText(core, options, "source-native-core.cs");
         var callerTree = CSharpSyntaxTree.ParseText(source, options, "source-native-caller.cs");
         var compilation = CSharpCompilation.Create("GenericNativeConditional", [coreTree, callerTree], [],

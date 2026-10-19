@@ -83,7 +83,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(result.NativeProofs, Is.Zero);
         Assert.That(result.NativeRefutations, Is.Zero);
         Assert.That(result.Failures, Has.Length.EqualTo(1));
-        var reproducer = member + "\n// inputs: [7]";
+        const string reproducer = member + "\n// inputs: [7]";
         Assert.That(result.Failures[0], Is.EqualTo(new FuzzFailure(0, 12351,
             "total-program", reproducer, reproducer,
             "Target0: incomplete " + reference.Classifications[0].Abstention)));

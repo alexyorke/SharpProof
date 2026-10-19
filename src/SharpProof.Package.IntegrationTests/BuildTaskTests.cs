@@ -864,7 +864,7 @@ public sealed class BuildTaskTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
+            Assert.That(engine.Warnings, Has.Length.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
             Assert.That(engine.Warnings[0].File, Is.EqualTo(path));
             Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
@@ -872,11 +872,11 @@ public sealed class BuildTaskTests
             Assert.That(
                 engine.Warnings[0].Message,
                 Is.EqualTo("assumptions: (user, trusted)"));
-            Assert.That(engine.Errors, Has.Count.EqualTo(1));
+            Assert.That(engine.Errors, Has.Length.EqualTo(1));
             Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
             Assert.That(engine.Errors[0].File, Is.Empty);
             Assert.That(task.HasStructuredError, Is.True);
-            Assert.That(engine.Messages, Has.Count.EqualTo(2));
+            Assert.That(engine.Messages, Has.Length.EqualTo(2));
         }
     }
 
@@ -1202,7 +1202,7 @@ public sealed class BuildTaskTests
         };
 
         Assert.That(task.Execute(), Is.False);
-        Assert.That(engine.Errors, Has.Count.EqualTo(1));
+        Assert.That(engine.Errors, Has.Length.EqualTo(1));
         Assert.That(File.ReadAllText(result), Is.EqualTo("preserved result"));
     }
 
@@ -1289,7 +1289,7 @@ public sealed class BuildTaskTests
         };
 
         Assert.That(task.Execute(), Is.False);
-        Assert.That(engine.Errors, Has.Count.EqualTo(1));
+        Assert.That(engine.Errors, Has.Length.EqualTo(1));
         Assert.That(File.ReadAllText(blocker), Is.EqualTo("preserved blocker"));
     }
 
@@ -1817,9 +1817,25 @@ public sealed class BuildTaskTests
 
     internal sealed class RecordingBuildEngine : IBuildEngine
     {
-        public List<BuildErrorEventArgs> Errors { get; } = [];
-        public List<BuildWarningEventArgs> Warnings { get; } = [];
-        public List<BuildMessageEventArgs> Messages { get; } = [];
+        private readonly object _eventGate = new();
+        private readonly ImmutableArray<BuildErrorEventArgs>.Builder _errors = ImmutableArray.CreateBuilder<BuildErrorEventArgs>();
+        private readonly ImmutableArray<BuildWarningEventArgs>.Builder _warnings = ImmutableArray.CreateBuilder<BuildWarningEventArgs>();
+        private readonly ImmutableArray<BuildMessageEventArgs>.Builder _messages = ImmutableArray.CreateBuilder<BuildMessageEventArgs>();
+
+        public ImmutableArray<BuildErrorEventArgs> Errors
+        {
+            get { lock (_eventGate) { return _errors.ToImmutable(); } }
+        }
+
+        public ImmutableArray<BuildWarningEventArgs> Warnings
+        {
+            get { lock (_eventGate) { return _warnings.ToImmutable(); } }
+        }
+
+        public ImmutableArray<BuildMessageEventArgs> Messages
+        {
+            get { lock (_eventGate) { return _messages.ToImmutable(); } }
+        }
         internal Action<BuildMessageEventArgs>? MessageObserver { get; init; }
         internal System.Threading.Tasks.TaskCompletionSource WorkerReported { get; } = new(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -1834,19 +1850,22 @@ public sealed class BuildTaskTests
         public void LogErrorEvent(BuildErrorEventArgs e)
         {
             System.ArgumentNullException.ThrowIfNull(e);
-            Errors.Add(e);
+            lock (_eventGate)
+            { _errors.Add(e); }
         }
 
         public void LogWarningEvent(BuildWarningEventArgs e)
         {
             System.ArgumentNullException.ThrowIfNull(e);
-            Warnings.Add(e);
+            lock (_eventGate)
+            { _warnings.Add(e); }
         }
 
         public void LogMessageEvent(BuildMessageEventArgs e)
         {
             System.ArgumentNullException.ThrowIfNull(e);
-            Messages.Add(e);
+            lock (_eventGate)
+            { _messages.Add(e); }
             MessageObserver?.Invoke(e);
             if (e.Message?.Contains("SharpProof summary", StringComparison.Ordinal) == true)
             {

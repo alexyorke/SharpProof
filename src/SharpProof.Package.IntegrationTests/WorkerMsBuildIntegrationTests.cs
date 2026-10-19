@@ -2367,7 +2367,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.GreaterThanOrEqualTo(0));
         }
 
-        var changedMethodRlimit =
+        const uint changedMethodRlimit =
             WorkerBudgets.DefaultMethodRlimit - 1;
         var changed = await BuildOkAsync(project.BuildAsync(
             verify: true,

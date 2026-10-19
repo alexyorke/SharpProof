@@ -17,7 +17,7 @@ public sealed class StringFromEndIndexBoundaryTests
             }
             """;
 
-        Assert.Throws<NullReferenceException>(new Action(() => { string value = null!; _ = value[^1]; }));
+        Assert.Throws<NullReferenceException>(new Action(() => { const string value = null!; _ = value[^1]; }));
         Assert.Throws<IndexOutOfRangeException>(new Action(() => { _ = Runtime(""); }));
 
         using var project = new ShadowTestProject(source, cacheEnabled: false);

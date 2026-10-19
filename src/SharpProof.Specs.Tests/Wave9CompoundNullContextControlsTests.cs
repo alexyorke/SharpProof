@@ -65,7 +65,7 @@ public sealed class Wave9CompoundNullContextControlsTests
     [TestCase(true)]
     public void DirectSequenceNullRetainsConcretePeer(bool normalCompletion)
     {
-        var kind = IrTypeKind.Sequence;
+        const IrTypeKind kind = IrTypeKind.Sequence;
         var value = new SpecVariableDeclaration(SpecVariableRole.Parameter, 1, kind);
         var condition = new SpecBinaryDeclaration(IrBinaryOperator.Equal,
             new SpecNullDeclaration(kind), value, IrTypeKind.Boolean);
@@ -121,7 +121,7 @@ public sealed class Wave9CompoundNullContextControlsTests
     [TestCase(true, true)]
     public void SequenceNullWithoutConcreteContextRemainsUnsupported(bool compound, bool normalCompletion)
     {
-        var kind = IrTypeKind.Sequence;
+        const IrTypeKind kind = IrTypeKind.Sequence;
         var flag = new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Boolean);
         var nil = new SpecNullDeclaration(kind);
         SpecTermDeclaration operand = compound
