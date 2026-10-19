@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -24,8 +25,8 @@ public sealed class ExternalEffectBoundaryTests
         {
             Assert.That(resolution.Kind, Is.EqualTo(EffectContractResolutionKind.Valid));
             Assert.That(summary, Is.EqualTo(resolution.Summary));
-            Assert.That(summary.Reads.Regions, Is.EquivalentTo(new[] { EffectRegionId.Receiver,
-                EffectRegionId.Parameter(0), EffectRegionId.Parameter(1), EffectRegionId.Ambient }));
+            Assert.That(summary.Reads.Regions, Is.EquivalentTo(ImmutableArray.Create(EffectRegionId.Receiver,
+                EffectRegionId.Parameter(0), EffectRegionId.Parameter(1), EffectRegionId.Ambient)));
             Assert.That(summary.Writes, Is.EqualTo(summary.Reads));
             Assert.That(summary.Allocation, Is.EqualTo(EffectAllocationKind.Managed));
             Assert.That(summary.Capabilities.Kinds, Is.EqualTo(EffectCapabilityKind.IO |
@@ -97,7 +98,7 @@ public sealed class ExternalEffectBoundaryTests
         var (resolver, getter) = Boundary("[EffectContract(SharpProofEffect.ReadsReceiverState, Complete = true)] " +
             "public int M { get { return 1; } }", property: true);
         Assert.That(resolver.ResolveContract(getter).Kind, Is.EqualTo(EffectContractResolutionKind.Valid));
-        Assert.That(resolver.Resolve(getter).Reads.Regions, Is.EqualTo(new[] { EffectRegionId.Receiver }));
+        Assert.That(resolver.Resolve(getter).Reads.Regions, Is.EqualTo(ImmutableArray.Create(EffectRegionId.Receiver)));
     }
 
     [TestCase("Missing.Exception")]
@@ -133,8 +134,8 @@ public sealed class ExternalEffectBoundaryTests
         var summary = ResolveFacets(facets);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(summary.Reads.Regions, Is.EquivalentTo(new[] { EffectRegionId.Receiver,
-                EffectRegionId.Parameter(0), EffectRegionId.Ambient }));
+            Assert.That(summary.Reads.Regions, Is.EquivalentTo(ImmutableArray.Create(EffectRegionId.Receiver,
+                EffectRegionId.Parameter(0), EffectRegionId.Ambient)));
             Assert.That(summary.Writes, Is.EqualTo(summary.Reads));
             Assert.That(summary.Capabilities.Kinds, Is.EqualTo(EffectCapabilityKind.IO |
                 EffectCapabilityKind.Synchronization | EffectCapabilityKind.NativeInterop |

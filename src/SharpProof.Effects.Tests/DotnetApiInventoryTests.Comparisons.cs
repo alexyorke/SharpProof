@@ -106,12 +106,11 @@ public sealed partial class DotnetApiInventoryTests
 
     private static bool CheckCountInvariant(string api, bool wrongClaim)
     {
-        foreach (var size in new[]
-        {
+        foreach (var size in ImmutableArray.Create(
             0,
             1,
             65
-        }
+        )
 
         )
         {

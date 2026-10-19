@@ -100,8 +100,17 @@ public sealed partial class DotnetApiInventoryTests
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         if (!lowered.IsExact)
         { return false; }
-        var inputs = context.Parameters.ToDictionary(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Entry,
-            parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new IrObjectState()));
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        foreach (var parameter in context.Parameters)
+        {
+            ArgumentNullException.ThrowIfNull(parameter);
+            var entry = parameter.Entry;
+            var value = factory.CreateReferenceValue(factory.GetVariableInfo(entry).Type, new IrObjectState());
+            if (inputBuilder.ContainsKey(entry))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + entry); }
+            inputBuilder.Add(entry, value);
+        }
+        var inputs = inputBuilder.ToImmutable();
         var normal = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);

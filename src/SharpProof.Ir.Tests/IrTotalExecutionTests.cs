@@ -636,17 +636,18 @@ public sealed class IrTotalExecutionTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
-        var values = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (present)
         {
-            values = values.Add(variable, factory.CreateBooleanValue(true));
+            valueBuilder.Add(variable, factory.CreateBooleanValue(true));
         }
-        var observed = new List<IrVarId>();
+        var values = valueBuilder.ToImmutable();
+        var observed = ImmutableArray.CreateBuilder<IrVarId>();
         var result = new IrInterpreter(factory).Evaluate(factory.Variable(variable), values,
             observed.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(result.Unsupported!.Reason, Is.EqualTo(reason));
-        Assert.That(observed, Is.EqualTo(present ? new[] { variable } : Array.Empty<IrVarId>()));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(present ? ImmutableArray.Create(variable) : ImmutableArray<IrVarId>.Empty));
     }
 
     [Test]
@@ -659,21 +660,19 @@ public sealed class IrTotalExecutionTests
         var term = factory.Conditional(factory.Variable(flag), factory.Variable(x), factory.Variable(y));
         var interpreter = new IrInterpreter(factory);
         using var barrier = new Barrier(2);
-        var whenTrue = new List<IrVarId>();
-        var whenFalse = new List<IrVarId>();
-        var tasks = new[]
-        {
+        var whenTrue = ImmutableArray.CreateBuilder<IrVarId>();
+        var whenFalse = ImmutableArray.CreateBuilder<IrVarId>();
+        var tasks = ImmutableArray.Create(
             Task.Run(() => Evaluate(true, whenTrue)),
-            Task.Run(() => Evaluate(false, whenFalse))
-        };
-        var results = await Task.WhenAll(tasks);
+            Task.Run(() => Evaluate(false, whenFalse)));
+        var results = (await Task.WhenAll(tasks)).ToImmutableArray();
         Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(IrEvaluationStatus.Value));
         Assert.That(results[0].Value!.Integer, Is.EqualTo(11));
         Assert.That(results[1].Value!.Integer, Is.EqualTo(22));
-        Assert.That(whenTrue, Is.EqualTo(new[] { flag, x }));
-        Assert.That(whenFalse, Is.EqualTo(new[] { flag, y }));
+        Assert.That(whenTrue.ToImmutable(), Is.EqualTo(ImmutableArray.Create(flag, x)));
+        Assert.That(whenFalse.ToImmutable(), Is.EqualTo(ImmutableArray.Create(flag, y)));
 
-        IrEvaluationResult Evaluate(bool selected, List<IrVarId> observed)
+        IrEvaluationResult Evaluate(bool selected, ImmutableArray<IrVarId>.Builder observed)
         {
             System.ArgumentNullException.ThrowIfNull(observed);
             var values = ImmutableDictionary<IrVarId, IrValue>.Empty

@@ -2739,3 +2739,29 @@ freeze after settlement, and preserve exact lazy read order. Freeze their fixed 
 task vectors and Task.WhenAll result snapshot. Keep concurrent tasks' observers separate
 and preserve interpreter inputs/callback timing. Validate all ordinary IR tests.
 Status: open before edits.
+
+Master cd3363c63 verified at merge f253d2f6b: no textual conflicts. Coordinator and
+read-only review confirmed composition-based Input projections, parameter/receiver order,
+immutable storage and the separate RegionIncompleteException catch. Full ordinary Release
+semantic suite passed 11,774 tests in 23 framework summaries and six isolated scheduler
+tasks, zero failures/skips. This snapshot includes M072-M073 and the master merge,
+before M074-M075. Literal comparison against cd3363c63 preserved 2,968 tokens across
+659 changed C# files; later M074-M075 comparison preserves 2,968 across 661 files.
+
+IMM-M074 verified: 120 ordinary Effects tests pass with zero warnings/errors after
+replacing inaccessible internal capture helpers with local strict builder construction.
+The previous ToDictionary duplicate contract remains explicit (compute value, check key,
+then Add); original indexer initializer overwrites remain indexer writes. Read-only review
+confirmed outer immutable case vectors retain nested mutable operands and source text.
+Classified four new Effects builders and all 13 remaining deliberate native/SUT/text
+boundaries. Current Effects syntax inventory has no Open rows; this scope statement does
+not imply completion of other projects or untracked mutation shapes.
+
+IMM-M075 verified: all 485 ordinary IR tests passed staged-publication and observer
+builder changes. Then the optional observer input map was converted from persistent root
+reassignment to a local builder, and all 65 IrTotalExecutionTests passed again, zero
+warnings/errors. Each concurrent task owns its builder, snapshots publish after WhenAll,
+and native bytes/atomic publication semantics are retained. TemporaryFiles publishes an
+immutable directory snapshot. Nine reviewed new builder rows classified across M074-M075.
+Latest inventory: 1,870 C# files, 2,980 syntax candidates, 2,370 Open. Remaining Open rows
+and semantic coverage gaps still require review; comprehensive migration remains open.

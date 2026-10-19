@@ -85,7 +85,7 @@ internal static class DotnetApiInventory
     private static Row Describe(ISymbol symbol, ResolvedApiSpecTable resolved)
     {
         global::System.ArgumentNullException.ThrowIfNull(resolved);
-        var evidence = new List<string>();
+        var evidence = ImmutableArray.CreateBuilder<string>();
         if (resolved.TryGet(symbol, out var spec))
         {
             var template = spec.Template;
@@ -156,7 +156,7 @@ internal static class DotnetApiInventory
             }
         }
 
-        return new Row(symbol.ContainingAssembly.Identity.Name, symbol.GetDocumentationCommentId() ?? throw new InvalidOperationException("Missing API identity: " + symbol), symbol.Kind.ToString(), string.Join(";", evidence));
+        return new Row(symbol.ContainingAssembly.Identity.Name, symbol.GetDocumentationCommentId() ?? throw new InvalidOperationException("Missing API identity: " + symbol), symbol.Kind.ToString(), string.Join(";", evidence.ToImmutable()));
     }
 
     internal static Delta Compare(IEnumerable<string> baseline, IEnumerable<string> current)
@@ -208,12 +208,11 @@ internal static class DotnetApiInventory
             report.Append("| ").Append(row.Id).Append(" | ").Append(row.Evidence).Append(" |\n");
         }
 
-        foreach (var (label, keys) in new[]
-        {
+        foreach (var (label, keys) in ImmutableArray.Create(
             ("Added", delta.Added),
             ("Removed", delta.Removed),
             ("Evidence changed", delta.Changed)
-        }
+        )
 
         )
         {

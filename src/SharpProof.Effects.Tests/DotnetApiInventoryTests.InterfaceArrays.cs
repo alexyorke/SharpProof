@@ -174,7 +174,7 @@ public sealed partial class DotnetApiInventoryTests
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
         context.TrackArrayReceivers(graph);
-        var property = graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
+        var property = graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
         Assert.That(context.ConcreteArray(property.Instance!) != null, Is.EqualTo(expected));
     }
 
@@ -187,14 +187,13 @@ public sealed partial class DotnetApiInventoryTests
     private static bool CheckInterfaceArrayIntrinsic(CSharpCompilation references, string api, bool wrongClaim)
     {
         global::System.ArgumentNullException.ThrowIfNull(api);
-        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? new[]
-        {
+        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? ImmutableArray.Create(
             "count",
             "inherited-count",
             "aliased-count"
-        }
+        )
 
-        : ["read", "write", "aliased-read", "aliased-write", "caught-read", "caught-write", "wrong-catch", "post-increment", "pre-decrement", "compound-add", "compound-after-write", "checked-increment"];
+        : ImmutableArray.Create("read", "write", "aliased-read", "aliased-write", "caught-read", "caught-write", "wrong-catch", "post-increment", "pre-decrement", "compound-add", "compound-after-write", "checked-increment");
         foreach (var action in actions)
         {
             var body = action switch
@@ -236,18 +235,16 @@ public sealed partial class DotnetApiInventoryTests
                 return false;
             }
 
-            foreach (var values in new int[]?[]
-            {
+            foreach (var values in ImmutableArray.Create<int[]?>(
                 null,
                 [],
                 [17],
                 [int.MinValue, 0, int.MaxValue]
-            }
+            )
 
             )
             {
-                foreach (var index in new[]
-                {
+                foreach (var index in ImmutableArray.Create(
                     int.MinValue,
                     -1,
                     0,
@@ -255,7 +252,7 @@ public sealed partial class DotnetApiInventoryTests
                     (values?.Length ?? 1) - 1,
                     values?.Length ?? 0,
                     int.MaxValue
-                }
+                )
 
                 )
                 {

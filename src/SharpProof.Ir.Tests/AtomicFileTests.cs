@@ -81,14 +81,16 @@ public sealed class AtomicFileTests : IDisposable
     {
         var path = Path.Combine(_root, "concurrent", "result.txt");
         const int publicationCount = 32;
-        var staged = new string[publicationCount];
-        for (var index = 0; index < staged.Length; index++)
+        var stagedBuilder = ImmutableArray.CreateBuilder<string>(publicationCount);
+        for (var index = 0; index < publicationCount; index++)
         {
-            staged[index] = AtomicFile.PrepareStaged(path);
+            var temporary = AtomicFile.PrepareStaged(path);
+            stagedBuilder.Add(temporary);
             AtomicFile.WriteStagedBytes(
-                staged[index],
+                temporary,
                 Encoding.UTF8.GetBytes($"content-{index}\n"));
         }
+        var staged = stagedBuilder.ToImmutable();
 
         using var start = new Barrier(publicationCount + 1);
         var publications = staged.Select(temporary => temporary is null ? throw new System.ArgumentNullException(nameof(temporary)) : (Task.Factory.StartNew(() =>
@@ -158,10 +160,10 @@ public sealed class AtomicFileTests : IDisposable
         }
     }
 
-    private static string[] TemporaryFiles(string path)
+    private static ImmutableArray<string> TemporaryFiles(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
-        return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
+        return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp").ToImmutableArray();
     }
 
     private async Task AssertWriteUtf8ReplacementAsync(

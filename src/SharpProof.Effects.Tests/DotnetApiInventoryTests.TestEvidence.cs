@@ -107,13 +107,12 @@ public sealed partial class DotnetApiInventoryTests
         if (!lowered.Classification.IsExact)
         { return false; }
         object first = new object(), second = new object();
-        foreach (var (left, right) in new (object? Left, object? Right)[] { (null, null), (null, first), (first, null), (first, first), (first, second) })
+        foreach (var (left, right) in ImmutableArray.Create<(object? Left, object? Right)>((null, null), (null, first), (first, null), (first, first), (first, second)))
         {
-            var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-            {
-                [context.Parameters[0].Current] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left),
-                [context.Parameters[1].Current] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right)
-            };
+            var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+            inputBuilder[context.Parameters[0].Current] = left == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, left);
+            inputBuilder[context.Parameters[1].Current] = right == null ? factory.CreateNullValue(factory.ObjectType) : factory.CreateReferenceValue(factory.ObjectType, right);
+            var inputs = inputBuilder.ToImmutable();
             var interpreter = new IrInterpreter(factory);
             if (interpreter.Evaluate(lowered.SafeCondition, inputs).Value?.Boolean != true ||
                 interpreter.Evaluate(lowered.Value, inputs).Value?.Boolean != (object.ReferenceEquals(left, right) ^ wrongClaim))

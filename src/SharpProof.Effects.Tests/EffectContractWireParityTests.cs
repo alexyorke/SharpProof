@@ -334,8 +334,7 @@ public sealed class EffectContractWireParityTests
     [Test]
     public void DirectEventWireCatalogIsClosedAndBijective()
     {
-        var expected = new[]
-        {
+        var expected = ImmutableArray.Create(
             (
                 EffectDirectEventKind.ManagedObjectAllocation,
                 "managed-allocation"),
@@ -360,7 +359,7 @@ public sealed class EffectContractWireParityTests
             (
                 EffectDirectEventKind.VolatileFieldAccess,
                 "volatile-field-access")
-        };
+        );
 
         using (Assert.EnterMultipleScope())
         {
@@ -432,15 +431,19 @@ public sealed class EffectContractWireParityTests
         }
     }
 
-    private static Dictionary<string, long> GetNamedValues(Type enumType)
+    private static ImmutableDictionary<string, long> GetNamedValues(Type enumType)
     {
         System.ArgumentNullException.ThrowIfNull(enumType);
-        return Enum.GetNames(enumType).ToDictionary(
-            static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
-            name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (Convert.ToInt64(
-                Enum.Parse(enumType, name),
-                System.Globalization.CultureInfo.InvariantCulture)),
-            StringComparer.Ordinal);
+        var values = ImmutableDictionary.CreateBuilder<string, long>(StringComparer.Ordinal);
+        foreach (var name in Enum.GetNames(enumType))
+        {
+            ArgumentNullException.ThrowIfNull(name);
+            var value = Convert.ToInt64(Enum.Parse(enumType, name), System.Globalization.CultureInfo.InvariantCulture);
+            if (values.ContainsKey(name))
+            { throw new ArgumentException("An item with the same key has already been added. Key: " + name); }
+            values.Add(name, value);
+        }
+        return values.ToImmutable();
     }
 
 }

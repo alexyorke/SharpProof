@@ -12,14 +12,14 @@ public sealed class EffectBoundaryCoverageTests
         var first = EffectRegionSet.Create(EffectRegionId.Parameter(1));
         var second = EffectRegionSet.Create(EffectRegionId.Parameter(2));
         var union = first.Union(second);
-        Assert.That(union.Regions, Is.EqualTo(new[] { EffectRegionId.Parameter(1), EffectRegionId.Parameter(2) }));
+        Assert.That(union.Regions, Is.EqualTo(ImmutableArray.Create(EffectRegionId.Parameter(1), EffectRegionId.Parameter(2))));
         Assert.That(first.Union(EffectRegionSet.Empty), Is.EqualTo(first));
         Assert.That(EffectRegionSet.Empty.Union(first), Is.EqualTo(first));
         Assert.That(EffectRegionSet.Unknown.Union(first), Is.EqualTo(EffectRegionSet.Unknown));
         Assert.That(EffectRegionSet.Unknown.IsSubsetOf(first), Is.False);
-        Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)new[] { EffectRegionId.Unknown, EffectRegionId.Parameter(1) }), Is.EqualTo(EffectRegionSet.Unknown));
+        Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)ImmutableArray.Create(EffectRegionId.Unknown, EffectRegionId.Parameter(1))), Is.EqualTo(EffectRegionSet.Unknown));
         Assert.That(EffectRegionSet.Create(Array.Empty<EffectRegionId>()).IsEmpty, Is.True);
-        Assert.That(EffectRegionSet.Create(new[] { EffectRegionId.Parameter(1) }), Is.EqualTo(first));
+        Assert.That(EffectRegionSet.Create(ImmutableArray.Create(EffectRegionId.Parameter(1))), Is.EqualTo(first));
         Assert.That(((object)first).Equals(first), Is.True);
         Assert.That(((object)first).Equals(second), Is.False);
         Assert.That(first == EffectRegionSet.Create(EffectRegionId.Parameter(1)), Is.True);
