@@ -3002,3 +3002,14 @@ IMM-M087 verified: 126 targeted Worker and 74 targeted Analyzer tests pass, zero
 failures/skips/warnings/errors. The Analyzer gate ran after all earlier project jobs
 finished, following automatic approval review's concurrency restriction. Main traced
 all 12 rebindings in five owners, comparers, negative cache entries and freeze points.
+
+IMM-M089: Main traced nine PowerShell argument += sites in four files: profile wrapper,
+doctor evaluation, loop Git inventory, and declaration classifier compilation. Build
+ordered argv with immutable string builders and freeze only at native/process/helper
+array boundaries. Preserve sorted environment/reference order, duplicates, explicit
+null/empty input behavior, optional filter/Fast/framework branches and environment
+restoration. The loop's decoded path list also becomes a builder with frozen enumerable
+publication; native NUL-delimited Git bytes remain unchanged. Replace declaration
+compiler argv array concatenation with builder assembly. Validate old/new argv, Git
+inventory outputs, declaration classification and doctor evaluation in canonical Linux.
+Status: open before edits.
