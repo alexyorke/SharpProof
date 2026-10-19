@@ -581,6 +581,40 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         """;
 
     [Test]
+    public async Task UnconstructibleJointTemplatesCannotProduceAnInvariantCertificate()
+    {
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var compilation = TestCompilation.Create("FixedChecksumHoudiniAdmission", ("Subject.cs", Source));
+        TestCompilation.AssertNoErrors(compilation);
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
+            WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
+            WorkerBudgets.DefaultMaximumExpressionDepth, cancellation);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: cancellation);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: cancellation);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparations.Single());
+        Assert.That(candidate, Is.Not.Null);
+        Assert.That(candidate!.IsBodyAbstraction, Is.False);
+        var loops = PassiveLoopCutter.Loops(candidate, cancellation);
+        var templates = LoopInvariantCandidates.Generate(candidate, loops, cancellation);
+        Assert.That(loops, Has.Length.EqualTo(1));
+        Assert.That(templates, Has.Length.EqualTo(48));
+        Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, templates, cancellation), Is.Null);
+        foreach (var template in templates)
+        {
+            Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [template], cancellation), Is.Not.Null);
+        }
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: cancellation), Is.True);
+        Assert.That(plan!.LoopSearch, Is.Not.Null);
+        using var solver = new PassiveCallableSolver(plan);
+        // Exercise admission independently of the normal worker's wall-clock deadline.
+        // Constructible individual guesses cannot certify an unconstructible joint plan.
+        var method = typeof(PassiveCallableSolver).GetMethod("HoudiniAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var task = (Task)method.Invoke(solver, [templates, cancellation])!;
+        await task;
+        Assert.That(task.GetType().GetProperty("Result")!.GetValue(task), Is.Null);
+    }
+
+    [Test]
     public async Task OwnedChecksumProgramAdmitsSingletonPlansButExceedsJointConstructionLimit()
     {
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")

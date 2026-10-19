@@ -25169,8 +25169,8 @@ System.Runtime	M:System.Array.BinarySearch``1(``0[],System.Int32,System.Int32,``
 System.Runtime	M:System.Array.BinarySearch``1(``0[],System.Int32,System.Int32,``0,System.Collections.Generic.IComparer{``0})	Method	unmodeled	-
 System.Runtime	M:System.Array.BinarySearch``1(``0[],``0)	Method	unmodeled	-
 System.Runtime	M:System.Array.BinarySearch``1(``0[],``0,System.Collections.Generic.IComparer{``0})	Method	unmodeled	-
-System.Runtime	M:System.Array.Clear(System.Array)	Method	unmodeled	-
-System.Runtime	M:System.Array.Clear(System.Array,System.Int32,System.Int32)	Method	unmodeled	-
+System.Runtime	M:System.Array.Clear(System.Array)	Method	partially-modeled	intrinsic=typed-sz-array-clear-state
+System.Runtime	M:System.Array.Clear(System.Array,System.Int32,System.Int32)	Method	partially-modeled	intrinsic=typed-sz-array-clear-state
 System.Runtime	M:System.Array.Clone	Method	unmodeled	-
 System.Runtime	M:System.Array.ConstrainedCopy(System.Array,System.Int32,System.Array,System.Int32,System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Array.ConvertAll``2(``0[],System.Converter{``0,``1})	Method	unmodeled	-

@@ -197,6 +197,12 @@ public sealed class ApiUsageRankingTests
                     : knownIntrinsics.Contains(syntax.SpanStart) ? "partially-modeled" : "unmodeled-dispatch";
             }
 
+            if (symbol is IMethodSymbol clearing && CSharpOperationSemantics.IsArrayClear(clearing))
+            {
+                status = model.GetOperation(syntax) is IInvocationOperation invocation && CSharpOperationSemantics.TypedArrayClearReceiver(invocation) != null
+                    ? "partially-modeled" : "unmodeled-domain";
+            }
+
             if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
             {
                 var use = model.GetOperation(syntax);
