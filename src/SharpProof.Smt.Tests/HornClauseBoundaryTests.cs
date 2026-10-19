@@ -7,6 +7,30 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class HornClauseBoundaryTests
 {
+    [Test]
+    public void DefaultClausesRejectBeforeCreatingNativeSearchResources()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = HornInvariantSearch.Propose(
+                factory, default, ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>>.Empty,
+                IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("clauses"));
+    }
+
+    [Test]
+    public void InitializedEmptyClausesProduceNoProposals()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var proposals = HornInvariantSearch.Propose(
+            factory, ImmutableArray<VerificationQuery>.Empty,
+            ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>>.Empty,
+            IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
+        Assert.That(proposals, Is.Empty);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task CompoundRelationHeadsPreserveTheEstablishedCounterBound(bool guarded)

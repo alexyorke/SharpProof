@@ -11,6 +11,24 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class DictionaryAnalyzerConfigurationContractTests
 {
+    [Test]
+    public void ExplicitComparerProviderKeepsGlobalValuesOutOfFileOptions()
+    {
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        builder.Add("CaseKey", "captured");
+        IReadOnlyDictionary<string, string> values = builder.ToImmutable();
+        var provider = new DictionaryAnalyzerConfigOptionsProvider(values, StringComparer.OrdinalIgnoreCase);
+        var tree = CSharpSyntaxTree.ParseText("public class C { }", path: "input.cs");
+        var additional = new ConfigurationAdditionalText();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(provider.GlobalOptions.TryGetValue("casekey", out var captured), Is.True);
+            Assert.That(captured, Is.EqualTo("captured"));
+            Assert.That(provider.GetOptions(tree), Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
+            Assert.That(provider.GetOptions(additional), Is.SameAs(DictionaryAnalyzerConfigOptions.Empty));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void ExplicitComparerSnapshotsAnOpaqueReadOnlyDictionary(bool ignoreCase)

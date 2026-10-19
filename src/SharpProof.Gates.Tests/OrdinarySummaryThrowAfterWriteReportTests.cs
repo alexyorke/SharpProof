@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -25,8 +26,8 @@ public sealed class OrdinarySummaryThrowAfterWriteReportTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var constraint = preparations.Single().EffectClaims.Single().Constraint;
         Assert.That(constraint.AllowedEffects, Is.EqualTo(WorkerEffectSet.Throws | WorkerEffectSet.Allocates));
-        Assert.That(constraint.AllowedExceptionTypes, Is.EqualTo(new[] {
-            SharpProof.Frontend.CompilerIdentityBridge.CreateTypeDisplay(compilation.GetTypeByMetadataName("System.InvalidOperationException")) }));
+        Assert.That(constraint.AllowedExceptionTypes, Is.EqualTo(ImmutableArray.Create(
+            SharpProof.Frontend.CompilerIdentityBridge.CreateTypeDisplay(compilation.GetTypeByMetadataName("System.InvalidOperationException")))));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());

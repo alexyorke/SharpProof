@@ -5,6 +5,23 @@ namespace SharpProof.Smt.Test;
 [TestFixture]
 public sealed class ArrayValueOverlayTests
 {
+    [TestCase(-1)]
+    [TestCase(1)]
+    public void ImmutableOverlayRejectsOutOfRangeObservationsWithoutChangingInput(int index)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var initial = factory.CreateBooleanValue(false);
+        ImmutableArray<IrValue> elements = [initial];
+        var observations = ImmutableDictionary<int, IrValue>.Empty.Add(index, factory.CreateBooleanValue(true));
+        Assert.Throws<UnsupportedIrEncodingException>((Action)(() =>
+        {
+            _ = SmtNativeUtilities.WithArrayObservations(
+                factory, factory.BooleanType, elements, observations);
+        }));
+        Assert.That(elements, Has.Length.EqualTo(1));
+        Assert.That(elements[0], Is.SameAs(initial));
+    }
+
     [Test]
     public void EmptyEntriesLeaveAnEmptyBufferEmpty()
     {

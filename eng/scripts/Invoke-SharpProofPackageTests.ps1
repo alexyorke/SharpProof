@@ -114,7 +114,7 @@ function Invoke-RequiredBuilds {
 
 function New-SharpProofWeightedBuckets {
     param(
-        [Parameter(Mandatory = $true)][object[]]$Methods,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Methods,
         [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds,
         [Parameter(Mandatory = $true)][int]$BucketCount
@@ -160,12 +160,12 @@ function New-SharpProofWeightedBuckets {
                     EstimatedMilliseconds = $estimatedMilliseconds[$bucket.Index]
                 }).AsReadOnly())
     }
-    return $buckets.ToImmutable()
+    return , $buckets.ToImmutable()
 }
 
 function Get-SharpProofBucketMaximum {
     param(
-        [Parameter(Mandatory = $true)][object[]]$Buckets,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Buckets,
         [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds
     )
@@ -528,7 +528,7 @@ try {
     $verifierDefaultsClass =
     'SharpProof.Package.Test.VerifierPackageDefaultsTests'
     function Get-SharpProofHistoricalFilterMilliseconds {
-        param([Parameter(Mandatory = $true)][string]$Filter)
+        param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Filter)
 
         $historyFilters = if ($TestFilter -ceq $canonicalPackageFilter) {
             @("($TestFilter)&($Filter)", $Filter)
@@ -544,19 +544,28 @@ try {
         return $null
     }
 
-    $shards = [Collections.Generic.List[object]]::new()
+    function Get-SharpProofPackageShardFilter {
+        param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Filter)
+
+        if ($TestFilter -ceq $canonicalPackageFilter) {
+            return "($TestFilter)&($Filter)"
+        }
+        return $Filter
+    }
+
+    $shardBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     if (-not $useDefaultShardPlan) {
-        $shards.Add([pscustomobject]@{
-                Name                  = 'selected'
-                Filter                = $TestFilter
-                EstimatedMilliseconds =
-                $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
-                        [long]$priorFilterMilliseconds[$TestFilter]
-                    }
-                    else {
-                        1L
-                    })
-            })
+        $shardBuilder.Add(([ordered]@{
+                    Name                  = 'selected'
+                    Filter                = Get-SharpProofPackageShardFilter ($TestFilter)
+                    EstimatedMilliseconds =
+                    $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
+                            [long]$priorFilterMilliseconds[$TestFilter]
+                        }
+                        else {
+                            1L
+                        })
+                }).AsReadOnly())
     }
     else {
         if ([string]::IsNullOrWhiteSpace($testAssembly)) {
@@ -577,7 +586,7 @@ try {
             $packageLayoutClass    = 'package-layout'
             $verifierDefaultsClass = 'verifier-package defaults'
         }
-        $workerMethods = @($discoveredMethods[$workerClass])
+        $workerMethods = $discoveredMethods[$workerClass]
         $threeTargetWorkerMethod =
         'ThreeTargetAbsoluteSarifSurvivesSerialInitialAndParallelIncrementalAndCleanBuilds'
         New-Variable -Name threeTargetWorkerHistoryNames -Option Constant -Value (
@@ -593,14 +602,13 @@ try {
         $isolateThreeTargetWorker =
         $parallelism -ge 4 -and
         $workerMethods -contains $threeTargetWorkerMethod
-        $bucketWorkerMethods = if ($isolateThreeTargetWorker) {
-            @($workerMethods | Where-Object {
-                    $_ -cne $threeTargetWorkerMethod
-                })
+        $bucketWorkerMethodBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        foreach ($method in $workerMethods) {
+            if (-not $isolateThreeTargetWorker -or $method -cne $threeTargetWorkerMethod) {
+                $bucketWorkerMethodBuilder.Add($method)
+            }
         }
-        else {
-            $workerMethods
-        }
+        $bucketWorkerMethods = $bucketWorkerMethodBuilder.ToImmutable()
         # Keep one worker bucket per available lane. Nested fixture workers
         # are charged separately through each shard's Slots reservation, so
         # reducing the bucket count only makes the heavy integration methods
@@ -615,16 +623,16 @@ try {
         # only when it predicts a materially shorter worker tail.  Wider
         # containers retain the historical plan because their extra lanes make
         # those samples useful and the existing wide-wave tuning depends on it.
-        $countBalancedBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $bucketWorkerMethods `
-                -HistoricalMilliseconds ([Collections.Immutable.ImmutableDictionary[string, long]]::Empty) `
-                -DefaultMilliseconds 1L `
-                -BucketCount $workerShardCount)
-        $weightedBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $bucketWorkerMethods `
-                -HistoricalMilliseconds $priorMethodMilliseconds `
-                -DefaultMilliseconds 1L `
-                -BucketCount $workerShardCount)
+        $countBalancedBuckets = New-SharpProofWeightedBuckets `
+            -Methods $bucketWorkerMethods `
+            -HistoricalMilliseconds ([Collections.Immutable.ImmutableDictionary[string, long]]::Empty) `
+            -DefaultMilliseconds 1L `
+            -BucketCount $workerShardCount
+        $weightedBuckets = New-SharpProofWeightedBuckets `
+            -Methods $bucketWorkerMethods `
+            -HistoricalMilliseconds $priorMethodMilliseconds `
+            -DefaultMilliseconds 1L `
+            -BucketCount $workerShardCount
         $countMaximum = Get-SharpProofBucketMaximum `
             -Buckets $countBalancedBuckets `
             -HistoricalMilliseconds $priorMethodMilliseconds `
@@ -635,16 +643,16 @@ try {
             -DefaultMilliseconds 1L
         $workerBuckets = if ($parallelism -le 4) {
             if ($weightedMaximum + 1000L -lt $countMaximum) {
-                $weightedBuckets
+                , $weightedBuckets
             }
             else {
-                $countBalancedBuckets
+                , $countBalancedBuckets
             }
         }
         else {
-            $weightedBuckets
+            , $weightedBuckets
         }
-        $packageLayoutMethods = @($discoveredMethods[$packageLayoutClass])
+        $packageLayoutMethods = $discoveredMethods[$packageLayoutClass]
         $packageLayoutFilter = "FullyQualifiedName~$packageLayoutClass"
         $defaultPackageLayoutMethodMilliseconds =
         if ($null -ne ($packageLayoutHistoricalMilliseconds =
@@ -669,11 +677,11 @@ try {
         # four-worker NUnit pool; a four-lane wave keeps one host so it does
         # not serialize two full pools or duplicate package-cache startup.
         $packageLayoutBucketCount = if ($parallelism -ge 8) { 2 } else { 1 }
-        $packageLayoutBuckets = @(New-SharpProofWeightedBuckets `
-                -Methods $packageLayoutMethods `
-                -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
-                -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
-                -BucketCount $packageLayoutBucketCount)
+        $packageLayoutBuckets = New-SharpProofWeightedBuckets `
+            -Methods $packageLayoutMethods `
+            -HistoricalMilliseconds $priorPackageLayoutMethodMilliseconds `
+            -DefaultMilliseconds $defaultPackageLayoutMethodMilliseconds `
+            -BucketCount $packageLayoutBucketCount
         New-Variable -Name fixtureClasses -Option Constant -Value (
             [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
                     'CompilerCaptureFreshnessControlTests',
@@ -683,17 +691,18 @@ try {
                     'VerifierPackageDefaultsTests',
                     'VerificationPublicationNullArgumentTests',
                     'FinalCompilationProbeTests')))
-        $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
+        $plannedFixtureBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
             [StringComparer]::Ordinal)
         foreach ($name in @($workerClass, $packageLayoutClass,
                 'SharpProof.Package.Test.BuildTaskTests')) {
-            [void]$plannedFixtures.Add($name)
+            [void]$plannedFixtureBuilder.Add($name)
         }
         foreach ($group in $fixtureClasses) {
             foreach ($name in ($group -split '\|')) {
-                [void]$plannedFixtures.Add("SharpProof.Package.Test.$name")
+                [void]$plannedFixtureBuilder.Add("SharpProof.Package.Test.$name")
             }
         }
+        $plannedFixtures = $plannedFixtureBuilder.ToImmutable()
         # Inspect metadata without loading fixture dependencies into PowerShell's
         # runtime. Package fixtures follow the <Name>Tests naming convention.
         $fixtureStream = [IO.File]::OpenRead($testAssembly)
@@ -747,74 +756,74 @@ try {
             else {
                 'fixture-' + $fixtureClass.ToLowerInvariant()
             }
-            $shards.Add([pscustomobject]@{
-                    Name                  = $fixtureName
-                    Filter                = $filter
-                    EstimatedMilliseconds = $estimatedMilliseconds
-                    # FinalCompilationProbeTests runs up to four NUnit children
-                    # concurrently, each launching an MSBuild process. Charge
-                    # those internal workers to the outer wave scheduler so they
-                    # do not consume untracked CPU alongside every worker shard.
-                    Slots                 = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
-                        [Math]::Min(4, $parallelism)
-                    }
-                    else {
-                        1
-                    }
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = $fixtureName
+                        Filter                = Get-SharpProofPackageShardFilter ($filter)
+                        EstimatedMilliseconds = $estimatedMilliseconds
+                        # FinalCompilationProbeTests runs up to four NUnit children
+                        # concurrently, each launching an MSBuild process. Charge
+                        # those internal workers to the outer wave scheduler so they
+                        # do not consume untracked CPU alongside every worker shard.
+                        Slots                 = if ($fixtureClass -ceq 'FinalCompilationProbeTests') {
+                            [Math]::Min(4, $parallelism)
+                        }
+                        else {
+                            1
+                        }
+                    }).AsReadOnly())
         }
         $buildTaskFilter = 'FullyQualifiedName~SharpProof.Package.Test.BuildTaskTests'
-        $shards.Add([pscustomobject]@{
-                Name                  = 'postflight-buildtask'
-                Filter                = $buildTaskFilter
-                EstimatedMilliseconds =
-                $(if ($null -ne ($historicalMilliseconds =
-                            Get-SharpProofHistoricalFilterMilliseconds `
-                                $buildTaskFilter)) {
-                        $historicalMilliseconds
-                    }
-                    else {
-                        10000L
-                    })
-                # BuildTaskTests needs a fresh dotnet test host.
-                Slots                 = 1
-                Exclusive             = $true
-            })
+        $shardBuilder.Add(([ordered]@{
+                    Name                  = 'postflight-buildtask'
+                    Filter                = Get-SharpProofPackageShardFilter ($buildTaskFilter)
+                    EstimatedMilliseconds =
+                    $(if ($null -ne ($historicalMilliseconds =
+                                Get-SharpProofHistoricalFilterMilliseconds `
+                                    $buildTaskFilter)) {
+                            $historicalMilliseconds
+                        }
+                        else {
+                            10000L
+                        })
+                    # BuildTaskTests needs a fresh dotnet test host.
+                    Slots                 = 1
+                    Exclusive             = $true
+                }).AsReadOnly())
         foreach ($bucket in $packageLayoutBuckets) {
             $filter = @($bucket.Methods | ForEach-Object {
                     "FullyQualifiedName~$packageLayoutClass.$_"
                 }) -join '|'
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'package-layout-' + ($bucket.Index + 1).ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture)
-                    Filter                = $filter
-                    EstimatedMilliseconds =
-                    $(if ($null -ne ($historicalMilliseconds =
-                                Get-SharpProofHistoricalFilterMilliseconds $filter)) {
-                            $historicalMilliseconds
-                        }
-                        else {
-                            $bucket.EstimatedMilliseconds
-                        })
-                    # PackageLayoutSmokeTests enables NUnit child parallelism up
-                    # to four workers. Charge that nested pool to the outer
-                    # scheduler so the package-layout host does not oversubscribe
-                    # the integration-test wave alongside worker shards.
-                    Slots                 = [Math]::Min(4, $parallelism)
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'package-layout-' + ($bucket.Index + 1).ToString(
+                            'D2', [Globalization.CultureInfo]::InvariantCulture)
+                        Filter                = Get-SharpProofPackageShardFilter ($filter)
+                        EstimatedMilliseconds =
+                        $(if ($null -ne ($historicalMilliseconds =
+                                    Get-SharpProofHistoricalFilterMilliseconds $filter)) {
+                                $historicalMilliseconds
+                            }
+                            else {
+                                $bucket.EstimatedMilliseconds
+                            })
+                        # PackageLayoutSmokeTests enables NUnit child parallelism up
+                        # to four workers. Charge that nested pool to the outer
+                        # scheduler so the package-layout host does not oversubscribe
+                        # the integration-test wave alongside worker shards.
+                        Slots                 = [Math]::Min(4, $parallelism)
+                    }).AsReadOnly())
         }
         foreach ($bucket in @($workerBuckets | Where-Object {
                     $_.Methods.Count -gt 0
                 })) {
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'worker-' + ($bucket.Index + 1).ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture)
-                    Filter                = @($bucket.Methods | ForEach-Object {
-                            "FullyQualifiedName~$workerClass.$_"
-                        }) -join '|'
-                    EstimatedMilliseconds = $bucket.EstimatedMilliseconds
-                    Slots                 = 1
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'worker-' + ($bucket.Index + 1).ToString(
+                            'D2', [Globalization.CultureInfo]::InvariantCulture)
+                        Filter                = Get-SharpProofPackageShardFilter (@($bucket.Methods | ForEach-Object {
+                                    "FullyQualifiedName~$workerClass.$_"
+                                }) -join '|')
+                        EstimatedMilliseconds = $bucket.EstimatedMilliseconds
+                        Slots                 = 1
+                    }).AsReadOnly())
         }
         if ($isolateThreeTargetWorker) {
             $threeTargetEstimatedMilliseconds = 1L
@@ -825,15 +834,15 @@ try {
                     break
                 }
             }
-            $shards.Add([pscustomobject]@{
-                    Name                  = 'worker-three-target'
-                    Filter                = "FullyQualifiedName~$workerClass.$threeTargetWorkerMethod"
-                    EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
-                    # The test performs a complete analyzer pass for each
-                    # framework. Reserve a bounded lane slice while allowing the
-                    # independent worker shards to overlap its work.
-                    Slots                 = [Math]::Min(3, $parallelism)
-                })
+            $shardBuilder.Add(([ordered]@{
+                        Name                  = 'worker-three-target'
+                        Filter                = Get-SharpProofPackageShardFilter ("FullyQualifiedName~$workerClass.$threeTargetWorkerMethod")
+                        EstimatedMilliseconds = $threeTargetEstimatedMilliseconds
+                        # The test performs a complete analyzer pass for each
+                        # framework. Reserve a bounded lane slice while allowing the
+                        # independent worker shards to overlap its work.
+                        Slots                 = [Math]::Min(3, $parallelism)
+                    }).AsReadOnly())
         }
     }
 
@@ -844,21 +853,17 @@ try {
             -Configuration $Configuration
     }
 
-    if ($TestFilter -ceq $canonicalPackageFilter) {
-        foreach ($shard in $shards) {
-            $shard.Filter = "($TestFilter)&($($shard.Filter))"
-        }
-    }
+    $shards = $shardBuilder.ToImmutable()
 
     # Start high-resource shards first so reserved lanes overlap their tails
     # instead of leaving the containment process as the final wave.
     $orderedShardBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($orderedShard in ($shards | Sort-Object `
             @{ Expression     = {
-                    $slots = if ($_.PSObject.Properties.Name -contains 'Slots') {
+                    $slots = if ((($_ -is [Collections.IDictionary] -and $_.Keys -contains 'Slots') -or ($_ -isnot [Collections.IDictionary] -and $_.PSObject.Properties.Name -contains 'Slots'))) {
                         [long]$_.Slots
                     }
-                    elseif ($_.PSObject.Properties.Name -contains 'Exclusive' -and
+                    elseif ((($_ -is [Collections.IDictionary] -and $_.Keys -contains 'Exclusive') -or ($_ -isnot [Collections.IDictionary] -and $_.PSObject.Properties.Name -contains 'Exclusive')) -and
                         [bool]$_.Exclusive) {
                         [long]$parallelism
                     }
@@ -868,8 +873,8 @@ try {
                     [long]$_.EstimatedMilliseconds * $slots
                 }; Descending = $true
             }, `
-            @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-            @{ Expression = 'Name'; Descending = $false }) ) {
+            @{ Expression = { [long]$_.EstimatedMilliseconds }; Descending = $true }, `
+            @{ Expression = { [string]$_.Name }; Descending = $false }) ) {
         $orderedShardBuilder.Add($orderedShard)
     }
     $orderedShards = $orderedShardBuilder.ToImmutable()
@@ -878,7 +883,7 @@ try {
         param([object]$shard)
 
         $nextIsExclusive =
-        $shard.PSObject.Properties.Name -contains 'Exclusive' -and
+        (($shard -is [Collections.IDictionary] -and $shard.Keys -contains 'Exclusive') -or ($shard -isnot [Collections.IDictionary] -and $shard.PSObject.Properties.Name -contains 'Exclusive')) -and
         [bool]$shard.Exclusive
         $environment = @{
             SHARPPROOF_PACKAGE_SOURCE = $feed
@@ -926,11 +931,10 @@ try {
                     '--results-directory', (Join-Path $results $shard.Name)))
         }
         $coverageArguments = Add-SharpProofCoverageArguments `
-            -Arguments ([string[]]@($argumentBuilder.ToImmutable())) `
+            -ImmutableArguments $argumentBuilder.ToImmutable() `
             -Enabled $coverageEnabled `
             -Settings $resolvedCoverageSettings
-        $arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string](
-            [string[]]@($coverageArguments))
+        $arguments = $coverageArguments
         return [pscustomobject]@{
             Arguments   = $arguments
             Environment = $environment
@@ -956,11 +960,11 @@ try {
                 exitCode            = $result.ExitCode
             })
     }
-    $failures = [Collections.Generic.List[string]]::new()
+    $failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0
             })) {
-        $failures.Add(
+        $failureBuilder.Add(
             "$($failure.Test.Name) exited $($failure.ExitCode): " +
             $failure.Test.Filter)
     }
@@ -1032,7 +1036,8 @@ try {
                     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 
-    if ($failures.Count -ne 0) {
+    $failures = $failureBuilder.ToImmutable()
+    if ($failures.Length -ne 0) {
         throw "Package test shards failed:`n$($failures -join "`n")"
     }
     if (-not $Quiet) {

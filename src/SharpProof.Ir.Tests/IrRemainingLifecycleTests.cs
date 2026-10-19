@@ -7,6 +7,22 @@ namespace SharpProof.Ir.Test;
 public sealed class IrRemainingLifecycleTests
 {
     [Test]
+    public void DefaultCallOperandsRejectBeforeReceiverEvaluation()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var interpreter = new IrProgramInterpreter(factory);
+        var values = new IrProgramInterpreter.ReplayValues(ImmutableHashSet<IrVarId>.Empty);
+        var missing = factory.Variable(factory.CreateVariable("missing-receiver", factory.ObjectType));
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = interpreter.EvaluateCallOperands(
+                missing, default, null, values, "receiver must not be evaluated",
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+    }
+
+    [Test]
     public void ScalarBoundaryHelpersRejectOverflowAndUnsupportedOperatorFamilies()
     {
         Assert.That(IrScalarOperations.TryNegate(long.MinValue, out var overflow), Is.False);

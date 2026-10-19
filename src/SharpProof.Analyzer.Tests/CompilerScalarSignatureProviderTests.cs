@@ -85,7 +85,7 @@ public sealed class CompilerScalarSignatureProviderTests
     public void GenuineMethodSignaturesClassifyAcceptedAndRejectedTypes(string name, SpecialType expected)
     {
         System.ArgumentNullException.ThrowIfNull(name);
-        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
+        using var pe = new PEReader(_image);
         var reader = pe.GetMetadataReader();
         var method = FindMethod(reader, name);
         var signature = method.DecodeSignature(new CompilerScalarSignatureProvider(), genericContext: null);
@@ -102,7 +102,7 @@ public sealed class CompilerScalarSignatureProviderTests
     public void GenuineReferenceReturnsRemainOutsideTheScalarSubset(string name)
     {
         System.ArgumentNullException.ThrowIfNull(name);
-        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
+        using var pe = new PEReader(_image);
         var reader = pe.GetMetadataReader();
         var signature = FindMethod(reader, name).DecodeSignature(
             new CompilerScalarSignatureProvider(), genericContext: null);
@@ -116,7 +116,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [Test]
     public void GenuinePinnedLocalsRemainOutsideTheScalarSubset()
     {
-        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
+        using var pe = new PEReader(_image);
         var reader = pe.GetMetadataReader();
         var method = FindMethod(reader, "Pinned");
         var body = pe.GetMethodBody(method.RelativeVirtualAddress);
@@ -129,7 +129,7 @@ public sealed class CompilerScalarSignatureProviderTests
     [Test]
     public void GenuineConstructedTypeSpecificationRemainsOutsideTheScalarSubset()
     {
-        using var pe = new PEReader(new MemoryStream(_image.ToArray(), writable: false));
+        using var pe = new PEReader(_image);
         var reader = pe.GetMetadataReader();
         var count = reader.GetTableRowCount(TableIndex.TypeSpec);
         var provider = new CompilerScalarSignatureProvider();

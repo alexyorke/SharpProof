@@ -377,18 +377,19 @@ public sealed class RequiresAndControlTests
         string name,
         string source,
         string? mode,
-        string[] enabledIds,
+        ImmutableArray<string> enabledIds,
         bool allowCompilationErrors,
         string? expectedId,
         int expectedCount = 1)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        { throw new ArgumentNullException(nameof(enabledIds)); }
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(source);
         return new TestCaseData(
                 source,
                 mode,
-                enabledIds,
+                enabledIds.ToArray(),
                 allowCompilationErrors,
                 expectedId,
                 expectedCount)

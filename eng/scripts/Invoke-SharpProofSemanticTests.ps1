@@ -590,10 +590,10 @@ try {
                 $argumentBuilder.Add("/m:$($task.ProjectParallelism)")
             }
             $coverageArguments = Add-SharpProofCoverageArguments `
-                -Arguments ([string[]]@($argumentBuilder.ToImmutable())) `
+                -ImmutableArguments $argumentBuilder.ToImmutable() `
                 -Enabled ($coverageEnabled -and $task.Name -cne 'architecture') `
                 -Settings $resolvedCoverageSettings
-            $arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($coverageArguments))
+            $arguments = $coverageArguments
         }
         return [pscustomobject]@{
             Arguments   = $arguments

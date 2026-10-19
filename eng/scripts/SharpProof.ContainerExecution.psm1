@@ -171,7 +171,7 @@ function Invoke-SharpProofRequiredDotnet {
     )
 
     if ($TimeoutSeconds -eq 0 -and -not $Quiet) {
-        Invoke-SharpProofCheckedCommand -Command 'dotnet' -Arguments @(
+        Invoke-SharpProofCheckedCommand -Command 'dotnet' -Arguments (
             Add-SharpProofStaticGraphArgument -Arguments $Arguments)
         return
     }
@@ -444,21 +444,36 @@ function Invoke-SharpProofTimedPhase {
 }
 
 function Add-SharpProofStaticGraphArgument {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Native')]
     param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [Parameter(Mandatory = $true, ParameterSetName = 'Native')]
+        [string[]]$Arguments,
+
+        [Parameter(ParameterSetName = 'Immutable')]
+        [AllowEmptyCollection()]
+        [Collections.Immutable.ImmutableArray[string]]$ImmutableArguments
     )
 
-    if ($Arguments.Count -lt 2 -or
-        $Arguments[0] -notin @('build', 'test') -or
-        [IO.Path]::GetExtension($Arguments[1]) -notin @('.sln', '.slnx', '.slnf') -or
-        $Arguments -contains '-graphBuild' -or
-        $Arguments -contains '/graphBuild') {
-        return $Arguments
+    $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    if ($PSCmdlet.ParameterSetName -ceq 'Immutable') {
+        if ($ImmutableArguments.IsDefault) {
+            throw [ArgumentNullException]::new('ImmutableArguments')
+        }
+        foreach ($argument in $ImmutableArguments) { $argumentBuilder.Add($argument) }
     }
-
-    return @($Arguments) + '-graphBuild'
+    else {
+        foreach ($argument in $Arguments) { $argumentBuilder.Add($argument) }
+    }
+    $commands = [Collections.Immutable.ImmutableArray]::Create[string]('build', 'test')
+    $extensions = [Collections.Immutable.ImmutableArray]::Create[string]('.sln', '.slnx', '.slnf')
+    if ($argumentBuilder.Count -ge 2 -and
+        $argumentBuilder[0] -in $commands -and
+        [IO.Path]::GetExtension($argumentBuilder[1]) -in $extensions -and
+        $argumentBuilder -notcontains '-graphBuild' -and
+        $argumentBuilder -notcontains '/graphBuild') {
+        $argumentBuilder.Add('-graphBuild')
+    }
+    return , $argumentBuilder.ToImmutable()
 }
 
 function Get-SharpProofParallelismOverride {
@@ -880,8 +895,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
                     '/nodeReuse:false',
                     '-p:UseSharedCompilation=true',
                     "-p:SharedCompilationId=$sharedCompilationId"))
-            $effectiveArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                    Add-SharpProofStaticGraphArgument -Arguments $arguments.ToImmutable()))
+            $effectiveArguments = Add-SharpProofStaticGraphArgument -ImmutableArguments $arguments.ToImmutable()
             $startInfo = New-SharpProofParallelProcessStartInfo `
                 -FileName 'dotnet' `
                 -WorkingDirectory $RepositoryRoot `
@@ -986,10 +1000,10 @@ function Invoke-SharpProofParallelDotnetTests {
     $pending = [Collections.Immutable.ImmutableList[object]]::Empty.ToBuilder()
     foreach ($test in $Tests) {
         $name = [string]$test.Name
-        $slots = if ($test.PSObject.Properties.Name -contains 'Slots') {
+        $slots = if ((($test -is [Collections.IDictionary] -and $test.Keys -contains 'Slots') -or ($test -isnot [Collections.IDictionary] -and $test.PSObject.Properties.Name -contains 'Slots'))) {
             [int]$test.Slots
         }
-        elseif ($test.PSObject.Properties.Name -contains 'Exclusive' -and
+        elseif ((($test -is [Collections.IDictionary] -and $test.Keys -contains 'Exclusive') -or ($test -isnot [Collections.IDictionary] -and $test.PSObject.Properties.Name -contains 'Exclusive')) -and
             [bool]$test.Exclusive) {
             $Parallelism
         }
@@ -1272,10 +1286,14 @@ function Remove-SharpProofOwnedDirectory {
 }
 
 function Add-SharpProofCoverageArguments {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Native')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Native')]
         [string[]]$Arguments,
+
+        [Parameter(ParameterSetName = 'Immutable')]
+        [AllowEmptyCollection()]
+        [Collections.Immutable.ImmutableArray[string]]$ImmutableArguments,
 
         [Parameter(Mandatory = $true)]
         [bool]$Enabled,
@@ -1284,12 +1302,23 @@ function Add-SharpProofCoverageArguments {
         [string]$Settings = ''
     )
 
-    if (-not $Enabled) {
-        return $Arguments
+    $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    if ($PSCmdlet.ParameterSetName -ceq 'Immutable') {
+        if ($ImmutableArguments.IsDefault) {
+            throw [ArgumentNullException]::new('ImmutableArguments')
+        }
+        foreach ($argument in $ImmutableArguments) { $argumentBuilder.Add($argument) }
     }
-    return @($Arguments) + @(
-        '--settings', $Settings,
-        '--collect', 'Code Coverage;Format=Cobertura')
+    else {
+        foreach ($argument in $Arguments) { $argumentBuilder.Add($argument) }
+    }
+    if ($Enabled) {
+        $argumentBuilder.Add('--settings')
+        $argumentBuilder.Add($Settings)
+        $argumentBuilder.Add('--collect')
+        $argumentBuilder.Add('Code Coverage;Format=Cobertura')
+    }
+    return , $argumentBuilder.ToImmutable()
 }
 
 function Resolve-SharpProofCoverageLineCredits {

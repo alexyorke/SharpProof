@@ -168,9 +168,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
         return new(name, expected, actual, trueResults, allocated, allocated / (double)MeasurementCount);
     }
 
-    private static ImmutableArray<IlInstruction> ReadIl(byte[] bytes)
+    private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
             .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
@@ -191,10 +190,10 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes, position),
+                OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(bytes.Slice(position, sizeof(int))),
                 _ => 4
             };
-            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.AsSpan(position, operandSize))));
+            instructions.Add(new(offset, opcode.Name!, Convert.ToHexString(bytes.Slice(position, operandSize))));
             position += operandSize;
         }
         return instructions.ToImmutable();

@@ -90,7 +90,7 @@ public sealed class CompilerCaptureInputWorkflowTests
                 new MetadataReferenceProperties(MetadataImageKind.Module), filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single();
-            using var pe = new PEReader(new MemoryStream((image).ToArray(), writable: false));
+            using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var module = captured.Modules.Single();
             using (Assert.EnterMultipleScope())

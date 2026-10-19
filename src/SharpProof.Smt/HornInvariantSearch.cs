@@ -8,11 +8,11 @@ namespace SharpProof.Smt;
 // what the proof kernel then proves over bitvectors.
 public static class HornInvariantSearch
 {
-    public static ImmutableDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, IReadOnlyList<VerificationQuery> clauses,
-        IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
+    public static ImmutableDictionary<IrMemberId, IrTerm> Propose(IrFactory factory, ImmutableArray<VerificationQuery> clauses,
+        ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(clauses, nameof(clauses));
+        RepositoryParameterGuard.ThrowIfMissing(clauses.IsDefault, nameof(clauses));
         ArgumentNullGuard.NotNull(states, nameof(states));
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
@@ -30,7 +30,7 @@ public static class HornInvariantSearch
     }
 
     private sealed class Search(Context context, IrFactory factory, Z3ExpressionOwner owner, BvEncoder encoder,
-        IReadOnlyDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
+        ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> states, uint rlimit, CancellationToken cancellationToken)
     {
         private readonly SmtQueryResourceMeter _meter = (states is null ? throw new System.ArgumentNullException(nameof(states)) : (encoder is null ? throw new System.ArgumentNullException(nameof(encoder)) : (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : new(rlimit, cancellationToken))))));
         private readonly ImmutableDictionary<string, IrTerm>.Builder _names = ImmutableDictionary.CreateBuilder<string, IrTerm>(StringComparer.Ordinal);
@@ -43,9 +43,9 @@ public static class HornInvariantSearch
         private readonly ImmutableList<FuncDecl>.Builder _relationOrder = ImmutableList.CreateBuilder<FuncDecl>();
         private FuncDecl? _error;
 
-        internal ImmutableDictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
+        internal ImmutableDictionary<IrMemberId, IrTerm> Run(ImmutableArray<VerificationQuery> clauses)
         {
-            clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
+            RepositoryParameterGuard.ThrowIfMissing(clauses.IsDefault, nameof(clauses));
             var proposals = ImmutableDictionary.CreateBuilder<IrMemberId, IrTerm>();
             _error = context.MkFuncDecl("error", [], context.BoolSort);
             var rules = ImmutableArray.CreateBuilder<BoolExpr>();

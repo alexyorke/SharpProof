@@ -449,7 +449,7 @@ public sealed class ParameterGuardAnalyzerTests
                 public static int Project(State value) => value.Code;
                 public static int Unsafe(State value) => value.Danger;
             }
-            """, [], [MetadataReference.CreateFromImage(image.ToArray())]);
+            """, [], [MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length))))]);
         var diagnostics = await compilation.WithAnalyzers([new ParameterGuardAnalyzer()])
             .GetAnalyzerDiagnosticsAsync();
 

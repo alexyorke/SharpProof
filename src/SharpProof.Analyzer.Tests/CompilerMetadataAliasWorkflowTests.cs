@@ -178,7 +178,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             await File.WriteAllBytesAsync(secondPath, (image).ToArray());
             var first = MetadataReference.CreateFromFile(firstPath);
             var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
-            MetadataReference[] references = includeAlias ? [first, second] : [first];
+            ImmutableArray<MetadataReference> references = includeAlias ? [first, second] : [first];
             var compilation = AnalyzerTestHost.CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], references);
@@ -256,9 +256,10 @@ public sealed class CompilerMetadataAliasWorkflowTests
     }
 
     private static async Task<string> PublishAsync(string source, string directory,
-        string name, MetadataReference[] references)
+        string name, ImmutableArray<MetadataReference> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(name);
         System.ArgumentNullException.ThrowIfNull(source);

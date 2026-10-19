@@ -125,7 +125,7 @@ public sealed class CompilerReferenceModuleSelectionTests
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(),
             "SharpProofModuleSelection-" + Guid.NewGuid().ToString("N"));
-        private readonly List<AssemblyMetadata> _metadata = [];
+        private readonly ImmutableArray<AssemblyMetadata>.Builder _metadata = ImmutableArray.CreateBuilder<AssemblyMetadata>();
 
         internal ModuleFiles()
         {
@@ -149,7 +149,7 @@ public sealed class CompilerReferenceModuleSelectionTests
 
         public void Dispose()
         {
-            foreach (var metadata in _metadata)
+            foreach (var metadata in _metadata.ToImmutable())
             {
                 metadata.Dispose();
             }
