@@ -148,21 +148,18 @@ internal sealed record SpecIntegerDeclaration(long Value)
 internal sealed record SpecStringDeclaration(string Value)
     : SpecTermDeclaration(IrTypeKind.String);
 
-internal sealed record SpecNullDeclaration(IrTypeKind Type)
+internal sealed record SpecNullDeclaration(IrTypeKind Type) : SpecTermDeclaration(Type);
+
+internal sealed record SpecUnaryDeclaration(IrUnaryOperator Operator,
+    SpecTermDeclaration Operand, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-internal sealed record SpecUnaryDeclaration(
-    IrUnaryOperator Operator, SpecTermDeclaration Operand, IrTypeKind Type)
+internal sealed record SpecBinaryDeclaration(IrBinaryOperator Operator,
+    SpecTermDeclaration Left, SpecTermDeclaration Right, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-internal sealed record SpecBinaryDeclaration(
-    IrBinaryOperator Operator, SpecTermDeclaration Left,
-    SpecTermDeclaration Right, IrTypeKind Type)
-    : SpecTermDeclaration(Type);
-
-internal sealed record SpecConditionalDeclaration(
-    SpecTermDeclaration Condition, SpecTermDeclaration WhenTrue,
-    SpecTermDeclaration WhenFalse, IrTypeKind Type)
+internal sealed record SpecConditionalDeclaration(SpecTermDeclaration Condition,
+    SpecTermDeclaration WhenTrue, SpecTermDeclaration WhenFalse, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
 internal sealed record SpecLengthDeclaration(SpecTermDeclaration Value)
