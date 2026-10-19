@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -120,7 +121,7 @@ public sealed class FrontendSourceReplayTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal).ToArray();
+            .OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal).ToImmutableArray();
         Assert.That(methods.Length, Is.EqualTo(inputs.Length));
         var context = new AssemblyLoadContext("FrontendSourceReplayPremise", isCollectible: true);
         try

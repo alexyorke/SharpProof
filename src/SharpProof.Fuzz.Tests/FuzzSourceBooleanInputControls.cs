@@ -19,7 +19,7 @@ public sealed class FuzzSourceBooleanInputControls
     [Test]
     public async Task ActualBooleanInputsPreserveAllFourClrAndInterpreterOutcomes()
     {
-        AssertActualBooleanParameters(Finite, FalsePair.ToArray(), false);
+        AssertActualBooleanParameters(Finite, FalsePair, false);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
             [new(positive, Finite, [false, false], Partial,
@@ -37,11 +37,11 @@ public sealed class FuzzSourceBooleanInputControls
     public void ActualSeventeenBooleanParametersRespectTheExistingFiniteDomainCap()
     {
         var names = Enumerable.Range(0, 17).Select(index =>
-            FormattableString.Invariant($"value{index}")).ToArray();
+            FormattableString.Invariant($"value{index}")).ToImmutableArray();
         var finite = "public static bool Target(" +
             string.Join(", ", names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ("bool " + name))) + ") => " +
             string.Join(" || ", names) + ";";
-        var inputs = new bool[names.Length];
+        var inputs = Enumerable.Repeat(false, names.Length).ToImmutableArray();
         AssertActualBooleanParameters(finite, inputs, false);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
@@ -52,9 +52,10 @@ public sealed class FuzzSourceBooleanInputControls
             "The finite source safety condition is not defined and true for every bounded assignment."));
     }
 
-    private static void AssertActualBooleanParameters(string members, bool[] inputs, bool expected)
+    private static void AssertActualBooleanParameters(string members, ImmutableArray<bool> inputs, bool expected)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(members);
         var tree = CSharpSyntaxTree.ParseText(
             "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n",

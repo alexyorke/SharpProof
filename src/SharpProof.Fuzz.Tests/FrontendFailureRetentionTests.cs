@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -68,8 +69,8 @@ public sealed class FrontendFailureRetentionTests
             cases = cases.Count,
             agreements,
             semanticFailures,
-            sources = cases.Select(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Source)).ToArray(),
-            outcomes = results.ToArray()
+            sources = cases.Select(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Source)).ToImmutableArray(),
+            outcomes = results
         });
         var evidenceRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")
             ?? Directory.GetCurrentDirectory();

@@ -190,7 +190,7 @@ public sealed class FuzzEmissionLifecycleTests
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
         var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().ToArray();
+            .OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
             Is.EquivalentTo(ParameterBindingMethodNames));
         var generated = new GeneratedCSharpCase(
@@ -440,7 +440,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
         Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().Span, Is.EqualTo(guardSyntax.Span));
         var sourceOperators = guardSyntax.ExpressionBody!.Expression.DescendantNodesAndSelf()
-            .OfType<PrefixUnaryExpressionSyntax>().ToArray();
+            .OfType<PrefixUnaryExpressionSyntax>().ToImmutableArray();
         Assert.That(sourceOperators.Length, Is.EqualTo(unaryCount));
         Assert.That(sourceOperators.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsKind(SyntaxKind.LogicalNotExpression))), Is.True);
         Assert.That(model.GetOperation(guardSyntax.ExpressionBody.Expression), Is.Not.Null);

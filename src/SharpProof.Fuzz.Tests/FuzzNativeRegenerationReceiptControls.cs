@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -66,7 +67,7 @@ public sealed class FuzzNativeRegenerationReceiptControls
                     .Concat(IrTermAnalysis.CollectVariables(partial.Formula))
                     .Concat(IrTermAnalysis.CollectVariables(partial.NormalCompletion)).Distinct()
                     .OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
-                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (new { Id = variable.Value, Term = printer.Print(factory.Variable(variable)) })).ToArray(),
+                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (new { Id = variable.Value, Term = printer.Print(factory.Variable(variable)) })).ToImmutableArray(),
                 Scenarios = partial.Scenarios.Select(scenario => scenario is null ? throw new System.ArgumentNullException(nameof(scenario)) : (scenario.OrderBy(pair => pair.Key.Value)
                     .Select(pair => new
                     {
@@ -74,10 +75,10 @@ public sealed class FuzzNativeRegenerationReceiptControls
                         Kind = pair.Value.Kind,
                         Value = pair.Value.Kind == IrValueKind.Boolean ? pair.Value.Boolean.ToString()
                             : pair.Value.Integer.ToString(CultureInfo.InvariantCulture)
-                    }).ToArray())).ToArray(),
+                    }).ToImmutableArray())).ToImmutableArray(),
                 partial.ExpectedOutcomes
             };
-        }).ToArray();
+        }).ToImmutableArray();
         var receipt = new
         {
             Schema = 1,

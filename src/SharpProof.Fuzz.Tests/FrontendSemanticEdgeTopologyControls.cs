@@ -40,7 +40,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         ];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
-        var methods = subject.Members.OfType<MethodDeclarationSyntax>().ToArray();
+        var methods = subject.Members.OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(methods.Length, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),

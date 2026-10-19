@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 
@@ -25,7 +26,7 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
                 Text = "proof",
                 Values = [2L, 3L],
                 Reference = "proof"
-            })).ToArray();
+            })).ToImmutableArray();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)

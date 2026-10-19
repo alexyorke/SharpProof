@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Fuzz;
@@ -14,7 +15,7 @@ public sealed class FuzzRunnerTests
         var statuses = Enumerable.Repeat(
                 FuzzOracleStatus.Mismatch,
                 FuzzRunner.MaximumRetainedFailures)
-            .ToArray();
+            .ToImmutableArray();
         var keys = FuzzRunner.SelectFailureKeys(
             statuses,
             statuses,

@@ -3099,3 +3099,7 @@ NoBuild behavior, package exclusion/filter branches, project parallelism and exp
 null/empty additional build arguments. Compare AST-extracted baseline/current functions
 and default test dispatch with recorded native calls before accepting changes.
 Status: open before edits.
+
+IMM-M091 Fuzz verified: all 302 ordinary Fuzz tests pass, zero failures/skips/warnings/
+errors. Main preserved actual reflection/parser/native buffers while freezing read-only
+boolean vectors and ordered runtime observations. Gates half remains pending separately.

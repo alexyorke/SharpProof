@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Fuzz;
@@ -291,12 +292,12 @@ public sealed class FrontendExpressionCoverageTests
             parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (CSharpStructuralShrinker.GetCandidates(parent)
                 .Where(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.NodeCount < parent.NodeCount))
                 .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((Parent: parent, Candidate: candidate)))))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(candidates, Is.Not.Empty);
         Assert.That(candidates.Select(item => item.Parent.Kind).Distinct().Count(), Is.EqualTo(parents.Count));
         Assert.That(candidates.All(item => item.Parent.Type == item.Candidate.Type), Is.True);
 
-        var cases = candidates.Select(item => Case(item.Candidate)).ToArray();
+        var cases = candidates.Select(item => Case(item.Candidate)).ToImmutableArray();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < cases.Length; index++)
