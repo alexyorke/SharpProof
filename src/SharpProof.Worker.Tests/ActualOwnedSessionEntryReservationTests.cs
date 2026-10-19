@@ -71,7 +71,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
         var domain = entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new Assumption(factory,
             factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value),
             new LoweredJustification(clause.Operation)))).ToImmutableArray();
-        long[] primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
+        ImmutableArray<long> primes = [1000000007L, 1000000009L, 1000000021L, 1000000033L];
         const long maximumInput = 1000000033L;
         foreach (var prime in primes)
         {

@@ -3721,3 +3721,11 @@ walk, source construction or cancellation assertion. Preserve intermediate count
 assertions, callback ordering and source text. Mutable RangeCase.CallLine subjects
 remain separate from their outer input vector, whose necessity is under review.
 Validate all ordinary Analyzer tests after independent review. Status: planned.
+
+IMM-M142 scope correction: main challenged the mutable-RangeCase exception for its outer cases vector. Independent tracing confirms no element replacement/reorder/array API; convert RES-51C303DB8BEB86FB to ToImmutableArray while retaining actual RangeCase.CallLine mutation (18 total sites). Final dispatch/nested-cancellation snapshots remain after all observations so late writes stay detectable.
+
+IMM-M141 verified: all 169 affected ordinary Release Worker tests pass, zero
+failures/skips/build warnings/errors; 88 exact embedded PDB outputs. Main and
+independent review cover all 33 rows across eighteen files, both DFS stack orders,
+strict maps, region IDs, declaration ordinals and native/mutable subjects. Canonical
+formatting applied; long mutation/fixture vectors retain separate readable rows.

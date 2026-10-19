@@ -35,17 +35,16 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         Assert.That(information.Nested.All(item => item.Method == null && item.Nested.IsEmpty), Is.True);
         var operation = model.GetOperation(declaration);
         Assert.That(operation, Is.InstanceOf<IMethodBodyOperation>());
-        var pending = new Stack<IOperation>();
-        pending.Push(operation!);
+        var pending = ImmutableStack<IOperation>.Empty.Push(operation!);
         var rank = 0;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            pending = pending.Pop(out var current);
             rank++;
             if (current is IDeconstructionAssignmentOperation)
             { break; }
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         Assert.That(rank, Is.EqualTo(emptyStatements + 6));
         var artifact = CreateArtifact(compilation);

@@ -51,7 +51,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_implicit[index]);
-        foreach (var input in new[] { 0, 1 })
+        foreach (var input in ImmutableArray.Create(0, 1))
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, input), Is.GreaterThan(0), "x=" + input); }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), native.Reason.ToString());
@@ -67,7 +67,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_implicit[index]);
-        foreach (var input in new[] { 0, 1 })
+        foreach (var input in ImmutableArray.Create(0, 1))
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Release, input), Is.Zero, "x=" + input); }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Release), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
@@ -82,9 +82,9 @@ public sealed class GenericImplicitTypeTestAllocationTests
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
         var source = Source(s_folded[index]);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
         }
         var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);

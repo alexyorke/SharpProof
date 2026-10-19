@@ -46,7 +46,7 @@ public sealed class GoldenVcRegressionTests
         else if (depthLimited)
         {
             Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
             Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.DeepPostcondition));
         }
         else

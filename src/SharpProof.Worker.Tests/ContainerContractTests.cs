@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -158,20 +159,22 @@ public sealed class ContainerContractTests
             Assert.Throws<InvalidDataException>(
                 (Action)(() => ContainerContract.ValidateRequired()));
 
-            var mutations = new Action<JsonObject>[]
-            {
+            var mutations = ImmutableArray.Create<Action<JsonObject>>(
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = "1"; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = 1; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["schemaVersion"] = JsonNode.Parse("2147483648"); },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = "invalid"; },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] = JsonNode.Parse("9223372036854775808"); },
-                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibraryBytes"] =
-                    contract["z3LibraryBytes"]!.GetValue<long>() + 1; },
+                contract =>
+                {
+                    System.ArgumentNullException.ThrowIfNull(contract);
+                    contract["z3LibraryBytes"] =
+                    contract["z3LibraryBytes"]!.GetValue<long>() + 1;
+                },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["z3LibrarySha256"] = new string('0', 64); },
                 contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["platform"] = " "; },
-                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["platform"] = "linux/arm64"; }
-                ,contract => { System.ArgumentNullException.ThrowIfNull(contract); contract.Remove("dotnetTestRuntimeVersion"); }
-            };
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract["platform"] = "linux/arm64"; },
+                contract => { System.ArgumentNullException.ThrowIfNull(contract); contract.Remove("dotnetTestRuntimeVersion"); });
             foreach (var mutate in mutations)
             {
                 var contract = JsonNode.Parse(canonicalJson)!.AsObject();

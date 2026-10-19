@@ -55,7 +55,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             var runtimeMethod = runtimeAssembly.GetType("Library")!.GetMethod("IsNull")!;
             Assert.That(runtimeMethod.ReturnType, Is.EqualTo(typeof(bool)));
             Assert.That(runtimeMethod.GetParameters().Single().ParameterType, Is.EqualTo(typeof(string)));
-            string?[] inputs = [null, "x"];
+            ImmutableArray<string?> inputs = [null, "x"];
             foreach (var input in inputs)
             {
                 Assert.That(runtimeMethod.Invoke(null, [input]), Is.EqualTo(input == null));

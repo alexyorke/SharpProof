@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -103,7 +104,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        var expectedClaims = manifest.Claims.ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
+        var expectedClaims = ImmutableDictionaryCapture.Create(manifest.Claims, claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {
             System.ArgumentNullException.ThrowIfNull(claim);
@@ -139,10 +140,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(manifest.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect)), Is.True);
-            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(new[]
-            {
-                WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow
-            }));
+            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(ImmutableArray.Create(WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow)));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)), Is.EquivalentTo(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             foreach (var claim in response.ClaimResults)

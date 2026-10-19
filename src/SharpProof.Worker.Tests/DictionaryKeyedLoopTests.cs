@@ -42,7 +42,7 @@ public sealed class DictionaryKeyedLoopTests
         inputBuilder[subject.Parameter.Entry] = factory.CreateIntegerValue(3);
         inputBuilder[owner.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState());
         var inputs = inputBuilder.ToImmutable();
-        foreach (var program in new[] { candidate.Program, search!.Program })
+        foreach (var program in ImmutableArray.Create(candidate.Program, search!.Program))
         {
             var result = new IrProgramInterpreter(factory).Execute(program, inputs, 1000);
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), result.Unsupported?.Detail);

@@ -42,7 +42,7 @@ public sealed class CoverageLineCreditTests
         using var results = await ReadResultsAsync();
         using (Assert.EnterMultipleScope())
         {
-            foreach (var number in new[] { 9, 26, 36 })
+            foreach (var number in ImmutableArray.Create(9, 26, 36))
             {
                 var result = FindResult(results, number);
                 Assert.That(result.GetProperty("permitted").GetBoolean(), Is.False);

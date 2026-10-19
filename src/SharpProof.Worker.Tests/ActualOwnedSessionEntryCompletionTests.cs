@@ -111,7 +111,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(maximumProduct, Is.LessThanOrEqualTo(new BigInteger(long.MaxValue)));
         var startedQueries = 0;
         long observedBatchDelta = 0;
-        (int First, int Second)[] lemmaPairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), (0, 0), (1, 1)];
+        ImmutableArray<(int First, int Second)> lemmaPairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), (0, 0), (1, 1)];
         Assert.That(lemmaPairs.Distinct().Count(), Is.EqualTo(8));
         // Eight distinct mathematical API obligations: six semiprimes and two
         // prime squares. This raw session API has only per-query native caps;

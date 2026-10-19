@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -108,7 +109,7 @@ public sealed class BitwiseOperatorSemanticsTests
 
     private static IEnumerable<object[]> Inputs()
     {
-        long[] edges = [0, 1, -1, 2, 7, 8, 15, 16, 127, 128, 255, 256, -127, -128, -129, 0x7FFF, 0x8000, 0xFFFF,
+        ImmutableArray<long> edges = [0, 1, -1, 2, 7, 8, 15, 16, 127, 128, 255, 256, -127, -128, -129, 0x7FFF, 0x8000, 0xFFFF,
             int.MaxValue, int.MinValue, uint.MaxValue, long.MaxValue, long.MinValue, 0x40000000, 0x55555555, unchecked((long)0xAAAAAAAAAAAAAAAAUL)];
         var random = new Random(20261010);
         long Pick()

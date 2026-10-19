@@ -31,7 +31,7 @@ public sealed class CompilerIlStreamFillTests
         Assert.That(body!.Method, Is.SameAs(method));
         Assert.That(body.Instructions, Is.Not.Empty);
         Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(body));
-        foreach (var value in new[] { -2, 0, 7 })
+        foreach (var value in ImmutableArray.Create(-2, 0, 7))
         {
             Assert.That(subject.Method.Invoke(null, [value]), Is.EqualTo(value));
             Assert.That(subject.RootMethod.Invoke(null, [value]), Is.EqualTo(value));

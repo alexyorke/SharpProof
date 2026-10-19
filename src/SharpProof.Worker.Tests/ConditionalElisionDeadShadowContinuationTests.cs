@@ -80,17 +80,17 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         System.ArgumentNullException.ThrowIfNull(owningInvocations);
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(source);
-        var regions = new List<ControlFlowRegion>();
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
+        var regionsBuilder = ImmutableArray.CreateBuilder<ControlFlowRegion>();
+        var pending = ImmutableStack<ControlFlowRegion>.Empty.Push(graph.Root);
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
-            regions.Add(region);
+            pending = pending.Pop(out var region);
+            regionsBuilder.Add(region);
             foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
+            { pending = pending.Push(nested); }
         }
-        var regionIds = regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))).ToDictionary(item => item.region, item => item.id);
+        var regions = regionsBuilder.ToImmutable();
+        var regionIds = ImmutableDictionaryCapture.Create(regions.Select((region, id) => region is null ? throw new System.ArgumentNullException(nameof(region)) : ((region, id))), item => item.region, item => item.id);
         var evidence = new
         {
             Source = source,

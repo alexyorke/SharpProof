@@ -61,7 +61,7 @@ public sealed class GenericNullableTypeTestAllocationTests
         var source = Source(members, run);
         Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, 1), Is.GreaterThan(0), "Debug x=1");
         Assert.That(AllocatedBytes(source, OptimizationLevel.Release, 1), releaseAllocates ? Is.GreaterThan(0) : Is.Zero, "Release x=1");
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
             if (optimization == OptimizationLevel.Release && !releaseAllocates)
             { continue; }
@@ -81,9 +81,9 @@ public sealed class GenericNullableTypeTestAllocationTests
 
         var (members, run) = s_nonNullable[index];
         var source = Source(members, run);
-        foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(OptimizationLevel.Debug, OptimizationLevel.Release))
         {
-            foreach (var input in new[] { 0, 1 })
+            foreach (var input in ImmutableArray.Create(0, 1))
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
             var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, optimization), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), optimization + ": " + native.Reason);
