@@ -154,6 +154,8 @@ public static partial class Inference
             var nominal = CSharpTypes.Erase(target);
             var signature = DelegateSignature(target, nominal);
             var previousAsync = asyncReturn;
+            var previousBuilder = asyncBuilder;
+            var previousBuilderUsesResult = builderUsesResult;
             try
             {
                 SetAsyncReturn(operation.Symbol);
@@ -188,7 +190,7 @@ public static partial class Inference
                 ImportConstructedConstraints(target, nominal);
                 return nominal;
             }
-            finally { asyncReturn = previousAsync; }
+            finally { asyncReturn = previousAsync; asyncBuilder = previousBuilder; builderUsesResult = previousBuilderUsesResult; }
         }
     }
 }

@@ -53,9 +53,13 @@ public static partial class Inference
                 throw new InferenceException("Extern and partial root methods are unsupported.");
             }
 
+            if (IsRequiredBuilderMember(symbol) && IsUsedBuilderMember(symbol))
+            { return new(symbol.Name, "Concrete", "Compiler-required async-builder members retain their declared signatures."); }
+
             SetIteratorReturn(method, symbol);
             if (iteratorReturn is null)
             { SetAsyncReturn(symbol); }
+            needsBuilderEmission |= HasNestedAsyncBuilder(method);
             var parameters = symbol.Parameters.Select(p =>
             {
                 if (p is null)
@@ -362,6 +366,9 @@ public static partial class Inference
                     return new(symbol.Name, "Rejected", "Generalization changes a collection initializer Add method.");
                 }
             }
+
+            if ((needsBuilderEmission || IsUsedBuilderMember(symbol)) && ValidateBuilderEmission(method, changedMethod, changedModel) is string builderFailure)
+            { return new(symbol.Name, "Rejected", builderFailure); }
 
             var typeParameterNames = (method.TypeParameterList?.Parameters.Select(p =>
             {
@@ -742,6 +749,8 @@ public static partial class Inference
                             return BindDeconstruction(assignment.Left, Expression(assignment.Right), original, AssignmentDeconstructionBinding(model, assignment));
                         }
 
+                        if (model.GetOperation(assignment.Left, cancellationToken) is IDiscardOperation)
+                        { return Expression(assignment.Right); }
                         return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 

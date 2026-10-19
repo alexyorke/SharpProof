@@ -151,7 +151,7 @@ nested/inherited enumerators. Await foreach supports configured and cancelable
 sources. Protocol members and conversions are rechecked after rewriting.
 Generic instance calls preserve receiver substitutions and explicit type arguments.
 
-The adapter skips custom async return builders, custom operators, expanded non-array params
+The adapter skips custom operators, expanded non-array params
 collections, unsupported patterns and other unimplemented syntax. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
 of generic constraints. See [the completion ledger](LIMITATIONS.md).
@@ -223,6 +223,21 @@ IsCompleted definitions are rechecked across all supplied source files; changed
 overloads or instance members shadowing extensions reject the candidate. Tests apply actual IDE
 fixes, compile with no warnings, and execute nullable values/references and new
 Task/ValueTask types through completed/suspended awaits, cancellation and faults.
+Custom task-like types use their `AsyncMethodBuilder` attribute, including a
+method-level override and builders inside non-generic containers. Generic builder
+constraints flow to the suggested signature. The builder's `Task` property can
+keep a result concrete even when the body alone would generalize it. Generic and
+non-generic task-like lambdas preserve the surrounding method's builder state.
+As in C#, a builder attribute on `async void` is ignored. Compiler-required
+builder signatures remain concrete even when their task-like type is not yet used.
+
+Custom-builder candidates also undergo full compiler emission: some builder
+failures are not reported by normal binding diagnostics. Explicit type usages in
+the same generic scope validate builder constraints that the compiler can omit
+for implicit builder constructions. Changes to source-defined compiler-required
+builder methods are checked too. Runtime tests apply IDE fixes and compare the
+original and fixed builder traces across completed and suspended awaits, normal
+and critical awaiters, method overrides, finalizers, faults and cancellation.
 Declared widening/boxing return conversions are retained rather than narrowing
 the result type, including within tuple returns.
 

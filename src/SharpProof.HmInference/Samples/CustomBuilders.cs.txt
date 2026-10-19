@@ -1,0 +1,33 @@
+#nullable enable
+using System;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+
+[AsyncMethodBuilder(typeof(SampleAsyncBuilder<>))]
+public readonly struct SampleBuiltTask<T>
+{
+    private readonly Task<T> task;
+    public SampleBuiltTask(Task<T> task) { this.task = task; }
+    public TaskAwaiter<T> GetAwaiter() => task.GetAwaiter();
+}
+
+// A small task-completion-source builder keeps the protocol visible in the sample.
+public struct SampleAsyncBuilder<T>
+{
+    private TaskCompletionSource<T> completion;
+    public static SampleAsyncBuilder<T> Create() => new() { completion = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+    public SampleBuiltTask<T> Task => new(completion.Task);
+    public void SetResult(T value) => completion.SetResult(value);
+    public void SetException(Exception error) => completion.SetException(error);
+    public void SetStateMachine(IAsyncStateMachine state) => ArgumentNullException.ThrowIfNull(state);
+    public void Start<S>(ref S state) where S : IAsyncStateMachine => state.MoveNext();
+    public void AwaitOnCompleted<A, S>(ref A awaiter, ref S state) where A : INotifyCompletion where S : IAsyncStateMachine => awaiter.OnCompleted(state.MoveNext);
+    public void AwaitUnsafeOnCompleted<A, S>(ref A awaiter, ref S state) where A : ICriticalNotifyCompletion where S : IAsyncStateMachine => awaiter.UnsafeOnCompleted(state.MoveNext);
+}
+
+public static class CustomBuilderSamples
+{
+    public static async SampleBuiltTask<int> BuilderIdentity(int value) => value;
+    public static async SampleBuiltTask<int> BuilderEcho(Task<int> task) => await task;
+    public static Func<SampleBuiltTask<int>> BuilderCapture(int value) => async () => { await System.Threading.Tasks.Task.Yield(); return value; };
+}

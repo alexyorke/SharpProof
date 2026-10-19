@@ -16,14 +16,16 @@ public static partial class Inference
             if (method is null)
             { throw new ArgumentNullException(nameof(method)); }
             asyncReturn = null;
-            if (!method.IsAsync || method.ReturnsVoid)
+            asyncBuilder = null;
+            builderUsesResult = false;
+            if (!method.IsAsync)
             { return; }
-            if (method.ReturnType is not INamedTypeSymbol named || named.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks"
-                || named.Name is not ("Task" or "ValueTask") || named.Arity > 1)
-            {
-                throw new InferenceException("Custom async return builders and async iterators are unsupported.");
-            }
+            if (method.ReturnsVoid)
+            { ConfigureBuilder(method, null); return; }
+            if (method.ReturnType is not INamedTypeSymbol { Arity: <= 1 } named)
+            { throw new InferenceException("Invalid async return type."); }
             asyncReturn = named;
+            ConfigureBuilder(method, named);
         }
 
         private HmType WrapAsyncResult(HmType value)
@@ -33,13 +35,16 @@ public static partial class Inference
             if (asyncReturn is null)
             { return value; }
             var declared = CSharpTypes.Rigid(asyncReturn);
-            if (asyncReturn.Arity == 0)
-            { return declared; }
-            return declared.Name == CSharpTypes.NullableReference
-                ? new(CSharpTypes.NullableReference, new HmType(declared.Arguments[0].Name, value))
-                : new(declared.Name, value);
+            HmType result = declared;
+            if (asyncReturn.Arity == 1)
+            {
+                var template = declared.Name == CSharpTypes.NullableReference ? declared.Arguments[0] : declared;
+                var constructed = new HmType(template.Name, value) { IsValueType = template.IsValueType };
+                result = declared.Name == CSharpTypes.NullableReference ? new(CSharpTypes.NullableReference, constructed) : constructed;
+            }
+            BindBuilderReturn(result, value);
+            return result;
         }
-
         private HmType VoidBody(BlockSyntax body)
         {
             if (body is null)
@@ -419,12 +424,12 @@ public static partial class Inference
             return prefix + warning.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private bool IntroducesCompilerWarnings(Compilation changed)
+        private bool IntroducesCompilerWarnings(Compilation changed, IEnumerable<Diagnostic>? originalDiagnostics = null, IEnumerable<Diagnostic>? changedDiagnostics = null)
         {
             if (changed is null)
             { throw new ArgumentNullException(nameof(changed)); }
             var existing = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var warning in model.Compilation.GetDiagnostics(cancellationToken))
+            foreach (var warning in originalDiagnostics ?? model.Compilation.GetDiagnostics(cancellationToken))
             {
                 if (warning.Severity == DiagnosticSeverity.Warning)
                 {
@@ -433,7 +438,7 @@ public static partial class Inference
                     existing[key] = count + 1;
                 }
             }
-            foreach (var warning in changed.GetDiagnostics(cancellationToken))
+            foreach (var warning in changedDiagnostics ?? changed.GetDiagnostics(cancellationToken))
             {
                 if (warning.Severity == DiagnosticSeverity.Warning)
                 {
