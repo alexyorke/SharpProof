@@ -3082,3 +3082,12 @@ failures/skips/warnings/errors. Main checked all 142 selected projections and co
 compiler overload, metadata reversal, direct immutable roots and member-index lookup.
 The first build identified one redundant immutable attribute copy; direct publication
 fixed it before this passing complete run. Native mutable SUT buffers remain intact.
+
+IMM-M094: RoslynOperationLowerer specialization and custom callbacks are configured
+before lowering and never changed during use. Make the exposed callbacks getter-only
+and backing custom delegate readonly; configure through a private constructor and an
+internal factory. Preserve public construction, known-pure callbacks, concrete replay
+compiler constants and identity/default callbacks. Replace all three configuring callers,
+retaining callback observation builders. Keep RoslynTypeMapper's separate runtime
+receiver specialization contract unchanged. Validate Frontend lowering/replay and Contracts.
+Status: open before edits.
