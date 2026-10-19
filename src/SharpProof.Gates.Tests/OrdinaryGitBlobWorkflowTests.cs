@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -49,7 +50,7 @@ public sealed class OrdinaryGitBlobWorkflowTests
         {
             var actual = await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "ordinary.cs", TestContext.CurrentContext.CancellationToken);
             Assert.That(actual, Has.Length.EqualTo(expected.Length));
-            Assert.That(Convert.ToHexString(SHA256.HashData(actual)), Is.EqualTo(Convert.ToHexString(SHA256.HashData(expected))));
+            Assert.That(Convert.ToHexString(SHA256.HashData(actual.AsSpan())), Is.EqualTo(Convert.ToHexString(SHA256.HashData(expected))));
         }
 
         Assert.That(GitProcessesIn(repository.FullName), Is.Empty);

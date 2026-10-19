@@ -567,7 +567,7 @@ internal static class OpenSourceCorpusCatalog
     private static string? ResolveLink(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
-        foreach (FileSystemInfo info in new FileSystemInfo[] { new FileInfo(path), new DirectoryInfo(path) })
+        foreach (FileSystemInfo info in ImmutableArray.Create<FileSystemInfo>(new FileInfo(path), new DirectoryInfo(path)))
         {
             try
             {

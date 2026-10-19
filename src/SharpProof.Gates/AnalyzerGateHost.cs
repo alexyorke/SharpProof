@@ -324,7 +324,7 @@ internal static class AnalyzerGateHost
         // Keep the generated image alive for this process's compilation cache.
         var directory = Directory.CreateTempSubdirectory("sharpproof-gates-reference-");
         var path = Path.Combine(directory.FullName, "SharpProof.Gates.ExternalEffects.dll");
-        File.WriteAllBytes(path, stream.ToArray());
+        File.WriteAllBytes(path, stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
         return references.Add(MetadataReference.CreateFromFile(path));
     }
 

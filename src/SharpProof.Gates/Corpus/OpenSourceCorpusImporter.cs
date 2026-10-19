@@ -140,12 +140,12 @@ SOFTWARE.
 
         var licenseText = OpenSourceCorpusCatalog.NormalizeLineEndings(
             Encoding.UTF8.GetString(
-                await ReadGitBlobAsync(
+                (await ReadGitBlobAsync(
                         resolvedUpstreamRoot,
                         commit,
                         "LICENSE",
                         cancellationToken)
-                    .ConfigureAwait(false)));
+                    .ConfigureAwait(false)).AsSpan()));
         ValidateReviewedMitLicense(licenseText);
 
         var (files, candidates) = await DiscoverSourcesAsync(
@@ -220,7 +220,7 @@ SOFTWARE.
             .Where(static method =>
                 method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Unspecified))
             .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))
-            .ToArray();
+            .ToImmutableArray();
         if (unreviewedMethods.Length != 0)
         {
             throw new InvalidDataException(
@@ -274,10 +274,9 @@ SOFTWARE.
     {
         System.ArgumentNullException.ThrowIfNull(commit);
         System.ArgumentNullException.ThrowIfNull(upstreamRoot);
-        var sourceRoots = new[] {
+        var sourceRoots = ImmutableArray.Create(
             Path.Combine(upstreamRoot, "Algorithms"),
-            Path.Combine(upstreamRoot, "DataStructures")
-        };
+            Path.Combine(upstreamRoot, "DataStructures"));
         foreach (var sourceRoot in sourceRoots)
         {
             if (!Directory.Exists(sourceRoot))
@@ -302,12 +301,12 @@ SOFTWARE.
         {
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 Encoding.UTF8.GetString(
-                    await ReadGitBlobAsync(
+                    (await ReadGitBlobAsync(
                             upstreamRoot,
                             commit,
                             relativePath,
                             cancellationToken)
-                        .ConfigureAwait(false)));
+                        .ConfigureAwait(false)).AsSpan()));
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
@@ -461,7 +460,7 @@ SOFTWARE.
         return result.Output.Trim();
     }
 
-    internal static async Task<byte[]> ReadGitBlobAsync(
+    internal static async Task<ImmutableArray<byte>> ReadGitBlobAsync(
         string workingDirectory,
         string commit,
         string relativePath,
@@ -523,7 +522,7 @@ SOFTWARE.
                 $"git cat-file blob {commit}:{relativePath} failed: {error}");
         }
 
-        return output.ToArray();
+        return ImmutableArray.Create<byte>(output.GetBuffer().AsSpan(0, checked((int)output.Length)));
     }
 
     internal static string NormalizeRepositoryUrl(string value)
