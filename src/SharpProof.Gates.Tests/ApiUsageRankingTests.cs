@@ -188,6 +188,17 @@ public sealed class ApiUsageRankingTests
                     ? "partially-modeled" : "unmodeled-domain";
             }
 
+            if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
+            {
+                var use = model.GetOperation(syntax);
+                status = use switch
+                {
+                    IObjectCreationOperation { Initializer: null, Constructor: { } constructor } => CSharpOperationSemantics.IsQueueStateMember(constructor) ? "partially-modeled" : "unmodeled-domain",
+                    IInvocationOperation invocation => CSharpOperationSemantics.IsQueueStateMember(invocation.TargetMethod) ? "partially-modeled" : "unmodeled-domain",
+                    IPropertyReferenceOperation => "partially-modeled",
+                    _ => "unmodeled-domain"
+                };
+            }
             if (CSharpOperationSemantics.IsListStateDeclaration(symbol))
             {
                 var use = model.GetOperation(syntax);

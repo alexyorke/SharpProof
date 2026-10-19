@@ -189,7 +189,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Scalar, reference and opaque specialization belongs to a supported collection
         // boundary. Other generic source calls retain their existing scalar domain.
         var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsDictionaryReceiverType(parameter.Type));
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType &&
+                queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1");
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
         { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
@@ -318,7 +320,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) != null ||
             TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
-            TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToArray();
+            TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is INamedTypeSymbol queueReceiver &&
+            queueReceiver.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1").ToArray();
         IOperation[] declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -342,7 +346,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 frame.SpecializeScalarParameter(parameter, scalar);
                 continue;
             }
-            if (TotalLoweringContext.IsListReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredList &&
+            if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1") && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }
