@@ -2525,3 +2525,14 @@ Master synchronization checkpoint: fetched 7e0e485a14ff3d09511c34009008ef83cdba5
 (opaque List values and generic helper storage, PR #330). Commit the verified batch
 before merging; retain new List provenance/storage semantics and existing immutable
 snapshots. Recheck affected tests and literals against this new master before pushing.
+
+IMM-M065: Coordinator and read-only agent reviewed CanonicalCohortEvidence.ps1 and
+its real consumers. Replace case/name arrays, strict identity membership and lookup
+construction with scoped immutable builders, freezing at phase boundaries. Preserve
+Ordinal identities and sorting, OrdinalIgnoreCase former PowerShell map lookup, encoded
+TRX collisions, historical aliases, duplicate-name multisets and custom missing-definition
+errors. Keep ordered receipt/case objects and explicit native/JSON array boundaries.
+Use builder.Sort(Ordinal) instead of mutable temporary sort arrays; append required
+Worker assembly through a builder. Validate actual parser controls plus negative collision,
+missing-definition and duplicate execution cases; retain authenticated GitHub/Git gates.
+Status: open before edits.
