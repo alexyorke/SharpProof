@@ -646,18 +646,17 @@ public static class IrStructuralShrinker
             throw new ArgumentNullException(nameof(term));
         }
 
-        var seen = ImmutableHashSet<IrId>.Empty;
+        var seen = ImmutableHashSet.CreateBuilder<IrId>();
         var pending = ImmutableStack<IrTerm>.Empty.Push(term);
         while (!pending.IsEmpty)
         {
             var current = pending.Peek();
             pending = pending.Pop();
-            if (seen.Contains(current.Id))
+            if (!seen.Add(current.Id))
             {
                 continue;
             }
 
-            seen = seen.Add(current.Id);
             pending = IrTraversal.PushChildren(current, pending);
         }
         return seen.Count;

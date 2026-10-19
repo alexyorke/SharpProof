@@ -218,14 +218,15 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
         var producerBytes = await Emit(directory, "producer", producer);
         var shadow = MetadataReference.CreateFromFile(Path.Combine(directory, "producer.dll"),
             MetadataReferenceProperties.Assembly.WithAliases(ShadowAliases));
-        var references = TestMetadataReferences.WithSharpProof.Add(shadow);
+        var referenceBuilder = TestMetadataReferences.WithSharpProof.ToBuilder();
+        referenceBuilder.Add(shadow);
         byte[]? priorBytes = null;
         IMethodSymbol? originalSourceLog = null;
         if (settings.Imported)
         {
             var priorSource = settings.Mixed ? MixedOneArgumentCaller : OneArgumentCaller;
             await File.WriteAllTextAsync(Path.Combine(directory, "Prior.cs"), priorSource);
-            var prior = CreateCompilation("BoundaryPrior", priorSource, settings.Symbols, references);
+            var prior = CreateCompilation("BoundaryPrior", priorSource, settings.Symbols, referenceBuilder.ToImmutable());
             priorBytes = await Emit(directory, "prior", prior);
             originalSourceLog = prior.GetTypeByMetadataName("Fixture")!.GetMembers("Log")
                 .OfType<IMethodSymbol>().Single();
@@ -249,9 +250,10 @@ public sealed class ConditionalAttributeCompilerAuthorityBoundaryTests
                 QualifyOfficialAttribute(priorAttributes.Single(attribute =>
                     attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, priorOfficial))), priorOfficial, "OFFICIAL_ABSENT");
             }
-            references = references.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "prior.dll"),
+            referenceBuilder.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "prior.dll"),
                 MetadataReferenceProperties.Assembly.WithAliases(PriorAliases)));
         }
+        var references = referenceBuilder.ToImmutable();
         var compilation = CreateCompilation("BoundaryCaller", settings.Source, settings.Symbols, references);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();

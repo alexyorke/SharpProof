@@ -11,14 +11,17 @@ internal static class IrSequenceReads
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
         var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
-        var writes = ImmutableDictionary<IrVarId, ImmutableList<IrInstruction>>.Empty;
+        var writes = ImmutableDictionary.CreateBuilder<IrVarId, ImmutableArray<IrInstruction>.Builder>();
         foreach (var instruction in instructions)
         {
             foreach (var variable in IrInstructionFacts.WrittenVariables(instruction))
             {
                 if (!writes.TryGetValue(variable, out var writers))
-                { writers = ImmutableList<IrInstruction>.Empty; }
-                writes = writes.SetItem(variable, writers.Add(instruction));
+                {
+                    writers = ImmutableArray.CreateBuilder<IrInstruction>();
+                    writes[variable] = writers;
+                }
+                writers.Add(instruction);
             }
         }
         // A fresh variable only ever holds a sequence this body allocated or
@@ -42,7 +45,7 @@ internal static class IrSequenceReads
             if (fresh.Count == previous.Count)
             { break; }
         }
-        var readers = ImmutableHashSet<IrInstructionId>.Empty;
+        var readers = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         foreach (var instruction in instructions)
         {
             var pending = ImmutableStack<IrTerm>.Empty;
@@ -56,13 +59,13 @@ internal static class IrSequenceReads
                     term is IrLengthTerm { Value: var measured } && !IsLocal(measured, fresh) ||
                     IrFieldSites.IsFieldRead(program.Factory, term) && !IsLocal(((IrOpaqueTerm)term).Receiver!, fresh))
                 {
-                    readers = readers.Add(instruction.Id);
+                    readers.Add(instruction.Id);
                     break;
                 }
                 pending = IrTraversal.PushChildren(term, pending);
             }
         }
-        return readers;
+        return readers.ToImmutable();
     }
 
     private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId> fresh)

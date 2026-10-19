@@ -32,6 +32,7 @@ internal sealed class PublicationLease : IDisposable
             throw new ArgumentException("A verification publication contains one to four stable members.", nameof(paths));
         }
         var lease = new PublicationLease();
+        var memberBuilder = ImmutableList.CreateBuilder<FileStream>();
         var elapsed = Stopwatch.StartNew();
         try
         {
@@ -48,7 +49,7 @@ internal sealed class PublicationLease : IDisposable
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
-                        lease._members = lease._members.Add(new FileStream(sidecar, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
+                        memberBuilder.Add(new FileStream(sidecar, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
                         break;
                     }
                     catch (IOException) when (elapsed.ElapsedMilliseconds < TimeoutMilliseconds)
@@ -57,10 +58,12 @@ internal sealed class PublicationLease : IDisposable
                     }
                 }
             }
+            lease._members = memberBuilder.ToImmutable();
             return lease;
         }
         catch
         {
+            lease._members = memberBuilder.ToImmutable();
             lease.Dispose();
             throw;
         }

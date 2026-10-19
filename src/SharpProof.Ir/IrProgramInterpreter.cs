@@ -108,7 +108,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             }
         }
         var entry = program.Entry;
-        var occurrences = ImmutableDictionary<IrInstructionId, int>.Empty;
+        var occurrences = ImmutableDictionary.CreateBuilder<IrInstructionId, int>();
         var state = new ExecutionState
         {
             Interpreter = this,
@@ -160,7 +160,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal CancellationToken CancellationToken;
         internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost;
         internal IrProgramReplayOptions? ReplayOptions;
-        internal ImmutableDictionary<IrInstructionId, int> Occurrences;
+        internal ImmutableDictionary<IrInstructionId, int>.Builder Occurrences;
         internal IrBlockId Current;
         internal int Steps;
         internal IrThrowInstruction? PendingException;
@@ -465,13 +465,13 @@ public sealed partial class IrAllocationInstruction
             var elements = Enumerable.Repeat(initial, count);
             if (!this.InitialValues.IsEmpty)
             {
-                var evaluatedElements = ImmutableList<IrValue>.Empty;
+                var evaluatedElements = ImmutableArray.CreateBuilder<IrValue>();
                 foreach (var initialValueTerm in this.InitialValues)
                 {
                     var initialValue = state.Interpreter.Evaluate(initialValueTerm, state.Values, state.CancellationToken);
-                    evaluatedElements = evaluatedElements.Add(initialValue.Value!);
+                    evaluatedElements.Add(initialValue.Value!);
                 }
-                elements = evaluatedElements;
+                elements = evaluatedElements.ToImmutable();
             }
             var createdArray = state.Interpreter._factory.CreateSequenceValue(this.AllocatedType, elements);
             state.Values[this.Target!.Value] = createdArray;
@@ -670,7 +670,7 @@ public sealed partial class IrHavocInstruction
         if (state.ReplayOptions != null && this.HavocKind == IrHavocKind.Variables)
         {
             state.Occurrences.TryGetValue(this.Id, out var occurrence);
-            state.Occurrences = state.Occurrences.SetItem(this.Id, occurrence + 1);
+            state.Occurrences[this.Id] = occurrence + 1;
             foreach (var variable in this.Variables)
             {
                 var request = new IrHavocRequest(this.Id, this.Operation, variable, occurrence, this.Origin);

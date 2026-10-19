@@ -290,13 +290,15 @@ public sealed class PassiveCallableVcTests
             "old-entry" => original with { Old = original.Entry },
             _ => original
         };
-        ImmutableArray<PassiveParameterBinding> parameters = [first];
+        var parameterBuilder = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
+        parameterBuilder.Add(first);
         if (alias == "cross-input")
         {
-            parameters = parameters.Add(new(original.Current,
+            parameterBuilder.Add(new(original.Current,
                 subject.Factory.CreateVariable("other-current", subject.Factory.IntegerType),
                 subject.Factory.CreateVariable("other-old", subject.Factory.IntegerType)));
         }
+        var parameters = parameterBuilder.ToImmutable();
         Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableCandidate("aliases", program, parameters,
             alias == "result" ? original.Current : subject.Result, [], [])));
     }

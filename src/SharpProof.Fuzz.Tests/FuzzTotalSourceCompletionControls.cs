@@ -41,9 +41,10 @@ public sealed class FuzzTotalSourceCompletionControls
             StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var bindings = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+        var bindingBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         var formula = LowerActual("Target");
         var completion = LowerActual("NormalCompletion");
+        var bindings = bindingBuilder.ToImmutable();
         Assert.That(formula.IsExact, Is.EqualTo(!fault));
         Assert.That(completion.IsExact, Is.EqualTo(!opaque));
         Assert.That(completion.Variables, Is.Empty);
@@ -140,7 +141,7 @@ public sealed class FuzzTotalSourceCompletionControls
                 var parameter = (IParameterSymbol)binding.Symbol;
                 Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, symbol), Is.True);
                 Assert.That(parameter.Ordinal, Is.Zero);
-                bindings = bindings.Add(binding.Variable, factory.CreateBooleanValue(true));
+                bindingBuilder.Add(binding.Variable, factory.CreateBooleanValue(true));
             }
             return lowered;
         }

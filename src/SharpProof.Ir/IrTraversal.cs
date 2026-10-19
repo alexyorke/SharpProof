@@ -108,28 +108,27 @@ internal static class IrTraversal
         bool collectVariables)
     {
         pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
-        var visited = ImmutableHashSet<IrId>.Empty;
-        var variables = ImmutableHashSet<IrVarId>.Empty;
+        var visited = ImmutableHashSet.CreateBuilder<IrId>();
+        var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
         while (!pending.IsEmpty)
         {
             var term = pending.Peek();
             pending = pending.Pop();
-            if (visited.Contains(term.Id))
+            if (!visited.Add(term.Id))
             {
                 continue;
             }
-            visited = visited.Add(term.Id);
             if (predicate != null && predicate(term))
             {
-                return (true, variables);
+                return (true, variables.ToImmutable());
             }
             if (collectVariables && term is IrVariableTerm variable)
             {
-                variables = variables.Add(variable.Variable);
+                variables.Add(variable.Variable);
             }
             pending = PushChildren(term, pending);
         }
-        return (false, variables);
+        return (false, variables.ToImmutable());
     }
 
     internal static (T Value, ImmutableDictionary<IrId, T> Memo) FoldBottomUp<T>(

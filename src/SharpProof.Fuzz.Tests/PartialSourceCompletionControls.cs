@@ -40,9 +40,10 @@ public sealed class PartialSourceCompletionControls
             StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory();
-        var bindings = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+        var bindingBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         var formula = LowerActual("Target");
         var completion = LowerActual("NormalCompletion");
+        var bindings = bindingBuilder.ToImmutable();
         Assert.That(formula.IsExact, Is.True);
         Assert.That(completion.IsExact, Is.EqualTo(!opaque));
         Assert.That(completion.Variables, Is.Empty);
@@ -124,7 +125,7 @@ public sealed class PartialSourceCompletionControls
                 var parameter = (IParameterSymbol)binding.Symbol;
                 Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, symbol), Is.True);
                 Assert.That(parameter.Ordinal, Is.Zero);
-                bindings = bindings.Add(binding.Variable, fault
+                bindingBuilder.Add(binding.Variable, fault
                     ? factory.CreateIntegerValue(factory.GetVariableInfo(binding.Variable).Type, 7L)
                     : factory.CreateBooleanValue(true));
             }

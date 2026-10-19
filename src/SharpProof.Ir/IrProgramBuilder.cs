@@ -6,7 +6,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly long _scope = Interlocked.Increment(ref s_nextScope);
-    private ImmutableList<BlockDraft> _blocks = [];
+    private readonly ImmutableList<BlockDraft>.Builder _blocks = ImmutableList.CreateBuilder<BlockDraft>();
     private int _nextInstruction;
     private IrBlockId? _entry;
     private bool _built;
@@ -18,7 +18,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         var nameId = string.IsNullOrWhiteSpace(name)
             ? (IrStringId?)null
             : _factory.InternString(name!);
-        _blocks = _blocks.Add(new BlockDraft(id, nameId));
+        _blocks.Add(new BlockDraft(id, nameId));
         _entry ??= id;
         return id;
     }
@@ -531,7 +531,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         }
 
         _nextInstruction++;
-        _blocks = _blocks.SetItem(blockId.Value, new BlockDraft(block.Id, block.Name, block.Instructions.Add(instruction)));
+        block.Instructions.Add(instruction);
         return instruction;
     }
 
@@ -679,15 +679,15 @@ public sealed class IrProgramBuilder(IrFactory factory)
         }
     }
 
-    private sealed class BlockDraft(IrBlockId id, IrStringId? name, ImmutableList<IrInstruction>? instructions = null)
+    private sealed class BlockDraft(IrBlockId id, IrStringId? name)
     {
         internal IrBlockId Id { get; } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
         internal IrStringId? Name { get; } = name;
-        internal ImmutableList<IrInstruction> Instructions { get; } = instructions ?? [];
+        internal ImmutableArray<IrInstruction>.Builder Instructions { get; } = ImmutableArray.CreateBuilder<IrInstruction>();
 
         internal IrBasicBlock Freeze()
         {
-            return new(Id, Name, [.. Instructions]);
+            return new(Id, Name, Instructions.ToImmutable());
         }
     }
 }

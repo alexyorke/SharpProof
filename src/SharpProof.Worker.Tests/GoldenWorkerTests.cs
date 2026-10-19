@@ -276,9 +276,10 @@ public sealed class GoldenWorkerTests
             using var pendingSolver = new PassiveCallableSolver(pendingPlan!);
             foreach (var allowReplacement in ImmutableArray.Create(false, true))
             {
-                var allowed = explicitThrows ? ImmutableHashSet<IrExceptionKind>.Empty : ImmutableHashSet.Create(IrExceptionKind.Overflow);
+                var allowedBuilder = (explicitThrows ? ImmutableHashSet<IrExceptionKind>.Empty : ImmutableHashSet.Create(IrExceptionKind.Overflow)).ToBuilder();
                 if (!explicitThrows && allowReplacement)
-                { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
+                { allowedBuilder.Add(IrExceptionKind.DivideByZero); }
+                var allowed = allowedBuilder.ToImmutable();
                 var pendingPolicy = await pendingSolver.VerifyExceptionsAsync(allowed,
                     allowedSite: site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (site == sites[0] || allowReplacement && site == sites[1]), exactSite: _ => true, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.AppendLine(prefix + (allowReplacement ? "-complete-policy: " : "-restricted-policy: ") + pendingPolicy.Outcome!.GetType().Name);
@@ -785,13 +786,15 @@ public sealed class GoldenWorkerTests
                 "old-entry" => subject.Parameter with { Old = subject.Parameter.Entry },
                 _ => subject.Parameter
             };
-            ImmutableArray<PassiveParameterBinding> parameters = [first];
+            var parameterBuilder = ImmutableArray.CreateBuilder<PassiveParameterBinding>();
+            parameterBuilder.Add(first);
             if (alias == "cross-input")
             {
-                parameters = parameters.Add(new(subject.Parameter.Current,
+                parameterBuilder.Add(new(subject.Parameter.Current,
                     subject.Factory.CreateVariable("other-current", subject.Factory.IntegerType),
                     subject.Factory.CreateVariable("other-old", subject.Factory.IntegerType)));
             }
+            var parameters = parameterBuilder.ToImmutable();
             var rejected = false;
             try
             {

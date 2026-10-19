@@ -28,7 +28,7 @@ public sealed class OperationPurityScopeCoverageTests
         var pure = invocations.First(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 1)"));
         var impure = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x++)"));
         var unknown = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.TargetMethod.Name == "Unknown"));
-        var calls = ImmutableList<string>.Empty;
+        var calls = ImmutableArray.CreateBuilder<string>();
         var classifier = new RoslynOperationPurityClassifier(KnownPure, 256);
         Assert.That(ImmutableArray.Create(
             classifier.IsDemonstrablyPure(pure, 0),
@@ -39,12 +39,12 @@ public sealed class OperationPurityScopeCoverageTests
             classifier.IsDemonstrablyPure(unknown, 0),
             classifier.IsDemonstrablyPure(pure, 256)
         ), Is.EqualTo(ExpectedBatchResults));
-        Assert.That(calls, Is.EqualTo(ExpectedBatchCalls));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedBatchCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
             System.ArgumentNullException.ThrowIfNull(method);
-            calls = calls.Add(method.Name);
+            calls.Add(method.Name);
             return method.Name == "Read";
         }
     }
@@ -74,7 +74,7 @@ public sealed class OperationPurityScopeCoverageTests
         var nested = invocations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString() == "Read(x + 2)"));
         FrontendLoweringResult? nestedResult = null;
         var reentered = false;
-        var calls = ImmutableList<string>.Empty;
+        var calls = ImmutableArray.CreateBuilder<string>();
         RoslynOperationLowerer? lowerer = null;
         // Reenter while the first argument is being classified. The second
         // argument still needs the restored classifier from the outer scope.
@@ -84,18 +84,18 @@ public sealed class OperationPurityScopeCoverageTests
         Assert.That(nestedResult, Is.Not.Null);
         AssertOpaque(nestedResult!, IrOpaquePurity.Pure);
         AssertOpaque(result, IrOpaquePurity.Pure);
-        Assert.That(calls, Is.EqualTo(ExpectedReentryCalls));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedReentryCalls));
         // The one-shot callback now follows the same policy without reentering.
         // Reuse the lowerer's bindings while requiring a fresh purity scope.
         var control = lowerer.Lower(outer);
         AssertOpaque(control, IrOpaquePurity.Pure);
         Assert.That(result.Term, Is.SameAs(control.Term));
-        Assert.That(calls, Is.EqualTo(ExpectedBothScopeCalls));
+        Assert.That(calls.ToImmutable(), Is.EqualTo(ExpectedBothScopeCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
             System.ArgumentNullException.ThrowIfNull(method);
-            calls = calls.Add(method.Name);
+            calls.Add(method.Name);
             if (method.Name == "Read" && !reentered)
             {
                 reentered = true;

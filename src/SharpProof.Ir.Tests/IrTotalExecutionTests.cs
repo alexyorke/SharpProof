@@ -475,9 +475,10 @@ public sealed class IrTotalExecutionTests
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, argument);
         builder.Call(entry, factory.CreateOperation(), null, member, factory.Variable(owner), factory.Variable(argument));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var initialBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (!missing)
-        { initial = initial.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        { initialBuilder.Add(owner, factory.CreateNullValue(factory.ObjectType)); }
+        var initial = initialBuilder.ToImmutable();
         var hostCalls = 0;
         IrValue? Host(IrCallInstruction call, IrValue? receiver, ImmutableArray<IrValue> arguments)
         { System.ArgumentNullException.ThrowIfNull(call, nameof(call)); if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } hostCalls++; return factory.CreateIntegerValue(0); }
@@ -589,12 +590,13 @@ public sealed class IrTotalExecutionTests
             builder.Load(entry, site, value, location);
         }
         builder.Return(entry, factory.CreateOperation());
-        var initial = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var initialBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (receiverKind != "missing")
         {
-            initial = initial.Add(receiver, receiverKind == "null" ? factory.CreateNullValue(factory.ObjectType)
+            initialBuilder.Add(receiver, receiverKind == "null" ? factory.CreateNullValue(factory.ObjectType)
                 : factory.CreateReferenceValue(factory.ObjectType, new object()));
         }
+        var initial = initialBuilder.ToImmutable();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
             new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(consumed));

@@ -154,7 +154,7 @@ public sealed class FuzzClosedDomainTests
             Assert.That(runtimeCompleted, Is.True);
             Assert.That(runtimeResult, Is.TypeOf<bool>());
             Assert.That(runtimeResult, Is.EqualTo(true));
-            var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+            var scenarioBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
             foreach (var variable in IrTermAnalysis.CollectVariables(lowering.Term))
             {
                 var binding = lowering.Variables.Single(entry => entry.Variable == variable);
@@ -162,9 +162,10 @@ public sealed class FuzzClosedDomainTests
                 var parameter = (IParameterSymbol)binding.Symbol;
                 Assert.That(parameter.Ordinal, Is.Zero);
                 Assert.That(parameter.Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
-                scenario = scenario.Add(variable,
+                scenarioBuilder.Add(variable,
                     factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, (long)arguments[parameter.Ordinal]!));
             }
+            var scenario = scenarioBuilder.ToImmutable();
             var evaluated = new IrInterpreter(factory).Evaluate(lowering.Term, scenario);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
             Assert.That(evaluated.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.OpaqueTerm));

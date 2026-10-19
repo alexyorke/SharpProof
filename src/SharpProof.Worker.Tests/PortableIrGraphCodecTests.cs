@@ -1012,23 +1012,20 @@ public sealed class PortableIrGraphCodecTests
         };
         if (kind == DeepGraphKind.Types)
         {
-            var types = graph.Types;
-            types = types.AddRange(Enumerable.Repeat<PortableIrType>(null!, depth));
-            graph = graph with { Types = types };
-            for (var index = 4; index < graph.Types.Length; index++)
+            var types = graph.Types.ToBuilder();
+            types.AddRange(Enumerable.Repeat<PortableIrType>(null!, depth));
+            for (var index = 4; index < types.Count; index++)
             {
-                graph = graph with
+                types[index] = new PortableIrType
                 {
-                    Types = graph.Types.SetItem(index, new PortableIrType
-                    {
-                        Kind = IrTypeKind.Sequence,
-                        Name = $"sequence-{index}",
-                        Element = index == graph.Types.Length - 1
-                        ? cyclic ? 4 : 0
-                        : index + 1
-                    })
+                    Kind = IrTypeKind.Sequence,
+                    Name = $"sequence-{index}",
+                    Element = index == types.Count - 1
+                    ? cyclic ? 4 : 0
+                    : index + 1
                 };
             }
+            graph = graph with { Types = types.ToImmutable() };
             graph = graph with { Variables = [new PortableIrVariable("deep", 4)] };
             graph = graph with
             {
@@ -1042,29 +1039,27 @@ public sealed class PortableIrGraphCodecTests
         }
         else
         {
-            graph = graph with { Terms = Enumerable.Repeat<PortableIrTerm>(null!, depth).ToImmutableArray() };
-            for (var index = 0; index < graph.Terms.Length; index++)
+            var terms = ImmutableArray.CreateBuilder<PortableIrTerm>(depth);
+            terms.AddRange(Enumerable.Repeat<PortableIrTerm>(null!, depth));
+            for (var index = 0; index < terms.Count; index++)
             {
-                graph = graph with
+                terms[index] = index == terms.Count - 1 &&
+                !cyclic
+                ? new PortableIrTerm
                 {
-                    Terms = graph.Terms.SetItem(index, index == graph.Terms.Length - 1 &&
-                    !cyclic
-                    ? new PortableIrTerm
-                    {
-                        Kind = IrTermKind.Boolean,
-                        Type = 0,
-                        A = 1
-                    }
-                    : new PortableIrTerm
-                    {
-                        Kind = IrTermKind.Unary,
-                        Type = 0,
-                        A = (int)IrUnaryOperator.Not,
-                        B = index == graph.Terms.Length - 1 ? 0 : index + 1
-                    })
+                    Kind = IrTermKind.Boolean,
+                    Type = 0,
+                    A = 1
+                }
+                : new PortableIrTerm
+                {
+                    Kind = IrTermKind.Unary,
+                    Type = 0,
+                    A = (int)IrUnaryOperator.Not,
+                    B = index == terms.Count - 1 ? 0 : index + 1
                 };
             }
-
+            graph = graph with { Terms = terms.ToImmutable() };
             graph = graph with { Roots = [0] };
         }
         return graph;

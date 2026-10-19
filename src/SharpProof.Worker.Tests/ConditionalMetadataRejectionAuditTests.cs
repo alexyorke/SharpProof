@@ -114,15 +114,16 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, "Producer.cs"), settings.Producer);
         await File.WriteAllTextAsync(Path.Combine(directory, "Subject.cs"), CallerSource);
-        var references = TestMetadataReferences.Platform;
+        var referenceBuilder = TestMetadataReferences.Platform.ToBuilder();
         byte[]? markerBytes = null;
         if (settings.External)
         {
             await File.WriteAllTextAsync(Path.Combine(directory, "Marker.cs"), NestedMarkerSource);
-            markerBytes = await Emit(directory, "marker", CreateCompilation("MarkerProducer", NestedMarkerSource, [], references));
-            references = references.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "marker.dll"),
+            markerBytes = await Emit(directory, "marker", CreateCompilation("MarkerProducer", NestedMarkerSource, [], referenceBuilder.ToImmutable()));
+            referenceBuilder.Add(MetadataReference.CreateFromFile(Path.Combine(directory, "marker.dll"),
                 MetadataReferenceProperties.Assembly.WithAliases(MarkerAliases)));
         }
+        var references = referenceBuilder.ToImmutable();
         var producer = CreateCompilation("LogProducer", settings.Producer, [], references);
         var originalBytes = await Emit(directory, "original-producer", producer);
         var sourceLog = producer.GetTypeByMetadataName("Sink")!.GetMembers("Log").OfType<IMethodSymbol>().Single();
@@ -483,14 +484,16 @@ public sealed class ConditionalMetadataRejectionAuditTests
         await File.WriteAllBytesAsync(producerPath, producerBytes);
         var prior = MetadataReference.CreateFromFile(producerPath,
             MetadataReferenceProperties.Assembly.WithAliases(PriorAliases));
-        var references = TestMetadataReferences.Platform.Add(prior);
+        var referenceBuilder = TestMetadataReferences.Platform.ToBuilder();
+        referenceBuilder.Add(prior);
         if (markerBytes != null)
         {
             var markerPath = Path.Combine(output, "marker.dll");
             await File.WriteAllBytesAsync(markerPath, markerBytes);
-            references = references.Add(MetadataReference.CreateFromFile(markerPath,
+            referenceBuilder.Add(MetadataReference.CreateFromFile(markerPath,
                 MetadataReferenceProperties.Assembly.WithAliases(MarkerAliases)));
         }
+        var references = referenceBuilder.ToImmutable();
         var compilation = CreateCompilation("MetadataCaller", CallerSource, symbols, references);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();

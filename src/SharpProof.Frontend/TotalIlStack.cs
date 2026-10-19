@@ -25,7 +25,9 @@ internal static class TotalIlStack
                 instruction.Code.StartsWith("B", StringComparison.Ordinal) && (instruction.Target < 0 || instruction.Target >= code.Length))
             { return false; }
         }
-        shapes = shapes.SetItem(0, ImmutableArray<TotalIlStackType>.Empty);
+        var shapeBuilder = shapes.ToBuilder();
+        shapeBuilder[0] = ImmutableArray<TotalIlStackType>.Empty;
+        shapes = shapeBuilder.ToImmutable();
         var pending = ImmutableQueue<int>.Empty.Enqueue(0);
         while (!pending.IsEmpty)
         {
@@ -51,10 +53,10 @@ internal static class TotalIlStack
                     }
                     var joined = merged.ToImmutable();
                     if (!previous.SequenceEqual(joined))
-                    { shapes = shapes.SetItem(target, joined); pending = pending.Enqueue(target); }
+                    { shapeBuilder[target] = joined; shapes = shapeBuilder.ToImmutable(); pending = pending.Enqueue(target); }
                 }
                 else
-                { shapes = shapes.SetItem(target, stack.ToImmutable()); pending = pending.Enqueue(target); }
+                { shapeBuilder[target] = stack.ToImmutable(); shapes = shapeBuilder.ToImmutable(); pending = pending.Enqueue(target); }
             }
         }
         return shapes.All(shape => shape != null);

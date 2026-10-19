@@ -147,18 +147,18 @@ public static class IrSubstitution
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        var replacementMap = ImmutableDictionary<IrVarId, IrTerm>.Empty;
-        var replacementOrder = ImmutableList<KeyValuePair<IrVarId, IrTerm>>.Empty;
+        var replacementMap = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        var replacementOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrTerm>>();
         foreach (var replacement in replacements)
         {
             if (replacementMap.ContainsKey(replacement.Key))
             {
                 throw new ArgumentException("An item with the same key has already been added. Key: " + replacement.Key);
             }
-            replacementMap = replacementMap.Add(replacement.Key, replacement.Value);
-            replacementOrder = replacementOrder.Add(replacement);
+            replacementMap.Add(replacement.Key, replacement.Value);
+            replacementOrder.Add(replacement);
         }
-        foreach (var replacement in replacementOrder)
+        foreach (var replacement in replacementOrder.ToImmutable())
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             ArgumentNullGuard.NotNull(replacement.Value, nameof(replacements));
@@ -171,7 +171,7 @@ public static class IrSubstitution
             }
         }
 
-        return replacementMap;
+        return replacementMap.ToImmutable();
     }
 
     /// <summary>
@@ -280,8 +280,7 @@ public static class IrSubstitution
         public IrTerm Visit(IrOpaqueTerm opaque, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             var receiver = IrSubstitution.VisitNullable(state.Memo, opaque.Receiver);
-            var arguments = opaque.Arguments;
-            var argumentsChanged = false;
+            ImmutableArray<IrTerm>.Builder? argumentBuilder = null;
             for (var index = 0; index < opaque.Arguments.Length; index++)
             {
                 var argument = IrSubstitution.Visit(state.Memo, opaque.Arguments[index]);
@@ -290,16 +289,17 @@ public static class IrSubstitution
                     continue;
                 }
 
-                arguments = arguments.SetItem(index, argument);
-                argumentsChanged = true;
+                argumentBuilder ??= opaque.Arguments.ToBuilder();
+                argumentBuilder[index] = argument;
             }
 
             if (ReferenceEquals(receiver, opaque.Receiver) &&
-                !argumentsChanged)
+                argumentBuilder is null)
             {
                 return opaque;
             }
 
+            var arguments = argumentBuilder?.ToImmutable() ?? opaque.Arguments;
             return state.Factory.RebuildOpaque(
                 opaque.Member, receiver, arguments, opaque.Purity, opaque.Operation);
         }

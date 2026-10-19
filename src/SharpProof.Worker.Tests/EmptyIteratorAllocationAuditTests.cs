@@ -485,7 +485,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = ImmutableList<IlInstruction>.Empty;
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -503,11 +503,11 @@ public sealed class EmptyIteratorAllocationAuditTests
                 _ => 4
             };
             var called = opcode.OperandType == OperandType.InlineMethod ? method.Module.ResolveMethod(BitConverter.ToInt32(body, offset)) : null;
-            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)), called?.MetadataToken,
                 called?.Module.ModuleVersionId, called?.DeclaringType?.FullName, called?.DeclaringType?.MetadataToken, called?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), [.. instructions]);
+        return new(method.MetadataToken, Convert.ToHexStringLower(body), instructions.ToImmutable());
     }
 
     private static object DiagnosticObservation(Diagnostic diagnostic)

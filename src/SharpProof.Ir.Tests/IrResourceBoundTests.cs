@@ -57,29 +57,31 @@ public sealed class IrResourceBoundTests
         var heap = new IrHeap();
         heap.StoreElement(sequence, 0, factory.CreateIntegerValue(7));
         var choice = factory.CreateVariable("choice", factory.BooleanType);
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(choice, factory.CreateBooleanValue(chooseFirst));
-        var leaves = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        valueBuilder[choice] = factory.CreateBooleanValue(chooseFirst);
+        var leafBuilder = ImmutableArray.CreateBuilder<IrTerm>();
         IrVarId first = default;
         for (var index = 0; index < leafCount; index++)
         {
             var variable = factory.CreateVariable("owner" + index, type);
             if (index == 0)
             { first = variable; }
-            values = values.Add(variable, sequence);
-            leaves = leaves.Add(factory.Variable(variable));
+            valueBuilder.Add(variable, sequence);
+            leafBuilder.Add(factory.Variable(variable));
         }
 
-        while (leaves.Count > 1)
+        var leaves = leafBuilder.ToImmutable();
+        while (leaves.Length > 1)
         {
-            var next = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
-            for (var index = 0; index < leaves.Count; index += 2)
+            var next = ImmutableArray.CreateBuilder<IrTerm>();
+            for (var index = 0; index < leaves.Length; index += 2)
             {
-                next = next.Add(factory.Conditional(factory.Variable(choice), leaves[index], leaves[index + 1]));
+                next.Add(factory.Conditional(factory.Variable(choice), leaves[index], leaves[index + 1]));
             }
-            leaves = next;
+            leaves = next.ToImmutable();
         }
 
         return (new IrInterpreter(factory), factory.SequenceAccess(leaves[0], factory.Integer(0)),
-            values, heap, first);
+            valueBuilder.ToImmutable(), heap, first);
     }
 }

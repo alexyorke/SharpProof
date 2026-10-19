@@ -465,7 +465,7 @@ public sealed class CompositionalLongFuzzTests
             var state = type.GetField("State")!;
             var writes = type.GetField("Writes")!;
             var method = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
-            var runs = ImmutableList<Observation>.Empty;
+            var runs = ImmutableArray.CreateBuilder<Observation>();
             foreach (var input in inputs)
             {
                 state.SetValue(null, 0);
@@ -480,9 +480,9 @@ public sealed class CompositionalLongFuzzTests
                 {
                     exceptionName = exception.InnerException!.GetType().FullName;
                 }
-                runs = runs.Add(new(input, value, exceptionName, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
+                runs.Add(new(input, value, exceptionName, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
             }
-            return new([.. runs], null);
+            return new(runs.ToImmutable(), null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

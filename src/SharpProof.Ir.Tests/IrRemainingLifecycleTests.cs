@@ -129,24 +129,27 @@ public sealed class IrRemainingLifecycleTests
         var heap = new IrHeap();
         heap.Fields[(value.Reference, field)] = factory.CreateIntegerValue(7);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
-        var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(flag, factory.CreateBooleanValue(true));
-        var leaves = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
+        var inputBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        inputBuilder[flag] = factory.CreateBooleanValue(true);
+        var leafBuilder = ImmutableArray.CreateBuilder<IrTerm>();
         var first = factory.CreateVariable("first", factory.ObjectType);
-        inputs = inputs.Add(first, value);
-        leaves = leaves.Add(factory.Variable(first));
+        inputBuilder.Add(first, value);
+        leafBuilder.Add(factory.Variable(first));
         for (var index = 1; index < 2048; index++)
         {
             var owner = factory.CreateVariable("owner" + index, factory.ObjectType);
-            inputs = inputs.Add(owner, value);
-            leaves = leaves.Add(factory.Variable(owner));
+            inputBuilder.Add(owner, value);
+            leafBuilder.Add(factory.Variable(owner));
         }
-        while (leaves.Count > 1)
+        var leaves = leafBuilder.ToImmutable();
+        while (leaves.Length > 1)
         {
-            var next = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
-            for (var index = 0; index < leaves.Count; index += 2)
-            { next = next.Add(factory.Conditional(factory.Variable(flag), leaves[index], leaves[index + 1])); }
-            leaves = next;
+            var next = ImmutableArray.CreateBuilder<IrTerm>();
+            for (var index = 0; index < leaves.Length; index += 2)
+            { next.Add(factory.Conditional(factory.Variable(flag), leaves[index], leaves[index + 1])); }
+            leaves = next.ToImmutable();
         }
+        var inputs = inputBuilder.ToImmutable();
         var interpreter = new IrInterpreter(factory);
         var valid = interpreter.Evaluate(factory.PureOpaque(field, factory.Variable(first)), inputs, null, heap, default, [first]);
         Assert.That(valid.Value!.Integer, Is.EqualTo(3));

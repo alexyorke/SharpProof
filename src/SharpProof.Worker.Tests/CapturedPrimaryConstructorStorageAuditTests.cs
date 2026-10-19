@@ -509,7 +509,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
-        var instructions = ImmutableList<IlInstruction>.Empty;
+        var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var offset = 0; offset < body.Length;)
         {
             var start = offset;
@@ -527,11 +527,11 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 _ => 4
             };
             FieldInfo? field = opcode.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(body, offset)) : null;
-            instructions = instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
+            instructions.Add(new(start, opcode.Name!, Convert.ToHexStringLower(body.AsSpan(offset, size)),
                 field?.MetadataToken, field?.Module.ModuleVersionId, field?.DeclaringType?.FullName, field?.Name));
             offset += size;
         }
-        return new(method.MetadataToken, Convert.ToHexStringLower(body), [.. instructions]);
+        return new(method.MetadataToken, Convert.ToHexStringLower(body), instructions.ToImmutable());
     }
 
     private static IEnumerable<IOperation> Walk(IOperation operation)

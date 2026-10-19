@@ -88,7 +88,7 @@ public sealed class ProofKernel(ISmtBackend backend)
         }
 
         var justifications = ImmutableArray.CreateBuilder<ProofJustification>();
-        var seen = ImmutableHashSet<int>.Empty;
+        var seen = ImmutableHashSet.CreateBuilder<int>();
         foreach (var index in result.UnsatCore)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -97,12 +97,11 @@ public sealed class ProofKernel(ISmtBackend backend)
                 return Unknown(AbstentionReason.MalformedBackendResult);
             }
 
-            if (seen.Contains(index))
+            if (!seen.Add(index))
             {
                 continue;
             }
 
-            seen = seen.Add(index);
             justifications.Add(query.Assumptions[index].Justification);
         }
         return new ProvenOutcome(justifications.ToImmutable());

@@ -133,8 +133,9 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var tokens = symbol.Parameters.Where(parameter =>
-            SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)).ToImmutableArray();
+        var tokenBuilder = ImmutableArray.CreateBuilder<IParameterSymbol>();
+        tokenBuilder.AddRange(symbol.Parameters.Where(parameter =>
+            SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
         if (isLocalFunction && !modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.StaticKeyword)))
         {
             foreach (var ancestor in declaration.Ancestors())
@@ -146,7 +147,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
 
                 if (context.SemanticModel.GetDeclaredSymbol(ancestor, context.CancellationToken) is IMethodSymbol enclosing)
                 {
-                    tokens = tokens.AddRange(enclosing.Parameters.Where(parameter =>
+                    tokenBuilder.AddRange(enclosing.Parameters.Where(parameter =>
                         SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
                 }
                 if (ancestor is MethodDeclarationSyntax ||
@@ -158,6 +159,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             }
         }
 
+        var tokens = tokenBuilder.ToImmutable();
         if (tokens.IsEmpty)
         {
             if (isLocalFunction || !IsFixedSignature(symbol, context.Compilation, context.CancellationToken))

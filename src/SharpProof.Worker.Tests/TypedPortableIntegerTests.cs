@@ -15,8 +15,8 @@ public sealed class TypedPortableIntegerTests
     public void RoundTripPreservesWidthSignednessBitsAndOperators()
     {
         var factory = new IrFactory();
-        var roots = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
-        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var rootBuilder = ImmutableArray.CreateBuilder<IrTerm>();
+        var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
             foreach (var isSigned in ImmutableArray.Create(false, true))
@@ -24,13 +24,15 @@ public sealed class TypedPortableIntegerTests
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
                 var variable = factory.CreateVariable($"input{width}{isSigned}", type);
-                values = values.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
-                roots = roots.Add(factory.IntegerBits(type, mask));
-                roots = roots.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots = roots.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
-                roots = roots.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
+                valueBuilder.Add(variable, factory.CreateIntegerValueFromBits(type, mask));
+                rootBuilder.Add(factory.IntegerBits(type, mask));
+                rootBuilder.Add(factory.Binary(IrBinaryOperator.Add, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                rootBuilder.Add(factory.Binary(IrBinaryOperator.LessThan, factory.Variable(variable), factory.IntegerBits(type, 1)));
+                rootBuilder.Add(factory.Cast(factory.GetOrCreateIntegerType(32, true), factory.Variable(variable)));
             }
         }
+        var roots = rootBuilder.ToImmutable();
+        var values = valueBuilder.ToImmutable();
         var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var json = JsonSerializer.Serialize(encoded.Graph, WorkerProtocolJson.SharedOptions);
         var decoded = PortableIrGraphCodec.Decode(JsonSerializer.Deserialize<PortableIrGraph>(
@@ -40,7 +42,7 @@ public sealed class TypedPortableIntegerTests
             pair => decoded.Factory.CreateIntegerValueFromBits(
                 decoded.Factory.GetVariableInfo(decoded.Variables[pair.Value]).Type,
                 values[pair.Key].IntegerBits));
-        for (var index = 0; index < roots.Count; index++)
+        for (var index = 0; index < roots.Length; index++)
         {
             var expected = new IrInterpreter(factory).Evaluate(roots[index], values);
             var actual = new IrInterpreter(decoded.Factory).Evaluate(decoded.Roots[index], decodedValues);

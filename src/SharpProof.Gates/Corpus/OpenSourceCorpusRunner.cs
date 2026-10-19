@@ -333,11 +333,12 @@ internal static class OpenSourceCorpusRunner
         System.ArgumentNullException.ThrowIfNull(method);
         System.ArgumentNullException.ThrowIfNull(targets);
         method = method.PartialImplementationPart ?? method;
-        var references = method.DeclaringSyntaxReferences;
+        var referenceBuilder = method.DeclaringSyntaxReferences.ToBuilder();
         if (method.PartialDefinitionPart is { } definition)
         {
-            references = references.AddRange(definition.DeclaringSyntaxReferences);
+            referenceBuilder.AddRange(definition.DeclaringSyntaxReferences);
         }
+        var references = referenceBuilder.ToImmutable();
         return [.. references
             .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (new TargetKey(reference.SyntaxTree, reference.Span.Start)))
             .Where(targets.ContainsKey)

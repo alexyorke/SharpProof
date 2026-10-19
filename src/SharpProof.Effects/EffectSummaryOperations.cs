@@ -213,7 +213,7 @@ internal static class EffectSummaryOperations
         }
 
         RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
-        var mappedRegions = ImmutableList<EffectRegionId>.Empty;
+        var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>();
         var hasUnknown = false;
         foreach (var region in regions.Regions)
         {
@@ -230,13 +230,13 @@ internal static class EffectSummaryOperations
             }
             else
             {
-                mappedRegions = mappedRegions.AddRange(mapped.Regions);
+                mappedRegions.AddRange(mapped.Regions);
             }
         }
 
         return hasUnknown
             ? EffectRegionSet.Unknown
-            : EffectRegionSet.Create(mappedRegions);
+            : EffectRegionSet.Create(mappedRegions.ToImmutable());
     }
 
     private static EffectSummary Create(

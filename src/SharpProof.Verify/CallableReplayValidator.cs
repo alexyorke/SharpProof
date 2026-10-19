@@ -3,7 +3,7 @@ namespace SharpProof.Verify;
 internal static class CallableReplayValidator
 {
     internal static bool EntryConstraintsHold(IrFactory factory, ImmutableArray<IrTerm> constraints,
-        IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
+        ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
 
         RepositoryParameterGuard.RequireInitialized(constraints.IsDefault, nameof(constraints), "Array must be initialized.");
@@ -39,8 +39,8 @@ internal static class CallableReplayValidator
     {
         if (!EntryConstraintsHold(factory, context.EntryConstraints, model, cancellationToken))
         { return AbstentionReason.CounterexampleReplayFailed; }
-        var final = model;
-        var approximationVariables = ImmutableHashSet<IrVarId>.Empty;
+        var finalBuilder = model.ToBuilder();
+        var approximationBuilder = ImmutableHashSet.CreateBuilder<IrVarId>();
         IrHeap? heap = null;
         if (!context.IsTrivial)
         {
@@ -85,11 +85,11 @@ internal static class CallableReplayValidator
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                final = final.SetItem(binding.Value, GetRequiredValue(execution.Values, binding.Key));
-                approximationVariables = approximationVariables.Remove(binding.Value);
+                finalBuilder[binding.Value] = GetRequiredValue(execution.Values, binding.Key);
+                approximationBuilder.Remove(binding.Value);
                 if (execution.ApproximationVariables.Contains(binding.Key))
                 {
-                    approximationVariables = approximationVariables.Add(binding.Value);
+                    approximationBuilder.Add(binding.Value);
                 }
             }
             if (context.ResultVariables.Length > 1 ||
@@ -102,8 +102,8 @@ internal static class CallableReplayValidator
             }
             if (context.ResultVariables.Length == 1)
             {
-                final = final.SetItem(context.ResultVariables[0], execution.ReturnValue!);
-                approximationVariables = approximationVariables.Remove(context.ResultVariables[0]);
+                finalBuilder[context.ResultVariables[0]] = execution.ReturnValue!;
+                approximationBuilder.Remove(context.ResultVariables[0]);
             }
         }
         else if (context.Program != null || !context.ParameterBindings.IsEmpty ||
@@ -119,9 +119,11 @@ internal static class CallableReplayValidator
             {
                 return AbstentionReason.CounterexampleReplayFailed;
             }
-            final = final.SetItem(binding.Key, value);
-            approximationVariables = approximationVariables.Remove(binding.Key);
+            finalBuilder[binding.Key] = value;
+            approximationBuilder.Remove(binding.Key);
         }
+        var final = finalBuilder.ToImmutable();
+        var approximationVariables = approximationBuilder.ToImmutable();
         foreach (var domain in context.IntegerDomains)
         {
             cancellationToken.ThrowIfCancellationRequested();

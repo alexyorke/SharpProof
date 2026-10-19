@@ -22,9 +22,10 @@ public sealed class PassiveExceptionLoopTests
         Assert.That(actual.ConsumedApproximation, Is.False);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var allowed = System.Collections.Immutable.ImmutableHashSet.Create(IrExceptionKind.Overflow);
+        var allowedBuilder = System.Collections.Immutable.ImmutableHashSet.Create(IrExceptionKind.Overflow).ToBuilder();
         if (allowDivision)
-        { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
+        { allowedBuilder.Add(IrExceptionKind.DivideByZero); }
+        var allowed = allowedBuilder.ToImmutable();
         var result = await solver.VerifyExceptionsAsync(allowed, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, allowDivision ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         if (!allowDivision)
