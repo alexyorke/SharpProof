@@ -3275,6 +3275,7 @@ Cache indexers preserve SetItem overwrite semantics and partial classification t
 Session configuration properties and mutable budget/result flags remain separate scope.
 Validate source-session reentry, source/IL recursion, budgets and initialization coverage.
 Status: open before edits.
+
 IMM-M107: Main reviewed all declaration classifier collection construction. Use array
 builders for ordered results, safe/unsafe spans and per-line tokens, and an integer map
 builder while accumulating. Freeze spans and each nested token value before filtering;
@@ -3282,14 +3283,18 @@ retain the valid-syntax short circuit, sorted unique output line numbers, duplic
 request paths and request order. Publish immutable result/line arrays to JSON. Compare
 baseline/current classifier outputs through the canonical PS helper, including invalid
 syntax, primary constructors, executable initializers and duplicate ordered requests.
-Status: open before edits.IMM-M108: Main verified every session-policy assignment. OpaqueCalls, OpaqueEffects,
+Status: open before edits.
+
+IMM-M108: Main verified every session-policy assignment. OpaqueCalls, OpaqueEffects,
 ApproximateElementReads and PinElementReads are configured only before lowering or
 in two test constructors. Append optional constructor/factory arguments and expose
 get-only properties. Preserve null callback fallback and deferred callback invocation,
 factory parameter guard timing and fresh per-pass session policy. Update the production
 factory call and test constructors; validate full Frontend plus Worker source-call paths.
 TotalLoweringContext phase/model state requires separate analysis, not blind init setters.
-Status: open before edits.IMM-M109: Package runner argv construction has eight collection appends and three
+Status: open before edits.
+
+IMM-M109: Package runner argv construction has eight collection appends and three
 scalar timing additions. Use scoped string builders for both prerequisite builds and
 per-shard direct/project arguments, immutable build descriptors after construction,
 and an immediate immutable snapshot of coverage-helper native output. Preserve build
@@ -3297,7 +3302,9 @@ order, fast flag, isolated OutDir position, exclusive/direct selection, coverage
 DOTNET_HOST_PATH and native adapters. Keep timing/scheduler/environment mutations.
 Compare extracted baseline/current blocks for direct, exclusive, coverage, empty/null
 and Debug/Release/Fast combinations before the real package workflow.
-Status: open before edits.IMM-M110: Main traced nine TotalLoweringContext private collection roots across every
+Status: open before edits.
+
+IMM-M110: Main traced nine TotalLoweringContext private collection roots across every
 partial file. Convert local/capture maps, concatenation operands, this/field/storage
 captures, specification exclusions, exact continuation cache and assumptions to readonly
 builders. No root escapes; variables/captures/entry assumptions already publish immutable
@@ -3305,14 +3312,18 @@ snapshots. Retain symbol/default comparers, strict AddUnique, overwrite/idempote
 semantics and local order. Preserve add/remove before cache clear, cache clear before
 graph/compilation reassignment, and assumption clear before entry-assumption clear.
 Validate full Frontend and specification reuse/capture/concatenation ownership controls.
-Status: open before edits.IMM-M111: SourceCallFrame.Entry is assigned once at the CFG entry creation point.
+Status: open before edits.
+
+IMM-M111: SourceCallFrame.Entry is assigned once at the CFG entry creation point.
 Make it a validated get-only constructor input and pass a frame factory through
 LowerSharedFrame into LowerCore. Invoke it only after the existing entry block creation,
 after cancellation/preflight/model capture and construction limits, retaining _calls.Enter
 and finally Leave, callback bodies, caller budget/continued block order and top-level
 SetEntry behavior. No frame-dependent code runs before that point. Validate composed
 source exception/filter, session reentry, construction-budget and cancellation paths.
-Status: open before edits.IMM-M107 verified: five baseline/current canonical classifier probes pass ordered and
+Status: open before edits.
+
+IMM-M107 verified: five baseline/current canonical classifier probes pass ordered and
 duplicate requests, invalid syntax, primary-constructor executable boundaries and exact
 JSON publication. Independent six-site review is clean; whitespace requires no changes.
 Raw/interpolated literal checkpoint verifies 3,219 text tokens in 736 changed C# files.
@@ -3321,3 +3332,12 @@ IMM-M102-M105 live Release gate is not yet complete. Worker compiler/core/claim/
 shards pass 48/240/88/4,322 tests; heavy shard passes 928 and fails one golden
 vc-shadow-core assertion after MethodTimeout (expected proof). Isolated reproduction
 is pending; this is not a clean full-gate result and the cause is not established.
+
+IMM-M112: Main traced four private exact-list/default-dictionary ownership sets and
+all uses, including FreshCollections local aliases and the IsKnownList helper. Use
+readonly symbol/CaptureId builders and mutate the chosen builder at each former
+publication point, preserving partial traversal state and parameter specialization.
+Narrow IsKnownList to private builder parameters; no collection escapes. Keep escape
+queues/LIFO traversals, order sidecars, domain exclusions and work counters unchanged.
+Validate list/dictionary domain, source capture and receiver ownership through Frontend.
+Status: open before edits.
