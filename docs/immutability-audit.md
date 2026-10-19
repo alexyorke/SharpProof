@@ -3787,3 +3787,18 @@ check/run vectors preserve JSON arrays, and the explicit measure adapter is nece
 A minimal actual two-run campaign is planned after this commit to verify native runner
 integration and clean-source evidence publication; external Doctor configuration remains
 an open nested-record scope rather than a claimed deep immutable projection.
+
+IMM-M144 actual workflow verified: the canonical private-clone campaign at committed
+source 7517e5819 ran rotating seed17 and retained seed23063 with one case each.
+Both native runner records passed validation; campaign.json reports passed=true,
+requestedCases=2 and totalCases=2. Build/rebuild succeeded with zero warnings/errors.
+Evidence is exported under artifacts/immutability-m144-campaign. This validates the
+readonly records through the actual scheduler, encoded native runner, sum aggregation,
+JSON publication and clean-source receipt, beyond fragment controls.
+IMM-M145: Migrate twenty Package integration construction scopes across five files:
+immutable packaged-analyzer item vectors and private coupled helpers, serial loader
+observations, scoped command argv builders, an atomic ordinal-ignore-case loader cache
+with a live resolver, strict framework artifact map and four environment snapshots.
+Preserve native process/environment objects, dynamic dependency registration visibility,
+last-write-wins cache behavior and argument/JSON ordering. Validate package workflow.
+Status: planned before edits.
