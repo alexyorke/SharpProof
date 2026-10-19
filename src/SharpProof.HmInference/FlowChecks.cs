@@ -37,8 +37,8 @@ internal static class FlowChecks
             ("TupleDiscardReassign", "static int M((int,bool) pair,int x) { (x,_)=pair; return x; }", "Suggestion", "T1 M<T1, T2>((T1, T2) pair, T1 x)"),
             ("VoidCall", "static int M(int x) { Consume(x); return x; } static void Consume<T>(T x) {}", "Suggestion", "T1 M<T1>(T1 x)"),
             ("EmptyStatements", "static int M(int x) { ; { ; } return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
-            ("BreakStillSkipped", "static int M(int x) { while(true) { break; } return x; }", "Skipped", null),
-            ("ContinueStillSkipped", "static int M(int x) { for(var i=0;i<1;i++) continue; return x; }", "Skipped", null),
+            ("BreakLoop", "static int M(int x) { while(true) { break; } return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
+            ("ContinueLoop", "static int M(int x) { for(var i=0;i<1;i++) continue; return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("EnumerableStillSkipped", "static int M(System.Collections.Generic.List<int> xs,int seed) { foreach(var x in xs) seed=x; return seed; }", "Skipped", null),
             ("InfiniteLoopReturn", "static int M(int x) { while(true) return x; }", "Skipped", null),
             ("PropertyWriteSkipped", "static int M(System.Text.StringBuilder builder,int x) { builder.Length=x; return x; }", "Skipped", null)

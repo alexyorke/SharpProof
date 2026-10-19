@@ -1,0 +1,37 @@
+static class ExitSamples
+{
+    public static int Select(int tag, int left, int right)
+    {
+        switch (tag) { case 0: return left; default: return right; }
+    }
+    public static int SkipFirst(int count, int seed, int value)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            switch (i) { case 0: continue; default: break; }
+            seed = value;
+        }
+        return seed;
+    }
+    public static int TakeOnce(int count, int seed, int value)
+    {
+        for (var i = 0; i < count; i++) { if (i > 0) break; seed = value; }
+        return seed;
+    }
+    public static int LastTuple((int, bool)[] values, int seed)
+    {
+        foreach (var (value, _) in values) seed = value;
+        return seed;
+    }
+    public static int Guard(bool fail, int value)
+    {
+        if (fail) throw new System.InvalidOperationException();
+        return value;
+    }
+    public static int CheckedIncrement(int value, bool ignored)
+    {
+        checked { value++; }
+        return value;
+    }
+    public static int ThrowExpression(bool fail, int value) => fail ? throw new System.InvalidOperationException() : value;
+}

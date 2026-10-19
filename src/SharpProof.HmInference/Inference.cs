@@ -107,12 +107,12 @@ public static class Inference
         private HmType Block(BlockSyntax block)
         {
             var flow = Scoped(() => Statements(block.Statements.ToArray()));
-            if (flow.FallsThrough || flow.ReturnType is null)
+            if (flow.FallsThrough || flow.Breaks || flow.Continues)
                 throw new InferenceException("Body has no structurally complete value return.");
-            return flow.ReturnType;
+            return flow.ReturnType ?? HmType.Variable();
         }
 
-        private readonly record struct Flow(HmType? ReturnType = null, bool FallsThrough = true);
+        private readonly record struct Flow(HmType? ReturnType, bool FallsThrough, bool Breaks = false, bool Continues = false);
 
         private Flow Scoped(Func<Flow> analyze)
         {
@@ -128,6 +128,8 @@ public static class Inference
         {
             HmType? returns = null;
             var fallsThrough = true;
+            var breaks = false;
+            var continues = false;
             for (var index = 0; index < statements.Length; index++)
             {
                 if (!fallsThrough) throw new InferenceException("Unreachable statements are unsupported.");
@@ -155,15 +157,16 @@ public static class Inference
                         var yes = Branch(conditional.Statement);
                         var no = conditional.Else is not null ? Branch(conditional.Else.Statement)
                             : new Flow(null, true);
-                        flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough);
+                        flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough,
+                            yes.Breaks || no.Breaks, yes.Continues || no.Continues);
                         break;
                     case BlockSyntax nested: flow = Scoped(() => Statements(nested.Statements.ToArray())); break;
                     case WhileStatementSyntax loop:
                         HmType.Unify(Expression(loop.Condition), new("bool"));
-                        flow = Branch(loop.Statement) with { FallsThrough = true };
+                        flow = LoopFlow(Branch(loop.Statement));
                         break;
                     case DoStatementSyntax loop:
-                        flow = Branch(loop.Statement) with { FallsThrough = true };
+                        flow = LoopFlow(Branch(loop.Statement));
                         HmType.Unify(Expression(loop.Condition), new("bool"));
                         break;
                     case ForStatementSyntax loop:
@@ -174,7 +177,7 @@ public static class Inference
                             if (loop.Condition is not null) HmType.Unify(Expression(loop.Condition), new("bool"));
                             var body = Branch(loop.Statement);
                             foreach (var increment in loop.Incrementors) Expression(increment);
-                            return body with { FallsThrough = true };
+                            return LoopFlow(body);
                         });
                         break;
                     case ForEachStatementSyntax loop when loop.AwaitKeyword == default:
@@ -192,16 +195,77 @@ public static class Inference
                                 iteration = CSharpTypes.Rigid(model.GetTypeInfo(loop.Type, cancellationToken).Type!);
                             }
                             environment.Add(model.GetDeclaredSymbol(loop, cancellationToken)!, iteration);
-                            return Branch(loop.Statement) with { FallsThrough = true };
+                            return LoopFlow(Branch(loop.Statement));
                         });
+                        break;
+                    case ForEachVariableStatementSyntax loop when loop.AwaitKeyword == default:
+                        flow = Scoped(() =>
+                        {
+                            var source = model.GetTypeInfo(loop.Expression, cancellationToken).Type as IArrayTypeSymbol
+                                ?? throw new InferenceException("Only array foreach deconstruction is supported.");
+                            if (source.ElementType is not INamedTypeSymbol { IsTupleType: true })
+                                throw new InferenceException("Only tuple array elements can be deconstructed.");
+                            var element = HmType.Variable();
+                            HmType.Unify(Expression(loop.Expression), new("[" + new string(',', source.Rank - 1) + "]", element));
+                            BindDeconstruction(loop.Variable, element, source.ElementType);
+                            return LoopFlow(Branch(loop.Statement));
+                        });
+                        break;
+                    case BreakStatementSyntax: flow = new(null, false, Breaks: true); break;
+                    case ContinueStatementSyntax: flow = new(null, false, Continues: true); break;
+                    case SwitchStatementSyntax switched: flow = Switch(switched); break;
+                    case CheckedStatementSyntax checkedStatement:
+                        flow = Scoped(() => Statements(checkedStatement.Block.Statements.ToArray()));
+                        break;
+                    case ThrowStatementSyntax { Expression: not null } thrown:
+                        Anchor(thrown.Expression);
+                        flow = new(null, false);
                         break;
                     case EmptyStatementSyntax: break;
                     default: throw new InferenceException($"Unsupported statement: {statement.Kind()}.");
                 }
                 returns = MergeReturns(returns, flow.ReturnType);
                 fallsThrough = flow.FallsThrough;
+                breaks |= flow.Breaks;
+                continues |= flow.Continues;
             }
-            return new(returns, fallsThrough);
+            return new(returns, fallsThrough, breaks, continues);
+        }
+
+        private static Flow LoopFlow(Flow body) => new(body.ReturnType, true);
+
+        private Flow Switch(SwitchStatementSyntax statement)
+        {
+            Anchor(statement.Expression);
+            return Scoped(() =>
+            {
+                HmType? returns = null;
+                var hasDefault = false;
+                var fallsThrough = false;
+                var continues = false;
+                foreach (var section in statement.Sections)
+                {
+                    foreach (var label in section.Labels)
+                    {
+                        switch (label)
+                        {
+                            case DefaultSwitchLabelSyntax: hasDefault = true; break;
+                            case CaseSwitchLabelSyntax: break;
+                            case CasePatternSwitchLabelSyntax { Pattern: ConstantPatternSyntax or DiscardPatternSyntax } pattern:
+                                if (pattern.WhenClause is not null) HmType.Unify(Expression(pattern.WhenClause.Condition), new("bool"));
+                                break;
+                            default: throw new InferenceException("Only constant/discard switch labels are supported.");
+                        }
+                    }
+                    // Switch sections share a C# declaration scope. Retain their
+                    // bindings until the entire switch has been analyzed.
+                    var sectionFlow = Statements(section.Statements.ToArray());
+                    returns = MergeReturns(returns, sectionFlow.ReturnType);
+                    fallsThrough |= sectionFlow.FallsThrough || sectionFlow.Breaks;
+                    continues |= sectionFlow.Continues;
+                }
+                return new Flow(returns, !hasDefault || fallsThrough, Continues: continues);
+            });
         }
 
         private static HmType? MergeReturns(HmType? first, HmType? second)
@@ -229,6 +293,9 @@ public static class Inference
             switch (expression)
             {
                 case ParenthesizedExpressionSyntax parentheses: return Expression(parentheses.Expression);
+                case ThrowExpressionSyntax thrown:
+                    Anchor(thrown.Expression);
+                    return HmType.Variable();
                 case AssignmentExpressionSyntax assignment:
                     if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                     {

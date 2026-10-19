@@ -91,6 +91,9 @@ method/local-function declarations supply schemes instantiated per call.
 | Mutable locals/parameters and array-element stores | Keep one monotype per symbol; preserve assignment conversions |
 | Compound assignments and increments | Retain original built-in operand types; skip custom operators |
 | Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
+| Break/continue and traditional switch | Track each exit separately; consume it at the correct loop/switch |
+| Tuple array foreach deconstruction | Bind nested tuple elements, discards and explicit types |
+| Checked/unchecked blocks and throws | Preserve overflow contexts and treat throws as nonreturning exits |
 | Tuple deconstruction declarations | Infer nested tuple bindings and discards; retain explicit element types |
 | Explicit/target-typed object construction | Bind constructor arguments and preserve the selected constructor |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
@@ -132,10 +135,18 @@ its operand is not executed, because the lookup still has to compile.
 Loop analysis accumulates constraints over monomorphic bindings; it does not
 generalize at iteration boundaries or prove termination. Loops conservatively
 fall through, so methods whose only return is inside an infinite loop are skipped.
-Break/continue/goto, foreach over custom enumerables, foreach deconstruction,
-property/field stores and void delegate calls remain unsupported. Ordinary void
+Goto, foreach over custom enumerables, property/field stores and void delegate
+calls remain unsupported. Switch statements support constant labels and guards,
+not declaration/type patterns. Try/catch/finally and rethrow are unsupported.
+Ordinary void
 method calls can appear as expression statements. The standalone HM core remains
 pure; these imperative extensions belong to the C# adapter only.
+
+Break exits are consumed by the nearest loop or switch; continue exits propagate
+through switches to the nearest loop. Throws contribute no return constraint;
+an all-throw body retains declared result information when producing a C# signature.
+The suite exercises nested exit ownership, tuple iteration, thrown exceptions and
+checked overflow versus unchecked wrapping at runtime.
 
 Candidates are checked independently. Applying multiple suggestions requires
 another compile. Public APIs, binary consumers, reflection and external callers
