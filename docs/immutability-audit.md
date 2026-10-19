@@ -3714,3 +3714,10 @@ skips/build warnings/errors; 64 exact embedded PDB outputs. Main and independent
 review confirm all 86 vector/snapshot changes, three strict maps, ordinal hierarchy
 sorting, graph reference identity and native/SUT preservation. Canonical whitespace
 check required zero changes. Seventeen collector rows remain a separate follow-up.
+
+IMM-M142: Replace seventeen Analyzer-test List collectors with scoped immutable
+array builders and explicit snapshots after the final synchronous callback, await,
+walk, source construction or cancellation assertion. Preserve intermediate count
+assertions, callback ordering and source text. Mutable RangeCase.CallLine subjects
+remain separate from their outer input vector, whose necessity is under review.
+Validate all ordinary Analyzer tests after independent review. Status: planned.
