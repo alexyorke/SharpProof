@@ -35,18 +35,24 @@ internal sealed partial class NativeSpecifiedCallTests
             "var data = new System.Collections.Generic.Dictionary<int, decimal> { { 17, 23m } }; return data.Count;", WorkerClaimOutcome.Unknown);
     }
 
-    [Test]
-    public async Task DictionaryConstructorOpaqueValueWriteDoesNotRetainEmptyState()
+    [TestCase(1, WorkerClaimOutcome.Proven)]
+    [TestCase(0, WorkerClaimOutcome.Refuted)]
+    public async Task DictionaryOpaqueValueInsertionUpdatesCountWithoutInterpretingTheValue(int result, WorkerClaimOutcome expected)
     {
         using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { " +
-            "public static int Target<T>(T value) where T : System.IComparable<T> { Contract.Ensures(Contract.Result<int>() == 0); " +
+            "public static int Target<T>(T value) where T : System.IComparable<T> { Contract.Ensures(Contract.Result<int>() == " + result + "); " +
             "var data = new System.Collections.Generic.Dictionary<int, T>(); data.Add(17, value); return data.Count; } }");
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
+        var claim = response.ClaimResults.Single();
+        Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
+        Assert.That(claim.Reason, Is.EqualTo(WorkerClaimReason.None));
+        if (expected == WorkerClaimOutcome.Refuted)
+        { Assert.That(claim.Model, Is.Not.Empty); }
     }
 
     [Test]
