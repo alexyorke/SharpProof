@@ -2453,3 +2453,16 @@ its native process adapter. The source compile-membership input can freeze an Or
 hash builder before passing to IReadOnlySet; preserve the negative uncompiled-document
 control and filesystem symlink containment checks. Validate actual link traversal and
 all source-document controls in the canonical container. Status: open before edits.
+
+IMM-M061: Coordinator read the remaining Worker projection/lane construction and passive
+plan publication paths. Sorted/interrupted targets and settled result projections can
+be immutable arrays; retain the concurrent indexed result array until all lanes settle
+and retain the exact lane array lock identity. Lane construction uses an array builder,
+with original backend ReferenceEquals rejection and cleanup order. Project immutable
+callable/flattened-claim arrays without deduplication, preserving positional order.
+Pass frozen entry assumptions, goals and normal-completion term directly into the plan
+constructor; remove builder publication setters while preserving freeze/Fresh/Fact order.
+Make plan allocation status get-only; freeze its two local filtered vectors. Replace the
+launcher allowed-name factory input with an immutable array. Preserve mutable solver
+resource lifecycle, cache read status and intentionally exercised CoreLib dictionary SUT.
+Status: open before edits; validate full ordinary Worker suite after the change.
