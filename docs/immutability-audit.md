@@ -2831,3 +2831,14 @@ zero failures/skips and zero compiler warnings/errors. The 25 fixed maps/list pr
 key/value evaluation order, indexer overwrite behavior and reference-valued operands.
 Postcondition assertions use immutable Length. All embedded program literals remain
 unchanged. Remaining dynamic substitution and binding accumulators stay in scope.
+
+IMM-M079: Release manifest, release evidence, tool evidence, contained-path resolution
+and embedded-symbol lookup retain read-only array captures. Freeze package/file/ZIP-entry
+and artifact projections with typed immutable arrays; preserve their enumeration order,
+case-sensitive filters, JSON array adapters and native package-identity parameter shape.
+Reuse PEReader.ReadDebugDirectory's existing immutable result. Freeze path components
+and explicitly enumerate the remaining suffix rather than assuming native range indexing.
+Retain scalar loop/read counters, ordered JSON dictionaries and native PE/PDB buffers.
+Validate release security/evidence and embedded-symbol regression scripts in the canonical
+container, plus path containment, nonexistent suffix and symlink escape controls.
+Status: open before edits.
