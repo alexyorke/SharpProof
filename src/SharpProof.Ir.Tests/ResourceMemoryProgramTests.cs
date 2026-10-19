@@ -7,6 +7,94 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(0, 0)]
+    [TestCase(1, 24)]
+    [TestCase(3, 32)]
+    [TestCase(6, 40)]
+    public void StringLifetimesPreserveAliasesAndSharedEmptyStorage(int length, int bytes)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var text = factory.CreateVariable("text", factory.StringType);
+        var saved = factory.CreateVariable("saved", factory.ObjectType);
+        var empty = factory.CreateVariable("empty", factory.StringType);
+        var fill = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x');
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, text, factory.Integer(length), [fill]);
+        builder.Assign(entry, factory.CreateOperation(), saved, factory.Cast(factory.ObjectType, factory.Variable(text)));
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, empty, factory.Integer(0), [fill]);
+        builder.Assign(entry, factory.CreateOperation(), text, factory.String(string.Empty));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(saved));
+        var program = builder.Build();
+        var result = ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Verified, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, 0, 0, bytes, bytes)));
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, TestContext.CurrentContext.CancellationToken);
+        var observed = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(observed.Verified, Is.True, observed.UnknownReason);
+        Assert.That(observed.Bounds, Is.EqualTo(result.Bounds));
+    }
+
+    [Test]
+    public void StringContentEqualityCannotBeProvedFromDistinctAllocationIdentities()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        var first = factory.CreateVariable("first", factory.StringType);
+        var second = factory.CreateVariable("second", factory.StringType);
+        var fill = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x');
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, first, factory.Integer(1), [fill]);
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, second, factory.Integer(1), [fill]);
+        builder.Branch(entry, factory.CreateOperation(), factory.Binary(IrBinaryOperator.Equal, factory.Variable(first), factory.Variable(second)), yes, no);
+        builder.Return(yes, factory.CreateOperation(), factory.Variable(first));
+        builder.Return(no, factory.CreateOperation(), factory.String(string.Empty));
+        var result = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("MemoryControlFlowUnsupported"));
+    }
+
+    [TestCase(0, 32, 0)]
+    [TestCase(1, 40, 48)]
+    public void EmptyIdentitySharingAndFreshStringReferenceGuardsKeepReadRootsLive(int length, int retained, int auxiliary)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        var first = factory.CreateVariable("first", factory.StringType);
+        var second = factory.CreateVariable("second", factory.StringType);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var comparison = factory.CreateVariable("comparison", factory.BooleanType);
+        var result = factory.CreateVariable("result", array);
+        var fill = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x');
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, first, factory.Integer(length), [fill]);
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, second, factory.Integer(length), [fill]);
+        builder.Assign(entry, factory.CreateOperation(), comparison, factory.Binary(IrBinaryOperator.Equal,
+            factory.Cast(factory.ObjectType, factory.Variable(first)), factory.Cast(factory.ObjectType, factory.Variable(second))));
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(comparison), yes, no);
+        builder.Allocate(yes, factory.CreateOperation(), array, result, factory.Integer(1));
+        builder.Return(yes, factory.CreateOperation(), factory.Variable(result));
+        builder.Allocate(no, factory.CreateOperation(), array, result, factory.Integer(3));
+        builder.Return(no, factory.CreateOperation(), factory.Variable(result));
+        var program = builder.Build();
+        var bounds = ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(bounds.Verified, Is.True, bounds.UnknownReason);
+        Assert.That(bounds.Bounds!.Value.RetainedUpper, Is.EqualTo(new System.Numerics.BigInteger(retained)));
+        Assert.That(bounds.Bounds.Value.PeakAuxiliaryUpper, Is.EqualTo(new System.Numerics.BigInteger(auxiliary)));
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 1000, options, TestContext.CurrentContext.CancellationToken);
+        var observed = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(observed.Verified, Is.True, observed.UnknownReason);
+        Assert.That(observed.Bounds, Is.EqualTo(bounds.Bounds));
+    }
+
     [TestCase(0, 24)]
     [TestCase(1, 32)]
     [TestCase(3, 40)]

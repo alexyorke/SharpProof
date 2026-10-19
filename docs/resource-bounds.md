@@ -434,8 +434,9 @@ Lifetime layout ownership is independent of cumulative-program availability.
 A proven fixed local size can therefore support a native lifetime proof even when
 the count analyzer reports Unknown.
 
-The native finite family admits primitive arrays with constant sizes and certified
-direct source classes, reference aliases, typed field stores and reads of explicitly
+The native finite family admits primitive arrays and repeated-character strings
+with constant sizes, certified direct source classes, reference aliases, typed
+field stores and reads of explicitly
 stored owned references, last-use root drops,
 literal copies through compiler temporaries and proven constant guards. Shared
 children and cycles count once by identity; overwritten field edges can release
@@ -468,3 +469,21 @@ supported integral/reference storage. Custom layout, static initialization, even
 cleanup methods, unsupported value fields and broader ownership remain Unknown.
 The model still describes logical source-owned storage under the reviewed layout,
 with final returned graphs excluded from auxiliary bytes throughout execution.
+
+### String lifetime identity
+
+Repeated-character string construction uses the reviewed UTF-16 storage layout.
+Positive lengths create distinct owned instances even when their contents match.
+Aliases, object widening and owned string field edges preserve those identities.
+Empty construction and the empty literal refer to shared non-null storage with
+zero newly owned bytes. A permanent zero-byte trace anchor preserves sharing
+without treating an empty string as null or resurrecting a reclaimed allocation.
+
+Guard reads count as uses of their operands, preserving roots through a proven
+reference comparison, including comparisons copied into Boolean temporaries.
+String content equality is separate from reference identity;
+a branch requiring unproved content equality returns Unknown. Borrowed nonempty
+strings, nonempty literals, negative construction lengths and unproved lifetime
+control flow also return Unknown without partial numbers. Numeric lifetime
+violations still require an independently observed normal completion satisfying
+all entry conditions, under the owned runtime/layout assumption.

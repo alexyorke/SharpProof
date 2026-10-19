@@ -1381,3 +1381,56 @@ phase adds measurement tooling rather than trusted proof capabilities. Benchmark
 report schema 3 distinguishes measured process/kernel time and allocation samples
 from source-derived resource proofs. The benchmark workflow requirement is now
 complete; all other unchecked C/E/F and final qualification requirements remain.
+
+## String lifetimes and guard root uses
+
+Finite typed-IR lifetime extraction and independent completed-execution replay
+now admit repeated-character string construction with constant nonnegative sizes.
+The reviewed UTF-16 layout charges distinct positive-length instances; equal
+contents do not collapse allocation identity. Object widening, saved aliases,
+field edges and overwrite preserve ownership. Shared empty construction and empty
+literals use a permanent non-null zero-byte anchor, so no new owned bytes are
+charged and repeated use cannot resurrect a reclaimed instance.
+
+Guard operands now participate in last-use root tracking in both extraction and
+replay. This corrects an earlier omission that could drop two references before
+the comparison that reads them. String content equality is explicitly excluded
+from reference-identity guard inference. Borrowed/nonempty literal storage,
+negative lengths, unproved content branches and broader composition remain Unknown
+without numeric evidence or used assumptions.
+
+Protocol 31, cache 33 and compiler artifact 46 invalidate earlier capabilities and
+cached outcomes, including the guard-root correction. Acceptance worker/cache
+versions and artifact snapshots move together. Manifest 6, resource program/evidence
+4, expression 1 and reviewed layout/lifetime model identities remain unchanged.
+Initial validation passed 58 memory IR cases and five native string cases.
+Compiler-pinned Boolean comparisons initially prevented two new native guard
+controls from being decided. Proven comparison values now propagate through
+Boolean temporaries, while unproved content/effect conditions remain Unknown.
+The expanded 11 native string controls and all 653 IR tests passed after this
+correction, along with 352 analyzer/collector cases. The final broad worker/
+protocol/acceptance/golden run passed 711 cases, and all four package controls
+passed.
+Phase C and the other unchecked roadmap requirements remain open.
+
+The four packaged string lifetime controls passed after Boolean guard propagation,
+including independently replayed retained and guard-root peak violations. There
+are now 34 distinct validated lifetime package cases, alongside the separate
+measurement workflow controls. The broad worker retry passed all 711 affected worker/protocol/acceptance/golden
+cases. An earlier .NET build-process exit 139 occurred before tests; the serial
+retry used fresh private CLI/HTTP state.
+
+Published benchmark-head f6e63144c coverage passed all four shards, then failed the
+unchanged 100% changed-trusted-code floor: 3242/3439 lines (94.27%), with 197 gaps.
+This is newer than the earlier closure-only measurement but predates string
+lifetimes and cannot qualify this implementation. Coverage gap closure and fresh
+exact-head CI remain required.
+
+Published benchmark-head canonical CI identified a script formatter failure in
+Measure-SharpProofConsumerPerformance.ps1, separate from its passing PowerShell
+lint. The formatter changed only script whitespace. The complete canonical
+formatting gate passed after that correction, including 87 PowerShell files,
+19 shell scripts, script-tool regression checks and complete C# formatting.
+The earlier package/consumer/
+release, documentation and security workflows passed. Native string changes
+remain subject to fresh exact-head CI and unchanged coverage qualification.

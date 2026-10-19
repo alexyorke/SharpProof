@@ -56,8 +56,6 @@ internal sealed class ResourceMemoryReplay
             var instruction = _observed[index].Instruction;
             if (!owned.Contains(instruction) || !seen.Add(instruction))
             { return Unknown("MemoryReplayInstructionUnowned"); }
-            if (instruction is IrBranchInstruction)
-            { continue; }
             var reads = 0;
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))
             {
@@ -75,6 +73,7 @@ internal sealed class ResourceMemoryReplay
         var fieldSlots = new Dictionary<IrMemberId, int>();
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
+        events.Add(new(ResourceMemoryEventKind.Allocate, ResourceMemoryProgram.EmptyStringIdentity, ResourceMemoryProgram.EmptyStringIdentity, 0));
         var output = 0;
         for (var index = 0; index < _observed.Count; index++)
         {
@@ -82,6 +81,27 @@ internal sealed class ResourceMemoryReplay
             var (instruction, value) = _observed[index];
             switch (instruction)
             {
+                case IrAllocationInstruction textAllocation when textAllocation.AllocatedType == factory.StringType:
+                    if (textAllocation.Target is not { } textTarget || value is not { Kind: IrValueKind.String } ||
+                        value.Type != factory.StringType || IrValue.HasUnknownStringIdentity(value) ||
+                        textAllocation.InitialValues.Length != 1 || textAllocation.InitialValues[0] is not IrIntegerTerm)
+                    { return Unknown("MemoryReplayStringAllocationUnsupported"); }
+                    actualValues[textTarget] = value;
+                    var textFootprint = ResourceRuntimeLayout.Bound(ResourceAllocationShape.String(ResourceExpression.Literal(value.String.Length)), layout, cancellation);
+                    if (textFootprint.Bounds is not { Lower.Constant: { } textLower, Upper.Constant: { } textUpper })
+                    { return Unknown(textFootprint.UnknownReason ?? "MemoryReplayStringAllocationUnsupported"); }
+                    if (value.String.Length == 0)
+                    {
+                        events.Add(new(ResourceMemoryEventKind.BindRoot, 0, Slot(textTarget, slots), ResourceMemoryProgram.EmptyStringIdentity));
+                        liveRoots.Add(textTarget);
+                        break;
+                    }
+                    if (Find(value, identities) != 0)
+                    { return Unknown("MemoryReplayStringAllocationUnsupported"); }
+                    identities.Add(value);
+                    events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(textTarget, slots), 0, textLower, textUpper));
+                    liveRoots.Add(textTarget);
+                    break;
                 case IrAllocationInstruction objectAllocation when objectAllocation.Length == null:
                     if (objectAllocation.Target is not { } objectTarget || value is not { Kind: IrValueKind.Reference } ||
                         objectAllocation.AllocatedType != value.Type || Find(value, identities) != 0 || !objectAllocation.InitialValues.IsEmpty)
@@ -211,8 +231,12 @@ internal sealed class ResourceMemoryReplay
         { lastUse[variable.Variable] = index; return true; }
         if (term is IrCastTerm cast)
         { return ReadVariables(cast.Operand, factory, lastUse, index, depth + 1); }
+        if (term is IrBinaryTerm binary)
+        { return ReadVariables(binary.Left, factory, lastUse, index, depth + 1) && ReadVariables(binary.Right, factory, lastUse, index, depth + 1); }
         if (term is IrOpaqueTerm { Receiver: { } owner, Arguments.IsEmpty: true } && IrFieldSites.IsFieldRead(factory, term))
         { return ReadVariables(owner, factory, lastUse, index, depth + 1); }
+        if (term is IrStringTerm text && factory.GetString(text.Value).Length == 0)
+        { return true; }
         return term is IrIntegerTerm or IrBooleanTerm or IrNullTerm;
     }
 
@@ -220,13 +244,17 @@ internal sealed class ResourceMemoryReplay
     {
         value = ArgumentNullGuard.NotNull(value, nameof(value));
         identities = ArgumentNullGuard.NotNull(identities, nameof(identities));
-        var identity = value.Kind switch { IrValueKind.Sequence => value.SequenceIdentity, IrValueKind.Reference => value.Reference, _ => null };
+        if (value.Kind == IrValueKind.String && IrValue.HasUnknownStringIdentity(value))
+        { return 0; }
+        var identity = value.Kind switch { IrValueKind.Sequence => value.SequenceIdentity, IrValueKind.Reference => value.Reference, IrValueKind.String => value.String, _ => null };
+        if (ReferenceEquals(identity, string.Empty))
+        { return ResourceMemoryProgram.EmptyStringIdentity; }
         if (identity == null)
         { return 0; }
         for (var index = 0; index < identities.Count; index++)
         {
             var candidate = identities[index];
-            var candidateIdentity = candidate.Kind == IrValueKind.Sequence ? candidate.SequenceIdentity : candidate.Reference;
+            var candidateIdentity = candidate.Kind switch { IrValueKind.Sequence => candidate.SequenceIdentity, IrValueKind.String => candidate.String, _ => candidate.Reference };
             if (ReferenceEquals(identity, candidateIdentity))
             { return index + 1; }
         }

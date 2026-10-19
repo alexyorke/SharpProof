@@ -5,6 +5,51 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeResourceContractTests
 {
+    [TestCase("return new string('x', 0);", 0, 0)]
+    [TestCase("return new string('x', 3);", 0, 32)]
+    [TestCase("var first=new string('x', 3); var saved=first; first=new string('y', 6); return saved;", 40, 32)]
+    [TestCase("var first=new string('x', 3); var second=new string('x', 3); return second;", 32, 32)]
+    [TestCase("var empty=new string('x', 0); object boxed=empty; var again=new string('y', 0); return boxed;", 0, 0)]
+    [TestCase("object first=new string('x', 1); object second=new string('x', 1); if(first==second) return null; return null;", 48, 0)]
+    [TestCase("var text=new string('x', 0); if(text==null) return new string('x',3); return text;", 0, 0)]
+    public async Task StringStorageLifetimesUseActualIdentitiesAndCachedEmptyStorage(string body, int auxiliary, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 5, 6 })
+        {
+            var upper = metric == 5 ? auxiliary : retained;
+            foreach (var violates in new[] { false, true })
+            {
+                if (violates && upper == 0)
+                { continue; }
+                var source = "using SharpProof.Attributes; public static class C { " +
+                    $"[ResourceUpperBound((ResourceMetric){metric},{(violates ? upper - 1 : upper)})] public static object Target() {{ {body} }} }}";
+                var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+                var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+                Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+                Assert.That(violates ? result.ResourceBound!.ObservedLowerBound : result.ResourceBound!.InferredUpperBound,
+                    Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
+    [TestCase("return input;")]
+    [TestCase("return \"borrowed literal\";")]
+    [TestCase("return new string('x',-1);")]
+    [TestCase("var first=new string('x',1); var second=new string('x',1); if(first==second) return first; return second;")]
+    public async Task UnsupportedStringLifetimesHaveNoPartialMetrics(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound(ResourceMetric.RetainedBytes,100)] public static string Target(string input) {{ {body} }} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
     [TestCase("var root=new Node(); root.Child=new int[1]; return root.Child;", 24, 32)]
     [TestCase("var root=new Node(); root.Child=new int[1]; var saved=root.Child; root.Child=new int[3]; return saved;", 64, 32)]
     [TestCase("var root=new Node(); var alias=root; root.Child=new int[1]; return alias.Child;", 24, 32)]
@@ -57,6 +102,7 @@ public sealed partial class NativeResourceContractTests
     [TestCase("public class Node { public int[] A; public int[] B; }", "var root=new Node(); var child=new int[1]; root.A=child; root.B=child; return root;", 0, 64)]
     [TestCase("public class Node { public Node Next; public int[] A; }", "var root=new Node(); root.Next=root; root.A=new int[1]; return root;", 0, 64)]
     [TestCase("public class Node { public int[] A; }", "var root=new Node(); root.A=new int[1]; root.A=new int[3]; return root;", 32, 64)]
+    [TestCase("public class Node { public string A; }", "var root=new Node(); root.A=new string('x',3); root.A=new string('y',6); return root;", 32, 64)]
     public async Task ObjectGraphProofAndReplayPreserveSharingCyclesAndOverwrite(string declaration, string body, int auxiliary, int retained)
     {
         ArgumentNullException.ThrowIfNull(declaration);

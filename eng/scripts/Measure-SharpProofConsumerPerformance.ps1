@@ -136,7 +136,8 @@ try {
     $runtimeSource = if ($Workload -eq 'resources') { New-RuntimeSource } else { '' }
     $runtimeSourceHash = if ($Workload -eq 'resources') {
         [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($runtimeSource))).ToLowerInvariant()
-    } else { $null }
+    }
+    else { $null }
     foreach ($iteration in 1..$Iterations) {
         # Rotate the order to reduce systematic first-run/compiler warmup bias.
         $variants = @('baseline', 'portable', 'verified')
@@ -219,11 +220,12 @@ try {
                     }
                 }
                 $runtimeMeasurements.Add([ordered]@{ iteration = $iteration; variant = $variant;
-                    processElapsedMilliseconds = $processMilliseconds; sourceSha256 = $sourceHash;
-                    runtime = $runtimeResult.runtime; architecture = $runtimeResult.architecture;
-                    os = $runtimeResult.os; gcServer = $runtimeResult.gcServer;
-                    tieredCompilation = $runtimeResult.tieredCompilation;
-                    samples = @($runtimeResult.measurements) })
+                        processElapsedMilliseconds = $processMilliseconds; sourceSha256 = $sourceHash;
+                        runtime = $runtimeResult.runtime; architecture = $runtimeResult.architecture;
+                        os = $runtimeResult.os; gcServer = $runtimeResult.gcServer;
+                        tieredCompilation = $runtimeResult.tieredCompilation;
+                        samples           = @($runtimeResult.measurements)
+                    })
             }
         }
     }
@@ -242,11 +244,12 @@ try {
             $elapsedMilliseconds = 1000.0 * $sample.kernelElapsedTicks / $sample.stopwatchFrequency
             $baselineMilliseconds = 1000.0 * $reference[0].kernelElapsedTicks / $reference[0].stopwatchFrequency
             $runtimeComparisons.Add([ordered]@{ iteration = $measurement.iteration; variant = $measurement.variant;
-                inputSize = $sample.inputSize; repetitions = $sample.repetitions;
-                baselineKernelMilliseconds = $baselineMilliseconds; kernelMilliseconds = $elapsedMilliseconds;
-                kernelDeltaMilliseconds = $elapsedMilliseconds - $baselineMilliseconds;
-                baselineAllocatedBytes = $reference[0].allocatedBytes; allocatedBytes = $sample.allocatedBytes;
-                allocatedDeltaBytes = $sample.allocatedBytes - $reference[0].allocatedBytes })
+                    inputSize = $sample.inputSize; repetitions = $sample.repetitions;
+                    baselineKernelMilliseconds = $baselineMilliseconds; kernelMilliseconds = $elapsedMilliseconds;
+                    kernelDeltaMilliseconds = $elapsedMilliseconds - $baselineMilliseconds;
+                    baselineAllocatedBytes = $reference[0].allocatedBytes; allocatedBytes = $sample.allocatedBytes;
+                    allocatedDeltaBytes     = $sample.allocatedBytes - $reference[0].allocatedBytes
+                })
         }
     }
     $completed = $true
