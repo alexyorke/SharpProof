@@ -63,6 +63,22 @@ public sealed class SourceTypeSubstitutionTests
         Assert.That(nested.Compilation, Is.Null);
     }
     [Test]
+    public void NullableReceiverElementSpecializationPreservesTheSourceFrame()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public class Box { public static void Target<T>(T value) { } }");
+        var compilation = CSharpCompilation.Create("NullableReceiverElement", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var concrete = compilation.GetSpecialType(SpecialType.System_Int32);
+        context.SpecializeTypeParameter(target.TypeParameters[0], concrete);
+        var specialize = typeof(TotalLoweringContext).GetMethod("SpecializeReceiverElementCore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        Assert.That(specialize.Invoke(context, [null]), Is.Null);
+        Assert.That(specialize.Invoke(context, [target.TypeParameters[0]]), Is.SameAs(concrete));
+        Assert.That(context.Compilation, Is.Null);
+        Assert.That(context.Target, Is.SameAs(target));
+    }
+    [Test]
     public void CyclicSubstitutionAbstainsWithinItsConstructionBound()
     {
         var tree = CSharpSyntaxTree.ParseText("public class Box<T> { public void Target() { } }");
