@@ -3207,3 +3207,15 @@ errors. Main verified callback serial execution, producer completion/freeze boun
 pre-mutation map snapshots, measured allocation intervals, native compiler argv and
 LIFO traversal. The flag maps retain indexer semantics and observation arrays preserve
 order and duplicates. No mutable subject buffers were changed.
+
+IMM-M102: Main traced three private Frontend owners: continuation planner maps/sets,
+nested operation-purity depth caches and operation binding/capture/per-lowering caches.
+Use readonly scoped builders for retained private accumulation and a fresh builder for
+each lowering scope; save/restore the prior scope in the existing finally. Keep symbol/
+reference comparers, strict AddUnique, overwrite/duplicate-owner semantics, capture
+names/order and immutable published bindings. Planner owner indexing must publish its
+private builder before scanning so budget/cancellation failures retain the old partial
+index state. Queue traversal stays immutable FIFO. Nested purity builders retain all
+recursive depth entries. Validate full Frontend and compiler continuation/purity/capture
+boundary tests; keep callbacks/region work accounting and explicit failure paths intact.
+Status: open before edits.
