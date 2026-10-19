@@ -99,7 +99,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         var source = $"public static class C {{ public static int State; public static {type} Target(int x) {{ {retyped} }} }}";
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         using var stream = new MemoryStream();

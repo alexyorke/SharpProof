@@ -212,7 +212,7 @@ public sealed class WorkerVcCyclicRegionTests
             StringComparer.Ordinal);
         var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Is.EqualTo(ImmutableArray.Create(repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(posts[1].Model, Is.Not.Empty);
         Assert.That(JsonSerializer.Serialize(cached.ClaimResults, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(first.ClaimResults, WorkerProtocolJson.SharedOptions)));

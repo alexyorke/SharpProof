@@ -283,7 +283,7 @@ public sealed class ContractMatrixLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Math.Abs CLR program did not compile: " +
@@ -404,7 +404,7 @@ public sealed class ContractMatrixLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Spec Max CLR program did not compile: " +
@@ -483,7 +483,7 @@ public sealed class ContractMatrixLongFuzzTests
                 "public static int Target(int x, int y) { " + Requires(callerClauses) +
                 " Contract.Ensures(Contract.Result<int>() == " + (variant == 1 ? "0" : "1") +
                 "); " + body + " } }";
-            var variantName = new[] { "aligned-true", "aligned-false", "wider-true", "guarded-true" }[variant];
+            var variantName = ImmutableArray.Create("aligned-true", "aligned-false", "wider-true", "guarded-true")[variant];
             return new("call/" + domain.Name + "/" + variantName, source, true, variant, 0, rewrite);
         }
         else
@@ -678,7 +678,7 @@ public sealed class ContractMatrixLongFuzzTests
     {
         System.ArgumentNullException.ThrowIfNull(item);
         var compilation = Compile(item.Source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Joint CLR program did not compile: " +
@@ -704,7 +704,7 @@ public sealed class ContractMatrixLongFuzzTests
             var exceptional = 0;
             string? postWitness = null;
             string? effectWitness = null;
-            foreach (var x in new[] { -1, 0, 1, 2 })
+            foreach (var x in ImmutableArray.Create(-1, 0, 1, 2))
             {
                 var allowed = (bool)callerPre.Invoke(null, [x])!;
                 if (allowed)
@@ -768,7 +768,7 @@ public sealed class ContractMatrixLongFuzzTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Joint claim program did not compile: " +
@@ -778,7 +778,7 @@ public sealed class ContractMatrixLongFuzzTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var targetClaims = artifact.Manifest.Claims.Where(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToImmutableArray();
         if (targetClaims.Length != 2 || targetClaims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().Count() != 2)
         {
             throw new InvalidOperationException("Expected two distinct Target ClaimIds, got " + targetClaims.Length);
@@ -796,7 +796,7 @@ public sealed class ContractMatrixLongFuzzTests
                 string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))));
         }
         var results = response.ClaimResults.Where(result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (targetClaims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)))).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (targetClaims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)))).ToImmutableArray();
         if (results.Length != 2 || results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)).Distinct().Count() != 2)
         {
             throw new InvalidOperationException("Expected one Worker result per Target ClaimId.");
@@ -809,7 +809,7 @@ public sealed class ContractMatrixLongFuzzTests
     {
         System.ArgumentNullException.ThrowIfNull(item);
         var compilation = Compile(item.Source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Generated CLR program did not compile: " +
@@ -918,7 +918,7 @@ public sealed class ContractMatrixLongFuzzTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
         return CSharpCompilation.Create("ContractMatrix_" + Guid.NewGuid().ToString("N"), [tree],
@@ -932,7 +932,7 @@ public sealed class ContractMatrixLongFuzzTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             throw new InvalidOperationException("Generated claim program did not compile: " +
@@ -967,14 +967,14 @@ public sealed class ContractMatrixLongFuzzTests
         {
             var targetClaims = artifact.Manifest.Claims.Where(claim =>
                 claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
-                claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
+                claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
             if (targetClaims.Length != 1)
             {
                 throw new InvalidOperationException("Expected exactly one Target Ensures claim, got " +
                     targetClaims.Length);
             }
             var matchingResults = response.ClaimResults.Where(result =>
-                result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targetClaims[0].ClaimId)).ToArray();
+                result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targetClaims[0].ClaimId)).ToImmutableArray();
             if (matchingResults.Length != 1)
             {
                 throw new InvalidOperationException("Expected exactly one response for Target Ensures ClaimId, got " +
@@ -983,7 +983,7 @@ public sealed class ContractMatrixLongFuzzTests
             return matchingResults[0];
         }
         var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
         if (claims.Length != 1)
         {
             throw new InvalidOperationException("Expected one Target claim, got " + claims.Length);

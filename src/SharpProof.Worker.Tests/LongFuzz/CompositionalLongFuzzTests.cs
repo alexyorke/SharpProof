@@ -144,7 +144,7 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var delta = new[] { 1, 2, -1, -2 }[cycle % 4];
+        var delta = ImmutableArray.Create(1, 2, -1, -2)[cycle % 4];
         return new("checked-add", "checked(y + " + Literal(delta) + ")",
             delta < 0 ? int.MinValue : int.MaxValue);
     }
@@ -154,8 +154,8 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var mask = new[] { 3, 7 }[cycle % 2];
-        var shift = new[] { 1, 31, 32, 33 }[cycle % 4];
+        var mask = ImmutableArray.Create(3, 7)[cycle % 2];
+        var shift = ImmutableArray.Create(1, 31, 32, 33)[cycle % 4];
         return new("shift-divide", "8 / (y & " + mask + ") + (y << " + shift + ")", 0);
     }
 
@@ -176,7 +176,7 @@ public sealed class CompositionalLongFuzzTests
         if (cycle < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(cycle)); }
 
-        var shift = new[] { 1, 2, 31, 32 }[cycle % 4];
+        var shift = ImmutableArray.Create(1, 2, 31, 32)[cycle % 4];
         return new("switch-pattern", "y switch { < 0 => checked(y * 2), 0 => 0, _ => y << " +
             shift + " }", 2);
     }
@@ -242,7 +242,7 @@ public sealed class CompositionalLongFuzzTests
         }
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, pair,
@@ -265,7 +265,7 @@ public sealed class CompositionalLongFuzzTests
             return;
         }
         var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, pair,
@@ -432,7 +432,7 @@ public sealed class CompositionalLongFuzzTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
         return CSharpCompilation.Create("CompositionProbe_" + Guid.NewGuid().ToString("N"), [tree],
@@ -446,7 +446,7 @@ public sealed class CompositionalLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         if (errors.Length != 0)
         {
             return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));

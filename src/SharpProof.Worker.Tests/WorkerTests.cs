@@ -1514,7 +1514,7 @@ public sealed partial class WorkerTests
         json = json.Replace(
             "\"compilerDiagnostics\":[]",
             "\"compilerDiagnostics\":" + JsonSerializer.Serialize(
-                new[] { diagnostic },
+                ImmutableArray.Create(diagnostic),
                 WorkerProtocolJson.Options),
             StringComparison.Ordinal);
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
@@ -1849,10 +1849,7 @@ public sealed partial class WorkerTests
         Assert.That(first.ClaimResults.Length, Is.EqualTo(2));
         Assert.That(
             first.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome)),
-            Is.EquivalentTo(new[] {
-                WorkerClaimOutcome.Proven,
-                WorkerClaimOutcome.Refuted
-            }));
+            Is.EquivalentTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(
             first.ClaimResults.Select(record =>
                 record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(first, record))),
@@ -2228,13 +2225,7 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var contradictory = new[]
-        {
-            Result("ByteImpossible"),
-            Result("UIntImpossible"),
-            Result("PositiveImpossible"),
-            Result("RangeImpossible")
-        };
+        var contradictory = ImmutableArray.Create(Result("ByteImpossible"), Result("UIntImpossible"), Result("PositiveImpossible"), Result("RangeImpossible"));
         var assumeOnly = Result("AssumeOnly");
 
         using (Assert.EnterMultipleScope())
@@ -2785,14 +2776,7 @@ public sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
-        foreach (var methodName in new[]
-                 {
-                     "RemainderRelation",
-                     "RemainderOverflowVacuous",
-                     "RemainderNormalResult",
-                     "DivisionControl",
-                     "LongRemainderControl"
-                 })
+        foreach (var methodName in ImmutableArray.Create("RemainderRelation", "RemainderOverflowVacuous", "RemainderNormalResult", "DivisionControl", "LongRemainderControl"))
         {
             var method = subject.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
@@ -3068,9 +3052,8 @@ public sealed partial class WorkerTests
     [Test]
     public void ImplementationIlScalarOpcodeMatrixUsesTotalBodies()
     {
-        var signatures = new (string ReturnType, string Name, string Parameters,
-            string Arguments)[]
-        {
+        var signatures = ImmutableArray.Create<(string ReturnType, string Name, string Parameters,
+            string Arguments)>(
             ("int", "MinusOne", "", ""),
             ("int", "Small", "", ""),
             ("int", "Wide", "", ""),
@@ -3102,8 +3085,7 @@ public sealed partial class WorkerTests
             ("int", "IntegerCondition", "int value, int yes, int no", "value, yes, no"),
             ("int", "PopCall", "int value", "value"),
             ("int", "NestedCall", "int value", "value"),
-            ("int", "InadmissibleCall", "int value", "value")
-        };
+            ("int", "InadmissibleCall", "int value", "value"));
         var subjectMethods = string.Join(
             Environment.NewLine,
             signatures.Select(static signature =>
@@ -3309,12 +3291,7 @@ public sealed partial class WorkerTests
             static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
 
-        foreach (var targetName in new[]
-                 {
-                     "VerifyRoundTrip",
-                     "VerifyAssignmentValue",
-                     "VerifyManyLocals"
-                 })
+        foreach (var targetName in ImmutableArray.Create("VerifyRoundTrip", "VerifyAssignmentValue", "VerifyManyLocals"))
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
             var preparation = lowerer.Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -3722,13 +3699,7 @@ public sealed partial class WorkerTests
                     StringComparison.Ordinal)));
         }
 
-        foreach (var methodName in new[]
-                 {
-                     "CallPlain",
-                     "CallRequires",
-                     "CallEnsures",
-                     "CallAssume"
-                 })
+        foreach (var methodName in ImmutableArray.Create("CallPlain", "CallRequires", "CallEnsures", "CallAssume"))
         {
             Assert.That(
                 ResultFor(methodName).Outcome,
@@ -4150,10 +4121,7 @@ public sealed partial class WorkerTests
 
         Assert.That(
             response.ClaimResults.Select(static record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Reason)),
-            Is.EquivalentTo(new[] {
-                WorkerClaimReason.DeepPostcondition,
-                WorkerClaimReason.CounterexampleNotReplayable
-            }));
+            Is.EquivalentTo(ImmutableArray.Create(WorkerClaimReason.DeepPostcondition, WorkerClaimReason.CounterexampleNotReplayable)));
         Assert.That(
             response.ClaimResults.All(static record =>
                 record is null ? throw new System.ArgumentNullException(nameof(record)) : (record.Outcome == WorkerClaimOutcome.Unknown)),
@@ -4396,9 +4364,9 @@ public sealed partial class WorkerTests
                 Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[WorkerClaimReason.BackendUnavailable, WorkerClaimReason.MethodTimeout]));
             Assert.That(response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerCallableCoverageReason[])[WorkerCallableCoverageReason.InfrastructureFailure,
+                Is.EqualTo((ImmutableArray<WorkerCallableCoverageReason>)[WorkerCallableCoverageReason.InfrastructureFailure,
                     WorkerCallableCoverageReason.MethodTimeout]));
             Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)),
                 Is.EqualTo(snapshot.CompilerManifest.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
@@ -4750,7 +4718,7 @@ public sealed partial class WorkerTests
             backend,
             () => backend.ConsumedResourceCount);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        WorkerClaimOutcome[] expectedStatuses = [
+        ImmutableArray<WorkerClaimOutcome> expectedStatuses = [
             WorkerClaimOutcome.Proven,
             WorkerClaimOutcome.Proven,
             WorkerClaimOutcome.Unknown
@@ -4948,13 +4916,13 @@ public sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None
                 ]));
@@ -4997,13 +4965,13 @@ public sealed partial class WorkerTests
                     : WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(
                 response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerCallableCoverageReason[])[
+                Is.EqualTo((ImmutableArray<WorkerCallableCoverageReason>)[
                     WorkerCallableCoverageReason.MethodTimeout,
                     WorkerCallableCoverageReason.InfrastructureFailure
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     backendUnavailable
                         ? WorkerClaimReason.BackendUnavailable
@@ -5083,7 +5051,7 @@ public sealed partial class WorkerTests
             Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     expectedClaimReason
                 ]));
@@ -5204,14 +5172,14 @@ public sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(2));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
                     WorkerClaimOutcome.Refuted
                 ]));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo((WorkerClaimReason[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimReason>)[
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None,
                     WorkerClaimReason.None
@@ -5261,7 +5229,7 @@ public sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.EqualTo(4));
             Assert.That(
                 response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo((WorkerClaimOutcome[])[
+                Is.EqualTo((ImmutableArray<WorkerClaimOutcome>)[
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,

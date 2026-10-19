@@ -154,7 +154,7 @@ public sealed class WorkerVcRegionTests
         if (kind == "assume-region")
         {
             Assert.That(total.Program.GetBlock(total.Program.Entry).Instructions.OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)),
-                Is.EqualTo(total.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Current, parameter.Old })))));
+                Is.EqualTo(total.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create(parameter.Current, parameter.Old))))));
             var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
             Assert.That(proven.BodyAssumptions, Does.Contain(point.Operation));
         }

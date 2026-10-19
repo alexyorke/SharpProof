@@ -165,7 +165,7 @@ public sealed class WorkerVcLoopTests
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response);
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }), kind);
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)), kind);
             Assert.That(posts.SelectMany(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions)).Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
             Assert.That(posts[1].Model, Is.Not.Empty, kind);
         }
@@ -183,7 +183,7 @@ public sealed class WorkerVcLoopTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown }));
+            Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
         Assert.That(posts[1].Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
         Assert.That(posts.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity == WorkerVacuityKind.None)), Is.True);
     }
@@ -227,7 +227,7 @@ public sealed class WorkerVcLoopTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(posts[1].Model, Is.Not.Empty);
     }
 

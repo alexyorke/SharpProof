@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -13,7 +14,7 @@ public sealed partial class WorkerTests
         const string otherSource = "using SharpProof.Attributes; public static class OtherSubject { public static int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; } }";
         using var first = TestProject.Create(firstSource);
         using var other = TestProject.Create(otherSource);
-        foreach (var project in new[] { first, other })
+        foreach (var project in ImmutableArray.Create(first, other))
         {
             var compilation = project.CreateCompilation();
             TestCompilation.AssertNoErrors(compilation);
@@ -31,7 +32,7 @@ public sealed partial class WorkerTests
         using var otherWorker = SharpProofWorker.Create(otherRequest.Budgets);
         var actual = await firstWorker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
         var foreign = await otherWorker.VerifyAsync(otherRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, foreign })
+        foreach (var response in ImmutableArray.Create(actual, foreign))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));

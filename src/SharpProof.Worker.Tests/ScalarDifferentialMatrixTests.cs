@@ -96,7 +96,7 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(total, Is.Not.Null);
         Assert.That(total!.IsBodyAbstraction, Is.False);
         var factory = total.Program.Factory;
-        var values = new[] { left, right };
+        var values = ImmutableArray.Create(left, right);
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
             ImmutableDictionaryCapture.Create(
                 total.Parameters.Select((parameter, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : ((parameter.Entry, Value: values[ordinal] is { } text
@@ -440,7 +440,7 @@ public sealed class ScalarDifferentialMatrixTests
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
-                foreach (var chooseFirst in new[] { true, false })
+                foreach (var chooseFirst in ImmutableArray.Create(true, false))
                 {
                     Assert.That(
                         method.Invoke(null, [input, chooseFirst]),
@@ -664,14 +664,12 @@ public sealed class ScalarDifferentialMatrixTests
                 "Conversion(",
                 StringComparison.Ordinal)))
             .ToImmutableArray();
-        var methodNames = new[]
-        {
+        var methodNames = ImmutableArray.Create(
             "UncheckedLongConversion",
             "CheckedLongConversion",
             "UncheckedNegativeByteConversion",
             "UncheckedAboveRangeByteConversion",
-            "UncheckedUnsignedConversion"
-        };
+            "UncheckedUnsignedConversion");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);

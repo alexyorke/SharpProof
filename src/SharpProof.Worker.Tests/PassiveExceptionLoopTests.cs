@@ -64,7 +64,7 @@ public sealed class PassiveExceptionLoopTests
             Is.True, reason.ToString());
         Assert.That(proof!.PendingThrows, Is.Not.Empty);
         var proofHavocs = proof.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Where(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)).Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Id)).ToHashSet();
+            .Where(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)).Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Id)).ToImmutableHashSet();
         Assert.That(proof.PendingThrows.Keys.All(proofHavocs.Contains), Is.True);
         Assert.That(proof.PendingThrows.Values.SelectMany(throws => throws)
             .All(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (originalThrows.Any(original => original is null ? throw new System.ArgumentNullException(nameof(original)) : (ReferenceEquals(original, thrown))))), Is.True);

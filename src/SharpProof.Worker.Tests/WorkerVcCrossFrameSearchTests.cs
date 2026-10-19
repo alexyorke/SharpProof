@@ -169,9 +169,9 @@ public sealed class WorkerVcCrossFrameSearchTests
                 StringComparer.Ordinal);
             var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+                Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
-                Is.EqualTo(new[] { incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None }));
+                Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
     }
