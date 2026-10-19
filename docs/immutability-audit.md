@@ -2946,3 +2946,14 @@ typed metadata-call and relative-syntax-path tests pass, zero failures/skips/war
 errors. These also cover M083's final immutable expected-vector helper and default
 guard. The cache owner, ordinal comparers and positive/negative cache identity remain
 unchanged; no synchronization or external mutation contract was added.
+
+IMM-M086: Main traced ten reported Worker H-P input-map candidates and selected eight
+fixed/default-comparer initializers. Use immutable empty roots and SetItem chains,
+retaining original indexer evaluation/overwrite behavior and nested runtime objects.
+A reported OpaqueList input map is actually populated in a loop: defer to a scoped
+builder batch. NightlyRefutation's case-insensitive option map needs provider adapter
+review; defer separately. Corrected a mistyped agent ID against the authoritative TSV.
+Validate ListStateOracle, MetadataClauseOrigin, MetadataSourceNativeProducerControls,
+NativeSpecifiedCall and Pr275AssumptionIdRequiredInput tests. Preserve all mutable SUT
+arrays, reflection arguments and runtime aliases embedded in these test scenarios.
+Status: open before edits.
