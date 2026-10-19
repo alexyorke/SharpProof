@@ -22,6 +22,47 @@ public sealed class DictionaryStateOracleTests
     [TestCase("uint")]
     [TestCase("long")]
     [TestCase("ulong")]
+    public void CapacityKeyBoundariesAgreeWithCompiledClr(string type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        Compare("var data = new System.Collections.Generic.Dictionary<" + type + ", int>(3); " +
+            "var alias = data; data.Add(" + type + ".MinValue, 23); alias[" + type + ".MaxValue] = 29; " +
+            "return data.Count * 1000 + data[" + type + ".MinValue] * 10 + alias[" + type + ".MaxValue];", true);
+    }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(3)]
+    [TestCase(17)]
+    public void CapacityConstructionAndAliasesAgreeWithCompiledClr(int capacity)
+    {
+        Compare("var data = new System.Collections.Generic.Dictionary<int, int>(" + capacity + "); " +
+            "var alias = data; data.Add(17, 23); alias[17] = 29; return data.Count * 100 + data[17];", true);
+    }
+
+    [TestCase("string")]
+    [TestCase("object")]
+    [TestCase("System.Guid")]
+    public void NonIntegerKeyCapacityConstructionHasEmptyStateOnNormalReturn(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        Compare("var data = new System.Collections.Generic.Dictionary<" + key + ", decimal>(3); return data.Count;", true);
+    }
+
+    [Test]
+    public void CapacityArgumentSideEffectPrecedesFreshState()
+    {
+        Compare("var previous = new System.Collections.Generic.Dictionary<int, int>(); previous[17] = 0; " +
+            "var data = new System.Collections.Generic.Dictionary<int, int>(capacity: previous[17] = 3); return previous[17] + data.Count;", true);
+    }
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
     public void BoundaryKeysAliasesMembershipAndUpdatesAgreeWithCompiledClr(string type)
     {
         ArgumentNullException.ThrowIfNull(type);

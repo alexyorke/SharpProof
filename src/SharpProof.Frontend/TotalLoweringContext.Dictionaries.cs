@@ -7,7 +7,7 @@ internal static partial class CSharpOperationSemantics
         symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var method = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
         return method != null && IsFrameworkCollectionMember(method) && symbol.OriginalDefinition.GetDocumentationCommentId() is
-            "M:System.Collections.Generic.Dictionary`2.#ctor" or "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)" or
+            "M:System.Collections.Generic.Dictionary`2.#ctor" or "M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)" or "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)" or
             "M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)" or "P:System.Collections.Generic.Dictionary`2.Count" or
             "P:System.Collections.Generic.Dictionary`2.Item(`0)";
     }
@@ -30,7 +30,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsEmptyDefaultDictionaryCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return operation is IObjectCreationOperation { Constructor: { Parameters.IsEmpty: true } constructor, Initializer: null } &&
+        return operation is IObjectCreationOperation { Constructor: { } constructor, Initializer: null } &&
             IsDefaultDictionaryStateMember(constructor);
     }
 }

@@ -8,10 +8,38 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeSpecifiedCallTests
 {
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(0); return data.Count;", 0)]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, int>(17); var alias = data; alias.Add(17, 23); data[17] = 29; return alias.Count * 100 + data[17];", 129)]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<int, decimal>(3); return data.Count + (data.ContainsKey(17) ? 1 : 0);", 0)]
+    [TestCase("var data = new System.Collections.Generic.Dictionary<string, int>(3); return data.Count;", 0)]
+    [TestCase("var previous = new System.Collections.Generic.Dictionary<int, int>(); previous[17] = 0; var data = new System.Collections.Generic.Dictionary<int, int>(capacity: previous[17] = 3); return previous[17] + data.Count;", 3)]
+    public async Task DictionaryCapacityConstructionPreservesEmptyStateAndOrderedArguments(string body, int result)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == " + result + "); " + body, WorkerClaimOutcome.Proven);
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == " + (result + 1) + "); " + body, WorkerClaimOutcome.Unknown);
+    }
+
+    [TestCase(-1)]
+    [TestCase(int.MinValue)]
+    public async Task DictionaryCapacityConstructionCannotReturnNormallyForNegativeCapacity(int capacity)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => { _ = new Dictionary<int, int>(capacity); }));
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 0); " +
+            "var data = new System.Collections.Generic.Dictionary<int, int>(" + capacity + "); return 1;", WorkerClaimOutcome.Proven);
+    }
+    [Test]
+    public async Task DictionaryCapacityConstructionRetainsUncertainEffects()
+    {
+        await CheckInterfaceArrayEffects("[DoesNotThrow, ZeroAllocations, EnforcePure]", "int capacity",
+            "var data = new System.Collections.Generic.Dictionary<int, int>(capacity); return data.Count;", false, false, false);
+    }
     [TestCase("", "return data.Count;", 0, WorkerClaimOutcome.Proven)]
     [TestCase("where T : System.IComparable<T>", "return data.Count;", 0, WorkerClaimOutcome.Proven)]
     [TestCase("where T : System.IComparable<T>", "return data.ContainsKey(17) ? 1 : 0;", 0, WorkerClaimOutcome.Proven)]
     [TestCase("where T : class", "return data.Count;", 0, WorkerClaimOutcome.Proven)]
+    [TestCase("", "data = new System.Collections.Generic.Dictionary<int, T>(17); return data.Count;", 0, WorkerClaimOutcome.Proven)]
+    [TestCase("where T : struct", "data = new System.Collections.Generic.Dictionary<int, T>(0); return data.ContainsKey(17) ? 1 : 0;", 0, WorkerClaimOutcome.Proven)]
     [TestCase("", "return data.Count;", 1, WorkerClaimOutcome.Refuted)]
     public async Task DictionaryConstructorEmptyStateDoesNotRequireValueSemantics(string constraints, string body, int result, WorkerClaimOutcome expected)
     {

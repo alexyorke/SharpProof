@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,599 declarations have no catalog/audited-intrinsic evidence, and 74 have partial
+55,598 declarations have no catalog/audited-intrinsic evidence, and 75 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,599 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,598 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -71,7 +71,7 @@ access kind and value domains satisfy the production guard.
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and exact List allocations/aliases are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
-| D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key scalar/reference/opaque storage also flows through proven immutable source-helper parameters; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
+| D: Dictionary | Fresh default/capacity construction and Count support all key/value domains; integer-key scalar/reference/opaque storage also flows through proven immutable source-helper parameters; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Capacity construction has normal-state support; precise failure identity and resource behavior remain open. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add, Insert, GetRange and scalar/reference/opaque get/set share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | HashSet default/capacity construction and signed Count are modeled; default-origin Boolean and nine integer/character key domains have shared Add/Contains/Remove state. Queue and Stack retain their FIFO/LIFO slices | Keep generic/custom equality and hashing callbacks, arbitrary incoming HashSet membership, contents outside primitive domains, ISet/ICollection dispatch, enumeration, set algebra, precise initializer/growth/fault behavior and pure membership clauses open. Comparer callbacks that reenter collection methods can make HashSet and Dictionary Count negative; nonnegativity must follow from modeled state, never a blanket getter assumption. Other Queue/Stack operations and precise resource behavior remain open. |
@@ -722,6 +722,37 @@ unproven incoming origins do not gain primitive membership semantics. Floating,
 decimal, string, reference and generic key callbacks, interface dispatch, other set
 operations, exact invalid-path semantics and pure Contains clauses remain backlog.
 
+## Verified Dictionary capacity construction
+
+The default-comparer capacity constructor now establishes fresh empty dictionary
+state on normal return. Capacity expressions execute and are saved before
+construction, including named arguments and mutations of an existing dictionary.
+Primitive integer-key aliases and immutable source-helper parameters retain shared
+Count, membership and scalar/reference/opaque value storage after this origin.
+Generic-key construction establishes empty Count after its conservative initializer
+returns; it supplies no primitive key or comparer assumptions.
+
+Compiled CLR/IR controls cover capacities 0, 1, 3 and 17, all nine integer/character
+key limits, generic/reference key types, aliases and argument side effects. Native
+controls prove supported normal results, reject wrong claims, retain uncertain
+allocation, writes and exceptions, and verify that negative capacities cannot
+return normally. Constructor arguments beyond the expression depth limit emit no
+collection stores. Inventory evidence executes this constructor with scalar,
+opaque-value, generic-key and source-helper cases plus a wrong-result control.
+
+This closes the unmodeled construction-state slice at five ranked sites in three
+callers and adds one partial declaration: 75 partial, 55,598 unmodeled and 3,966
+excluded declarations in the same 59,639-row universe. The ranking remains 117
+API/access/status rows and 641 sites, with zero unresolved sites. These are source
+classification changes; they do not establish complete proofs for those callers.
+
+Allocation, runtime initialization and failure remain conservative. Negative
+capacity has no normal continuation, while exact exception identity, backing
+array sizes, initializer/growth behavior, custom-comparer/collection constructors
+and their callbacks remain gaps. Selected normal CLR/IR paths consume
+approximation and grant no new native framework replay authority. Incoming or
+custom-comparer dictionaries receive no new content assumptions.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -865,7 +896,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | unmodeled | T |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | partially-modeled | T |
 | M:System.ArgumentException.#ctor(System.String) | call | 5 | unmodeled | T |
-| M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | unmodeled | D |
+| M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | partially-modeled | D |
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | partially-modeled | S |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | unmodeled | F |
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | unmodeled | N |
@@ -959,7 +990,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 74 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 75 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -970,6 +1001,7 @@ These 74 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | intrinsic=default-integer-comparer-only |
 | M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
+| M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state;intrinsic=capacity-dictionary-construction-state |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state |
 | M:System.Collections.Generic.HashSet`1.#ctor | intrinsic=default-primitive-hash-set-state |

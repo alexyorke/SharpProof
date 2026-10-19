@@ -32,7 +32,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Collections.Generic.KeyNotFoundException.#ctor(System.String) | call | 7 | 5 | 0 | 7 | 0 | unmodeled |
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | 7 | 0 | 7 | 0 | partially-modeled |
 | M:System.ArgumentException.#ctor(System.String) | call | 5 | 5 | 0 | 5 | 0 | unmodeled |
-| M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | 3 | 0 | 5 | 0 | unmodeled |
+| M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | 3 | 0 | 5 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | 5 | 0 | 5 | 0 | partially-modeled |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | 3 | 0 | 5 | 0 | unmodeled |
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | 2 | 0 | 5 | 0 | unmodeled |
