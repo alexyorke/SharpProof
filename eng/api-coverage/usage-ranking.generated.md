@@ -24,7 +24,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | write | 13 | 11 | 0 | 13 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.HashSet`1.Add(`0) | call | 12 | 10 | 0 | 12 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.#ctor | call | 11 | 7 | 0 | 11 | 0 | partially-modeled |
-| M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | unmodeled |
+| M:System.Collections.Generic.Queue`1.Enqueue(`0) | call | 10 | 5 | 0 | 10 | 0 | partially-modeled |
 | M:System.Collections.Generic.HashSet`1.#ctor | call | 9 | 8 | 0 | 9 | 0 | unmodeled |
 | M:System.IComparable`1.CompareTo(`0) | call | 9 | 9 | 0 | 9 | 0 | unmodeled |
 | M:System.Collections.Generic.Dictionary`2.#ctor | call | 8 | 4 | 0 | 8 | 0 | partially-modeled |
@@ -33,7 +33,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.String.IsNullOrEmpty(System.String) | call | 7 | 7 | 0 | 7 | 0 | partially-modeled |
 | M:System.ArgumentException.#ctor(System.String) | call | 5 | 5 | 0 | 5 | 0 | unmodeled |
 | M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32) | call | 5 | 3 | 0 | 5 | 0 | unmodeled |
-| M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | 5 | 0 | 5 | 0 | unmodeled |
+| M:System.Collections.Generic.Queue`1.Dequeue | call | 5 | 5 | 0 | 5 | 0 | partially-modeled |
 | M:System.Linq.Enumerable.ToList``1(System.Collections.Generic.IEnumerable{``0}) | call | 5 | 3 | 0 | 5 | 0 | unmodeled |
 | M:System.Random.Next(System.Int32,System.Int32) | call | 5 | 2 | 0 | 5 | 0 | unmodeled |
 | P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | 4 | 0 | 5 | 0 | unmodeled |
@@ -48,7 +48,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.ArgumentNullException.#ctor(System.String) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | 2 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
-| M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
+| M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | 3 | 0 | 3 | 0 | partially-modeled |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |
 | M:System.Convert.ToInt64(System.Int32) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |
 | M:System.Guid.NewGuid | call | 3 | 3 | 0 | 0 | 3 | unmodeled |
@@ -59,7 +59,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Object.Equals(System.Object) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | 2 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
-| M:System.Collections.Generic.Queue`1.#ctor | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
+| M:System.Collections.Generic.Queue`1.#ctor | call | 2 | 2 | 0 | 2 | 0 | partially-modeled |
 | M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
 | M:System.Console.Write(System.String) | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | M:System.IndexOutOfRangeException.#ctor(System.String) | call | 2 | 2 | 0 | 2 | 0 | unmodeled |

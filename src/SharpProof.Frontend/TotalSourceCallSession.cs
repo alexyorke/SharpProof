@@ -186,12 +186,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         graph = null;
         if (!Spend(method.Parameters.Length + 1))
         { return false; }
-        // Scalar, reference and opaque element specialization belongs to the List helper
-        // boundary. Other generic source calls retain their existing scalar domain.
-        var listElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type));
+        // Scalar, reference and opaque element specialization belongs to supported collection helpers
+        // only. Other generic source calls retain their existing scalar domain.
+        var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : (TotalLoweringContext.IsListReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1"));
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
-        { return listElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
+        { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
             KnownSourceValue(method.ReturnType) != null;
         if (!contractOnly && IsActive(method) ||
@@ -338,7 +338,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 frame.SpecializeScalarParameter(parameter, scalar);
                 continue;
             }
-            if (TotalLoweringContext.IsListReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredList &&
+            if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1") && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }
