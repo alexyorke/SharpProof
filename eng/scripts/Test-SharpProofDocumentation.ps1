@@ -23,8 +23,12 @@ function Get-Anchors([string]$Content) {
 }
 
 # Restrict discovery to tracked source; ignored artifacts can contain other worktrees.
-$tracked = @(& git -C $RepositoryRoot ls-files --cached --others --exclude-standard -- '*.md' ':!:eng/common/**' | Sort-Object -Unique)
+$trackedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+& git -C $RepositoryRoot ls-files --cached --others --exclude-standard -- '*.md' ':!:eng/common/**' |
+    Sort-Object -Unique |
+    ForEach-Object { $trackedBuilder.Add([string]$_) }
 if ($LASTEXITCODE -ne 0) { throw 'Documentation discovery requires a Git source checkout.' }
+$tracked = $trackedBuilder.ToImmutable()
 $fileBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 foreach ($relative in $tracked) { $fileBuilder.Add((Join-Path $RepositoryRoot $relative)) }
 $generated = Join-Path $RepositoryRoot 'docs/generated/source-reference.md'
