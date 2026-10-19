@@ -60,7 +60,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | 2 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | 1 | 0 | 2 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | 2 | 0 | 2 | 0 | partially-modeled |
-| M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
+| M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | 1 | 0 | 2 | 0 | partially-modeled |
 | M:System.Console.Write(System.String) | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | M:System.IndexOutOfRangeException.#ctor(System.String) | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
 | M:System.Math.Min(System.Int64,System.Int64) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
@@ -88,8 +88,8 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable{`0}) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.Clear | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Collections.Generic.List`1.RemoveAll(System.Predicate{`0}) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
-| M:System.Collections.Generic.Stack`1.#ctor(System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
-| M:System.Collections.Generic.Stack`1.Pop | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
+| M:System.Collections.Generic.Stack`1.#ctor(System.Int32) | call | 1 | 1 | 0 | 1 | 0 | partially-modeled |
+| M:System.Collections.Generic.Stack`1.Pop | call | 1 | 1 | 0 | 1 | 0 | partially-modeled |
 | M:System.Collections.IEnumerator.MoveNext | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Convert.ToInt16(System.Int64) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |
 | M:System.Convert.ToInt32(System.Int32) | call | 1 | 1 | 0 | 1 | 0 | unmodeled |

@@ -10,7 +10,7 @@ internal sealed partial class BvEncoder
     private readonly Dictionary<IrStringId, Expr> _stringLiterals = [];
     internal List<BoolExpr> ReferenceFacts { get; } = [];
 
-    // Witness sizes are charged when decoded. Prefer small string/array/List/Queue
+    // Witness sizes are charged when decoded. Prefer small string/array/collection
     // models without restricting the unbounded query used for proofs.
     internal BoolExpr? SmallReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)
     {
@@ -30,7 +30,7 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
-            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count")
+            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
             {
                 foreach (var observed in field.Value.Values)
                 {
