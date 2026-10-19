@@ -16,6 +16,23 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=guarded-exception-message-construction", StringComparison.Ordinal))
+            {
+                var resource = row.Evidence.Contains("intrinsic=guarded-exception-resource-synchronization", StringComparison.Ordinal);
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "null, empty and explicit messages; reverse named arguments; allocation retained; compiled CLR/IR normal-path agreement and deliberately wrong result; guarded resource-lock shape where applicable; native callback effects, message preconditions and runtime lock/culture oracles in ExceptionConstruction and ExceptionResourceLock tests",
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, false) && (!resource || CheckExceptionMessageIntrinsic(compilation, row.Id, false, resourceOnly: true)),
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, true) || resource && CheckExceptionMessageIntrinsic(compilation, row.Id, true, resourceOnly: true));
+            }
+
+            if (row.Evidence.Contains("intrinsic=guarded-exception-resource-synchronization", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "exact default/parameter-name/null-message overload; explicit allocation and conditional resource-lock IR retained; CLR/IR normal-path agreement and wrong-result control; pinned-runtime IL hashes, actual lock identity and culture callback lock ownership checked by ExceptionResourceLockOracleTests; native resource synchronization witnesses and unsupported module/prefix controls",
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, false, resourceOnly: true),
+                    () => CheckExceptionMessageIntrinsic(compilation, row.Id, true, resourceOnly: true));
+            }
+
             if (row.Evidence.Contains("intrinsic=typed-sz-array-clear-state", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,

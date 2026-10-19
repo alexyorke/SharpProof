@@ -33,6 +33,26 @@ public sealed class NativeEffectOracleSelectionTests
     public async Task CorpusMutableMethodsRetainConcreteMutationWitnesses(string methodId)
     {
         ArgumentNullException.ThrowIfNull(methodId);
+        await CheckCorpusObservableViolation(methodId);
+    }
+
+    [TestCase("OSS0059")]
+    [TestCase("OSS0144")]
+    public async Task CorpusResourceConstructorsHaveConcreteSynchronizationWitnesses(string methodId)
+    {
+        ArgumentNullException.ThrowIfNull(methodId);
+        await CheckCorpusObservableViolation(methodId);
+    }
+
+    [Test]
+    public async Task ResourceConstructorWithUnsupportedEntryInitializationRemainsUnknown()
+    {
+        await CheckCorpusObservableViolation("OSS0139", unknownEntryInitialization: true);
+    }
+
+    private static async Task CheckCorpusObservableViolation(string methodId, bool unknownEntryInitialization = false)
+    {
+        ArgumentNullException.ThrowIfNull(methodId);
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
         document = document with { Methods = [.. document.Methods.Where(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Id == methodId)] };
@@ -51,8 +71,17 @@ public sealed class NativeEffectOracleSelectionTests
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, [methodId], root, "selected-prefix-witness", 200,
             TestContext.CurrentContext.CancellationToken, purity: true);
         var row = report.Rows.Single();
-        Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted),
+        if (unknownEntryInitialization)
+        {
+            Assert.That(preparation.Total!.EffectsCompleteAtEntry, Is.False);
+            Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(row.NativeReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+        else
+        {
+            Assert.That(row.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted),
             row.NativeReason + "; total=" + row.HasTotalBody + "; abstraction=" + row.HasBodyAbstraction);
+        }
         Assert.That(report.Passed, Is.True);
     }
     [TestCase(-1)]

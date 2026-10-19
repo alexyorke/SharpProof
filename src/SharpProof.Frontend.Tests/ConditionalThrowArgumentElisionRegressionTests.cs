@@ -72,14 +72,14 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
         var type = subject.Factory.GetVariableInfo(parameter).Type;
         var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,
-            new Dictionary<IrVarId, IrValue> { [parameter] = value });
+            new Dictionary<IrVarId, IrValue> { [parameter] = value },
+            maximumSteps: 10000, replayOptions: ExceptionConstructorNormalReplay.Options(subject.Factory));
         Assert.That(replay.Status, Is.EqualTo(exception != null
             ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         if (exception != null)
         { Assert.That(replay.Exception!.Kind, Is.EqualTo(exceptionKind)); }
         else
         { Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(returned))); }
-        Assert.That(replay.ConsumedApproximation, Is.False);
-        Assert.That(replay.ApproximationVariables, Is.Empty);
+        ExceptionConstructorNormalReplay.AssertApproximation(replay, exception != null && exceptionKind == IrExceptionKind.Explicit);
     }
 }

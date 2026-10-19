@@ -124,9 +124,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
-    // The full key includes the artifact, runtime identity, and budgets.
-    // Every valid complete response is reusable, including semantic Unknown
-    // outcomes and effects. Failed, timed-out, and canceled runs are not.
+    // The key includes the artifact, worker and Z3 identities, and budgets.
+    // It does not bind CoreLib or effective resource-key mode. Synchronization
+    // witnesses certified from that runtime context therefore stay uncacheable.
+    // Other complete responses, including semantic Unknown, remain reusable.
     internal static bool IsCacheable(
         WorkerVerifyResponse? response,
         string expectedInputHash,
@@ -144,7 +145,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerProtocolJson.ValidateKnownInputHash(
             response,
             expectedInputHash,
-            expectedManifest).IsValid;
+            expectedManifest).IsValid &&
+        response.ClaimResults.All(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.EffectWitness is not { Kind: "synchronization-lock", Detail: { } detail } ||
+                !detail.StartsWith(IrOpaqueCallSite.ExceptionResourceLockPrefix, StringComparison.Ordinal));
     }
 
     private void EvictOldest(string protectedPath)

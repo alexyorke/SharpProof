@@ -23,17 +23,19 @@ public sealed class NativeExplicitThrowTests
         Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
     }
 
-    [TestCase("catch (System.InvalidOperationException) { }", typeof(ProvenOutcome))]
+    [TestCase("catch (System.InvalidOperationException) { }", null)]
+    [TestCase("catch (System.InvalidOperationException) { }", typeof(ProvenOutcome), true)]
     [TestCase("catch (System.Exception) { }", typeof(ProvenOutcome))]
+    [TestCase("catch (System.Exception) { }", typeof(ProvenOutcome), true)]
     [TestCase("catch { }", typeof(ProvenOutcome))]
+    [TestCase("catch { }", typeof(ProvenOutcome), true)]
     [TestCase("catch (System.ArgumentException) { }", typeof(RefutedOutcome))]
-    public async Task HandlersMatchTheThrownType(string handler, Type outcome)
+    public async Task HandlersMatchTheThrownType(string handler, Type? outcome, bool explicitMessage = false)
     {
         System.ArgumentNullException.ThrowIfNull(handler);
-        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await ExceptionsAsync("[DoesNotThrow] public static void Target(bool flag) { " +
-            "try { throw new System.InvalidOperationException(); } " + handler + " }");
-        Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
+            "try { throw " + (explicitMessage ? "new System.InvalidOperationException(\"failure\")" : "new System.InvalidOperationException()") + "; } " + handler + " }");
+        Assert.That(result.Outcome, outcome == null ? Is.Null : Is.TypeOf(outcome), result.Reason.ToString());
     }
 
     [TestCase("catch (System.ObjectDisposedException) { }", null)]
@@ -64,7 +66,8 @@ public sealed class NativeExplicitThrowTests
     // A site is allowed when its static type derives from an allowed type; a
     // created exception of another type refutes; a thrown variable's runtime
     // type may be an allowed subtype, so it stays unknown.
-    [TestCase("throw new System.ObjectDisposedException(\"gone\");", typeof(ProvenOutcome))]
+    [TestCase("throw new System.ObjectDisposedException(\"gone\");", null)]
+    [TestCase("throw new System.ObjectDisposedException(\"gone\", \"message\");", typeof(ProvenOutcome))]
     [TestCase("throw new System.ArgumentException();", typeof(RefutedOutcome))]
     [TestCase("throw (System.Exception)new System.InvalidOperationException();", null)]
     public async Task AllowedExceptionsCompareThrownTypes(string body, Type? outcome)

@@ -293,6 +293,14 @@ public sealed class Pr275BulkCoreApiTests
                 public static InvalidOperationException ConstructExceptionWithAllowedAllocation() =>
                     new InvalidOperationException();
 
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static Exception ConstructExplicitBaseException() =>
+                    new Exception("message");
+
+                [EffectContract(SharpProofEffect.Allocates, Complete = true)]
+                public static Exception ConstructExplicitBaseExceptionWithAllowedAllocation() =>
+                    new Exception("message");
+
                 public static int NoClaim(int value) => value + 1;
 
                 [EffectContract(SharpProofEffect.None, Complete = true)]
@@ -340,6 +348,8 @@ public sealed class Pr275BulkCoreApiTests
         var lockCall = Analyze(compilation, session, "Lock");
         var constructorCall = Analyze(compilation, session, "ConstructException");
         var constructorEffects = Analyze(compilation, session, "ConstructExceptionWithAllowedAllocation");
+        var explicitConstructor = Analyze(compilation, session, "ConstructExplicitBaseException");
+        var explicitConstructorEffects = Analyze(compilation, session, "ConstructExplicitBaseExceptionWithAllowedAllocation");
         var noClaim = Analyze(compilation, session, "NoClaim");
         var noViolation = Analyze(compilation, session, "NoViolation");
 
@@ -376,8 +386,10 @@ public sealed class Pr275BulkCoreApiTests
             AssertOutcomeWithoutDiagnostic(allowedThrow);
             AssertOutcomeWithoutDiagnostic(declaredThrow);
             AssertOutcomeWithDiagnostic(lockCall, "SP0016", "Synchronization");
-            AssertOutcomeWithoutDiagnostic(constructorCall);
-            AssertOutcomeWithoutDiagnostic(constructorEffects);
+            AssertOutcomeWithDiagnostic(constructorCall, "SP0016", "may use capabilities");
+            AssertOutcomeWithDiagnostic(constructorEffects, "SP0052", "may have undeclared effects");
+            AssertOutcomeWithoutDiagnostic(explicitConstructor);
+            AssertOutcomeWithoutDiagnostic(explicitConstructorEffects);
             Assert.That(noClaim.Outcome, Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
             Assert.That(noClaim.Diagnostics, Is.Empty);
             Assert.That(noViolation.Outcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));

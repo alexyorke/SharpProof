@@ -70,7 +70,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.UniverseMethodCount, Is.EqualTo(200));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("7E82E15FCC1072D6840020DAD19E302073035006E8A34D305806C2C8332F4A5C"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("31977072EF599C536C78C6897ADE56CA1E04DA61BCCB4F458045CAB5A79909C1"));
         Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
@@ -183,7 +183,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.UniverseSha256, Is.EqualTo("7E82E15FCC1072D6840020DAD19E302073035006E8A34D305806C2C8332F4A5C"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("31977072EF599C536C78C6897ADE56CA1E04DA61BCCB4F458045CAB5A79909C1"));
         Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.Passed, Is.True);
         var retained = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == "OSS0199"));
@@ -324,7 +324,7 @@ public sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
-        Assert.That(report.UniverseSha256, Is.EqualTo("7E82E15FCC1072D6840020DAD19E302073035006E8A34D305806C2C8332F4A5C"));
+        Assert.That(report.UniverseSha256, Is.EqualTo("31977072EF599C536C78C6897ADE56CA1E04DA61BCCB4F458045CAB5A79909C1"));
         Assert.That(report.Passed, Is.True);
         await TestContext.Progress.WriteLineAsync($"Purity oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; {report.NativeRefuted} refuted.");
     }
