@@ -49,8 +49,8 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | 2 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | 3 | 0 | 3 | 0 | partially-modeled |
-| M:System.Convert.ToInt64(System.Int16) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |
-| M:System.Convert.ToInt64(System.Int32) | call | 3 | 1 | 0 | 3 | 0 | unmodeled |
+| M:System.Convert.ToInt64(System.Int16) | call | 3 | 1 | 0 | 3 | 0 | partially-modeled |
+| M:System.Convert.ToInt64(System.Int32) | call | 3 | 1 | 0 | 3 | 0 | partially-modeled |
 | M:System.Guid.NewGuid | call | 3 | 3 | 0 | 0 | 3 | unmodeled |
 | M:System.Linq.Enumerable.Max(System.Collections.Generic.IEnumerable{System.Int32}) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | M:System.Linq.Enumerable.Min(System.Collections.Generic.IEnumerable{System.Int32}) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |

@@ -66,12 +66,19 @@ duplicate registrations. Mutation controls verify that removing an API/facet or
 postcondition witness, accepting a wrong claim, or omitting edge inputs is detected.
 
 `intrinsic-test-evidence.json` and `.md` cover the audited string, integer comparison,
-concrete Count invariants, and the guarded fresh-dictionary state slice. The inventory test compiles expressions through the
+checked integral `Convert.ToInt64`, concrete Count invariants, and the guarded
+fresh-dictionary state slice. The inventory test compiles expressions through the
 production frontend, and interprets their result and receiver-safety conditions against
 runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
 and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
 must be rejected. Integer and Count edges are described below. Every inventoried
-intrinsic requires a registered behavioral probe.
+intrinsic requires a registered behavioral probe. Conversion probes cover the nine
+integer/Char domains and Boolean 0/1, signed Int64 result width, and the UInt64
+overflow boundary. Native tests retain argument and class-initialization effects
+while checking arithmetic proof/refutation. Separate CLR/IR oracles check actual
+runtime boundaries, using concrete readiness only after observing initialization
+and the matching fixed primitive overload. Initializer effect claims, pure clauses
+and other conversion domains remain open.
 
 All four evidence files are included in the API inventory artifact, and both Markdown
 matrices appear in the CI job summary. To reproduce the catalog gate separately:
