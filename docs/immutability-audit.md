@@ -3157,3 +3157,12 @@ skips/warnings/errors. Nineteen fixed vectors preserve values, duplicate rows, e
 byte/nullable enum types and process/compiler input order. The plan's twelve-owner
 count was corrected to eleven files after exact-node selection. Mutable SUT buffers
 and reflection arrays remain unchanged.
+
+IMM-M099: TypeSpecializer builds substitution and signature maps only in its constructor.
+Use local symbol-comparer builders threaded through private static construction helpers,
+then assign readonly immutable fields once. The partial-counterpart TypesMatch callback
+must read the live construction substitutions builder synchronously; Specialize reads
+only frozen fields after construction. Preserve substitution indexer overwrite semantics,
+signature first-seen behavior, recursive type shape and nullable annotations. Validate
+constructed/partial generic contracts, flow capture and all Contracts tests.
+Status: open before edits.
