@@ -114,15 +114,15 @@ function Get-SharpProofFuzzCampaignSchedule {
         -RetainedRunCount $retainedRunSeeds.Count `
         -MaximumCases $maximumCaseCount
 
-    return [pscustomobject]@{
-        RotatingCases          = $scheduledRotatingCases
-        RequestedRotatingCases = $rotatingCaseCount
-        RetainedCasesPerSeed   = $retainedCaseCount
-        RetainedSeeds          = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]$RetainedSeeds)
-        RetainedRunSeeds       = $retainedRunSeeds.ToImmutable()
-        SharedRetainedSeed     = $sharedRetainedSeed
-        RequestedCases         = $requestedCases
-    }
+    return ([ordered]@{
+            RotatingCases          = $scheduledRotatingCases
+            RequestedRotatingCases = $rotatingCaseCount
+            RetainedCasesPerSeed   = $retainedCaseCount
+            RetainedSeeds          = [Collections.Immutable.ImmutableArray]::CreateRange[int]([int[]]$RetainedSeeds)
+            RetainedRunSeeds       = $retainedRunSeeds.ToImmutable()
+            SharedRetainedSeed     = $sharedRetainedSeed
+            RequestedCases         = $requestedCases
+        }).AsReadOnly()
 }
 
 function Read-SharpProofRetainedFuzzSeedManifest {
@@ -192,11 +192,11 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             & $AfterValidation $Path
         }
 
-        return [pscustomobject]@{
-            SchemaVersion = $schemaVersion
-            CasesPerSeed  = $casesPerSeed
-            Seeds         = $seeds.ToImmutable()
-        }
+        return ([ordered]@{
+                SchemaVersion = $schemaVersion
+                CasesPerSeed  = $casesPerSeed
+                Seeds         = $seeds.ToImmutable()
+            }).AsReadOnly()
     }
     finally {
         if ($null -ne $document) { $document.Dispose() }

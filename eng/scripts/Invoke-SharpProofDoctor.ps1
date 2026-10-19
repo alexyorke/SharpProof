@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $checks = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 function Add-Check([string]$Name, [string]$Status, [string]$Message, [string]$Action = '') {
-    $checks.Add([ordered]@{ name = $Name; status = $Status; message = $Message; action = $Action })
+    $checks.Add(([ordered]@{ name = $Name; status = $Status; message = $Message; action = $Action }).AsReadOnly())
 }
 $sdk = (& dotnet --version 2>$null | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) { Add-Check 'sdk' 'error' 'No compatible SDK was selected.' 'Install the SDK required by global.json.' }
@@ -45,7 +45,7 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
         $configuration = $evaluation.Properties
         $packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($evaluation.Items.PackageReference | Where-Object { $_.Identity -in $packageIds } | ForEach-Object {
                     $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
-                    [ordered]@{ id = $_.Identity; version = $version }
+                    ([ordered]@{ id = $_.Identity; version = $version }).AsReadOnly()
                 }))
         if ($packages.Length -eq 0) { Add-Check 'packages' 'warning' 'No direct SharpProof package references were evaluated.' 'Add SharpProof and restore the project; transitive references require inspection of the restored assets file.' }
         else { Add-Check 'packages' 'ok' "$($packages.Length) direct SharpProof package references found." }
@@ -61,7 +61,7 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
                     $resolvedPackages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($assets.libraries.Keys | Sort-Object | ForEach-Object {
                                 $parts = $_ -split '/', 2
                                 if ($parts.Count -eq 2 -and $parts[0] -in $packageIds) {
-                                    [ordered]@{ id = $parts[0]; version = $parts[1] }
+                                    ([ordered]@{ id = $parts[0]; version = $parts[1] }).AsReadOnly()
                                 }
                             }))
                 }
@@ -150,15 +150,15 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
 }
 else { Add-Check 'project' 'warning' 'No consumer project selected.' 'Pass -Target path/to/consumer.csproj to inspect effective configuration.' }
 $checkSnapshot = $checks.ToImmutable()
-$report = [ordered]@{
-    schemaVersion    = 1
-    host             = [ordered]@{ os = [Runtime.InteropServices.RuntimeInformation]::OSDescription; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); sdk = $sdk }
-    scope            = 'Read-only SDK discovery and trusted-project evaluation; no restore, build, write probe, solver execution, or secret/environment collection.'
-    packages         = $packages
-    resolvedPackages = $resolvedPackages
-    configuration    = $configuration
-    checks           = @($checkSnapshot)
-}
+$report = ([ordered]@{
+        schemaVersion    = 1
+        host             = ([ordered]@{ os = [Runtime.InteropServices.RuntimeInformation]::OSDescription; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); sdk = $sdk }).AsReadOnly()
+        scope            = 'Read-only SDK discovery and trusted-project evaluation; no restore, build, write probe, solver execution, or secret/environment collection.'
+        packages         = $packages
+        resolvedPackages = $resolvedPackages
+        configuration    = $configuration
+        checks           = $checkSnapshot
+    }).AsReadOnly()
 if ($Format -eq 'Json') { $report | ConvertTo-Json -Depth 12 }
 else {
     Write-Output "SharpProof doctor - $($report.host.os) / $($report.host.architecture)"

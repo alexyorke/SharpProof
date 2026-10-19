@@ -161,21 +161,21 @@ try {
         catch {
             $validationError = $_.Exception.Message
         }
-        return [pscustomobject][ordered]@{
-            name                = $Name
-            requestedCases      = $Cases
-            observedCases       = $observedCases
-            seed                = $Seed
-            exitCode            = $process.ExitCode
-            runnerSchemaVersion = $runnerSchemaVersion
-            agreements          = $agreements
-            abstentions         = $abstentions
-            runnerPassed        = $runnerPassed
-            validationPassed    = $null -eq $validationError
-            validationError     = $validationError
-            standardOutput      = "$logicalOutput/$Name.stdout.json"
-            standardError       = "$logicalOutput/$Name.stderr.txt"
-        }
+        return ([ordered]@{
+                name                = $Name
+                requestedCases      = $Cases
+                observedCases       = $observedCases
+                seed                = $Seed
+                exitCode            = $process.ExitCode
+                runnerSchemaVersion = $runnerSchemaVersion
+                agreements          = $agreements
+                abstentions         = $abstentions
+                runnerPassed        = $runnerPassed
+                validationPassed    = $null -eq $validationError
+                validationError     = $validationError
+                standardOutput      = "$logicalOutput/$Name.stdout.json"
+                standardError       = "$logicalOutput/$Name.stderr.txt"
+            }).AsReadOnly()
     }
 
     $runs = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
@@ -201,21 +201,21 @@ try {
                 $_.exitCode -ne 0 -or -not $_.validationPassed
             }))
     $campaignPassed = $failedRuns.Length -eq 0
-    $summary = [pscustomobject][ordered]@{
-        schemaVersion          = 5
-        status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
-        commit                 = $sourceCommit
-        rotatingSeed           = $RotatingSeed
-        rotatingCases          = $schedule.RotatingCases
-        requestedRotatingCases = $schedule.RequestedRotatingCases
-        retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
-        retainedSeeds          = $schedule.RetainedSeeds
-        requestedCases         = $schedule.RequestedCases
-        totalCases             = [int](@($runSnapshot |
-                    Measure-Object -Property observedCases -Sum).Sum)
-        runs                   = @($runSnapshot)
-        passed                 = $campaignPassed
-    }
+    $summary = ([ordered]@{
+            schemaVersion          = 5
+            status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
+            commit                 = $sourceCommit
+            rotatingSeed           = $RotatingSeed
+            rotatingCases          = $schedule.RotatingCases
+            requestedRotatingCases = $schedule.RequestedRotatingCases
+            retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
+            retainedSeeds          = $schedule.RetainedSeeds
+            requestedCases         = $schedule.RequestedCases
+            totalCases             = [int](@($runSnapshot |
+                        Measure-Object -Property { $_.observedCases } -Sum).Sum)
+            runs                   = $runSnapshot
+            passed                 = $campaignPassed
+        }).AsReadOnly()
     Complete-SharpProofFuzzEvidence `
         -OutputDirectory $resolvedOutput `
         -Summary $summary

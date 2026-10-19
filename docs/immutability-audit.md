@@ -3775,3 +3775,15 @@ skips/build warnings/errors; 16 exact embedded PDB outputs. Thirty pinned Roslyn
 native/immutable annotation/arity/exception controls pass and independent review
 confirms all four files, target-layer increment, non-null symbol provenance and matching
 nullable annotation vectors. Canonical whitespace check requires zero changes.
+
+IMM-M144 probe correction: Measure-Object's property-name binding does not read keys from readonly OrderedDictionary run records. Use its explicit property expression { $_.observedCases } at the summary aggregation; legal run records always carry the validated integer field. Preserve the baseline zero-run fragment's pre-existing missing-Sum failure (real campaigns always schedule at least one run), and test scalar property/filter/measure/JSON behavior before committing.
+
+IMM-M144 bounded controls verified: ten baseline/current wire/ordering/property/filter/
+measure comparisons and 48 indexer/property write-rejection checks pass. All three
+package snapshot controls, all 67 seed/validation/callback/source-capture controls,
+actual Doctor regressions and 87-PS/19-shell format verification pass. Independent
+review confirms nine inline backing maps have no escaping mutable alias, immutable
+check/run vectors preserve JSON arrays, and the explicit measure adapter is necessary.
+A minimal actual two-run campaign is planned after this commit to verify native runner
+integration and clean-source evidence publication; external Doctor configuration remains
+an open nested-record scope rather than a claimed deep immutable projection.
