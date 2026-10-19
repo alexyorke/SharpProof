@@ -3264,3 +3264,14 @@ one expected unsupported-host platform skip, zero build warnings/errors. Main re
 all 39 nodes and helper couplings, ZIP/JSON lifetime, pre-Prepare snapshots, native
 adapters and XML IndexOf assertions. First compilation identified a redundant claim-path
 copy after helper narrowing; direct immutable publication fixed it before this full run.
+
+IMM-M106: TotalSourceCallSession owns four private synchronous sets/maps for source/IL
+active membership, iterator classification and type-initialization eligibility. Main
+traced every use: none publishes a collection root; nested lowerers share the session
+synchronously and leave active membership through existing cleanup. Use readonly
+symbol/ordinal builders, retaining budget/cancellation/count checks before membership
+changes. Enter returns Add's boolean after existing guards; Leave remains idempotent.
+Cache indexers preserve SetItem overwrite semantics and partial classification timing.
+Session configuration properties and mutable budget/result flags remain separate scope.
+Validate source-session reentry, source/IL recursion, budgets and initialization coverage.
+Status: open before edits.
