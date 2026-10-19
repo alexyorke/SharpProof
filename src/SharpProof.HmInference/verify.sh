@@ -21,6 +21,7 @@ output=$(find artifacts/bin/SharpProof.HmInference -name SharpProof.HmInference.
 test -n "$output"
 mkdir -p /workspace/SharpProof/artifacts/hm-inference
 bash src/SharpProof.HmInference/verify-projects.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/project-checks.txt
+bash src/SharpProof.HmInference/verify-frameworks.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/framework-checks.txt
 dotnet "$output" --self-test | tee /workspace/SharpProof/artifacts/hm-inference/tests.txt
 dotnet "$output" --samples | tee /workspace/SharpProof/artifacts/hm-inference/samples.txt
 dotnet "$output" --hm-samples | tee /workspace/SharpProof/artifacts/hm-inference/hm-samples.txt

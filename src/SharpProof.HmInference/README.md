@@ -50,7 +50,9 @@ configuration. Dependencies are restored by default; `--no-restore` assumes curr
 restore assets. Build source-generator/analyzer project dependencies when their
 binaries are required. The native MSBuild graph supplies project contexts; source
 references are compiled to fresh in-memory metadata, including Visual Basic
-references. A source reference error stops analysis even when old binaries exist.
+references. Requested multi-target roots include every framework by default.
+Dependencies use the SDK-selected compatible target, excluding unused frameworks.
+A selected source reference error stops analysis even when old binaries exist.
 Project mode reports configured HM0001 diagnostics for each loaded C# target
 framework. A bare project/solution path is accepted too. Original compilation errors
 stop inference with exit code 1; missing files give exit code 2. Unsupported

@@ -8,31 +8,28 @@ internal sealed class ProjectBuildContexts
 {
     private static readonly char[] AliasSeparators = [',', ';'];
     private readonly ProjectGraph graph;
-    private readonly HashSet<ProjectGraphNode> scope = [];
     internal ProjectBuildContexts(string path, Dictionary<string, string> properties)
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(properties);
         graph = new ProjectGraph(path, properties);
-        foreach (var root in graph.EntryPointNodes)
-        { Visit(root); }
     }
 
-    private void Visit(ProjectGraphNode node)
+    internal IEnumerable<ProjectGraphNode> Roots => graph.EntryPointNodes.SelectMany(ExpandRoot).Distinct();
+
+    private static IEnumerable<ProjectGraphNode> ExpandRoot(ProjectGraphNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        if (!scope.Add(node))
-        { return; }
-        foreach (var dependency in References(node))
-        { Visit(dependency); }
+        if (!IsOuter(node))
+        { yield return node; yield break; }
+        foreach (var inner in node.ProjectReferences)
+        {
+            if (!SamePath(node.ProjectInstance.FullPath, inner.ProjectInstance.FullPath))
+            { continue; }
+            foreach (var target in ExpandRoot(inner))
+            { yield return target; }
+        }
     }
-
-    internal IEnumerable<ProjectGraphNode> Projects => graph.ProjectNodesTopologicallySorted.Where(node =>
-    {
-        ArgumentNullException.ThrowIfNull(node);
-        return scope.Contains(node) && !IsOuter(node);
-    });
-
     private static bool IsOuter(ProjectGraphNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
