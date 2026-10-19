@@ -415,6 +415,57 @@ public sealed class ApiUsageRankingTests
     }
 
     [Test]
+    public void UsageScanCreditsPublishedDictionaryOriginsWithoutCreditingUnprovenReceivers()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class DictionaryOriginUsageProbe {
+                private static readonly System.Collections.Generic.Dictionary<int, decimal> Field = new();
+                public static void Target<T>(System.Collections.Generic.Dictionary<int, decimal> incoming,
+                    System.Collections.Generic.IEqualityComparer<int> comparer, T key) where T : notnull {
+                    var fresh = new System.Collections.Generic.Dictionary<int, decimal>();
+                    Publish(fresh);
+                    fresh.Add(1, 23m); _ = fresh.ContainsKey(1); _ = fresh[1]; fresh[1] = 29m; _ = fresh.Count;
+                    incoming.Add(1, 23m); _ = incoming[1];
+                    var custom = new System.Collections.Generic.Dictionary<int, decimal>(comparer);
+                    custom.Add(1, 23m); _ = custom[1];
+                    var capacity = new System.Collections.Generic.Dictionary<int, decimal>(4);
+                    capacity.Add(1, 23m); _ = capacity[1];
+                    var genericKeys = new System.Collections.Generic.Dictionary<T, decimal>();
+                    genericKeys.Add(key, 23m); _ = genericKeys[key];
+                    Field.Add(1, 23m); _ = Field[1];
+                    fresh[1]++;
+                }
+                private static void Publish(System.Collections.Generic.Dictionary<int, decimal> data) { }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var target = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var known = KnownIntrinsicSites(model, target);
+        var freshMembers = target.DescendantNodes().Where(node => node is null ? throw new ArgumentNullException(nameof(node)) :
+            node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" } } } ||
+            node is ElementAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Parent: not PostfixUnaryExpressionSyntax } ||
+            node is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Name.Identifier.ValueText: "Count" }).ToArray();
+        Assert.That(freshMembers, Has.Length.EqualTo(5));
+        Assert.That(freshMembers.All(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.True);
+        var unprovenIndexers = target.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Except(freshMembers.OfType<ElementAccessExpressionSyntax>()).ToArray();
+        Assert.That(unprovenIndexers, Has.Length.EqualTo(6));
+        Assert.That(unprovenIndexers.Any(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.False);
+        var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
+        var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor })
+            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(), _ => "partially-modeled", StringComparer.Ordinal);
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, target, "test", "probe", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) :
+            site.Status == "partially-modeled" && !site.Api.Contains("#ctor", StringComparison.Ordinal)), Is.EqualTo(5));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(11));
+    }
+
+    [Test]
     public void UsageScanCreditsConcreteListParametersWithinTheirValueDomain()
     {
         var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
@@ -469,8 +520,8 @@ public sealed class ApiUsageRankingTests
             foreach (var invocation in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>())
             {
                 if (context.IsDefaultIntegerComparison(invocation) ||
-                    invocation.Instance != null && CSharpOperationSemantics.IsDefaultDictionaryStateMember(invocation.TargetMethod) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(invocation.TargetMethod) && context.IsDefaultDictionary(invocation.Instance) ||
+                    invocation.Instance != null && DictionaryMember(invocation.TargetMethod) &&
+                    context.IsDefaultDictionaryOrigin(invocation.Instance) ||
                     invocation.Instance != null && CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod) &&
                     (CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod) || context.IsExactList(invocation.Instance)))
                 { known.Add(invocation.Syntax.SpanStart); }
@@ -478,14 +529,23 @@ public sealed class ApiUsageRankingTests
             foreach (var property in graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IPropertyReferenceOperation>())
             {
                 if (context.ArrayCollectionReceiver(property) != null ||
-                    property.Instance != null && property.Property.GetMethod is { } getter && CSharpOperationSemantics.IsDefaultDictionaryStateMember(getter) &&
-                    CSharpOperationSemantics.IsDictionaryStateDeclaration(property.Property) && context.IsDefaultDictionary(property.Instance) ||
+                    property.Instance != null && property.Property.GetMethod is { } getter && DictionaryMember(getter) &&
+                    context.IsDefaultDictionaryOrigin(property.Instance) &&
+                    property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation) ||
                     property.Instance != null && property.Property.GetMethod is { } listGetter && CSharpOperationSemantics.IsListStateMember(listGetter) &&
                     (CSharpOperationSemantics.IsConcreteListStateMember(listGetter) || context.IsExactList(property.Instance)) &&
                     property.Parent is not (ICompoundAssignmentOperation or IIncrementOrDecrementOperation))
                 {
                     known.Add(property.Syntax.SpanStart);
                 }
+            }
+
+            bool DictionaryMember(IMethodSymbol member)
+            {
+                global::System.ArgumentNullException.ThrowIfNull(member);
+                return CSharpOperationSemantics.IsDefaultDictionaryStateMember(member,
+                    context.KnownValueType(member.ContainingType.TypeArguments.ElementAtOrDefault(0)),
+                    context.KnownValueType(member.ContainingType.TypeArguments.ElementAtOrDefault(1)));
             }
         }
 

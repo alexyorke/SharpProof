@@ -3353,3 +3353,26 @@ construction work pending full Frontend validation. Current Worker follow-up is 
 running on its isolated pre-merge snapshot. These pending batches are checkpointed for
 safe conflict resolution, not declared fully validated. Master advanced to 16063804e
 (#331 dictionary source-helper state); merge review takes priority before more changes.
+
+IMM-M113: Resolve master #331 conflicts by retaining constructor-origin dictionaries,
+identityOnly escape rules, owner-independent dictionary field identity, receiver/argument
+Pin calls and clause modeling. Keep scoped immutable construction from this branch:
+new origin sets become symbol/default builders, expression dictionary cache becomes a
+readonly builder with the new three-part local key and four-part interned identity,
+new DefaultDictionaryState accepts an immutable argument snapshot with initialized
+guard. Preserve source receiver specialization and immutable declaration/callee vectors.
+Review automatic Effects/Gates merges and run new dictionary helper/contract/old-heap
+controls plus full Frontend after the pre-merge Worker job ends.
+Status: merge reconciliation in progress.
+
+IMM-M106/M108/M110-M113 checkpoint validation: follow-up Worker run passes 131 tests,
+including golden fixtures, session reentry, IL/stack boundaries and declaration accounting;
+zero failures/skips/warnings/errors. The prior vc-shadow-core timeout did not reproduce;
+its cause remains unproven. Resolved #331 merge passes all 2,064 Frontend tests with zero
+failures/skips/warnings/errors. Independent four-file merge review confirms constructor
+origins, identityOnly escape rules, field interning identity, Pin order and immutable
+publication. Script format checks 87 PS/19 shell with zero changes; M109's 32 probes
+pass after formatting. New dictionary Worker workflow controls are still running.
+Inventory now covers 1,878 C# files/2,600 candidates (1,791 Open) and 84 PS scripts/
+1,090 candidates (809 Open), zero PS parse failures. Newly checked builder rows still
+await explicit classification. New master test collections remain in the open inventory.

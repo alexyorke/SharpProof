@@ -46,7 +46,7 @@ access kind and value domains satisfy the production guard.
 | Work item | Priority and present boundary | Concrete completion criteria |
 | --- | --- | --- |
 | A: IList / ICollection dispatch | 56 index reads, 13 writes, 40 Count reads; arbitrary standalone interface parameters remain open | Prove concrete receiver identity, add the concrete implementation's heap/effect model, and test aliases, joins, mutation, ref/closure escape and wrong implementations. Existing scalar-array provenance and exact List allocations/aliases are supported, including immutable generic source-helper parameters with caller implementation evidence; arbitrary incoming interface parameters remain open. |
-| D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key membership and scalar/reference contents remain separate; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
+| D: Dictionary | Fresh default construction and Count support all key/value domains; integer-key scalar/reference/opaque storage also flows through proven immutable source-helper parameters; the 40 reads, 22 Add, 22 ContainsKey and one write in the ranked corpus still lack receiver/domain evidence | Remaining: establish actual corpus receiver/comparer and generic/reference-key semantics; model incoming/custom comparers and callbacks, missing/null/duplicate keys, precise initialization/capacity/growth faults and partial mutation, views, removal and other constructors. Do not assume dictionary-typed parameters use default comparers. |
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add and scalar/reference/opaque get/set now share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
@@ -351,7 +351,8 @@ a subclass that reimplements interfaces, so it supplies no interface dispatch pr
 Allocation identity is separate from content knowledge. Unknown writers invalidate
 contents even after by-value publication. Rebinding, ref escape, closure capture,
 mixed definitions and unknown interface implementations retain conservative fallback.
-Helper contracts use caller entry state and Old values; a standalone arbitrary
+Helper preconditions use caller state; helper Ensures/Old expressions are not
+verified at specialized source call sites. A standalone arbitrary
 interface claim remains Unknown even when a proven call context can model its body.
 
 Native tests include scalar limits, Boolean/reference/null identity, shared mutation,
@@ -419,6 +420,52 @@ still need independent models. Those gaps stay open, with negative controls.
 Boxing controls retain allocation uncertainty for opaque and nullable elements.
 Existing alias invalidation, dispatch and growth/fault uncertainty remain. Normal
 CLR/IR growth choices consume approximation and grant no native replay authority.
+
+## Verified constructor-origin dictionary source parameters
+
+Parameterless framework dictionary allocation identity now flows through aliases,
+by-value publication and immutable source-helper parameters. Generic helpers
+specialize key/value storage from the caller's known domains and share Count,
+membership and values. Primitive-integer-key operations copy opaque values as
+atoms without interpreting their operators, fields, equality or conversions.
+Specialized source preconditions can read Count, ContainsKey and present values.
+Caller proofs use shared body state. Helper postconditions and Old heap
+expressions are not verified at specialized call sites; standalone incoming
+dictionaries remain unsupported. Their postcondition verification remains open.
+
+Allocation lineage does not prove the current comparer. A constructor-written
+heap predicate guards the primitive model after publication. Unknown writers
+invalidate that predicate and the contents, preserving opaque fallback. Incoming
+parameters, custom/explicit-comparer construction, ref escape, captured mutable
+parameters and mixed unproven receivers acquire no constructor-origin fact.
+Source preconditions remain obligations and cannot restore comparer knowledge.
+
+All 196 Dictionary worker tests pass, including 25 CLR/IR comparisons, source
+preconditions, key/receiver evaluation order and comparer mutation controls.
+Opaque insertion proves Count one and refutes Count zero without invoking value
+comparison/equality/hash callbacks. Failed initialization observations still
+cannot certify replay. Separate snapshot tests validate Old lowering with an
+explicitly supplied origin; these are not specialized postcondition proofs.
+False helper Ensures controls prove the actual return and refute the claimed
+wrong return, confirming those helper postconditions are not imported assumptions.
+Nine reproduced regressions also verify that generic construction specialized to
+primitive integer keys preserves caller memory. Non-primitive-key initialization
+retains arbitrary existing-state effects.
+The inventory's 29 tests pass with executed positive/wrong-claim probes for shared
+helper state and opaque atom storage. Exactly five existing partial declaration
+rows gain evidence; the reference manifest and declaration totals are unchanged.
+All 40 Dictionary frontend domain tests and nine ranking tests also pass. The
+pre-integration core run passes 2,057 frontend and 472 Gates tests. Integrated-head
+coverage and exact-commit CI remain gates.
+
+The original corpus still has 85 unmodeled Dictionary content sites: 23 use
+primitive keys but obtain receivers from static caches (9), virtual Trie Children
+properties (10), or graph fields (4). The remaining 62 also require generic-key
+equality/hash/comparer semantics. Capacity constructors and ref parameters remain
+separate barriers. This removes the source-helper and opaque-storage gaps only
+within the proven domain; it does not close those corpus sites or work item D.
+Precise initialization/growth/faults, missing/duplicate/null keys, views, removal,
+other constructors and arbitrary incoming/custom comparer behavior remain open.
 
 ## Cross-cutting gaps previously identified
 
@@ -662,9 +709,9 @@ These 45 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Byte.CompareTo(System.Byte) | intrinsic=integer-comparison |
 | M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | intrinsic=default-integer-comparer-only |
-| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
-| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state |
-| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
+| M:System.Collections.Generic.Dictionary`2.#ctor | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
+| M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
+| M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state |
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=concrete-list-state |
@@ -691,8 +738,8 @@ These 45 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.UInt16.CompareTo(System.UInt16) | intrinsic=integer-comparison |
 | M:System.UInt32.CompareTo(System.UInt32) | intrinsic=integer-comparison |
 | M:System.UInt64.CompareTo(System.UInt64) | intrinsic=integer-comparison |
-| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
-| P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state |
+| P:System.Collections.Generic.Dictionary`2.Count | catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state |
+| P:System.Collections.Generic.Dictionary`2.Item(`0) | intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage |
 | P:System.Collections.Generic.ICollection`1.Count | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state |
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | intrinsic=scalar-array-backed-interface;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | P:System.Collections.Generic.List`1.Count | catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative;intrinsic=fresh-list-state;intrinsic=concrete-list-state |

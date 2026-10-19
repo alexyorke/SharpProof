@@ -10,6 +10,19 @@ namespace SharpProof.Frontend.Test;
 
 public sealed class DictionaryDomainBoundaryTests
 {
+    [TestCase("((System.Collections.Generic.Dictionary<int, int>)data).Count", true)]
+    [TestCase("((System.Collections.Generic.Dictionary<int, int>)(object)data).Count", false)]
+    public void DictionaryConstructorOriginCrossesIdentityCastsButRequiresEvidenceForReferenceCasts(string expression, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var (model, syntax, graph, context) = Prepare("",
+            "var data = new System.Collections.Generic.Dictionary<int, int>(); return " + expression + ";");
+        context.TrackDefaultDictionaries(graph);
+        var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(
+            syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsDefaultDictionaryOrigin(property.Instance!), Is.EqualTo(expected));
+    }
+
     [TestCase("receiver", 255)]
     [TestCase("argument", 254)]
     [TestCase("value", 254)]
@@ -84,17 +97,17 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(expected));
     }
 
-    [TestCase("int", "T", "", true, false)]
+    [TestCase("int", "T", "", true, true)]
     [TestCase("int", "T", "where T : class", true, true)]
-    [TestCase("int", "T", "where T : struct", true, false)]
-    [TestCase("int", "T", "where T : unmanaged", true, false)]
-    [TestCase("int", "T", "where T : notnull", true, false)]
-    [TestCase("int", "T", "where T : System.IDisposable", true, false)]
+    [TestCase("int", "T", "where T : struct", true, true)]
+    [TestCase("int", "T", "where T : unmanaged", true, true)]
+    [TestCase("int", "T", "where T : notnull", true, true)]
+    [TestCase("int", "T", "where T : System.IDisposable", true, true)]
     [TestCase("int", "T", "where T : class, System.IDisposable", true, true)]
     [TestCase("int", "T", "where T : System.Exception", true, true)]
     [TestCase("string", "object", "", false, false)]
     [TestCase("T", "int", "where T : System.IComparable<T>", false, false)]
-    [TestCase("int", "decimal", "", true, false)]
+    [TestCase("int", "decimal", "", true, true)]
     [TestCase("int", "object[][]", "", true, false)]
     [TestCase("int", "object[]", "", true, true)]
     [TestCase("int", "int[,]", "", true, true)]
