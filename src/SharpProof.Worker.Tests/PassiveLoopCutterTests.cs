@@ -38,7 +38,7 @@ public sealed class PassiveLoopCutterTests
         var flagType = shape == "array-length" ? factory.GetOrCreateSequenceType(factory.IntegerType)
             : shape is "string-content" or "string-length" ? factory.StringType : factory.BooleanType;
         var flag = Parameter("flag", flagType);
-        var parameters = new[] { subject.Parameter, owner, other, flag };
+        var parameters = ImmutableArray.Create(subject.Parameter, owner, other, flag);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
         var entry = builder.CreateBlock();
         var header = builder.CreateBlock();
@@ -160,14 +160,14 @@ public sealed class PassiveLoopCutterTests
         var body = builder.CreateBlock();
         var exit = builder.CreateBlock();
         var headerSite = factory.CreateOperation("header");
-        foreach (var parameter in new[] { a, b, c, subject.Parameter })
+        foreach (var parameter in ImmutableArray.Create(a, b, c, subject.Parameter))
         {
             builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
             builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
         }
         builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(a.Current), selector,
             conditional ? factory.Boolean(false) : factory.Variable(b.Current));
-        foreach (var parameter in new[] { b, c })
+        foreach (var parameter in ImmutableArray.Create(b, c))
         { builder.FieldStore(entry, subject.Site, IrWriteRegion.Field, factory.Variable(parameter.Current), value, factory.Integer(0)); }
         builder.Goto(entry, subject.Site, header);
         builder.Branch(header, headerSite, factory.Binary(IrBinaryOperator.GreaterThan,
@@ -182,9 +182,9 @@ public sealed class PassiveLoopCutterTests
         builder.Goto(body, subject.Site, header);
         builder.Return(exit, subject.Site, factory.PureOpaque(value, factory.Variable(c.Current)));
         var requires = new List<PassiveContractClause>();
-        foreach (var parameter in new[] { a, b, c })
+        foreach (var parameter in ImmutableArray.Create(a, b, c))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(parameter.Entry), factory.Null(factory.ObjectType)), factory.Boolean(true), subject.Site)); }
-        foreach (var pair in new[] { (a, b), (a, c), (b, c) })
+        foreach (var pair in ImmutableArray.Create((a, b), (a, c), (b, c)))
         { requires.Add(new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(pair.Item1.Entry), factory.Variable(pair.Item2.Entry)), factory.Boolean(true), subject.Site)); }
         requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site));
         var candidate = new PassiveCallableCandidate("changing-heap-receiver", builder.Build(), [a, b, c, subject.Parameter], subject.Result,
@@ -234,7 +234,7 @@ public sealed class PassiveLoopCutterTests
             else
             { builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(value)); }
         }
-        foreach (var parameter in new[] { owner, subject.Parameter })
+        foreach (var parameter in ImmutableArray.Create(owner, subject.Parameter))
         {
             builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
             builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));

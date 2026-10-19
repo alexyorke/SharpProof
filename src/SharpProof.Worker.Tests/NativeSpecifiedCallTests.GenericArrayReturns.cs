@@ -14,11 +14,11 @@ public sealed partial class NativeSpecifiedCallTests
 {
     private static IEnumerable<TestCaseData> GenericArrayReturnCases()
     {
-        foreach (var element in new[] { "bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
+        foreach (var element in ImmutableArray.Create("bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong"))
         {
-            foreach (var local in new[] { false, true })
+            foreach (var local in ImmutableArray.Create(false, true))
             {
-                foreach (var correct in new[] { false, true })
+                foreach (var correct in ImmutableArray.Create(false, true))
                 { yield return new TestCaseData(element, local, correct); }
             }
         }
@@ -61,10 +61,10 @@ public sealed partial class NativeSpecifiedCallTests
     }
     private static IEnumerable<TestCaseData> GenericArrayReturnOracleCases()
     {
-        foreach (var element in new[] { "bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong" })
+        foreach (var element in ImmutableArray.Create("bool", "char", "sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong"))
         {
-            foreach (var local in new[] { false, true })
-            { foreach (var directArray in new[] { false, true }) { yield return new TestCaseData(element, local, directArray); } }
+            foreach (var local in ImmutableArray.Create(false, true))
+            { foreach (var directArray in ImmutableArray.Create(false, true)) { yield return new TestCaseData(element, local, directArray); } }
         }
     }
 
@@ -124,7 +124,7 @@ public sealed partial class NativeSpecifiedCallTests
             var elementType = factory.GetTypeInfo(arrayType).ElementType!.Value;
             foreach (var values in inputs)
             {
-                foreach (var index in new[] { -1, 0, (values?.Length ?? 0) - 1, values?.Length ?? 0, int.MaxValue }.Distinct())
+                foreach (var index in ImmutableArray.Create(-1, 0, (values?.Length ?? 0) - 1, values?.Length ?? 0, int.MaxValue).Distinct())
                 {
                     Exception? fault = null;
                     object? expected = null;

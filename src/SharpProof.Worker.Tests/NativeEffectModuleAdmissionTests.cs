@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -49,7 +50,7 @@ public sealed class NativeEffectModuleAdmissionTests
         Assert.That(result.ExceptionWitness, Is.Null);
         if (!beyond)
         {
-            Assert.That(result.EntryModel.Keys, Is.EqualTo(new[] { parameter.Entry }));
+            Assert.That(result.EntryModel.Keys, Is.EqualTo(ImmutableArray.Create(parameter.Entry)));
             var execution = new IrProgramInterpreter(factory).Execute(candidate.Program, result.EntryModel);
             Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(execution.ConsumedApproximation, Is.False);

@@ -49,7 +49,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         var owned = total!;
         var factory = owned.Program.Factory;
         var entry = owned.Parameters.Single().Entry;
-        foreach (var input in new[] { -17, 0, 23 })
+        foreach (var input in ImmutableArray.Create(-17, 0, 23))
         {
             var expected = input - 7;
             Assert.That(subject.InvokeRoot(input), Is.EqualTo(expected));

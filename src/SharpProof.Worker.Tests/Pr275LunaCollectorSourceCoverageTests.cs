@@ -133,12 +133,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
             StringComparer.Ordinal);
 
-        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(new[]
-        {
-            MethodKind.Constructor,
-            MethodKind.PropertyGet,
-            MethodKind.PropertySet
-        }));
+        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(ImmutableArray.Create(MethodKind.Constructor, MethodKind.PropertyGet, MethodKind.PropertySet)));
         foreach (var target in targets)
         {
             var manifestClaims = target.EffectClaims

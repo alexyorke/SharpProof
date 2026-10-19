@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
@@ -70,7 +71,7 @@ public sealed class OptionalDefaultBoxingAuditTests
             var echoMethod = boundaryType.GetMethod("Echo")!;
             var echo = echoMethod.CreateDelegate<Func<object, object>>();
             var calleeIl = echoMethod.GetMethodBody()!.GetILAsByteArray()!;
-            Assert.That(calleeIl, Is.EqualTo(new byte[] { 0x02, 0x2A }), "Reviewed callee must only return its supplied reference.");
+            Assert.That(calleeIl, Is.EqualTo(ImmutableArray.Create<byte>(0x02, 0x2A)), "Reviewed callee must only return its supplied reference.");
             var sentinel = new object();
             var calleeControl = Measure(() => echo(sentinel));
             Assert.That(calleeControl.Value, Is.SameAs(sentinel));

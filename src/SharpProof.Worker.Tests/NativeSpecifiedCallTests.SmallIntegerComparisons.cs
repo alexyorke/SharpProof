@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -7,9 +8,9 @@ public sealed partial class NativeSpecifiedCallTests
 {
     private static IEnumerable<TestCaseData> SmallIntegerComparisonCases()
     {
-        foreach (var element in new[] { "sbyte", "byte", "short", "ushort", "char" })
+        foreach (var element in ImmutableArray.Create("sbyte", "byte", "short", "ushort", "char"))
         {
-            foreach (var correct in new[] { false, true })
+            foreach (var correct in ImmutableArray.Create(false, true))
             { yield return new TestCaseData(element, correct); }
         }
     }

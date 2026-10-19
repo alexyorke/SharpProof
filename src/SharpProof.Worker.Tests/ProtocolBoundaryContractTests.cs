@@ -53,7 +53,7 @@ public sealed class ProtocolBoundaryContractTests
         manifest.Callables[0].SelectedFeatures = [feature, WorkerSelectedFeature.Contracts];
         WorkerProtocolJson.Canonicalize(manifest);
         Assert.That(manifest.Callables[0].SelectedFeatures,
-            Is.EqualTo(new[] { feature, WorkerSelectedFeature.Contracts }
+            Is.EqualTo(ImmutableArray.Create(feature, WorkerSelectedFeature.Contracts)
                 .OrderBy(value => value.ToString(), StringComparer.Ordinal)));
     }
 
@@ -66,7 +66,7 @@ public sealed class ProtocolBoundaryContractTests
         manifest.Callables[0].SelectionReasons = [reason, WorkerSelectionReason.ExplicitAnnotation];
         WorkerProtocolJson.Canonicalize(manifest);
         Assert.That(manifest.Callables[0].SelectionReasons,
-            Is.EqualTo(new[] { reason, WorkerSelectionReason.ExplicitAnnotation }
+            Is.EqualTo(ImmutableArray.Create(reason, WorkerSelectionReason.ExplicitAnnotation)
                 .OrderBy(value => value.ToString(), StringComparer.Ordinal)));
     }
 

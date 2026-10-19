@@ -115,12 +115,7 @@ public sealed class Pr275CoreRequiredInputTests
         var lowering = TotalBodyLowering.Lower(
             fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         var variables = context.Parameters
-            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[]
-            {
-                parameter.Entry,
-                parameter.Current,
-                parameter.PreState
-            }))
+            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
             .Concat(lowering.Program.Blocks
                 .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrAssignInstruction>()

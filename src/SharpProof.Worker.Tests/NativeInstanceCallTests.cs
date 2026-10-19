@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -50,7 +51,7 @@ public sealed class NativeInstanceCallTests
             Assert.That(purity.Outcome, Is.TypeOf<ProvenOutcome>(), purity.Reason.ToString());
             // The downcast may fail, allocating its exception, but whether it
             // does is not concrete.
-            foreach (var result in new[] { allocations, exceptions })
+            foreach (var result in ImmutableArray.Create(allocations, exceptions))
             {
                 Assert.That(result.Outcome, Is.Null);
                 Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));

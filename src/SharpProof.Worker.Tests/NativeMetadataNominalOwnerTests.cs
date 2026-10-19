@@ -110,7 +110,7 @@ public sealed class NativeMetadataNominalOwnerTests
         var factory = decoded.Body.Program.Factory;
         var entries = decoded.Body.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
         var token = Activator.CreateInstance(subject.RootMethod.DeclaringType!.Assembly.GetType("Token")!)!;
-        foreach (var aliases in new[] { false, true })
+        foreach (var aliases in ImmutableArray.Create(false, true))
         {
             var other = aliases ? token : new object();
             var observations = 0;

@@ -121,9 +121,9 @@ public sealed partial class NativeSpecifiedCallTests
             var runtime = assembly.GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int[]?, int, int, int, int>>();
             foreach (var values in new int[]?[] { null, [], [17], [11, 23], [-1, 0, 7] })
             {
-                foreach (var first in new[] { -1, 0, 1, values?.Length ?? 0 })
+                foreach (var first in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                 {
-                    foreach (var second in new[] { -1, 0, 1, values?.Length ?? 0 })
+                    foreach (var second in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                     {
                         for (var read = 0; read < Math.Max(1, values?.Length ?? 0); read++)
                         {

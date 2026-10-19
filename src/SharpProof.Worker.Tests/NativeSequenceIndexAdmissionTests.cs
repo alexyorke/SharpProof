@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -57,7 +58,7 @@ public sealed class NativeSequenceIndexAdmissionTests
         var ensures = factory.Binary(IrBinaryOperator.Equal, factory.Variable(resultVariable), factory.Integer(falsePostcondition ? 2 : 1));
         var candidate = new PassiveCallableCandidate("sequence-index-admission", builder.Build(), [parameter], resultVariable,
             [new(requires, factory.Boolean(true), site)], [new(ensures, factory.Boolean(true), site)]);
-        foreach (var original in new[] { 0, 7 })
+        foreach (var original in ImmutableArray.Create(0, 7))
         {
             var replay = new IrProgramInterpreter(factory).Execute(candidate.Program,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(original)])));

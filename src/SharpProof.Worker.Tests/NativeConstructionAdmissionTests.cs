@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -15,7 +16,7 @@ public sealed class NativeConstructionAdmissionTests
         System.ArgumentNullException.ThrowIfNull(dimension);
         var bounded = CreateCandidate(dimension, 1);
         var enlarged = CreateCandidate(dimension, PassiveCallableVcBuilder.MaximumSteps + 1);
-        foreach (var candidate in new[] { bounded, enlarged })
+        foreach (var candidate in ImmutableArray.Create(bounded, enlarged))
         {
             // The public builder accepts both owned programs, and their entry
             // executes normally. Size admission does not imply malformed IR.
@@ -75,7 +76,7 @@ public sealed class NativeConstructionAdmissionTests
         var candidate = new PassiveCallableCandidate("bounded-expansion-admission", builder.Build(), [input], null, [], [ensures]);
         Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
-        foreach (var value in new[] { false, true })
+        foreach (var value in ImmutableArray.Create(false, true))
         {
             var inputValue = factory.CreateBooleanValue(value);
             var actual = new IrProgramInterpreter(factory).Execute(candidate.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input.Entry, inputValue).SetItem(input.Current, inputValue).SetItem(input.Old, inputValue));

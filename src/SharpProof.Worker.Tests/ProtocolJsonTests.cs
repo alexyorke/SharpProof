@@ -1167,8 +1167,7 @@ public sealed class ProtocolJsonTests
         var requestJson = WorkerProtocolJson.SerializeRequest(CreateRequest());
         var response = CreateShapeCoverageResponse();
         var responseJson = WorkerProtocolJson.SerializeResponse(response);
-        var cases = new (string Json, Func<JsonObject, JsonObject> Select, string Property)[]
-        {
+        var cases = ImmutableArray.Create<(string Json, Func<JsonObject, JsonObject> Select, string Property)>(
             (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["compilerManifest"]!.AsObject()), "path"),
             (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["budgets"]!.AsObject()), "queryRlimit"),
             (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["cache"]!.AsObject()), "enabled"),
@@ -1184,8 +1183,7 @@ public sealed class ProtocolJsonTests
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!.AsObject()), "cacheStatus"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!["versions"]!.AsObject()), "protocolVersion"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!["budgets"]!.AsObject()), "queryRlimit"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["errors"]![0]!.AsObject()), "code")
-        };
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["errors"]![0]!.AsObject()), "code"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1219,13 +1217,7 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            foreach (var invalid in new[]
-            {
-                caseVariant,
-                numericString,
-                extra.ToJsonString(),
-                arraySwap.ToJsonString()
-            })
+            foreach (var invalid in ImmutableArray.Create(caseVariant, numericString, extra.ToJsonString(), arraySwap.ToJsonString()))
             {
                 Assert.Throws<JsonException>((Action)(() =>
                     WorkerProtocolJson.DeserializeResponse(invalid)));
@@ -1672,10 +1664,7 @@ public sealed class ProtocolJsonTests
         }];
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        foreach (var separator in new[]
-        {
-            "\n", "\r", "\t", "\u001b", "\u2028", "\u2029"
-        })
+        foreach (var separator in ImmutableArray.Create("\n", "\r", "\t", "\u001b", "\u2028", "\u2029"))
         {
             { response = response with { Errors = response.Errors.ReplaceAt(0, response.Errors[0] with { Code = "worker" + separator + "infrastructure" }) }; }
             AssertContainsErrorCode(
@@ -2022,10 +2011,7 @@ public sealed class ProtocolJsonTests
             Assert.That(roundtrip.RunStatus, Is.EqualTo(status));
             Assert.That(roundtrip.Manifest.Claims, Is.Empty);
             Assert.That(roundtrip.ClaimResults, Is.Empty);
-            Assert.That(roundtrip.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Is.EqualTo(hasCallable ? [] : new[]
-            {
-                status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout
-            }));
+            Assert.That(roundtrip.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Is.EqualTo(hasCallable ? [] : ImmutableArray.Create(status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout)));
             Assert.That(VerificationCache.IsCacheable(roundtrip, inputHash, manifest), Is.False);
         }
         var originalError = new WorkerProtocolError
@@ -2037,7 +2023,7 @@ public sealed class ProtocolJsonTests
             manifest, request.Budgets, status, WorkerRunFailureReason.None,
             WorkerCallableCoverageReason.ProjectTimeout, WorkerClaimReason.ProjectTimeout,
             errors: [originalError], versions: versions);
-        Assert.That(contextual.Errors, Is.EqualTo(new[] { originalError }));
+        Assert.That(contextual.Errors, Is.EqualTo(ImmutableArray.Create(originalError)));
         { roundtrip = roundtrip with { RunStatus = WorkerRunStatus.Complete }; }
         Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
             inputHash, manifest, request, versions).IsValid, Is.False);

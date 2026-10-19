@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
@@ -21,7 +22,7 @@ public sealed partial class NativeSpecifiedCallTests
         var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
-            foreach (var result in new[] { exceptions, allocations, purity, capabilities })
+            foreach (var result in ImmutableArray.Create(exceptions, allocations, purity, capabilities))
             { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         }
     }

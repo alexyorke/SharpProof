@@ -179,7 +179,7 @@ public sealed class PassiveExceptionLoopTests
         var havocs = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>().ToImmutableArray();
         Assert.That(havocs, Has.Length.EqualTo(insideEntry ? 1 : 2));
         Assert.That(havocs.Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin)), Is.All.EqualTo(IrHavocOrigin.Approximation));
-        Assert.That(havocs.SelectMany(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Variables)).Intersect(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Old })))), Is.Empty);
+        Assert.That(havocs.SelectMany(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Variables)).Intersect(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Old))))), Is.Empty);
         Assert.That(proof.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation)),
             Is.All.EqualTo(candidate.Ensures[0].Operation));
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -189,7 +189,7 @@ public sealed class PassiveExceptionLoopTests
         using var solver = new PassiveCallableSolver(plan);
         var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        Assert.That(result.EntryModel.Keys, Is.EqualTo(new[] { candidate.Parameters[0].Entry }));
+        Assert.That(result.EntryModel.Keys, Is.EqualTo(ImmutableArray.Create(candidate.Parameters[0].Entry)));
         Assert.That(result.EntryModel.Values.Single().IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(3)));
         Assert.That(result.BodyAssumptions, Is.Empty);
     }

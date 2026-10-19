@@ -151,10 +151,10 @@ public sealed class IteratorRootAdmissionControlTests
             Assert.That(claim.Location.Length, Is.EqualTo(attributeSyntax.Span.Length));
             Assert.That(effectClaim.ContractKind, Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
             Assert.That(effectClaim.ClaimId, Is.EqualTo(claim.ClaimId));
-            Assert.That(preparation.Entry.ClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(preparation.Entry.ClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
             Assert.That(preparation.Entry.Assumptions, Is.Empty);
             Assert.That(preparation.Total, Is.Not.Null);
-            Assert.That(preparation.Total!.ValidEffectClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(preparation.Total!.ValidEffectClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
             Assert.That(preparation.Total.Clauses, Is.Empty);
             Assert.That(preparation.Total.CallPreconditions, Is.Empty);
             Assert.That(native.BodyAssumptions, Is.Empty);

@@ -13,11 +13,11 @@ public sealed class NativeAllocationEffectTests
     [Test]
     public void DelegateNullEmissionDistinguishesEscapingAndErasedConstruction()
     {
-        foreach (var optimization in new[] { Microsoft.CodeAnalysis.OptimizationLevel.Debug, Microsoft.CodeAnalysis.OptimizationLevel.Release })
+        foreach (var optimization in ImmutableArray.Create(Microsoft.CodeAnalysis.OptimizationLevel.Debug, Microsoft.CodeAnalysis.OptimizationLevel.Release))
         {
-            foreach (var framework in new[] { false, true })
+            foreach (var framework in ImmutableArray.Create(false, true))
             {
-                foreach (var escapes in new[] { false, true })
+                foreach (var escapes in ImmutableArray.Create(false, true))
                 {
                     var source = "public class Receiver { public void Sink() {} } public static class C { public static object Target() { " +
                         (framework ? "System.Func<string> action = new System.Func<string>(((string)null).Trim); "
@@ -282,9 +282,11 @@ public sealed class NativeAllocationEffectTests
         var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
         (allocation, graph) = graph.ChangeRow(allocation, allocation with
         {
-            Items = (mutation == "count" ? new[] { allocation.Items[0] }
-                    : new[] { PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
-                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)), allocation.Items[1] }).ToImmutableArray()
+            Items = (mutation == "count" ? ImmutableArray.Create(allocation.Items[0])
+                    : ImmutableArray.Create(
+                        PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
+                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)),
+                        allocation.Items[1]))
         });
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(

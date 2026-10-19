@@ -143,11 +143,11 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             var targetMethod = type.GetMethod("Target")!;
             var controlMethod = type.GetMethod("Control")!;
             var sourceMethod = type.GetMethod("SourceEcho", BindingFlags.NonPublic | BindingFlags.Static)!;
-            foreach (var method in new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod })
+            foreach (var method in ImmutableArray.Create(targetMethod, controlMethod, sourceMethod, boundaryMethod))
             { AssertNoInliningOnly(method); }
             Assert.That(boundaryMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
             Assert.That(sourceMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
-            var il = new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod }.Select(DescribeIl).ToImmutableArray();
+            var il = ImmutableArray.Create(targetMethod, controlMethod, sourceMethod, boundaryMethod).Select(DescribeIl).ToImmutableArray();
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
                 JsonSerializer.Serialize(il, WorkerProtocolJson.SharedOptions));
             var target = targetMethod.CreateDelegate<Func<decimal, object, int>>();

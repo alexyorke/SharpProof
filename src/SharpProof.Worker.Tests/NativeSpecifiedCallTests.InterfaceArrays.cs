@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -156,7 +157,7 @@ public sealed partial class NativeSpecifiedCallTests
         var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (!valid)
         { Assert.That(purity.Outcome, Is.Not.TypeOf<RefutedOutcome>(), "A possible cache write must not fabricate a definite impurity."); }
-        foreach (var result in new[] { allocations, purity, capabilities })
+        foreach (var result in ImmutableArray.Create(allocations, purity, capabilities))
         { Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(valid), result.Reason.ToString()); }
     }
 
@@ -188,7 +189,9 @@ public sealed partial class NativeSpecifiedCallTests
     public async Task InterfaceArrayBoundsRetainResourceCallbackExceptionUncertainty(string allowed, bool expected)
     {
         System.ArgumentNullException.ThrowIfNull(allowed);
-        foreach (var access in new[] { "return ((System.Collections.Generic.IList<int>)values)[index];", "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;" })
+        foreach (var access in ImmutableArray.Create(
+            "return ((System.Collections.Generic.IList<int>)values)[index];",
+            "((System.Collections.Generic.IList<int>)values)[index] = 37; return 0;"))
         {
             var preparation = Prepare("[AllowedExceptions(typeof(" + allowed + "))] public static int Target(int[] values, int index) { Contract.Requires(values != null); " + access + " }");
             var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Smt;
@@ -126,8 +127,8 @@ public sealed class NativeOpaqueTermAdmissionTests
         }
         builder.Return(block, site, returnValue);
         var ensures = resultVariable is { } result
-            ? new[] { new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal, factory.Variable(result), factory.Integer(1)),
-                factory.Boolean(true), site) }
+            ? ImmutableArray.Create(new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal, factory.Variable(result), factory.Integer(1)),
+                factory.Boolean(true), site))
             : [];
         var candidate = new PassiveCallableCandidate("external-operand-admission", builder.Build(), [], resultVariable, [], [.. ensures]);
         var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);

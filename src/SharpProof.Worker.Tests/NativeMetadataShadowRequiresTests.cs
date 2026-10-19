@@ -55,7 +55,7 @@ public sealed class NativeMetadataShadowRequiresTests
         var (execution, observations) = Execute(native, callerType, callerInput);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(result)));
-        Assert.That(observations, Is.EqualTo(new[] { predicate }));
+        Assert.That(observations, Is.EqualTo(ImmutableArray.Create(predicate)));
         var runtimeInput = int.Parse(callerInput!, CultureInfo.InvariantCulture);
         Assert.That(subject.RootMethod.Invoke(null, [runtimeInput]), Is.EqualTo(result));
         Assert.That(JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest), Is.EqualTo(baseline));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -54,7 +55,7 @@ public sealed class NativeAcyclicLoopAdmissionTests
         var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
-        foreach (var value in new[] { false, true })
+        foreach (var value in ImmutableArray.Create(false, true))
         {
             var inputValue = factory.CreateBooleanValue(value);
             var execution = new IrProgramInterpreter(factory).Execute(candidate.Program,

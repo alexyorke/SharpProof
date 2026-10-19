@@ -103,7 +103,7 @@ public sealed class MetadataClauseOriginTests
                     "maximum" => origin with { Maximum = 9 },
                     "signature" => origin with { ConstructorSignature = [0x20, 0, 1] },
                     "blob" => origin with { ValueBlob = [1] },
-                    "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(new byte[65_536]) },
+                    "oversized" => origin with { ValueBlob = ImmutableArray.CreateRange(Enumerable.Repeat((byte)0, 65_536)) },
                     "missing-origin" => null,
                     "wrong-table" => origin with { MethodToken = 0x08000001 },
                     _ => origin

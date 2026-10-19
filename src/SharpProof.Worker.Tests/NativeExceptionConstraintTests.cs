@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -60,7 +61,7 @@ public sealed class NativeExceptionConstraintTests
         try
         {
             var assembly = context.LoadFromStream(image);
-            foreach (var argument in new[] { typeof(int), typeof(string) })
+            foreach (var argument in ImmutableArray.Create(typeof(int), typeof(string)))
             {
                 var target = assembly.GetType("C")!.GetMethod("Target")!.MakeGenericMethod(argument);
                 var node = Activator.CreateInstance(assembly.GetType("Node`1")!.MakeGenericType(argument));

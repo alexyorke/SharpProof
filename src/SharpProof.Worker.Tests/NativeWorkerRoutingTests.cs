@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Ir;
@@ -32,7 +33,7 @@ public sealed class NativeWorkerRoutingTests
         {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
-                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+                Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(response.ClaimResults[1].Model, Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -143,7 +144,7 @@ public sealed class NativeWorkerRoutingTests
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)),
-            Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
+            Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
 

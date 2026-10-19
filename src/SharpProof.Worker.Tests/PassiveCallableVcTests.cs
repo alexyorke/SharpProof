@@ -34,7 +34,7 @@ public sealed class PassiveCallableVcTests
         if (result.Kind == PassiveCallableFeasibilityKind.Feasible)
         {
             Assert.That(result.Evidence.Outcome, Is.TypeOf<RefutedOutcome>());
-            Assert.That(result.Evidence.EntryModel.Keys, Is.EqualTo(new[] { subject.Parameter.Entry }));
+            Assert.That(result.Evidence.EntryModel.Keys, Is.EqualTo(ImmutableArray.Create(subject.Parameter.Entry)));
         }
     }
 
@@ -130,11 +130,11 @@ public sealed class PassiveCallableVcTests
         Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
         var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(proof.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
+        Assert.That(proof.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.True);
         var normal = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
-        Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
+        Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
@@ -329,13 +329,13 @@ public sealed class PassiveCallableVcTests
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<LoweredJustification>()
             .Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (justification.Operation)).Distinct(),
-            Is.EqualTo(new[] { subject.Site }));
+            Is.EqualTo(ImmutableArray.Create(subject.Site)));
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<UserAssumedJustification>()
             .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
         var proof = (ProvenOutcome)await kernel.VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(plan.CoreLabels(proof), Has.Length.EqualTo(query.Assumptions.Length));
-        Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(new[] { subject.Site }));
+        Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(ImmutableArray.Create(subject.Site)));
         var other = new ScalarSubject();
         var otherBlock = other.Builder.CreateBlock();
         other.Builder.Return(otherBlock, other.Site, other.Factory.Integer(0));

@@ -19,7 +19,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
     {
         var compilation = TestCompilation.Create("Pr275ActualCaptureCache",
             Enumerable.Range(0, treeCount).Select(index =>
-                ($"Subject{index}.cs", $"public static class Subject{index} {{ public static int Value() => {index}; }}")).ToArray());
+                ($"Subject{index}.cs", $"public static class Subject{index} {{ public static int Value() => {index}; }}")).ToImmutableArray());
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
@@ -45,7 +45,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
             Assert.That(captured[ordinal].Sha256,
                 Is.EqualTo(CompilerCompilationCapture.CaptureTree(trees[ordinal], TestContext.CurrentContext.CancellationToken).Sha256));
         }
-        foreach (var invalidOrdinal in new[] { -1, treeCount, int.MaxValue })
+        foreach (var invalidOrdinal in ImmutableArray.Create(-1, treeCount, int.MaxValue))
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, invalidOrdinal, out var length), Is.False);
             Assert.That(length, Is.Zero);

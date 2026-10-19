@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -18,14 +19,7 @@ public sealed partial class NativeSpecifiedCallTests
         var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        foreach (var result in new[]
-        {
-            exceptions,
-            allocations,
-            purity
-        }
-
-        )
+        foreach (var result in ImmutableArray.Create(exceptions, allocations, purity))
         {
             Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         }
@@ -96,16 +90,14 @@ public sealed partial class NativeSpecifiedCallTests
     {
         System.ArgumentNullException.ThrowIfNull(type);
         var declaration = "System.Collections.Generic.Comparer<" + type + ">";
-        foreach (var body in new[]
-        {
+        foreach (var body in ImmutableArray.Create(
             "var comparer = " + declaration + ".Default; return comparer.Compare(left, right);",
             "var comparer = " + declaration + ".Default; var alias = comparer; return alias.Compare(y: right, x: left);",
             declaration + " comparer; if (left == right) comparer = " + declaration + ".Default; else comparer = " + declaration + ".Default; return comparer.Compare(left, right);",
             "var comparer = left == right ? " + declaration + ".Default : " + declaration + ".Default; return comparer.Compare(left, right);",
             "var comparer = " + declaration + ".Default; return comparer.Compare(left, right == left ? left : right);",
             "var comparer = " + declaration + ".Default; comparer = " + declaration + ".Default; return comparer.Compare(left, right);",
-            "var comparer = " + declaration + ".Default; return ((" + declaration + ")comparer).Compare(left, right);"
-        })
+            "var comparer = " + declaration + ".Default; return ((" + declaration + ")comparer).Compare(left, right);"))
         { await CheckComparisonContract(type, body, WorkerClaimOutcome.Proven); }
     }
 

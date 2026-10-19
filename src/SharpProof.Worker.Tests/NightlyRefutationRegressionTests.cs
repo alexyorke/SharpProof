@@ -47,7 +47,7 @@ public sealed class NightlyRefutationRegressionTests
         image.Position = 0;
         var assembly = System.Reflection.Assembly.Load(image.ToArray());
         var target = assembly.GetType("C")!.GetMethod("Target")!;
-        foreach (var x in new[] { 1, 2 })
+        foreach (var x in ImmutableArray.Create(1, 2))
         {
             var exception = Assert.Throws<System.Reflection.TargetInvocationException>(
                 new Action(() => { _ = target.Invoke(null, [x]); }));

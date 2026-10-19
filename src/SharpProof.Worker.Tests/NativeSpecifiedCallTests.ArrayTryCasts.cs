@@ -96,7 +96,7 @@ public sealed partial class NativeSpecifiedCallTests
             var runtime = load.LoadFromStream(emitted).GetType("C")!.GetMethod("Target")!.CreateDelegate<Func<int[]?, int, int, int>>();
             foreach (var values in new int[]?[] { null, [], [11], [17, 23] })
             {
-                foreach (var index in new[] { -1, 0, 1, values?.Length ?? 0 })
+                foreach (var index in ImmutableArray.Create(-1, 0, 1, values?.Length ?? 0))
                 {
                     Exception? fault = null;
                     var expected = 0;

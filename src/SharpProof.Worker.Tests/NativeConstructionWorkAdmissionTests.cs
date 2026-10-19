@@ -14,7 +14,7 @@ public sealed class NativeConstructionWorkAdmissionTests
     {
         var small = DispatcherLoops(3);
         var large = DispatcherLoops(300);
-        foreach (var candidate in new[] { small, large })
+        foreach (var candidate in ImmutableArray.Create(small, large))
         {
             Assert.That(candidate.Program.Blocks.Length, Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
             AssertReturned(new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program));
@@ -37,7 +37,7 @@ public sealed class NativeConstructionWorkAdmissionTests
     {
         var small = HeapStores(1);
         var large = HeapStores(725);
-        foreach (var candidate in new[] { small, large })
+        foreach (var candidate in ImmutableArray.Create(small, large))
         {
             Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(),
                 Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));

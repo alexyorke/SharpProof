@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -30,18 +31,14 @@ public sealed class NativeFieldRefutationReplayTests
         var observed = factory.CreateVariable("observed", factory.IntegerType);
         builder.Assign(block, site, observed, Read(parameter.Current));
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site)
-        };
-        var ensures = new[]
-        {
+            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site));
+        var ensures = ImmutableArray.Create(
             new PassiveContractClause(Equal(Read(parameter.Current), factory.Integer(1)), factory.Boolean(true), site),
             new PassiveContractClause(Equal(Read(parameter.Old), factory.Integer(0)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Current), factory.Integer(0)), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Current), factory.Integer(0)), factory.Boolean(true), site));
         var candidate = new PassiveCallableCandidate("field-current-refutation", builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var owner = factory.CreateReferenceValue(boxType,

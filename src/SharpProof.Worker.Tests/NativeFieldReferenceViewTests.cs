@@ -117,9 +117,9 @@ public sealed class NativeFieldReferenceViewTests
 
     private static IEnumerable<TestCaseData> AdditionalPrimitiveCases()
     {
-        foreach (var typeName in new[] { "Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64" })
+        foreach (var typeName in ImmutableArray.Create("Boolean", "Int8", "UInt8", "Int16", "UInt16", "UInt32", "Int64", "UInt64"))
         {
-            foreach (var upcastStoreView in new[] { false, true })
+            foreach (var upcastStoreView in ImmutableArray.Create(false, true))
             {
                 var viewName = upcastStoreView ? "ObjectUpcast" : "SameView";
                 yield return new TestCaseData(typeName, upcastStoreView)
@@ -172,17 +172,13 @@ public sealed class NativeFieldReferenceViewTests
         var observed = factory.CreateVariable("observed", fieldType);
         builder.Assign(block, site, observed, Read(parameter.Current));
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site)
-        };
-        var ensures = new[]
-        {
+            new PassiveContractClause(Equal(Read(parameter.Entry), initialTerm), factory.Boolean(true), site));
+        var ensures = ImmutableArray.Create(
             new PassiveContractClause(Equal(Read(parameter.Current), storedTerm), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Old), initialTerm), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Old), initialTerm), factory.Boolean(true), site));
         var candidate = new PassiveCallableCandidate("field-reference-view-" + typeName, builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var owner = factory.CreateReferenceValue(boxType, new IrObjectState().WithField(field, initialValue));
@@ -216,17 +212,13 @@ public sealed class NativeFieldReferenceViewTests
         var observed = factory.CreateVariable("observed", factory.IntegerType);
         builder.Assign(block, site, observed, Read(parameter.Current));
         builder.Return(block, site);
-        var requires = new[]
-        {
+        var requires = ImmutableArray.Create(
             new PassiveContractClause(factory.Binary(IrBinaryOperator.NotEqual,
                 factory.Variable(parameter.Entry), factory.Null(boxType)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site)
-        };
-        var ensures = new[]
-        {
+            new PassiveContractClause(Equal(Read(parameter.Entry), factory.Integer(0)), factory.Boolean(true), site));
+        var ensures = ImmutableArray.Create(
             new PassiveContractClause(Equal(Read(parameter.Current), factory.Integer(1)), factory.Boolean(true), site),
-            new PassiveContractClause(Equal(Read(parameter.Old), factory.Integer(0)), factory.Boolean(true), site)
-        };
+            new PassiveContractClause(Equal(Read(parameter.Old), factory.Integer(0)), factory.Boolean(true), site));
         var candidate = new PassiveCallableCandidate("field-reference-view", builder.Build(), [parameter], null,
             [.. requires], [.. ensures]);
         var objectState = new IrObjectState().WithField(field, factory.CreateIntegerValue(0));

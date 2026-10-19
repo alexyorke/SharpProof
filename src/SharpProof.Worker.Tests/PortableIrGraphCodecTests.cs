@@ -197,7 +197,7 @@ public sealed class PortableIrGraphCodecTests
             factory.IntegerType,
             isStatic: true,
             sequenceType);
-        IrTerm[] roots = [
+        ImmutableArray<IrTerm> roots = [
             factory.ImpureOpaque(
                 factory.CreateOperation(),
                 member,
@@ -238,7 +238,7 @@ public sealed class PortableIrGraphCodecTests
             Assert.That(memberRow.ParameterTypes, Is.EqualTo([sequenceIndex]));
             Assert.That(
                 graph.Operations.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Description)),
-                Is.EqualTo(new string?[] { null, "described" }));
+                Is.EqualTo(ImmutableArray.Create<string?>(null, "described")));
         }
     }
 
@@ -785,7 +785,7 @@ public sealed class PortableIrGraphCodecTests
     public void RootsOnlyGraphDoesNotFabricateAProgram()
     {
         var factory = new IrFactory();
-        IrTerm[] roots = [factory.Integer(42)];
+        ImmutableArray<IrTerm> roots = [factory.Integer(42)];
 
         var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -1108,7 +1108,7 @@ public sealed class PortableIrGraphCodecTests
             flagTerm,
             numberTerm,
             factory.Integer(7));
-        IrTerm[] roots = [
+        ImmutableArray<IrTerm> roots = [
             factory.Boolean(true),
             factory.Integer(5),
             factory.String("text"),
@@ -1185,9 +1185,9 @@ public sealed class PortableIrGraphCodecTests
         return new CodecFixture(
             factory,
             program,
-            roots.ToImmutableArray(),
-            Array.IndexOf(roots, conditional),
-            Array.IndexOf(roots, flagTerm));
+            roots,
+            roots.IndexOf(conditional),
+            roots.IndexOf(flagTerm));
     }
 
     public enum MalformedMutation

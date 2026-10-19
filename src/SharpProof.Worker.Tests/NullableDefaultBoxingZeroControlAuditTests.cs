@@ -170,7 +170,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
             var type = runtime.LoadFromStream(image).GetType("Subject")!;
             var targetMethod = type.GetMethod("Target")!;
             var controlMethod = type.GetMethod("Control")!;
-            var methods = new[] { targetMethod, controlMethod, echoMethod };
+            var methods = ImmutableArray.Create(targetMethod, controlMethod, echoMethod);
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
                 JsonSerializer.Serialize(methods.Select(DescribeIl).ToImmutableArray(), WorkerProtocolJson.SharedOptions));
             foreach (var method in methods)
