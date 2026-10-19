@@ -150,6 +150,7 @@ public static partial class Inference
             var signature = DelegateSignature(target, nominal);
             var previousAsync = asyncReturn;
             var previousBuilder = asyncBuilder;
+            var previousBuilderResult = asyncBuilderResult;
             var previousBuilderUsesResult = builderUsesResult;
             try
             {
@@ -185,7 +186,7 @@ public static partial class Inference
                 ImportConstructedConstraints(target, nominal);
                 return nominal;
             }
-            finally { asyncReturn = previousAsync; asyncBuilder = previousBuilder; builderUsesResult = previousBuilderUsesResult; }
+            finally { asyncReturn = previousAsync; asyncBuilder = previousBuilder; asyncBuilderResult = previousBuilderResult; builderUsesResult = previousBuilderUsesResult; }
         }
     }
 }

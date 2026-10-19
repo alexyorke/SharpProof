@@ -86,6 +86,7 @@ method/local-function declarations supply schemes instantiated per call.
 
 | Feature | Behavior |
 | --- | --- |
+| Primary-constructor captures | Preserve declared instance storage types while generalizing unrelated method inputs |
 | Primitive and nominal parameter types | Generalize unconstrained leaves; retain assembly identity and generic-parameter scopes, verify spelling through extern aliases and shadowed nested names |
 | Func, tuples, named tuples, generic/nested containers | Preserve owner/inner arguments, nullable annotations and tuple names |
 | Ref-like types, Span and ReadOnlySpan | Infer element types, indexing/slicing, ref stores/returns and ref iteration; synthesize allows ref struct when supported |
@@ -280,7 +281,12 @@ fixes, compile with no warnings, and execute nullable values/references and new
 Task/ValueTask types through completed/suspended awaits, cancellation and faults.
 Custom task-like types use their `AsyncMethodBuilder` attribute, including a
 method-level override and builders inside non-generic containers. Generic builder
-constraints flow to the suggested signature. The builder's `Task` property can
+constraints flow to the suggested signature. Extra constraints on normal/critical
+awaiter parameters are projected onto inferred awaiter types, including implicit
+async-foreach awaits. They can pin an await input or couple it to the result while
+other inputs still generalize. Nested async lambdas retain separate builder-result
+contexts. Generic builders with generic containing types are excluded by C# itself
+(CS8940); regression fixtures check that boundary. The builder's `Task` property can
 keep a result concrete even when the body alone would generalize it. Generic and
 non-generic task-like lambdas preserve the surrounding method's builder state.
 As in C#, a builder attribute on `async void` is ignored. Compiler-required

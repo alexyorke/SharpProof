@@ -17,6 +17,7 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(method)); }
             asyncReturn = null;
             asyncBuilder = null;
+            asyncBuilderResult = null;
             builderUsesResult = false;
             if (!method.IsAsync)
             { return; }
@@ -146,6 +147,8 @@ public static partial class Inference
                 if (operand.Name == CSharpTypes.NullableReference)
                 { operand = operand.Arguments[0].Root; }
                 HmType.Unify(operand, new(CSharpTypes.Rigid(named.WithNullableAnnotation(NullableAnnotation.NotAnnotated)).Name, value));
+                if (asyncBuilder is not null && info.GetAwaiterMethod is not null)
+                { BindBuilderAwaiter(info.GetAwaiterMethod.ReturnType, AwaitProtocolResult(named, operand, info.GetAwaiterMethod)); }
                 return value;
             }
             var selected = info.GetAwaiterMethod;
@@ -155,6 +158,7 @@ public static partial class Inference
                 try
                 {
                     var awaiter = AwaitProtocolResult(operandType, operand, selected);
+                    BindBuilderAwaiter(selected.ReturnType, awaiter);
                     HmType.Unify(PatternSymbolType(info.IsCompletedProperty, awaiter, selected.ReturnType), new HmType("bool"));
                     return AwaitProtocolResult(selected.ReturnType, awaiter, info.GetResultMethod);
                 }

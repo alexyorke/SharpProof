@@ -31,3 +31,38 @@ public static class CustomBuilderSamples
     public static async SampleBuiltTask<int> BuilderEcho(Task<int> task) => await task;
     public static Func<SampleBuiltTask<int>> BuilderCapture(int value) => async () => { await System.Threading.Tasks.Task.Yield(); return value; };
 }
+
+public interface SampleAwaiterTag<T> { }
+public readonly struct SampleTaggedAwaitable<T>(Task<T> task)
+{
+    public SampleTaggedAwaiter<T> GetAwaiter() => new(task.GetAwaiter());
+}
+public readonly struct SampleTaggedAwaiter<T>(TaskAwaiter<T> inner) : INotifyCompletion, SampleAwaiterTag<T>
+{
+    public bool IsCompleted => inner.IsCompleted;
+    public T GetResult() => inner.GetResult();
+    public void OnCompleted(Action continuation) => inner.OnCompleted(continuation);
+}
+public struct SampleCoupledBuilder<T>
+{
+    private AsyncTaskMethodBuilder<T> inner;
+    public static SampleCoupledBuilder<T> Create() => new() { inner = AsyncTaskMethodBuilder<T>.Create() };
+    public Task<T> Task => inner.Task;
+    public void SetResult(T value) => inner.SetResult(value);
+    public void SetException(Exception error) => inner.SetException(error);
+    public void SetStateMachine(IAsyncStateMachine state) => inner.SetStateMachine(state);
+    public void Start<S>(ref S state) where S : IAsyncStateMachine => inner.Start(ref state);
+    public void AwaitOnCompleted<A, S>(ref A awaiter, ref S state)
+        where A : INotifyCompletion, SampleAwaiterTag<T> where S : IAsyncStateMachine => inner.AwaitOnCompleted(ref awaiter, ref state);
+    public void AwaitUnsafeOnCompleted<A, S>(ref A awaiter, ref S state)
+        where A : ICriticalNotifyCompletion where S : IAsyncStateMachine => inner.AwaitUnsafeOnCompleted(ref awaiter, ref state);
+}
+public static class CustomBuilderConstraintSamples
+{
+    [AsyncMethodBuilder(typeof(SampleCoupledBuilder<>))]
+    public static async Task<int> CoupledAwaiter(SampleTaggedAwaitable<int> awaited, int value)
+    {
+        await awaited;
+        return value;
+    }
+}

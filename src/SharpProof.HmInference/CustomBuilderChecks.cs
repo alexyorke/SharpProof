@@ -63,6 +63,23 @@ internal static class CustomBuilderChecks
         var extraAwaiter = "public interface IExtra<T> {}" + Support.Replace("SafeAwaiter<T>(TaskAwaiter<T> awaiter):INotifyCompletion", "SafeAwaiter<T>(TaskAwaiter<T> awaiter):INotifyCompletion,IExtra<T>", StringComparison.Ordinal)
             .Replace("where A:INotifyCompletion where S", "where A:INotifyCompletion,IExtra<int> where S", StringComparison.Ordinal)
             .Replace("where A:ICriticalNotifyCompletion where S", "where A:ICriticalNotifyCompletion,IExtra<int> where S", StringComparison.Ordinal);
+        var builderEnd = extraAwaiter.IndexOf("public struct ProbeBuilder {", StringComparison.Ordinal);
+        var tiedAwaiter = extraAwaiter[..builderEnd].Replace("IExtra<int>", "IExtra<T>", StringComparison.Ordinal) + extraAwaiter[builderEnd..];
+        var unsafeAwaiter = extraAwaiter.Replace(":INotifyCompletion,IExtra<T>", ":ICriticalNotifyCompletion,IExtra<T>", StringComparison.Ordinal)
+            .Replace("public void OnCompleted(Action action)=>awaiter.OnCompleted(action);", "public void OnCompleted(Action action)=>awaiter.OnCompleted(action);public void UnsafeOnCompleted(Action action)=>awaiter.UnsafeOnCompleted(action);", StringComparison.Ordinal);
+        const string stream = """
+            public class BuilderStream<T> {
+                public Enumerator GetAsyncEnumerator()=>new();
+                public class Enumerator {
+                    public T Current=>default!;
+                    public MoveAwaitable<T> MoveNextAsync()=>new();
+                }
+            }
+            public readonly struct MoveAwaitable<T> {public MoveAwaiter<T> GetAwaiter()=>new();}
+            public readonly struct MoveAwaiter<T>:INotifyCompletion,IExtra<T> {
+                public bool IsCompleted=>true;public bool GetResult()=>false;public void OnCompleted(Action action)=>action();
+            }
+            """;
         (string Name, string Source, string Support, string Status, string? Signature)[] tests =
         [
             ("DiscardAssignmentValue", "static int M(int x)=>(_=x);", Support, "Suggestion", "T1 M<T1>(T1 x)"),
@@ -87,7 +104,16 @@ internal static class CustomBuilderChecks
             ("CustomBuilderOverloadedSetResult", "static async ProbeTask<int> M(int x)=>x;", overloaded, "Suggestion", "global::ProbeTask<T1> M<T1>(T1 x)"),
             ("AsyncVoidBuilderAttributeIgnored", "[AsyncMethodBuilder(typeof(ProbeBuilder))] static async void M(int x,Task task) { await task; }", Support, "Suggestion", "void M<T1>(T1 x, global::System.Threading.Tasks.Task task)"),
             ("CustomBuilderInvalidGenericConstraint", "static async ProbeTask<T> M<T>(T x,bool ignored)=>x;", constrained, "Skipped", null),
-            ("CustomBuilderAwaiterConstraintGuard", "static async ProbeTask<int> M(SafeTask<int> task) { await task;return 1; }", extraAwaiter, "Rejected", null),
+            ("CustomBuilderAwaiterConstraintGuard", "static async ProbeTask<int> M(SafeTask<int> task) { await task;return 1; }", extraAwaiter, "Concrete", null),
+            ("CustomBuilderAwaiterKeepsUnrelated", "static async ProbeTask<int> M(SafeTask<int> task,int x) {await task;return x;}", extraAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderVoidAwaiterKeepsUnrelated", "static async ProbeTask M(SafeTask<int> task,int x){await task;_=x;}", extraAwaiter, "Suggestion", "global::ProbeTask M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderAwaiterTiedResult", "static async ProbeTask<int> M(SafeTask<int> task,int x) {await task;return x;}", tiedAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<T1> task, T1 x)"),
+            ("CustomBuilderUnsafeAwaiterKeepsUnrelated", "static async ProbeTask<int> M(SafeTask<int> task,int x) {await task;return x;}", unsafeAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderImplicitMoveConstraint", "static async ProbeTask<int> M(BuilderStream<int> stream,int x){await foreach(var item in stream){}return x;}", extraAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderStream<int> stream, T1 x)"),
+            ("CustomBuilderImplicitMoveTiesResult", "static async ProbeTask<int> M(BuilderStream<int> stream,int x){await foreach(var item in stream){}return x;}", tiedAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderStream<T1> stream, T1 x)"),
+            ("CustomBuilderLambdaAwaiterConstraint", "static Func<ProbeTask<int>> M(SafeTask<int> task,int x)=>async()=>{await task;return x;};", extraAwaiter, "Suggestion", "global::System.Func<global::ProbeTask<T1>> M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderRestoresStandardOuter", "static async Task<int> M(SafeTask<int> task,int x){Func<ProbeTask<int>> nested=async()=>{await task;return 1;};await nested();return x;}", extraAwaiter, "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderRestoresCustomOuter", "static async ProbeTask<int> M(SafeTask<int> task,int x){Func<Task<int>> nested=async()=>1;await task;return x;}", extraAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
             ("CustomBuilderNestedLocalEmission", "static int M(SafeTask<int> task,int x) { async ProbeTask<int> Local(){await task;return 1;} _=Local();return x; }", extraAwaiter, "Rejected", null),
             ("CustomBuilderInvalidSetResult", "static async ProbeTask<int> M(int x,bool ignored)=>x;", invalidResult, "Skipped", null),
             ("CustomBuilderInvalidConstraint", "static async ProbeTask<string> M(string x,bool ignored)=>x;", constrained, "Skipped", null)
@@ -107,6 +133,19 @@ internal static class CustomBuilderChecks
             { throw new InvalidOperationException("Builder analyzer crashed: " + test.Name); }
             Program.Log.Info("PASS " + test.Name);
         }
+        (string Spelling, string Error)[] excluded = [("BuilderOwner<>.ProbeBuilder<>", "CS8940"), ("BuilderOwner<int>.ProbeBuilder<>", "CS7003"), ("BuilderOwner<int>.ProbeBuilder<int>", "CS8940")];
+        foreach (var item in excluded)
+        {
+            var unsupported = nested.Replace("class BuilderOwner {", "class BuilderOwner<OwnerT> {", StringComparison.Ordinal)
+                .Replace("typeof(BuilderOwner.ProbeBuilder<>)", "typeof(" + item.Spelling + ")", StringComparison.Ordinal)
+                .Replace("typeof(BuilderOwner.ProbeBuilder)", "typeof(BuilderOwner<int>.ProbeBuilder)", StringComparison.Ordinal);
+            var compilation = Program.Compile([CSharpSyntaxTree.ParseText(Imports + unsupported + "class InvalidNested {static async ProbeTask<int> M(int x)=>x;}", cancellationToken: cancellationToken)]);
+            using var image = new MemoryStream();
+            var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+            if (emitted.Success || !emitted.Diagnostics.Any(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity == DiagnosticSeverity.Error && d.Id == item.Error; }))
+            { throw new InvalidOperationException("Compiler nested-builder exclusion changed: " + item.Spelling); }
+            Program.Log.Info("PASS CompilerExcludesGenericEnclosingBuilder " + item.Spelling);
+        }
         var memberTree = CSharpSyntaxTree.ParseText(Imports + Support.Replace("inner.SetException(exception);", "inner.SetException(new Exception());", StringComparison.Ordinal)
             + "class MemberUse {static async ProbeTask<int> M(int x)=>x;}", cancellationToken: cancellationToken);
         var memberCompilation = Program.Compile([memberTree]);
@@ -125,7 +164,7 @@ internal static class CustomBuilderChecks
         if (Inference.Analyze(unusedMember, unusedCompilation.GetSemanticModel(unusedTree), cancellationToken).Status != "Concrete")
         { throw new InvalidOperationException("An unused task-like type lost its builder contract."); }
         Program.Log.Info("PASS CustomBuilderUnusedTypeContract");
-        return tests.Length + 2 + await Runtime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + excluded.Length + 2 + await Runtime(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
@@ -135,8 +174,23 @@ internal static class CustomBuilderChecks
         var overrideBuilder = Support[genericStart..genericEnd].Replace("ProbeBuilder", "OverrideBuilder", StringComparison.Ordinal)
             .Replace("public ProbeTask<T> Task", "public Task<T> Task", StringComparison.Ordinal)
             .Replace("return new(inner.Task);", "return inner.Task;", StringComparison.Ordinal);
-        var source = Imports + Support + overrideBuilder + """
+        var runtimeSupport = "public interface IExtra<T>{}" + Support.Replace("SafeAwaiter<T>(TaskAwaiter<T> awaiter):INotifyCompletion", "SafeAwaiter<T>(TaskAwaiter<T> awaiter):INotifyCompletion,IExtra<T>", StringComparison.Ordinal);
+        var fixedBuilder = overrideBuilder.Replace("OverrideBuilder", "FixedAwaitBuilder", StringComparison.Ordinal)
+            .Replace("where A:INotifyCompletion where S", "where A:INotifyCompletion,IExtra<int> where S", StringComparison.Ordinal)
+            .Replace("where A:ICriticalNotifyCompletion where S", "where A:ICriticalNotifyCompletion,IExtra<int> where S", StringComparison.Ordinal);
+        var tiedBuilder = fixedBuilder.Replace("FixedAwaitBuilder", "TiedAwaitBuilder", StringComparison.Ordinal).Replace("IExtra<int>", "IExtra<T>", StringComparison.Ordinal);
+        var source = Imports + runtimeSupport + overrideBuilder + fixedBuilder + tiedBuilder + """
+            public readonly struct CriticalTask<T>(Task<T> task) {public CriticalAwaiter<T> GetAwaiter()=>new(task.GetAwaiter());}
+            public readonly struct CriticalAwaiter<T>(TaskAwaiter<T> awaiter):ICriticalNotifyCompletion,IExtra<T> {
+                public bool IsCompleted=>awaiter.IsCompleted;public T GetResult()=>awaiter.GetResult();
+                public void OnCompleted(Action action)=>awaiter.OnCompleted(action);
+                public void UnsafeOnCompleted(Action action)=>awaiter.UnsafeOnCompleted(action);
+            }
             public static class BuilderProbe {
+                [AsyncMethodBuilder(typeof(FixedAwaitBuilder<>))] public static async Task<int> FixedUnsafe(CriticalTask<int> task,int value){await task;return value;}
+                [AsyncMethodBuilder(typeof(TiedAwaitBuilder<>))] public static async Task<int> TiedUnsafe(CriticalTask<int> task,int value){await task;return value;}
+                [AsyncMethodBuilder(typeof(FixedAwaitBuilder<>))] public static async Task<int> Fixed(SafeTask<int> task,int value){await task;return value;}
+                [AsyncMethodBuilder(typeof(TiedAwaitBuilder<>))] public static async Task<int> Tied(SafeTask<int> task,int value){await task;return value;}
                 [AsyncMethodBuilder(typeof(OverrideBuilder<>))] /* builder retained */ public static async Task<int> Override(Task<int> task)=>await task;
                 [AsyncMethodBuilder(typeof(ProbeBuilder))] public static async void Void(int ignored,Task task,TaskCompletionSource signal) { await task;signal.SetResult(); }
                 public static async ProbeTask<int> Echo(Task<int> task)=>await task;
@@ -155,7 +209,7 @@ internal static class CustomBuilderChecks
         var before = Load(original, cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 12; round++)
+        for (var round = 0; round < 16; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false)).GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
@@ -168,11 +222,11 @@ internal static class CustomBuilderChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 8)
-        { throw new InvalidOperationException("Expected eight custom-builder fixes; got " + fixes); }
+        if (fixes != 12)
+        { throw new InvalidOperationException("Expected twelve custom-builder fixes; got " + fixes); }
         var changed = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var after = Load(changed, cancellationToken);
-        foreach (var method in new[] { "Echo", "SafeEcho", "Ignore", "Guarded", "Override" })
+        foreach (var method in new[] { "Echo", "SafeEcho", "Ignore", "Guarded", "Override", "Fixed", "Tied", "FixedUnsafe", "TiedUnsafe" })
         {
             var baseline = await Execute(before, method, false, false, cancellationToken).ConfigureAwait(false);
             var fixedResult = await Execute(after, method, true, false, cancellationToken).ConfigureAwait(false);
@@ -190,7 +244,7 @@ internal static class CustomBuilderChecks
             if (beforeVoid != afterVoid)
             { throw new InvalidOperationException("Async void builder override changed its protocol."); }
         }
-        foreach (var method in new[] { "Echo", "SafeEcho", "Ignore", "Guarded", "Override" })
+        foreach (var method in new[] { "Echo", "SafeEcho", "Ignore", "Guarded", "Override", "Fixed", "Tied", "FixedUnsafe", "TiedUnsafe" })
         {
             foreach (var failure in new[] { 1, 2 })
             {
@@ -208,6 +262,19 @@ internal static class CustomBuilderChecks
         var work = echo.Invoke(null, new object[] { Task.FromResult("generic") })!;
         if (await Result<string>(work, cancellationToken).ConfigureAwait(false) != "generic")
         { throw new InvalidOperationException("Generic custom task lost its result."); }
+        var sentinel = new Uri("https://example.invalid/builder-constraints");
+        foreach (var method in new[] { "Fixed", "Tied", "FixedUnsafe", "TiedUnsafe" })
+        {
+            var element = method.StartsWith("Fixed", StringComparison.Ordinal) ? typeof(int) : typeof(Uri);
+            var wrapper = after.GetType(method.EndsWith("Unsafe", StringComparison.Ordinal) ? "CriticalTask`1" : "SafeTask`1")!.MakeGenericType(element);
+            object task = element == typeof(int) ? Task.FromResult(42) : Task.FromResult(sentinel);
+            var input = Activator.CreateInstance(wrapper, task)!;
+            var generic = probe.GetMethod(method)!.MakeGenericMethod(typeof(Uri));
+            var value = await Result<Uri>(generic.Invoke(null, new[] { input, sentinel })!, cancellationToken).ConfigureAwait(false);
+            if (!ReferenceEquals(value, sentinel))
+            { throw new InvalidOperationException("Custom-builder awaiter constraints lost the result domain: " + method); }
+        }
+        Program.Log.Info("PASS CustomBuilderAwaiterConstraintNewDomains");
         var guid = Guid.NewGuid();
         var nullableWork = probe.GetMethod("Nullable")!.MakeGenericMethod(typeof(Guid)).Invoke(null, new object[] { Task.FromResult<Guid?>(guid) })!;
         if (await Result<Guid?>(nullableWork, cancellationToken).ConfigureAwait(false) != guid)
@@ -228,7 +295,7 @@ internal static class CustomBuilderChecks
         Program.Log.Info("PASS CustomBuilderOriginalAndFixedProtocolTraces");
         Program.Log.Info("PASS CustomBuilderSuspensionFaultsAndCancellation");
         Program.Log.Info("PASS CustomBuilderFailureProtocolTraces");
-        return 4;
+        return 5;
     }
 
     private static System.Reflection.Assembly Load(Compilation compilation, CancellationToken cancellationToken)
@@ -269,12 +336,14 @@ internal static class CustomBuilderChecks
         if (!suspend)
         { Complete(); }
         object input = completion.Task;
-        if (method == "SafeEcho")
+        if (method is "SafeEcho" or "Fixed" or "Tied")
         { input = Activator.CreateInstance(assembly.GetType("SafeTask`1")!.MakeGenericType(typeof(int)), input)!; }
+        if (method is "FixedUnsafe" or "TiedUnsafe")
+        { input = Activator.CreateInstance(assembly.GetType("CriticalTask`1")!.MakeGenericType(typeof(int)), input)!; }
         var target = assembly.GetType("BuilderProbe")!.GetMethod(method)!;
         if (generic)
         { target = target.MakeGenericMethod(typeof(int)); }
-        var work = target.Invoke(null, new[] { input })!;
+        var work = target.Invoke(null, method is "Fixed" or "Tied" or "FixedUnsafe" or "TiedUnsafe" ? new object[] { input, 42 } : new[] { input })!;
         var pending = method == "Ignore" ? ResultVoid(work, cancellationToken) : Result<int>(work, cancellationToken);
         if (suspend)
         {

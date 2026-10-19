@@ -822,6 +822,14 @@ public static partial class Inference
                         return type;
                     }
 
+                    // Captured constructor parameters retain their instance storage type.
+                    if (symbol is IParameterSymbol captured && captured.DeclaringSyntaxReferences.Any(reference =>
+                    {
+                        if (reference is null)
+                        { throw new ArgumentNullException(nameof(reference)); }
+                        return reference.GetSyntax(cancellationToken) is ParameterSyntax { Parent.Parent: TypeDeclarationSyntax };
+                    }))
+                    { return CSharpTypes.Rigid(captured.Type); }
                     if (symbol is IFieldSymbol field)
                     {
                         return CSharpTypes.Rigid(field.Type);

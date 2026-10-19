@@ -11,6 +11,7 @@ public static partial class Inference
     {
         private INamedTypeSymbol? asyncBuilder;
         private bool builderUsesResult;
+        private HmType? asyncBuilderResult;
         private bool needsBuilderEmission;
 
         private static AttributeData? BuilderAttribute(IMethodSymbol method, INamedTypeSymbol? returned)
@@ -56,6 +57,7 @@ public static partial class Inference
             if (attribute is not null)
             {
                 (asyncBuilder, builderUsesResult) = ConstructBuilder(attribute, returned);
+                asyncBuilderResult = builderUsesResult ? HmType.Variable() : null;
                 needsBuilderEmission = true;
                 return;
             }
@@ -72,6 +74,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(value)); }
             if (asyncBuilder is null)
             { return; }
+            if (asyncBuilderResult is not null)
+            { HmType.Unify(asyncBuilderResult, value); }
             var definition = asyncBuilder.OriginalDefinition;
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             for (var i = 0; i < definition.TypeParameters.Length; i++)
@@ -91,6 +95,36 @@ public static partial class Inference
             UnifyRuntimeTypes(result, CSharpTypes.Rigid(task.OriginalDefinition.Type, mapping));
         }
 
+        private void BindBuilderAwaiter(ITypeSymbol source, HmType shape)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (shape is null)
+            { throw new ArgumentNullException(nameof(shape)); }
+            if (asyncBuilder is null)
+            { return; }
+            var critical = model.Compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ICriticalNotifyCompletion");
+            var unsafeAwait = critical is not null && ((CSharpCompilation)model.Compilation).ClassifyConversion(source, critical).IsImplicit;
+            var name = unsafeAwait ? "AwaitUnsafeOnCompleted" : "AwaitOnCompleted";
+            var method = asyncBuilder.GetMembers(name).OfType<IMethodSymbol>().SingleOrDefault(IsRequiredBuilderMember);
+            if (method is null)
+            { throw new InferenceException("Missing custom-builder await member."); }
+            var definition = method.OriginalDefinition;
+            var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
+            for (var owner = asyncBuilder; owner is not null; owner = owner.ContainingType)
+            {
+                for (var i = 0; i < owner.Arity; i++)
+                { mapping[owner.OriginalDefinition.TypeParameters[i]] = SymbolEqualityComparer.Default.Equals(owner, asyncBuilder) && builderUsesResult ? asyncBuilderResult! : CSharpTypes.Rigid(owner.TypeArguments[i]); }
+            }
+            mapping[definition.TypeParameters[0]] = shape;
+            mapping[definition.TypeParameters[1]] = HmType.Variable();
+            ImportConstraints(definition.TypeParameters[0], shape, mapping, source);
+            for (var i = 0; i < definition.TypeParameters[0].ConstraintTypes.Length; i++)
+            {
+                var expected = CSharpTypes.Rigid(definition.TypeParameters[0].ConstraintTypes[i], mapping);
+                BindSubtype(source, method.TypeParameters[0].ConstraintTypes[i], shape, expected, false);
+            }
+        }
         private static void UnifyRuntimeTypes(HmType left, HmType right)
         {
             if (left is null)

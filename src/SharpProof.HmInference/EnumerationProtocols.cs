@@ -65,6 +65,7 @@ public static partial class Inference
             {
                 var awaited = info.Value;
                 var awaiter = AwaitProtocolResult(method.ReturnType, shape, awaited.GetAwaiterMethod!);
+                BindBuilderAwaiter(awaited.GetAwaiterMethod!.ReturnType, awaiter);
                 HmType.Unify(PatternSymbolType(awaited.IsCompletedProperty, awaiter, awaited.GetAwaiterMethod!.ReturnType), new HmType("bool"));
                 var result = AwaitProtocolResult(awaited.GetAwaiterMethod.ReturnType, awaiter, awaited.GetResultMethod!);
                 if (booleanResult)
