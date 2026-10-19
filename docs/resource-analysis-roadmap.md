@@ -1779,3 +1779,20 @@ closure and exact-head CI qualification remain mandatory, as do all phase E/F
 unchecked requirements. Latest fetched master 8556188d1 adds exception-constructor
 and callback-effect semantics; it must be incorporated and its affected workflows
 verified before this checkpoint is qualified.
+
+## Stack checkpoint and latest-master integration
+
+Stack implementation and its progress document are committed in bdef19d084.
+Latest master 8556188d1 merged cleanly in d5ce7c3ae. On the combined tree, all
+2144 frontend tests and 636 selected native resource, exception, callback,
+cache/SARIF and artifact controls passed. This directly checks the merged
+constructor/callback semantics alongside resource derivation. Repository quality
+and negative-fixture checks passed; documentation generation and all 725 local
+links passed. Evaluated layout passed for 2740 sources, 59 projects and all
+151 unchanged pinned common files. Complete post-merge repository formatting passed.
+
+The earlier stack-specific package cases, full analyzer/IR suites, final stack
+boundaries and independent recursive controls remain recorded above. The merge
+did not change their resource implementation. Fresh pushed-head CI must verify
+the combined state before qualification. Phase E/F implementation and the unchanged
+100% coverage gate remain required; this checkpoint does not complete the goal.
