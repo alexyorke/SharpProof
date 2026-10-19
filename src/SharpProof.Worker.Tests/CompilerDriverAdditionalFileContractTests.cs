@@ -54,7 +54,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
             var root = manifest.RootElement;
             Assert.That(root.GetProperty("schema").GetString(),
                 Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(44));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(45));
             Assert.That(root.GetProperty("compilerDiagnostics").GetArrayLength(), Is.Zero);
             Assert.That(root.GetProperty("maximumExpressionDepth").GetInt32(),
                 Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));

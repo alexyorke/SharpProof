@@ -435,11 +435,12 @@ A proven fixed local size can therefore support a native lifetime proof even whe
 the count analyzer reports Unknown.
 
 The native finite family admits primitive arrays with constant sizes and certified
-direct source classes, reference aliases, typed field stores, last-use root drops,
+direct source classes, reference aliases, typed field stores and reads of explicitly
+stored owned references, last-use root drops,
 literal copies through compiler temporaries and proven constant guards. Shared
 children and cycles count once by identity; overwritten field edges can release
 former children. Unproved branches, repeated regions, borrowed references,
-field-value reads, source-call lifetime effects and unsupported storage
+unwritten field reads, source-call lifetime effects and unsupported storage
 return Unknown without partial numbers or used layout dependencies. Numerical
 refutations in the admitted finite family require a validated feasible entry and
 an independently observed completed execution. Replay reconstructs identities,

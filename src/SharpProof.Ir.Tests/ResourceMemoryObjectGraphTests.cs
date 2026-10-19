@@ -65,6 +65,35 @@ public sealed class ResourceMemoryObjectGraphTests
     }
 
     [Test]
+    public void ReadFieldAliasSurvivesAnOverwriteAndKeepsItsIdentity()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
+        factory.RegisterClosedClassReferenceType(node, null);
+        factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, IrFieldSites.Prefix + "data", array, false);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", node);
+        var child = factory.CreateVariable("child", array);
+        var saved = factory.CreateVariable("saved", array);
+        var receiver = factory.Cast(factory.ObjectType, factory.Variable(root));
+        builder.Allocate(entry, factory.CreateOperation(), node, root);
+        builder.Allocate(entry, factory.CreateOperation(), array, child, factory.Integer(1));
+        builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, factory.Variable(child));
+        builder.Assign(entry, factory.CreateOperation(), saved, factory.PureOpaque(field, receiver));
+        builder.Allocate(entry, factory.CreateOperation(), array, child, factory.Integer(3));
+        builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, factory.Variable(child));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(saved));
+        var program = builder.Build();
+        var result = ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Verified, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds, Is.EqualTo(new ResourceMemoryBounds(96, 96, 64, 64, 32, 32)));
+        Assert.That(Observed(program).Bounds, Is.EqualTo(result.Bounds));
+    }
+
+    [Test]
     public void CompleteStorageIsImmutableAndRequiresADirectClass()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);

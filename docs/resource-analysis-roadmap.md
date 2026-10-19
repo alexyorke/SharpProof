@@ -1290,3 +1290,43 @@ Broad regression checks caught an initially excessive certificate restriction on
 sealed classes. Sealed and direct-class facts now compose, and both original
 suites plus the explicit sealed-object control pass. Packing controls preserve
 Unknown between the packed lower and conservative upper bounds.
+
+## Reads of explicitly stored owned references
+
+Finite lifetime extraction now resolves instance field reads by scoped receiver and
+member identity after an explicit supported store. Object aliases see the same
+field; copying a child reference into a local preserves the child's identity when
+the field is later overwritten. Explicitly stored null references are also known.
+The bounded reference resolver follows safe casts and nested field reads while
+last-use traversal keeps their receiver roots live through evaluation.
+
+Concrete replay derives read results from actual completed instruction values,
+independently of the static field map. The existing normal-completion and entry
+validation requirements remain in force. Unwritten fields remain Unknown because
+the current storage certificate does not bind field members to complete default
+storage facts. Scalar field computations and broader lifetime composition are
+still required; this checkpoint does not finish phases C, E or F.
+
+Protocol 30, cache 32 and compiler artifact 45 invalidate older capabilities and
+cached Unknown results. Manifest 6, resource program/evidence 4, expression 1 and
+the reviewed layout/lifetime model identities remain unchanged. Focused checks
+passed all five IR graph cases and five native read controls, including proof and
+concrete refutation, aliases, overwritten edges, explicit null and an unwritten
+field Unknown with no partial numbers or used layout dependencies.
+
+Broader checks passed all 646 IR tests, 578 affected worker/resource/protocol/portable
+cases, 352 analyzer/collector cases and four actual packaged field-read cases.
+Across lifetime milestones, 30 distinct packaged consumer cases have passed.
+Quality/compatibility, formatting, documentation generation and 723 local links
+passed. A restore-process crash was retried successfully with fresh container-private
+CLI/HTTP state and auditing enabled.
+
+Published coverage CI for object-graph head 143901c17 exposed a missed acceptance
+contract cache update: the contract still specified schema 28 while the worker
+used 31. The contract now matches schema 32. Exact-head published CI and the
+unchanged 100% coverage floor remain required; local checks do not substitute for
+that qualification.
+
+The corrected acceptance contract and updated artifact snapshots passed all 122
+selected acceptance/golden worker cases. Final documentation spelling and Markdown
+checks passed.

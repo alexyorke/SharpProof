@@ -63,7 +63,7 @@ internal sealed class ResourceMemoryReplay
             {
                 if (++reads > ResourceMemoryTrace.MaximumEvents)
                 { return Unknown("MemoryReplayBudgetExceeded"); }
-                if (!ReadVariables(term, lastUse, index, 0))
+                if (!ReadVariables(term, _program.Factory, lastUse, index, 0))
                 { return Unknown("MemoryReplayValueUnsupported"); }
             }
         }
@@ -200,16 +200,19 @@ internal sealed class ResourceMemoryReplay
         return null;
     }
 
-    private static bool ReadVariables(IrTerm term, Dictionary<IrVarId, int> lastUse, int index, int depth)
+    private static bool ReadVariables(IrTerm term, IrFactory factory, Dictionary<IrVarId, int> lastUse, int index, int depth)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         lastUse = ArgumentNullGuard.NotNull(lastUse, nameof(lastUse));
         if (depth > 32)
         { return false; }
         if (term is IrVariableTerm variable)
         { lastUse[variable.Variable] = index; return true; }
         if (term is IrCastTerm cast)
-        { return ReadVariables(cast.Operand, lastUse, index, depth + 1); }
+        { return ReadVariables(cast.Operand, factory, lastUse, index, depth + 1); }
+        if (term is IrOpaqueTerm { Receiver: { } owner, Arguments.IsEmpty: true } && IrFieldSites.IsFieldRead(factory, term))
+        { return ReadVariables(owner, factory, lastUse, index, depth + 1); }
         return term is IrIntegerTerm or IrBooleanTerm or IrNullTerm;
     }
 

@@ -5,6 +5,44 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeResourceContractTests
 {
+    [TestCase("var root=new Node(); root.Child=new int[1]; return root.Child;", 24, 32)]
+    [TestCase("var root=new Node(); root.Child=new int[1]; var saved=root.Child; root.Child=new int[3]; return saved;", 64, 32)]
+    [TestCase("var root=new Node(); var alias=root; root.Child=new int[1]; return alias.Child;", 24, 32)]
+    [TestCase("var root=new Node(); root.Child=new int[1]; root.Child=null; return root.Child;", 56, 0)]
+    public async Task OwnedFieldReadsPreserveOutputIdentityAndAliasing(string body, int auxiliary, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 5, 6 })
+        {
+            var upper = metric == 5 ? auxiliary : retained;
+            foreach (var violates in new[] { false, true })
+            {
+                if (violates && upper == 0)
+                { continue; }
+                var source = "using SharpProof.Attributes; public class Node { public int[] Child; } public static class C { " +
+                    $"[ResourceUpperBound((ResourceMetric){metric},{(violates ? upper - 1 : upper)})] public static int[] Target() {{ {body} }} }}";
+                var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+                var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+                Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+                Assert.That(violates ? result.ResourceBound!.ObservedLowerBound : result.ResourceBound!.InferredUpperBound,
+                    Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
+    [Test]
+    public async Task UnwrittenFieldReadsRemainUnknownWithoutMemberStorageFacts()
+    {
+        var source = "using SharpProof.Attributes; public class Node { public int[] Child; } public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,100)] public static int[] Target() { var root=new Node(); return root.Child; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
     [TestCase(5, 0)]
     [TestCase(6, 56)]
     public async Task ObjectGraphLifetimesRetainOwnedChildStorage(int metric, int upper)
