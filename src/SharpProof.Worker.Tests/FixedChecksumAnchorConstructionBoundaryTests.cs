@@ -618,7 +618,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             var runtimeTarget = Assembly.Load(runtimeImage.ToArray()).GetType("Subject")!.GetMethod("Target")!;
             Assert.That(runtimeTarget.GetParameters(), Has.Length.EqualTo(16));
             var controls = Controls();
-            var controlResults = new List<object>();
+            var controlResults = ImmutableArray.CreateBuilder<object>();
             foreach (var inputs in controls)
             {
                 var checksum = ReferenceChecksum(inputs);
@@ -626,7 +626,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 var expected = unchecked((int)checksum) & mask;
                 var actual = (int)runtimeTarget.Invoke(null, inputs.Cast<object>().ToArray())!;
                 controlResults.Add(new { inputs, checksum, preChecksumMask = mask, expected, actual });
-                observation["controls"] = controlResults;
+                observation["controls"] = controlResults.ToImmutable();
                 Assert.That(actual, Is.EqualTo(expected));
                 Assert.That(actual, Is.InRange(0, inputs[0]));
             }
@@ -675,15 +675,15 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             var irControlCount = 0;
             foreach (var inputs in controls)
             {
-                var initial = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
+                var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
                 for (var ordinal = 0; ordinal < inputs.Length; ordinal++)
                 {
                     var binding = candidate.Parameters[ordinal];
-                    initial = initial.Add(binding.Entry, candidate.Factory.CreateIntegerValue(
+                    initial.Add(binding.Entry, candidate.Factory.CreateIntegerValue(
                         candidate.Factory.GetVariableInfo(binding.Entry).Type, inputs[ordinal]));
                 }
                 // Public interpreter default10000, not an expanded limit or Worker replay4096 override.
-                var replay = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, initial);
+                var replay = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, initial.ToImmutable());
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.Unsupported, Is.Null);
@@ -728,14 +728,16 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             {
                 throw new AssertionException("The full generated joint construction must exceed the unchanged default construction limit.");
             }
-            var singletonBuilds = new List<bool>();
-            observation["singletonBuilds"] = singletonBuilds;
+            var singletonBuilds = ImmutableArray.CreateBuilder<bool>();
+            observation["singletonBuilds"] = singletonBuilds.ToImmutable();
             foreach (var invariant in generated)
             {
                 singletonBuilds.Add(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], TestContext.CurrentContext.CancellationToken) != null);
+                observation["singletonBuilds"] = singletonBuilds.ToImmutable();
             }
-            Assert.That(singletonBuilds, Has.Count.EqualTo(48));
-            Assert.That(singletonBuilds.All(built => built), Is.True, "Every actual generated singleton must remain constructible.");
+            var singletonSnapshot = singletonBuilds.ToImmutable();
+            Assert.That(singletonSnapshot, Has.Length.EqualTo(48));
+            Assert.That(singletonSnapshot.All(built => built), Is.True, "Every actual generated singleton must remain constructible.");
             observation["disposition"] = "Strict component construction separation; no normal native/Houdini execution established";
         }
         catch (Exception exception)
@@ -757,29 +759,32 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
-    private static ImmutableArray<int[]> Controls()
+    private static ImmutableArray<ImmutableArray<int>> Controls()
     {
-        var values = ImmutableArray.CreateBuilder<int[]>();
+        var values = ImmutableArray.CreateBuilder<ImmutableArray<int>>(20);
         for (var index = 0; index < 5; index++)
         {
             var count = index switch { 0 => 0, 1 => 1, 2 => 16, 3 => 32, _ => 64 };
-            var inputs = Enumerable.Repeat(-1, 16).ToArray();
+            var inputs = ImmutableArray.CreateBuilder<int>(16);
+            inputs.AddRange(Enumerable.Repeat(-1, 16));
             inputs[0] = count;
-            values.Add(inputs);
+            values.Add(inputs.MoveToImmutable());
         }
         for (var ordinal = 1; ordinal < 16; ordinal++)
         {
-            var inputs = Enumerable.Repeat(-1, 16).ToArray();
+            var inputs = ImmutableArray.CreateBuilder<int>(16);
+            inputs.AddRange(Enumerable.Repeat(-1, 16));
             inputs[0] = 64;
             inputs[ordinal] = -3;
-            values.Add(inputs);
+            values.Add(inputs.MoveToImmutable());
         }
-        return values.ToImmutable();
+        return values.MoveToImmutable();
     }
 
-    private static uint ReferenceChecksum(int[] inputs)
+    private static uint ReferenceChecksum(ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (inputs.IsDefault)
+        { throw new System.ArgumentNullException(nameof(inputs)); }
         var hash = 2166136261U;
         for (var round = 0; round < 32; round++)
         {

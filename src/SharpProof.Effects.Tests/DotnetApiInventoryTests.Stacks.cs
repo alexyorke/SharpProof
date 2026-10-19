@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -38,7 +39,7 @@ public sealed partial class DotnetApiInventoryTests
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         if (!lowered.IsExact)
         { return false; }
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>();
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         if (incoming)
         {
             var count = lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
@@ -46,16 +47,17 @@ public sealed partial class DotnetApiInventoryTests
                 .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
                 .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
             var parameter = context.Parameters.Single().Entry;
-            inputs[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
+            inputBuilder[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
                 new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(1)));
         }
         else if (opaque)
         {
             foreach (var parameter in context.Parameters)
             {
-                inputs[parameter.Entry] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new IrObjectState());
+                inputBuilder[parameter.Entry] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new IrObjectState());
             }
         }
+        var inputs = inputBuilder.ToImmutable();
         var normal = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);

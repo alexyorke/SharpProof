@@ -28,7 +28,7 @@ public sealed class OpaqueQueueValueOracleTests
     {
         ArgumentNullException.ThrowIfNull(domain);
         var (type, first, second) = Inputs(domain);
-        var source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new Queue<T>(); data.Enqueue(first); data.Enqueue(second); data.Dequeue(); return Read<T>(data); } static U Read<U>(Queue<U> data) => data.Dequeue(); }";
+        const string source = "using System.Collections.Generic; using SharpProof.Attributes; public static class Probe { public static T Target<T>(T first, T second) { Contract.Ensures(true); var data = new Queue<T>(); data.Enqueue(first); data.Enqueue(second); data.Dequeue(); return Read<T>(data); } static U Read<U>(Queue<U> data) => data.Dequeue(); }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
