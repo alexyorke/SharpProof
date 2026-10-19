@@ -3495,3 +3495,9 @@ vectors and visited membership, and case-insensitive metadata-name membership. U
 immutable FIFO for guard dependency discovery; native reflection/byte buffers remain.
 Validate shared guards, metadata callers, evidence and symbol/package controls.
 Status: open before edits. Production host live forwarded-argument alias remains open.
+IMM-M125: Review production MSBuild host outer records/forwarding collectors, runtime
+assembly projection and fixed name allow-list. Use ordered array builders and freeze at
+final serialization; preserve each forwarded SDK argument object's live alias across
+Execute and all native reflection argument adapters. Pinned runtime host diagnostic
+metadata remains observable; no earlier forwarded snapshot is justified. Validate actual
+pinned production inventory queries and diagnostic JSON order/shape. Status: open before edits.
