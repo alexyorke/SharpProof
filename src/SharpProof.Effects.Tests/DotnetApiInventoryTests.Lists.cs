@@ -84,11 +84,22 @@ public sealed partial class DotnetApiInventoryTests
         finally
         { runtime.Unload(); }
     }
-    private static bool CheckOpaqueListStorageIntrinsic(CSharpCompilation references, bool wrongClaim, bool direct = false)
+    private static bool CheckOpaqueListStorageIntrinsic(CSharpCompilation references, bool wrongClaim, bool direct = false, string? rangeMethod = null)
     {
         ArgumentNullException.ThrowIfNull(references);
-        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static T Target<T>(T first, T second) { var data = new System.Collections.Generic.List<T>(); data.Add(first); System.Collections.Generic.ICollection<T> alias = data; alias.Add(second); " +
-            (direct ? "data[0] = data[1];" : "Replace<T>(data);") + " return data[0]; } static void Replace<U>(System.Collections.Generic.IList<U> data) { data[0] = data[1]; } }");
+        var body = "var data = new System.Collections.Generic.List<T>(); data.Add(first); System.Collections.Generic.ICollection<T> alias = data; alias.Add(second); " +
+            (direct ? "data[0] = data[1];" : "Replace<T>(data);") + " return data[0];";
+        if (rangeMethod != null)
+        {
+            body = "var data = new System.Collections.Generic.List<T>(); data.Add(first); " + (rangeMethod switch
+            {
+                "M:System.Collections.Generic.List`1.Insert(System.Int32,`0)" => "data.Insert(0, second); return data[0];",
+                "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" => "System.Collections.Generic.IList<T> alias = data; alias.Insert(0, second); return alias[0];",
+                "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)" => "data.Add(second); var copy = data.GetRange(1, 1); data[1] = first; return copy[0];",
+                _ => throw new ArgumentOutOfRangeException(nameof(rangeMethod))
+            });
+        }
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static T Target<T>(T first, T second) { " + body + " } static void Replace<U>(System.Collections.Generic.IList<U> data) { data[0] = data[1]; } }");
         var compilation = references.AddSyntaxTrees(tree);
         if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }

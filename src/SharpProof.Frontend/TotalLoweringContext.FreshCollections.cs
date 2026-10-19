@@ -128,7 +128,7 @@ public sealed partial class TotalLoweringContext
             }
             if (operation is IFlowCaptureReferenceOperation capture && !excludedCaptures.Contains(capture.Id) && captures.TryGetValue(capture.Id, out var captured))
             { return All(captured, depth + 1); }
-            return lists ? CSharpOperationSemantics.IsEmptyListCreation(operation) : CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
+            return lists ? CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation) : CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
         }
     }
 

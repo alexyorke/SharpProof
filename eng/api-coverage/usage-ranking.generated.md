@@ -39,7 +39,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.KeyValuePair`2.Value | read | 5 | 4 | 0 | 5 | 0 | unmodeled |
 | P:System.Collections.Generic.Queue`1.Count | read | 5 | 5 | 0 | 5 | 0 | partially-modeled |
 | M:System.ArgumentOutOfRangeException.#ctor(System.String) | call | 4 | 4 | 0 | 4 | 0 | unmodeled |
-| M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | call | 4 | 1 | 0 | 4 | 0 | unmodeled |
+| M:System.Collections.Generic.List`1.Insert(System.Int32,`0) | call | 4 | 1 | 0 | 4 | 0 | partially-modeled |
 | M:System.Console.WriteLine(System.String) | call | 4 | 1 | 0 | 4 | 0 | unmodeled |
 | M:System.InvalidOperationException.#ctor(System.String) | call | 4 | 4 | 0 | 4 | 0 | partially-modeled |
 | M:System.Math.Abs(System.Int32) | call | 4 | 2 | 0 | 4 | 0 | partially-modeled |
@@ -58,7 +58,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | M:System.Object.#ctor | call | 3 | 3 | 1 | 0 | 2 | partially-modeled |
 | M:System.Object.Equals(System.Object) | call | 3 | 3 | 0 | 3 | 0 | unmodeled |
 | P:System.Collections.Generic.KeyValuePair`2.Key | read | 3 | 2 | 0 | 3 | 0 | unmodeled |
-| M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | 1 | 0 | 2 | 0 | unmodeled |
+| M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32) | call | 2 | 1 | 0 | 2 | 0 | partially-modeled |
 | M:System.Collections.Generic.Queue`1.#ctor | call | 2 | 2 | 0 | 2 | 0 | partially-modeled |
 | M:System.Collections.Generic.Stack`1.Push(`0) | call | 2 | 1 | 0 | 2 | 0 | partially-modeled |
 | M:System.Console.Write(System.String) | call | 2 | 2 | 0 | 2 | 0 | unmodeled |
