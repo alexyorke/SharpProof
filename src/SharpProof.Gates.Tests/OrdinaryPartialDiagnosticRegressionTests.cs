@@ -34,7 +34,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
     public async Task BothActualPartialSelectionsPreserveNativeRefutationAndDiagnostics(bool selectImplementation)
     {
         var root = CSharpSyntaxTree.ParseText(Source).GetCompilationUnitRoot();
-        var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
         var definition = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body == null && method.ExpressionBody == null));
         var implementation = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
@@ -52,7 +52,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var preparedTree = compilation.SyntaxTrees.Single(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath == "ordinary-partial-diagnostics.cs"));
-        var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var preparedDefinition = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body == null && item.ExpressionBody == null));
         var preparedImplementation = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Body != null || item.ExpressionBody != null));
         var model = compilation.GetSemanticModel(preparedTree);

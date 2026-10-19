@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
@@ -14,7 +15,7 @@ public sealed class Pr275CorpusDiagnosticCoverageTests
         var descriptor = new DiagnosticDescriptor("PR275", "Counted diagnostic", "Counted diagnostic",
             "Test", DiagnosticSeverity.Warning, isEnabledByDefault: true);
         var diagnostic = Diagnostic.Create(descriptor, Location.None);
-        var counts = Enumerable.Repeat(1, count).ToArray();
+        var counts = Enumerable.Repeat(1, count).ToImmutableArray();
 
         var exception = Assert.Throws<ArgumentException>((Action)(() =>
             OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment([diagnostic], counts)));

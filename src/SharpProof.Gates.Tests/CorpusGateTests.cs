@@ -72,7 +72,7 @@ public sealed class CorpusGateTests
         var snapshotBefore = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
         var frozen = (await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
             .ToDictionary(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0]), StringComparer.Ordinal);
-        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Mode == "contracts")).ToArray();
+        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Mode == "contracts")).ToImmutableArray();
         Assert.That(cases, Has.Length.EqualTo(100));
         Assert.That(cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId)).Distinct().Count(), Is.EqualTo(10));
         Assert.That(frozen.Keys, Is.EquivalentTo(cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id))));
@@ -824,9 +824,9 @@ public sealed class CorpusGateTests
     {
         var cases = CorpusCatalog.CreateCases();
         var synthetic = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToArray();
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToImmutableArray();
         var openSource = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.OpenSource)).ToArray();
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.OpenSource)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1035,7 +1035,7 @@ public sealed class CorpusGateTests
             [.. observations]);
 
         Assert.That(
-            failures.ToArray(),
+            failures,
             Is.EqualTo([
                 "Metamorphic variant seed.trivia changed semantic outcome " +
                 "from Refuted to Unknown relative to seed.baseline.",
@@ -1203,7 +1203,7 @@ public sealed class IndependentPinnedRequiresCensusTests
         Assert.That(obligations, Is.EqualTo(100));
         var snapshot = await File.ReadAllLinesAsync(Path.Combine(root, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"));
         var pinnedContractIds = snapshot.Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
-            .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0])).ToArray();
+            .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0])).ToImmutableArray();
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
         var document = OpenSourceCorpusCatalog.Load(root);
         Assert.That(document.Methods, Has.Length.EqualTo(200));

@@ -254,7 +254,7 @@ internal static class AnalyzerGateHost
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .Take(limit)
             .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
-            .ToArray();
+            .ToImmutableArray();
         if (errors.Length != 0)
         {
             throw createException(string.Join(Environment.NewLine, errors));

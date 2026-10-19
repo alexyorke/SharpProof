@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -102,8 +103,8 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         Assert.That(root.GetProperty("IncompleteCallableCount").GetInt32(), Is.EqualTo(mutationCount));
         Assert.That(root.GetProperty("ClaimCount").GetInt32(), Is.EqualTo(mutationCount + 1));
         Assert.That(root.GetProperty("ClaimsWithReasonCount").GetInt32(), Is.EqualTo(mutationCount));
-        var incomplete = root.GetProperty("IncompleteCallables").EnumerateArray().ToArray();
-        var claims = root.GetProperty("ClaimsWithReasons").EnumerateArray().ToArray();
+        var incomplete = root.GetProperty("IncompleteCallables").EnumerateArray().ToImmutableArray();
+        var claims = root.GetProperty("ClaimsWithReasons").EnumerateArray().ToImmutableArray();
         Assert.That(incomplete, Has.Length.EqualTo(Math.Min(8, mutationCount)));
         Assert.That(claims, Has.Length.EqualTo(Math.Min(8, mutationCount)));
         Assert.That(incomplete.Select(static row => ((row.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(row)) : (row.GetProperty("CallableId").GetString()!))), Is.Ordered.Using<string>(StringComparer.Ordinal));

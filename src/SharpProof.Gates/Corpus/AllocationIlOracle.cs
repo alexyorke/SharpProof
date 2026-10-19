@@ -22,7 +22,7 @@ internal static class AllocationIlOracle
         var bytes = body?.GetILAsByteArray();
         if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > CorpusExecutionDefaults.MaximumAllocationOracleBodyBytes)
         { return true; }
-        var instructions = ImmutableDictionary<int, (OpCode Op, int Next, ImmutableArray<int> Targets)>.Empty;
+        var instructionBuilder = ImmutableDictionary.CreateBuilder<int, (OpCode Op, int Next, ImmutableArray<int> Targets)>();
         var cursor = 0;
         while (cursor < bytes.Length)
         {
@@ -51,11 +51,12 @@ internal static class AllocationIlOracle
                     .Select(index => next + BitConverter.ToInt32(bytes, cursor + 4 + 4 * index)).ToImmutableArray(),
                 _ => []
             };
-            instructions = instructions.Add(offset, (opcode, next, targets));
+            instructionBuilder.Add(offset, (opcode, next, targets));
             cursor = next;
         }
+        var instructions = instructionBuilder.ToImmutable();
         var pending = ImmutableStack<int>.Empty;
-        var seen = ImmutableHashSet<int>.Empty;
+        var seen = ImmutableHashSet.CreateBuilder<int>();
         pending = pending.Push(0);
         while (!pending.IsEmpty)
         {
@@ -63,7 +64,7 @@ internal static class AllocationIlOracle
             pending = pending.Pop();
             if (seen.Contains(offset))
             { continue; }
-            seen = seen.Add(offset);
+            seen.Add(offset);
             var instruction = instructions[offset];
             if (instruction.Op == OpCodes.Newobj || instruction.Op == OpCodes.Newarr || instruction.Op == OpCodes.Box ||
                 instruction.Op == OpCodes.Throw || instruction.Op == OpCodes.Rethrow ||

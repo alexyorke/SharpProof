@@ -3112,3 +3112,9 @@ nullable enum element types and compiler constraint base types. Convert the two 
 conditional branches with their nonempty vectors so both branches stay immutable.
 Validate the affected Worker classes; callback/maps remain a separate following batch.
 Status: open before edits.
+
+IMM-M091 Gates and IMM-M093 verified: all 473 ordinary Gates tests plus explicit corpus
+catalog workflow coverage pass, zero failures/skips/warnings/errors. Main and read-only
+review checked partial-entry cleanup, frozen rollback state, marker publication, ordinal
+path preflight, IL target ordering and diagnostic projection. The first build required
+explicit configured-factory callback guards (M094); those are now present.

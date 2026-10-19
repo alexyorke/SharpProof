@@ -33,19 +33,19 @@ internal static class CorpusFileTransaction
             return;
         }
 
-        var destinations = ImmutableArray<string>.Empty;
-        var seenDestinations = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+        var destinationsBuilder = ImmutableArray.CreateBuilder<string>(capturedUpdates.Length);
+        var seenDestinations = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var hasDuplicateDestination = false;
         for (var index = 0; index < capturedUpdates.Length; index++)
         {
             ArgumentNullException.ThrowIfNull(capturedUpdates[index], nameof(updates));
             var destination = Path.GetFullPath(capturedUpdates[index].Path);
-            destinations = destinations.Add(destination);
+            destinationsBuilder.Add(destination);
             OpenSourceCorpusCatalog.EnsureContained(
                 transactionRoot,
                 destination);
             var duplicateDestination = seenDestinations.Contains(destination);
-            seenDestinations = seenDestinations.Add(destination);
+            seenDestinations.Add(destination);
             if (duplicateDestination)
             {
                 hasDuplicateDestination = true;
@@ -58,8 +58,10 @@ internal static class CorpusFileTransaction
                 nameof(updates));
         }
 
+        var destinations = destinationsBuilder.ToImmutable();
         var transactionId = Guid.NewGuid().ToString("N");
-        var entries = ImmutableList<TransactionEntry>.Empty;
+        var entriesBuilder = ImmutableArray.CreateBuilder<TransactionEntry>(capturedUpdates.Length);
+        ImmutableArray<TransactionEntry> entries = default;
         var markerPath = Path.Combine(transactionRoot, MarkerName);
         var markerPublished = false;
         try
@@ -78,7 +80,7 @@ internal static class CorpusFileTransaction
                 var staged = Path.Combine(directory, stem + ".new");
                 var backup = Path.Combine(directory, stem + ".old");
                 var existed = File.Exists(destination);
-                entries = entries.Add(new TransactionEntry(destination, staged, backup, existed));
+                entriesBuilder.Add(new TransactionEntry(destination, staged, backup, existed));
                 if (existed)
                 {
                     await CopyDurablyAsync(
@@ -95,13 +97,14 @@ internal static class CorpusFileTransaction
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            entries = entriesBuilder.ToImmutable();
             await WriteMarkerAsync(
                     markerPath,
-                    new TransactionMarker(SchemaVersion, entries.ToImmutableArray()),
+                    new TransactionMarker(SchemaVersion, entries),
                     cancellationToken)
                 .ConfigureAwait(false);
             markerPublished = true;
-            for (var index = 0; index < entries.Count; index++)
+            for (var index = 0; index < entries.Length; index++)
             {
                 beforePublish?.Invoke(index);
                 File.Move(
@@ -127,7 +130,7 @@ internal static class CorpusFileTransaction
         {
             if (!markerPublished)
             {
-                Cleanup(entries);
+                Cleanup(entries.IsDefault ? entriesBuilder.ToImmutable() : entries);
             }
         }
     }
@@ -155,14 +158,14 @@ internal static class CorpusFileTransaction
 
         var paths = ImmutableHashSet.Create(StringComparer.Ordinal,
             OpenSourceCorpusCatalog.ResolvePath(transactionRoot),
-            OpenSourceCorpusCatalog.ResolvePath(markerPath));
+            OpenSourceCorpusCatalog.ResolvePath(markerPath)).ToBuilder();
         foreach (var entry in marker.Entries)
         {
             if (entry == null)
             {
                 throw new InvalidDataException("A corpus transaction entry is null.");
             }
-            foreach (var path in new[] { entry.DestinationPath, entry.StagedPath, entry.BackupPath })
+            foreach (var path in ImmutableArray.Create(entry.DestinationPath, entry.StagedPath, entry.BackupPath))
             {
                 if (string.IsNullOrEmpty(path) || !Path.IsPathFullyQualified(path))
                 {
@@ -171,7 +174,7 @@ internal static class CorpusFileTransaction
                 OpenSourceCorpusCatalog.EnsureContained(transactionRoot, path);
                 var resolvedPath = OpenSourceCorpusCatalog.ResolvePath(path);
                 var duplicate = paths.Contains(resolvedPath);
-                paths = paths.Add(resolvedPath);
+                paths.Add(resolvedPath);
                 if (duplicate || Directory.Exists(path))
                 {
                     throw new InvalidDataException("Corpus transaction paths must name distinct files.");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -121,17 +122,17 @@ public sealed class CorpusCatalogWorkflowTests
                         OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
                         declaration.Identifier.ValueText, "effects", CorpusVerdict.Unknown, CorpusSupport.IntentionallyUnsupported);
                 });
-        }).DistinctBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256)).ToArray();
+        }).DistinctBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256)).ToImmutableArray();
         var groups = candidates.GroupBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpenSourceCorpusCatalog.GetSourceFileKey(method.SourceId, method.Path)))
             .OrderByDescending(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()))
             .ThenBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
             .Take(OpenSourceCorpusCatalog.MinimumSourceFileCount - 1)
-            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToArray())).ToArray();
+            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray())).ToImmutableArray();
         Assert.That(groups, Has.Length.EqualTo(24));
-        var selected = groups.Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group[0]))
-            .Concat(groups.SelectMany(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Skip(1))))
+        var selected = groups.Select(static group => group.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(group)) : (group[0]))
+            .Concat(groups.SelectMany(static group => group.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(group)) : (group.Skip(1))))
             .Take(OpenSourceCorpusCatalog.MinimumMethodCount)
-            .Select(static (method, index) => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method with { Id = $"OSS{index + 1:D4}" })).ToArray();
+            .Select(static (method, index) => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method with { Id = $"OSS{index + 1:D4}" })).ToImmutableArray();
         Assert.That(selected, Has.Length.EqualTo(200));
         Assert.That(OpenSourceCorpusCatalog.CountSourceFiles(selected), Is.EqualTo(24));
 

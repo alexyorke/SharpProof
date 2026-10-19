@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -56,14 +57,14 @@ public sealed class ApiUsageRankingTests
         var corpus = OpenSourceCorpusCatalog.Load(root);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(corpus, TestContext.CurrentContext.CancellationToken).WithReferences(references);
         RequireCompilation(compilation);
-        var targets = compilation.SyntaxTrees.SelectMany(tree => tree is null ? throw new global::System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())).Where(method => OpenSourceCorpusRunner.CorpusMethodId(method) != null).ToArray();
+        var targets = compilation.SyntaxTrees.SelectMany(tree => tree is null ? throw new global::System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())).Where(method => OpenSourceCorpusRunner.CorpusMethodId(method) != null).ToImmutableArray();
         Assert.That(targets, Has.Length.EqualTo(corpus.Methods.Length));
         foreach (var target in targets)
         {
             Scan(compilation, target, "oss", OpenSourceCorpusRunner.CorpusMethodId(target)!, inventory, sites, gaps);
         }
 
-        var seeds = CorpusCatalog.CreateSyntheticCases().Where(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.Variant == CorpusVariant.Baseline)).ToArray();
+        var seeds = CorpusCatalog.CreateSyntheticCases().Where(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.Variant == CorpusVariant.Baseline)).ToImmutableArray();
         Assert.That(seeds, Has.Length.EqualTo(CorpusCatalog.Seeds.Length));
         foreach (var seed in seeds)
         {
@@ -73,7 +74,7 @@ public sealed class ApiUsageRankingTests
             Scan(synthetic, target, "synthetic", seed.SeedId, inventory, sites, gaps);
         }
 
-        var sampleFiles = Directory.GetFiles(Path.Combine(root, "src/samples"), "*.cs", SearchOption.AllDirectories).Where(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (!path.Replace('\\', '/').Contains("/obj/", StringComparison.Ordinal) && !path.Replace('\\', '/').Contains("/bin/", StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToArray();
+        var sampleFiles = Directory.GetFiles(Path.Combine(root, "src/samples"), "*.cs", SearchOption.AllDirectories).Where(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (!path.Replace('\\', '/').Contains("/obj/", StringComparison.Ordinal) && !path.Replace('\\', '/').Contains("/bin/", StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToImmutableArray();
         var sampleTrees = sampleFiles.Select(path =>
         {
             global::System.ArgumentNullException.ThrowIfNull(path);
@@ -81,7 +82,7 @@ public sealed class ApiUsageRankingTests
             var source = File.ReadAllText(path);
             inputs.Add(relative, Hash(source));
             return CSharpSyntaxTree.ParseText(source, AnalyzerGateHost.ParseOptions, relative);
-        }).ToArray();
+        }).ToImmutableArray();
         var implicitUsings = CSharpSyntaxTree.ParseText("global using System; global using System.Collections.Generic; global using System.Linq; global using System.Threading.Tasks;", AnalyzerGateHost.ParseOptions);
         var samples = CSharpCompilation.Create("ApiUsageSamples", sampleTrees.Append(implicitUsings), references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         RequireCompilation(samples);
@@ -90,7 +91,7 @@ public sealed class ApiUsageRankingTests
             Scan(samples, tree.GetRoot(), "src/samples", tree.FilePath, inventory, sites, gaps);
         }
 
-        var ranked = sites.GroupBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Assembly + "\t" + site.Api + "\t" + site.Access + "\t" + site.Status)).Select(group => group is null ? throw new global::System.ArgumentNullException(nameof(group)) : (new { assembly = group.First().Assembly, api = group.First().Api, access = group.First().Access, status = group.First().Status, sites = group.Count(), callers = group.Select(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin + ":" + site.Caller)).Distinct(StringComparer.Ordinal).Count(), samples = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "src/samples")), oss = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "oss")), synthetic = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "synthetic")), locations = group.OrderBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Location), StringComparer.Ordinal).ToArray() })).OrderByDescending(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.sites)).ThenBy(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.api), StringComparer.Ordinal).ToArray();
+        var ranked = sites.GroupBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Assembly + "\t" + site.Api + "\t" + site.Access + "\t" + site.Status)).Select(group => group is null ? throw new global::System.ArgumentNullException(nameof(group)) : (new { assembly = group.First().Assembly, api = group.First().Api, access = group.First().Access, status = group.First().Status, sites = group.Count(), callers = group.Select(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin + ":" + site.Caller)).Distinct(StringComparer.Ordinal).Count(), samples = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "src/samples")), oss = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "oss")), synthetic = group.Count(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Origin == "synthetic")), locations = group.OrderBy(site => site is null ? throw new global::System.ArgumentNullException(nameof(site)) : (site.Location), StringComparer.Ordinal).ToImmutableArray() })).OrderByDescending(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.sites)).ThenBy(item => item is null ? throw new global::System.ArgumentNullException(nameof(item)) : (item.api), StringComparer.Ordinal).ToImmutableArray();
         var output = Path.Combine(root, "artifacts/api-coverage");
         Directory.CreateDirectory(output);
         File.WriteAllText(Path.Combine(output, "usage-ranking.json"), JsonSerializer.Serialize(new { schemaVersion = 1, scope = "explicit calls, constructions, and property/indexer uses; selected OSS methods, original synthetic targets, and sample sources; no metamorphic duplicates or dependency-only methods", ossTargets = targets.Length, syntheticTargets = seeds.Length, sampleFiles = sampleFiles.Length, inputs, unresolved = gaps, ranked }, JsonOptions) + "\n");
@@ -377,11 +378,11 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(3));
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshDictionaryCalls));
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(indexers, Has.Length.EqualTo(4));
         Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
             Is.EqualTo(FreshDictionaryIndexers));
@@ -405,10 +406,10 @@ public sealed class ApiUsageRankingTests
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
         var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         Assert.That(known.Contains(creation.SpanStart), Is.True);
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(calls.Select(call => call is null ? throw new ArgumentNullException(nameof(call)) : known.Contains(call.SpanStart)),
             Is.EqualTo(FreshListCalls));
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(indexers.Select(indexer => indexer is null ? throw new ArgumentNullException(nameof(indexer)) : known.Contains(indexer.SpanStart)),
             Is.EqualTo(FreshListIndexers));
     }
@@ -428,12 +429,12 @@ public sealed class ApiUsageRankingTests
             """, TestContext.CurrentContext.CancellationToken);
         var tree = compilation.SyntaxTrees.Single();
         var known = KnownIntrinsicSites(compilation.GetSemanticModel(tree), tree.GetRoot());
-        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToImmutableArray();
         Assert.That(known.Contains(calls[0].SpanStart), Is.True);
         Assert.That(known.Contains(calls[1].SpanStart), Is.False);
         Assert.That(known.Contains(calls[2].SpanStart), Is.True);
         Assert.That(known.Contains(calls[3].SpanStart), Is.False);
-        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
+        var indexers = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToImmutableArray();
         Assert.That(known.Contains(indexers[0].SpanStart), Is.True);
         Assert.That(known.Contains(indexers[1].SpanStart), Is.False);
         Assert.That(known.Contains(indexers[2].SpanStart), Is.True);
