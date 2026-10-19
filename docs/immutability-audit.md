@@ -2675,3 +2675,13 @@ and 19 shell scripts with zero changes; inventory parsed all 84 scripts with zer
 Classified coordinator-reviewed frozen snapshot/builder rows, including earlier canonical
 CreateRange capture wrappers that the syntactic scanner still reports as array literals.
 The repository migration remains open; no unchecked row has been treated as absent.
+
+IMM-M072: Coordinator checked 14 Effects.Tests ToArray candidates against current
+master330 source and consumers. Preserve the emitted MemoryStream byte[] image adapter;
+convert the other 13 read-only diagnostic, inventory, syntax, reflection-attribute and
+instruction query snapshots in eight files. Narrow Collect/Markdown/intrinsic evidence
+row vectors and FindExecutableCatalogSyntax to ImmutableArray, retaining initialized
+input guards, order, duplicates and all embedded source text. Leave mutable List/Dictionary/
+Queue/Stack SUT probes and runtime reflection arrays unchanged. Validate the entire
+ordinary Effects test project, including new opaque List/generic storage controls.
+Status: open before edits.
