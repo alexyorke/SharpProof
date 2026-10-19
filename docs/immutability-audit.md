@@ -2575,3 +2575,15 @@ fixed nested vectors to ImmutableArray, and special-name JSON maps/document to p
 readonly record shapes with explicit property names/order. Preserve exact SARIF key
 order, outcome/policy projection and byte serialization; validate launcher/SARIF cases.
 Status: open before edits.
+
+IMM-M068: Coordinator reviewed five remaining frontend construction boundaries with
+agent evidence. Replace the 126-entry operation-decision temporary dictionary with an
+immutable map builder using original indexer overwrite semantics. Handler ordinal
+membership uses a hash builder without enumerating it. Three comparison argument
+buffers become Count-initialized immutable array builders, preserving default slots,
+source evaluation order, named argument ordinal placement and receiver-first faults.
+Freeze the single-symbol Distinct vector and narrow RegionFilterEdgeResolver's retained
+map to ImmutableDictionary; all callers already pass immutable values. Keep original
+null/missing-edge exceptions, SymbolEqualityComparer and lexical handler order. Validate
+full ordinary Frontend and Worker comparison/reference-identity cases.
+Status: open before edits.
