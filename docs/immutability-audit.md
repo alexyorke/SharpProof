@@ -3103,3 +3103,12 @@ Status: open before edits.
 IMM-M091 Fuzz verified: all 302 ordinary Fuzz tests pass, zero failures/skips/warnings/
 errors. Main preserved actual reflection/parser/native buffers while freezing read-only
 boolean vectors and ordered runtime observations. Gates half remains pending separately.
+
+IMM-M096: Main checked nineteen fixed Worker A-G vectors across twelve owners against
+current syntax nodes. Freeze expected values, paired responses, compiler syntax inputs,
+metadata rows and process argv accepted as IEnumerable. Keep byte read buffers and
+reflection invocation arrays mutable. Preserve repeated rows/values, explicit byte and
+nullable enum element types and compiler constraint base types. Convert the two empty
+conditional branches with their nonempty vectors so both branches stay immutable.
+Validate the affected Worker classes; callback/maps remain a separate following batch.
+Status: open before edits.
