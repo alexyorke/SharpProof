@@ -48,6 +48,9 @@ public static partial class Inference
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
+            if (model.GetSymbolInfo(expression.Operand, cancellationToken).Symbol is IMethodSymbol method
+                && model.GetTypeInfo(expression, cancellationToken).ConvertedType is IFunctionPointerTypeSymbol target)
+            { return FunctionAddress(expression.Operand, method, target); }
             var value = Expression(expression.Operand);
             var original = model.GetTypeInfo(expression.Operand, cancellationToken).Type
                 ?? throw new InferenceException("Unresolved address operand.");
@@ -57,12 +60,42 @@ public static partial class Inference
             { HmType.Unify(value, CSharpTypes.Rigid(original)); }
             return new(CSharpTypes.Pointer, value);
         }
+        private HmType FunctionAddress(ExpressionSyntax expression, IMethodSymbol method, IFunctionPointerTypeSymbol target)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (method is null)
+            { throw new ArgumentNullException(nameof(method)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            var signature = target.Signature;
+            var identical = method.RefKind == signature.RefKind && method.Parameters.Length == signature.Parameters.Length
+                && SymbolEqualityComparer.IncludeNullability.Equals(method.ReturnType, signature.ReturnType);
+            for (var i = 0; identical && i < method.Parameters.Length; i++)
+            { identical &= method.Parameters[i].RefKind == signature.Parameters[i].RefKind && SymbolEqualityComparer.IncludeNullability.Equals(method.Parameters[i].Type, signature.Parameters[i].Type); }
+            if (!identical)
+            { return CSharpTypes.Rigid(target); }
+            var shape = CSharpTypes.Erase(target);
+            var mapping = ReceiverMapping(method, null);
+            var definition = method.OriginalDefinition;
+            var explicitArguments = expression is GenericNameSyntax generic ? generic.TypeArgumentList.Arguments
+                : expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax name } ? name.TypeArgumentList.Arguments : default;
+            foreach (var parameter in definition.TypeParameters)
+            { mapping.Add(parameter, explicitArguments.Count == 0 ? HmType.Variable() : CSharpTypes.Rigid(model.GetTypeInfo(explicitArguments[parameter.Ordinal], cancellationToken).Type!)); }
+            for (var i = 0; i < definition.Parameters.Length; i++)
+            { HmType.Unify(shape.Arguments[i], CSharpTypes.Rigid(definition.Parameters[i].Type, mapping)); }
+            HmType.Unify(shape.Arguments[shape.Arguments.Length - 1], CSharpTypes.Rigid(definition.ReturnType, mapping));
+            foreach (var parameter in definition.TypeParameters)
+            { ImportConstraints(parameter, mapping[parameter], mapping, method.TypeArguments[parameter.Ordinal]); }
+            ImportConstructedConstraints(target, shape);
+            return shape;
+        }
         private HmType PointerBinary(BinaryExpressionSyntax binary)
         {
             if (binary is null)
             { throw new ArgumentNullException(nameof(binary)); }
-            var leftPointer = model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol;
-            var rightPointer = model.GetTypeInfo(binary.Right, cancellationToken).Type is IPointerTypeSymbol;
+            var leftPointer = model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol or IFunctionPointerTypeSymbol;
+            var rightPointer = model.GetTypeInfo(binary.Right, cancellationToken).Type is IPointerTypeSymbol or IFunctionPointerTypeSymbol;
             var left = leftPointer ? Expression(binary.Left) : null;
             var right = rightPointer ? Expression(binary.Right) : null;
             if (!leftPointer && !binary.Left.IsKind(SyntaxKind.NullLiteralExpression))

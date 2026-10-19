@@ -77,6 +77,13 @@ public static partial class Inference
                 ImportConstructedConstraints(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), inferred.Arguments[0]);
                 return;
             }
+            if (declared is IFunctionPointerTypeSymbol functionPointer && inferred.Name == CSharpTypes.FunctionPointerName(functionPointer.Signature))
+            {
+                for (var i = 0; i < functionPointer.Signature.Parameters.Length; i++)
+                { ImportConstructedConstraints(functionPointer.Signature.Parameters[i].Type, inferred.Arguments[i]); }
+                ImportConstructedConstraints(functionPointer.Signature.ReturnType, inferred.Arguments[inferred.Arguments.Length - 1]);
+                return;
+            }
             if (declared is IPointerTypeSymbol pointer && inferred.Name == CSharpTypes.Pointer)
             {
                 if (pointer.PointedAtType.IsUnmanagedType)

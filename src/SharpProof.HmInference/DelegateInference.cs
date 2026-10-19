@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -101,7 +102,9 @@ public static partial class Inference
                 if (expression is not (IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax))
                 { continue; }
                 if (semantic.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol
-                    && semantic.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate })
+                    && (semantic.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate }
+                        || expression.Parent is PrefixUnaryExpressionSyntax address && address.IsKind(SyntaxKind.AddressOfExpression)
+                        && semantic.GetTypeInfo(address, cancellationToken).ConvertedType is IFunctionPointerTypeSymbol))
                 { groups.Add(expression); }
             }
             return groups.ToArray();

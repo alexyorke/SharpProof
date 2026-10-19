@@ -11,6 +11,8 @@ internal static partial class CSharpTypes
     {
         if (type is null)
         { throw new ArgumentNullException(nameof(type)); }
+        if (type is IFunctionPointerTypeSymbol functionPointer)
+        { return FunctionPointerName(functionPointer.Signature); }
         if (type is INamedTypeSymbol named)
         {
             if (named.IsAnonymousType)
@@ -92,6 +94,15 @@ internal static partial class CSharpTypes
         { return a.Rank == b.Rank && a.IsSZArray == b.IsSZArray && SameSignatureType(a.ElementType, b.ElementType); }
         if (left is IPointerTypeSymbol pointerLeft && right is IPointerTypeSymbol pointerRight)
         { return SameSignatureType(pointerLeft.PointedAtType, pointerRight.PointedAtType); }
+        if (left is IFunctionPointerTypeSymbol functionLeft && right is IFunctionPointerTypeSymbol functionRight)
+        {
+            if (FunctionPointerName(functionLeft.Signature) != FunctionPointerName(functionRight.Signature)
+                || !SameSignatureType(functionLeft.Signature.ReturnType, functionRight.Signature.ReturnType))
+            { return false; }
+            for (var i = 0; i < functionLeft.Signature.Parameters.Length; i++)
+            { if (!SameSignatureType(functionLeft.Signature.Parameters[i].Type, functionRight.Signature.Parameters[i].Type)) { return false; } }
+            return true;
+        }
         if (ConstructorIdentity(left) != ConstructorIdentity(right))
         { return false; }
         if (left is INamedTypeSymbol x && right is INamedTypeSymbol y)

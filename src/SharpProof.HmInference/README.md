@@ -420,6 +420,18 @@ Unused generic struct arguments remain free. Explicit pointer locals and fixed
 initializers retain their storage types. Stack allocation infers implicit elements
 and preserves explicit element types and conversions; pointer and span targets are
 supported. Applied IDE-fix runtime checks cover aliases, stores, element stride,
-byte/struct payloads and stack allocation. Function pointers and full pinning-pattern
-validation remain open. Project mode uses the project's unsafe setting; loose files
-require --unsafe.
+byte/struct payloads and stack allocation. Full pinning-pattern
+validation remains open. Project mode uses the project's unsafe setting; loose files
+require `--unsafe`.
+
+Function pointer signatures retain managed/unmanaged calling conventions, explicit
+convention lists and parameter/return reference kinds. Inference covers indirect
+calls, nested signatures, nullable values, pointer payloads, generic containing
+types and method addresses with inferred/explicit type arguments and constraints.
+Supplied method-address bindings are checked alongside delegate method groups.
+Applied IDE fixes verify managed reference identity, ref-return storage, out and
+readonly callbacks, generic callback addresses and native Cdecl calls using int
+and long payloads. Explicit local storage and conversion endpoints stay fixed.
+Candidates are rejected when a supplied bare method-address call cannot infer the
+new C# type arguments. Typed callback variables provide their complete signatures
+for inference; this call-site distinction has regression coverage.

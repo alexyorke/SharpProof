@@ -9,6 +9,33 @@ internal static class UnsafeChecks
     {
         var tests = new (string Name, string Source, string Signature)[]
         {
+            ("FunctionPointerIdentity", "static delegate*<int,int> M(delegate*<int,int> pointer)=>pointer;", "delegate*<T1, T2> M<T1, T2>(delegate*<T1, T2> pointer)"),
+            ("FunctionPointerExistingAddressCaller", "static int M(int value)=>value;static delegate*<int,int> Use()=>&M;", "T1 M<T1>(T1 value)"),
+            ("FunctionPointerOptionalReadonly", "static int M(delegate*<in int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate*<in T1, T2> pointer, T1 value)"),
+            ("FunctionPointerWidening", "static long M(delegate*<long,long> pointer,int value,int ignored)=>pointer(value);", "T1 M<T1, T2>(delegate*<long, T1> pointer, int value, T2 ignored)"),
+            ("FunctionPointerDefaultArgument", "static int M(delegate*<int,int> pointer)=>pointer(default);", "T2 M<T1, T2>(delegate*<T1, T2> pointer)"),
+            ("FunctionPointerPointerToPointer", "static delegate*<int,int>* M(delegate*<int,int>* pointer)=>pointer;", "delegate*<T1, T2>* M<T1, T2>(delegate*<T1, T2>* pointer)"),
+            ("FunctionPointerGenericContainer", "static Container<int> M(Container<int> container,int value){container.Pointer(value);return container;}", "global::Container<T1> M<T1>(global::Container<T1> container, T1 value)"),
+            ("FunctionPointerAddress", "static delegate*<int,int> M(delegate*<int,int> pointer,bool choose)=>choose?&Echo:pointer;static T Echo<T>(T value)=>value;", "delegate*<T1, T1> M<T1>(delegate*<T1, T1> pointer, bool choose)"),
+            ("FunctionPointerExplicitAddress", "static delegate*<int,int> M(int ignored)=>&Echo<int>;static T Echo<T>(T value)=>value;", "delegate*<int, int> M<T1>(T1 ignored)"),
+            ("FunctionPointerConstrainedAddress", "static delegate*<int,int> M(delegate*<int,int> pointer,bool choose)=>choose?&Echo:pointer;static T Echo<T>(T value) where T:unmanaged=>value;", "delegate*<T1, T1> M<T1>(delegate*<T1, T1> pointer, bool choose) where T1 : unmanaged"),
+            ("FunctionPointerNull", "static bool M(delegate*<int,int> pointer)=>pointer==null;", "bool M<T1, T2>(delegate*<T1, T2> pointer)"),
+            ("FunctionPointerNoArguments", "static int M(delegate*<int> pointer)=>pointer();", "T1 M<T1>(delegate*<T1> pointer)"),
+            ("FunctionPointerRefStore", "static int M(delegate*<ref int,ref int> pointer,ref int value,int replacement){pointer(ref value)=replacement;return value;}", "T1 M<T1, T2>(delegate*<ref T1, ref T2> pointer, ref T1 value, T2 replacement)"),
+            ("FunctionPointerReadonlyReturn", "static ref readonly int M(delegate*<in int,ref readonly int> pointer,in int value)=>ref pointer(in value);", "ref readonly T2 M<T1, T2>(delegate*<in T1, ref readonly T2> pointer, in T1 value)"),
+            ("FunctionPointerRefReadonlyParameter", "static int M(delegate*<ref readonly int,int> pointer,in int value)=>pointer(in value);", "T2 M<T1, T2>(delegate*<ref readonly T1, T2> pointer, in T1 value)"),
+            ("FunctionPointerDefaultUnmanaged", "static int M(delegate* unmanaged<int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate* unmanaged<T1, T2> pointer, T1 value)"),
+            ("FunctionPointerSuppressedTransition", "static int M(delegate* unmanaged[Cdecl,SuppressGCTransition]<int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate* unmanaged[Cdecl, SuppressGCTransition]<T1, T2> pointer, T1 value)"),
+            ("FunctionPointerCall", "static int M(delegate*<int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate*<T1, T2> pointer, T1 value)"),
+            ("FunctionPointerVoid", "static void M(delegate*<int,void> pointer,int value)=>pointer(value);", "void M<T1>(delegate*<T1, void> pointer, T1 value)"),
+            ("FunctionPointerRef", "static int M(delegate*<ref int,ref int> pointer,ref int value)=>pointer(ref value);", "T2 M<T1, T2>(delegate*<ref T1, ref T2> pointer, ref T1 value)"),
+            ("FunctionPointerOut", "static int M(delegate*<out int,void> pointer){pointer(out var value);return value;}", "T1 M<T1>(delegate*<out T1, void> pointer)"),
+            ("FunctionPointerIn", "static int M(delegate*<in int,int> pointer,in int value)=>pointer(in value);", "T2 M<T1, T2>(delegate*<in T1, T2> pointer, in T1 value)"),
+            ("FunctionPointerUnmanaged", "static int M(delegate* unmanaged[Cdecl]<int,int> pointer,int value)=>pointer(value);", "T2 M<T1, T2>(delegate* unmanaged[Cdecl]<T1, T2> pointer, T1 value)"),
+            ("FunctionPointerDataPointer", "static int M(delegate*<int*,int> pointer,int* value)=>pointer(value);", "T2 M<T1, T2>(delegate*<T1*, T2> pointer, T1* value) where T1 : unmanaged"),
+            ("FunctionPointerNested", "static int M(delegate*<delegate*<int,int>,int,int> pointer,delegate*<int,int> callback,int value)=>pointer(callback,value);", "T4 M<T1, T2, T3, T4>(delegate*<delegate*<T1, T2>, T3, T4> pointer, delegate*<T1, T2> callback, T3 value)"),
+            ("FunctionPointerArray", "static delegate*<int,int>[] M(delegate*<int,int>[] pointers)=>pointers;", "delegate*<T1, T2>[] M<T1, T2>(delegate*<T1, T2>[] pointers)"),
+            ("FunctionPointerNullable", "static string? M(delegate*<string?,string?> pointer,string? value)=>pointer(value);", "T2? M<T1, T2>(delegate*<T1?, T2?> pointer, T1? value) where T1 : class where T2 : class"),
             ("PointerIdentity", "static int* M(int* value)=>value;", "T1* M<T1>(T1* value) where T1 : unmanaged"),
             ("PointerRead", "static int M(int* value)=>*value;", "T1 M<T1>(T1* value) where T1 : unmanaged"),
             ("PointerStore", "static int* M(int* destination,int value){*destination=value;return destination;}", "T1* M<T1>(T1* destination, T1 value) where T1 : unmanaged"),
@@ -43,7 +70,7 @@ internal static class UnsafeChecks
         var failures = new List<string>();
         foreach (var test in tests)
         {
-            var source = "public struct Cell<T>{public T Value;public T Read()=>Value;public T Property=>Value;}public struct Phantom<T>{public int Value;}unsafe class Cases{" + test.Source + "}";
+            var source = "public unsafe struct Container<T>{public delegate*<T,T> Pointer;}public struct Cell<T>{public T Value;public T Read()=>Value;public T Property=>Value;}public struct Phantom<T>{public int Value;}unsafe class Cases{" + test.Source + "}";
             var compilation = Program.Compile([CSharpSyntaxTree.ParseText(source, cancellationToken: cancellationToken)]);
             compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true));
             var errors = compilation.GetDiagnostics(cancellationToken).Where(Inference.IsCompilationError).ToArray();
@@ -57,6 +84,23 @@ internal static class UnsafeChecks
         }
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
-        return tests.Length + await UnsafeRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        string[] uninferrableCallers =
+        [
+            "static int M(delegate*<int,int> pointer)=>pointer(default);static int Echo(int value)=>value;static int Use()=>M(&Echo);",
+            "static int M(delegate*<out int,void> pointer){pointer(out var value);return value;}static void Copy(out int value)=>value=1;static int Use()=>M(&Copy);",
+            "static delegate*<int,int> M(delegate*<int,int> pointer,bool choose)=>choose?&Echo:pointer;static T Echo<T>(T value)=>value;static int Copy(int value)=>value;static delegate*<int,int> Use()=>M(&Copy,true);"
+        ];
+        foreach (var source in uninferrableCallers)
+        {
+            var compilation = Program.Compile([CSharpSyntaxTree.ParseText("unsafe class Cases{" + source + "}", cancellationToken: cancellationToken)]);
+            compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true));
+            if (compilation.GetDiagnostics(cancellationToken).Any(Inference.IsCompilationError))
+            { throw new InvalidOperationException("The original bare method-address caller must compile."); }
+            var result = Program.Results(compilation, cancellationToken).Single(result => { ArgumentNullException.ThrowIfNull(result); return result.Method == "M"; });
+            if (result.Status != "Rejected")
+            { throw new InvalidOperationException("An uninferrable method-address caller must reject the candidate: " + result); }
+        }
+        Program.Log.Info("PASS FunctionPointerBareAddressCallersRequireInferableTypeArguments");
+        return tests.Length + uninferrableCallers.Length + await UnsafeRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
     }
 }

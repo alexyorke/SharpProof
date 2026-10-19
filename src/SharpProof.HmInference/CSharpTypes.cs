@@ -11,6 +11,18 @@ internal static partial class CSharpTypes
     internal const string NullableReference = "@nullable-reference";
     internal const string NullableValue = "global::System.Nullable";
 
+    internal static string FunctionPointerName(IMethodSymbol signature)
+    {
+        if (signature is null)
+        { throw new ArgumentNullException(nameof(signature)); }
+        return "@function:" + signature.CallingConvention + ":" + signature.RefKind + ":"
+            + string.Join(",", signature.Parameters.Select(parameter =>
+            { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return parameter.RefKind.ToString(); }))
+            + ":" + string.Join(",", signature.UnmanagedCallingConventionTypes.Select(type =>
+            { if (type is null) { throw new ArgumentNullException(nameof(type)); } return ConstructorIdentity(type); }).OrderBy(identity =>
+            { if (identity is null) { throw new ArgumentNullException(nameof(identity)); } return identity; }, StringComparer.Ordinal));
+    }
+
     public static string Display(ITypeSymbol type)
     {
         if (type is null)
@@ -75,6 +87,14 @@ internal static partial class CSharpTypes
             return new(Display(type));
         }
 
+        if (type is IFunctionPointerTypeSymbol functionPointer)
+        {
+            var signature = functionPointer.Signature;
+            var components = signature.Parameters.Select(parameter =>
+            { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return Convert(parameter.Type, erase, variables, allowRefLike); }).ToList();
+            components.Add(Convert(signature.ReturnType, erase, variables, allowRefLike));
+            return new(FunctionPointerName(signature), components.ToArray());
+        }
         if (type is IPointerTypeSymbol pointer)
         {
             // Managed pointees are a warning-bearing C# extension. Retain their
@@ -219,6 +239,22 @@ internal static partial class CSharpTypes
             })) + ")";
         }
 
+        if (declared is IFunctionPointerTypeSymbol functionPointer && inferred.Name == FunctionPointerName(functionPointer.Signature))
+        {
+            var syntax = (FunctionPointerTypeSyntax)SyntaxFactory.ParseTypeName(Display(declared));
+            var parameters = syntax.ParameterList.Parameters;
+            var rendered = new List<string>();
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                var original = i == functionPointer.Signature.Parameters.Length ? functionPointer.Signature.ReturnType : functionPointer.Signature.Parameters[i].Type;
+                var modifiers = string.Join(" ", parameters[i].Modifiers.Select(token =>
+                { if (token.RawKind == 0) { throw new ArgumentException("Expected a function pointer modifier.", nameof(token)); } return token.ValueText; }));
+                rendered.Add((modifiers.Length == 0 ? "" : modifiers + " ")
+                    + Render(inferred.Arguments[i], original, variables, nullableAnnotations, model, position, preserveDeclaredAnnotations));
+            }
+            return "delegate*" + (syntax.CallingConvention is null ? "" : " " + syntax.CallingConvention.NormalizeWhitespace().ToFullString())
+                + "<" + string.Join(", ", rendered) + ">";
+        }
         if (inferred.Name == Pointer && declared is IPointerTypeSymbol pointer)
         {
             return Render(inferred.Arguments[0], pointer.PointedAtType, variables,

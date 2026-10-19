@@ -29,14 +29,35 @@ internal static class UnsafeRuntimeChecks
                 public static int Stack(int value){var buffer=stackalloc[]{value,default};return buffer[0];}
                 public static Phantom<int> PhantomStack(Phantom<int> value){var buffer=stackalloc[]{value};return buffer[0];}
                 public static int Address(int value){var pointer=&value;return *pointer;}
+                public static int CallPointer(delegate*<int,int> pointer,int value)=>pointer(value);
+                public static int DefaultPointer(delegate*<int,int> pointer)=>pointer(default);
+                public static ref int BorrowPointer(delegate*<ref int,ref int> pointer,ref int value)=>ref pointer(ref value);
+                public static int StorePointerResult(delegate*<ref int,ref int> pointer,ref int value,int replacement){pointer(ref value)=replacement;return value;}
+                public static int OutPointer(delegate*<out int,void> pointer){pointer(out var value);return value;}
+                public static ref readonly int ReadonlyPointer(delegate*<in int,ref readonly int> pointer,in int value)=>ref pointer(in value);
+                public static int NativePointer(delegate* unmanaged[Cdecl]<int,int> pointer,int value)=>pointer(value);
+                public static delegate*<int,int> ChoosePointer(delegate*<int,int> pointer,bool choose)=>choose?&Echo:pointer;
+                private static T Echo<T>(T value)=>value;
             }
             public unsafe static class OriginalUnsafeRunner {
+                private static int Echo(int value)=>value;
+                private static ref int Borrow(ref int value)=>ref value;
+                private static ref readonly int Readonly(in int value)=>ref value;
+                private static void Out(out int value)=>value=61;
+                [System.Runtime.InteropServices.UnmanagedCallersOnly(CallConvs=new[]{typeof(System.Runtime.CompilerServices.CallConvCdecl)})]
+                private static int Native(int value)=>value+1;
                 public static bool Run(){
+                    delegate*<int,int> echo=&Echo;delegate*<out int,void> copy=&Out;
                     int* values=stackalloc int[]{11,17,23,31};int* absent=null;
                     if(UnsafeProbe.Read(values)!=11||UnsafeProbe.Index(values,2)!=23||!UnsafeProbe.IsNull(absent))return false;
                     if(UnsafeProbe.Store(values,41)!=values||values[0]!=41||UnsafeProbe.Offset(values,2)!=values+2||UnsafeProbe.Distance(values+3,values)!=3||UnsafeProbe.Increment(values)!=values+1)return false;
                     var pointer=values;if(UnsafeProbe.Nested(&pointer)!=&pointer)return false;
                     var cell=new Cell<int>{Value=37};if(UnsafeProbe.Field(&cell)!=37||UnsafeProbe.FieldStore(&cell,43)!=43||cell.Value!=43)return false;
+                    int item=67;UnsafeProbe.BorrowPointer(&Borrow,ref item)=71;
+                    if(item!=71||UnsafeProbe.StorePointerResult(&Borrow,ref item,73)!=73||item!=73||UnsafeProbe.ReadonlyPointer(&Readonly,in item)!=73)return false;
+                    if(UnsafeProbe.CallPointer(&Echo,79)!=79||UnsafeProbe.DefaultPointer(echo)!=0||UnsafeProbe.OutPointer(copy)!=61||UnsafeProbe.NativePointer(&Native,83)!=84)return false;
+                    var chosen=UnsafeProbe.ChoosePointer(echo,true);if(chosen(89)!=89)return false;
+                    chosen=UnsafeProbe.ChoosePointer(echo,false);if(chosen!=echo||chosen(97)!=97)return false;
                     return UnsafeProbe.Stack(47)==47&&UnsafeProbe.Address(53)==53&&UnsafeProbe.PhantomStack(new Phantom<int>{Value=59}).Value==59;
                 }
             }
@@ -50,7 +71,7 @@ internal static class UnsafeRuntimeChecks
         { throw new InvalidOperationException("Original unsafe runtime behavior failed."); }
         var provider = new HmSignatureCodeFixProvider();
         var fixes = 0;
-        for (var round = 0; round < 16; round++)
+        for (var round = 0; round < 24; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -70,12 +91,28 @@ internal static class UnsafeRuntimeChecks
             document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
             fixes++;
         }
-        if (fixes != 13)
-        { throw new InvalidOperationException("Expected thirteen unsafe fixes; got " + fixes); }
+        if (fixes != 21)
+        {
+            var pending = (CSharpCompilation)(await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+            throw new InvalidOperationException("Expected twenty-one unsafe fixes; got " + fixes + ": " + string.Join("; ", Program.Results(pending, cancellationToken)
+                .Where(result => { ArgumentNullException.ThrowIfNull(result); return result.Status is "Rejected" or "Skipped"; })
+                .Select(result => { ArgumentNullException.ThrowIfNull(result); return result.Method + ": " + result.Message; })));
+        }
         document = document.Project.AddDocument("NewUnsafeDomains.cs", """
             public struct Datum {public long Number;public short Tag;}
             public unsafe static class NewUnsafeRunner {
+                private static T Echo<T>(T value)=>value;
+                private static long Length(string value)=>value.Length;
+                private static string result="before";
+                private static ref string Other(ref int value)=>ref result;
+                private static bool IsNull(string value)=>value is null;
+                private static ref T Borrow<T>(ref T value)=>ref value;
+                private static ref readonly T Readonly<T>(in T value)=>ref value;
+                private static void Out(out string value)=>value="from callback";
+                [System.Runtime.InteropServices.UnmanagedCallersOnly(CallConvs=new[]{typeof(System.Runtime.CompilerServices.CallConvCdecl)})]
+                private static long Native(long value)=>value+3;
                 public static bool Run(){
+                    delegate*<string,bool> checker=&IsNull;delegate*<out string,void> copy=&Out;delegate*<Datum,Datum> echo=&Echo<Datum>;
                     byte* bytes=stackalloc byte[]{3,5,7,11};byte* absent=null;
                     if(UnsafeProbe.Read(bytes)!=(byte)3||UnsafeProbe.Store(bytes,(byte)13)!=bytes||bytes[0]!=13||UnsafeProbe.Index(bytes,2)!=7||UnsafeProbe.Offset(bytes,2)!=bytes+2||UnsafeProbe.Distance(bytes+3,bytes)!=3||UnsafeProbe.Increment(bytes)!=bytes+1||!UnsafeProbe.IsNull(absent))return false;
                     Datum* values=stackalloc Datum[2];values[0]=new Datum{Number=101,Tag=17};values[1]=new Datum{Number=103,Tag=19};
@@ -83,6 +120,17 @@ internal static class UnsafeRuntimeChecks
                     var pointer=values;if(UnsafeProbe.Nested(&pointer)!=&pointer)return false;
                     var cell=new Cell<Datum>{Value=values[0]};if(UnsafeProbe.Field(&cell).Number!=101||UnsafeProbe.FieldStore(&cell,values[1]).Tag!=19||cell.Value.Number!=103)return false;
                     if(UnsafeProbe.Stack(values[0]).Tag!=17||UnsafeProbe.Address(values[1]).Number!=103)return false;
+                    var text=new string('x',3);var replacement=new string('y',4);
+                    if(!object.ReferenceEquals(UnsafeProbe.CallPointer(&Echo<string>,text),text)||!UnsafeProbe.DefaultPointer(checker))return false;
+                    if(UnsafeProbe.CallPointer(&Length,text)!=3L)return false;
+                    int separate=127;UnsafeProbe.BorrowPointer(&Other,ref separate)=replacement;
+                    if(separate!=127||!object.ReferenceEquals(result,replacement))return false;
+                    UnsafeProbe.BorrowPointer(&Borrow<string>,ref text)=replacement;
+                    if(!object.ReferenceEquals(text,replacement)||!object.ReferenceEquals(UnsafeProbe.ReadonlyPointer(&Readonly<string>,in text),replacement))return false;
+                    if(!object.ReferenceEquals(UnsafeProbe.StorePointerResult(&Borrow<string>,ref text,replacement),replacement)||UnsafeProbe.OutPointer(copy)!="from callback")return false;
+                    if(UnsafeProbe.NativePointer(&Native,113L)!=116L)return false;
+                    var chosen=UnsafeProbe.ChoosePointer(echo,true);if(chosen(values[1]).Tag!=19)return false;
+                    chosen=UnsafeProbe.ChoosePointer(echo,false);if(chosen!=echo||chosen(values[0]).Number!=101)return false;
                     return UnsafeProbe.PhantomStack(new Phantom<string>{Value=109}).Value==109;
                 }
             }
@@ -93,12 +141,13 @@ internal static class UnsafeRuntimeChecks
             || after.GetType("NewUnsafeRunner")!.GetMethod("Run")!.Invoke(null, null) is not true)
         { throw new InvalidOperationException("Unsafe fixes changed aliasing, storage, element stride or new-domain values."); }
         Program.Log.Info("PASS UnsafeCodeFixRuntimeAliasingStrideStorageAndNewDomains");
+        Program.Log.Info("PASS FunctionPointerCodeFixDispatchRefAliasesNativeAbiAndNewDomains");
         var invalid = document.Project.AddDocument("ManagedDomain.cs", "public unsafe static class InvalidDomain{public static string Read(string* value)=>UnsafeProbe.Read<string>(value);}");
         var rejected = (await invalid.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         if (!rejected.GetDiagnostics(cancellationToken).Any(diagnostic => { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Id == "CS8377" && diagnostic.Severity == DiagnosticSeverity.Error; }))
         { throw new InvalidOperationException("Inferred unmanaged requirements must reject managed payloads."); }
         Program.Log.Info("PASS UnsafeGenericConstraintsRejectManagedDomains");
-        return fixes + 2;
+        return fixes + 3;
     }
     private static System.Reflection.Assembly Load(Compilation compilation, CancellationToken cancellationToken)
     {

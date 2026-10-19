@@ -1161,6 +1161,9 @@ public static partial class Inference
 
         private HmType AssignmentTarget(ExpressionSyntax target)
         {
+            if (target is InvocationExpressionSyntax pointerInvocation
+                && model.GetOperation(pointerInvocation, cancellationToken) is IFunctionPointerInvocationOperation { Target.Type: IFunctionPointerTypeSymbol { Signature.ReturnsByRef: true } })
+            { return Expression(pointerInvocation); }
             if (target is InvocationExpressionSyntax invocation && model.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true })
             { return Expression(invocation); }
             if (target is PrefixUnaryExpressionSyntax pointerTarget && pointerTarget.IsKind(SyntaxKind.PointerIndirectionExpression))
@@ -1360,8 +1363,8 @@ public static partial class Inference
 
         private HmType Binary(BinaryExpressionSyntax binary)
         {
-            if (model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol
-                || model.GetTypeInfo(binary.Right, cancellationToken).Type is IPointerTypeSymbol)
+            if (model.GetTypeInfo(binary.Left, cancellationToken).Type is IPointerTypeSymbol or IFunctionPointerTypeSymbol
+                || model.GetTypeInfo(binary.Right, cancellationToken).Type is IPointerTypeSymbol or IFunctionPointerTypeSymbol)
             { return PointerBinary(binary); }
             if (binary.IsKind(SyntaxKind.CoalesceExpression))
             {
@@ -1440,6 +1443,18 @@ public static partial class Inference
 
         private HmType MethodCall(InvocationExpressionSyntax invocation)
         {
+            if (model.GetOperation(invocation, cancellationToken) is IFunctionPointerInvocationOperation pointerCall)
+            {
+                var pointer = Expression(invocation.Expression).Root;
+                if (pointerCall.Target.Type is not IFunctionPointerTypeSymbol declared || pointer.Name != CSharpTypes.FunctionPointerName(declared.Signature))
+                { throw new InferenceException("Unresolved function pointer invocation."); }
+                // A default literal takes its type from the already inferred
+                // function pointer parameter, rather than fixing that parameter.
+                BindArguments(pointerCall.Arguments.Where(argument =>
+                { if (argument is null) { throw new ArgumentNullException(nameof(argument)); } return !argument.Value.Syntax.IsKind(SyntaxKind.DefaultLiteralExpression); }),
+                    pointer.Arguments.Take(pointer.Arguments.Length - 1).ToArray());
+                return pointer.Arguments[pointer.Arguments.Length - 1];
+            }
             var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation ?? throw new InferenceException("Unresolved or dynamic invocation.");
             var called = operation.TargetMethod;
             if (called.MethodKind == MethodKind.DelegateInvoke)
