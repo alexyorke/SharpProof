@@ -2,6 +2,9 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    private static readonly ImmutableArray<IrExceptionKind> RuntimeExceptionKinds =
+        Enum.GetValues(typeof(IrExceptionKind)).Cast<IrExceptionKind>().ToImmutableArray();
+
     internal static string ExceptionMetadataName(IrExceptionKind kind)
     {
         return kind switch
@@ -34,7 +37,7 @@ internal static partial class CSharpOperationSemantics
             return false;
         }
         var matched = ImmutableArray.CreateBuilder<IrExceptionKind>();
-        foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
+        foreach (var kind in RuntimeExceptionKinds)
         {
             var runtime = core.GetTypeByMetadataName(ExceptionMetadataName(kind));
             if (runtime == null)

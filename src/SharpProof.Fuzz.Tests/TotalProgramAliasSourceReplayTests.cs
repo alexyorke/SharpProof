@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -34,7 +35,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         AssertActualCompilerAndInterpreter(member, arguments, sharedIdentity);
 
         var replay = new TotalProgramSourceReplay(12350 + parameterCount);
-        await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        await replay.CompareBatchAsync([new(member, arguments.ToImmutableArray(), false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
             string.Join("\n", result.Failures.Select(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.Detail))) +

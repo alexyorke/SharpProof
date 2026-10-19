@@ -154,7 +154,7 @@ public static class FuzzRunner
     internal const int MaximumRetainedFailures = 64;
 
     internal static async Task<int> RunCliAsync(
-        string[] arguments,
+        IReadOnlyList<string> arguments,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)

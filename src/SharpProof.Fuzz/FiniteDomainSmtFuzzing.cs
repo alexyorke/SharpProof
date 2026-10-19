@@ -276,13 +276,13 @@ public static class FiniteDomainSmtDifferentialOracle
     {
         var factory = domain.Factory;
         var variables = domain.Variables;
-        var assumptions = ImmutableArray.CreateBuilder<Assumption>(
+        var assumptionBuilder = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
         foreach (var variable in variables)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var predicate = CreateDomainPredicate(factory, variable);
-            assumptions.Add(
+            assumptionBuilder.Add(
                 new Assumption(
                     factory,
                     predicate,
@@ -291,6 +291,7 @@ public static class FiniteDomainSmtDifferentialOracle
                             "finite-domain-v" +
                             variable.Value))));
         }
+        var assumptions = assumptionBuilder.MoveToImmutable();
         var query = new VerificationQuery(
             factory,
             assumptions,
@@ -323,7 +324,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 FuzzOracleStatus.Abstained,
                 expected,
                 null,
-                assumptions.Count,
+                assumptions.Length,
                 detail);
         }
         return new FiniteDomainDifferentialResult(
@@ -332,7 +333,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 : FuzzOracleStatus.Mismatch,
             expected,
             actual,
-            assumptions.Count,
+            assumptions.Length,
             actual == expected
                 ? ""
                 : "Finite enumeration reported " +
@@ -361,7 +362,7 @@ public static class FiniteDomainSmtDifferentialOracle
         {
             cancellationToken.ThrowIfCancellationRequested();
             var remaining = assignment;
-            var assumptions = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
+            var assumptionBuilder = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
             foreach (var variable in variables)
             {
                 var type = factory.GetVariableInfo(variable).Type;
@@ -370,10 +371,11 @@ public static class FiniteDomainSmtDifferentialOracle
                 var ordinal = remaining % domainSize;
                 remaining /= domainSize;
                 var literal = CreateDomainLiteral(factory, type, ordinal);
-                assumptions.Add(new Assumption(factory,
+                assumptionBuilder.Add(new Assumption(factory,
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
             }
+            var assumptions = assumptionBuilder.MoveToImmutable();
             var proof = await kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
                 cancellationToken).ConfigureAwait(false);
             if (proof is RefutedOutcome)

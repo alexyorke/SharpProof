@@ -59,7 +59,7 @@ internal static class TotalProgramDifferentialOracle
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(128, cases - offset);
-            var inputsBuilder = ImmutableArray.CreateBuilder<object?[]>(count);
+            var inputsBuilder = ImmutableArray.CreateBuilder<ImmutableArray<object?>>(count);
             inputsBuilder.Count = count;
             var membersBuilder = ImmutableArray.CreateBuilder<string>(count);
             membersBuilder.Count = count;
@@ -107,7 +107,7 @@ internal static class TotalProgramDifferentialOracle
         return new(new(cases, result.Agreements, result.NativeProofs, result.NativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], result.ExceptionalExits, typeMask, arrayReads), result.Failures);
     }
 
-    private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
+    private static (string Source, ImmutableArray<object?> Inputs, int Mask) ReferenceCase(int ordinal, Random random)
     {
         RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
 
@@ -124,7 +124,7 @@ internal static class TotalProgramDifferentialOracle
         };
     }
 
-    private static (string Source, object?[] Inputs, int Mask) Objects(string name, bool same)
+    private static (string Source, ImmutableArray<object?> Inputs, int Mask) Objects(string name, bool same)
     {
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var shared = new object();
@@ -154,7 +154,12 @@ internal static class TotalProgramDifferentialOracle
         };
     }
 
-    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
+    internal static ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder CreateAliases()
+    {
+        return ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
+    }
+
+    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
@@ -170,7 +175,7 @@ internal static class TotalProgramDifferentialOracle
             : factory.CreateIntegerValue(type, Convert.ToInt64(value, CultureInfo.InvariantCulture));
         }
         if (!aliases.TryGetValue(type, out var typed))
-        { aliases.Add(type, typed = new(ReferenceEqualityComparer.Instance)); }
+        { aliases.AddUnique(type, typed = ImmutableDictionary.CreateBuilder<object, IrValue>(ReferenceEqualityComparer.Instance)); }
         if (typed.TryGetValue(value, out var existing))
         { return existing; }
         // Null/length cases use a valid same-length representative, including
@@ -178,7 +183,7 @@ internal static class TotalProgramDifferentialOracle
         var result = value is string text ? factory.CreateStringValue(new string('\0', text.Length))
             : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases))))
             : factory.CreateReferenceValue(type, value);
-        typed.Add(value, result);
+        typed.AddUnique(value, result);
         return result;
     }
 

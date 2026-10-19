@@ -14,10 +14,10 @@ using SharpProof.Worker;
 
 namespace SharpProof.Fuzz;
 
-internal sealed record TotalProgramSourceCase(string Member, object?[] Arguments, bool IsLoop)
+internal sealed record TotalProgramSourceCase(string Member, ImmutableArray<object?> Arguments, bool IsLoop)
 {
     public string Member { get; init; } = Member ?? throw new System.ArgumentNullException(nameof(Member));
-    public object?[] Arguments { get; init; } = Arguments ?? throw new System.ArgumentNullException(nameof(Arguments));
+    public ImmutableArray<object?> Arguments { get; init; } = Arguments.IsDefault ? throw new System.ArgumentNullException(nameof(Arguments)) : Arguments;
 }
 
 internal sealed record TotalProgramSourceResult(int Cases, int Agreements, int NativeProofs,
@@ -77,12 +77,13 @@ internal sealed class TotalProgramSourceReplay
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var method = methods[index];
+                var nativeArguments = inputs[index].ToArray();
                 void Fail(string detail)
                 {
                     detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
                     if (failures.Count < FuzzRunner.MaximumRetainedFailures)
                     {
-                        var reproducer = members[index] + "\n// inputs: " + JsonSerializer.Serialize(inputs[index]);
+                        var reproducer = members[index] + "\n// inputs: " + JsonSerializer.Serialize(nativeArguments);
                         failures.Add(new(offset + index, seed, "total-program", reproducer, reproducer, detail));
                     }
                 }
@@ -92,7 +93,7 @@ internal sealed class TotalProgramSourceReplay
                 {
                     var compiled = runtime.GetMethod(method.Identifier.ValueText)
                         ?? throw new InvalidOperationException("Generated Total method is missing from the emitted assembly.");
-                    expected = compiled.Invoke(null, inputs[index]);
+                    expected = compiled.Invoke(null, nativeArguments);
                 }
                 catch (TargetInvocationException exception) when (exception.InnerException != null)
                 { expectedException = exception.InnerException; }
@@ -103,9 +104,9 @@ internal sealed class TotalProgramSourceReplay
                 var lower = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(method, model, cancellationToken)!, context, static _ => true, cancellationToken);
                 if (!lower.IsExact)
                 { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
-                var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
+                var aliases = TotalProgramDifferentialOracle.CreateAliases();
                 var entries = ImmutableDictionaryCapture.Create(context.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
-                    parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases)));
+                    parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, nativeArguments[parameter.Parameter.Ordinal], aliases)));
                 var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
                 var original = new IrProgramInterpreter(factory).Execute(lower.Program,
                     entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
@@ -131,7 +132,7 @@ internal sealed class TotalProgramSourceReplay
                         var leftParameter = referenceParameters[left];
                         var rightParameter = referenceParameters[right];
                         requirements.Add(new(factory.Binary(ReferenceEquals(
-                            inputs[index][leftParameter.Parameter.Ordinal], inputs[index][rightParameter.Parameter.Ordinal])
+                            nativeArguments[leftParameter.Parameter.Ordinal], nativeArguments[rightParameter.Parameter.Ordinal])
                                 ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
                             factory.Variable(leftParameter.Entry), factory.Variable(rightParameter.Entry)), factory.Boolean(true), site));
                     }

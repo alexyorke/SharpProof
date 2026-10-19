@@ -68,7 +68,7 @@ internal sealed class MetadataSourceCompilation : IDisposable
             TestMetadataReferences.SortedDistinctPlatform, options);
         libraryImage = MetadataProgramDifferentialOracle.Emit(library, cancellationToken);
         var imagePath = Path.Combine(directory.FullName, "MetadataLibrary.dll");
-        await File.WriteAllBytesAsync(imagePath, libraryImage.ToArray(), cancellationToken);
+        await File.WriteAllBytesAsync(imagePath, libraryImage.GetBuffer().AsMemory(0, checked((int)libraryImage.Length)), cancellationToken);
         runtime.LoadFromStream(libraryImage);
         var source = "using SharpProof.Attributes; public static class MetadataSubject { " + string.Join("\n", sourceMembers) + " }";
         var compilation = CSharpCompilation.Create("MetadataSubject", [Parse(source, Path.Combine(directory.FullName, "Subject.cs"))],
@@ -166,9 +166,9 @@ internal sealed class MetadataProgramSourceReplay
             var factory = total.Program.Factory;
             var parameter = total.Parameters.Single();
             var entriesBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-            entriesBuilder[parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], []);
+            entriesBuilder[parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], TotalProgramDifferentialOracle.CreateAliases());
             var entries = entriesBuilder.ToImmutable();
-            var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, []);
+            var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, TotalProgramDifferentialOracle.CreateAliases());
             var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||
                 !TotalProgramDifferentialOracle.Equal(execution.ReturnValue!, expected))
