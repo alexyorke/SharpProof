@@ -3579,3 +3579,10 @@ full gate supersedes the earlier failed timeout gate as current validation; the 
 timeout's cause remains unproven. M131 next Worker vectors remain open and are excluded
 from this gate and new builder classification. Literal checkpoint: 3,318 tokens across
 768 changed C# files match master 16063804e; M131 literals require a later checkpoint.
+IMM-M132: Review eighteen Package fixed vectors (PNG signature, frameworks, paths,
+filenames and stable member order), the shared compilation-server ID cache and nested
+expected package dependency data. Use immutable vectors, an ordinal atomic immutable
+cache with the same GetOrAdd factory semantics, and immutable nested dependency vectors
+with original indexer overwrite/comparer behavior. Retain native PNG read scratch bytes
+and mutable package/compiler subjects. Validate canonical Release package workflow.
+Status: open before edits.
