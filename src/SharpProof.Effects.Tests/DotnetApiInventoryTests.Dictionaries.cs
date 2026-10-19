@@ -18,7 +18,7 @@ public sealed partial class DotnetApiInventoryTests
         { Assert.That(CSharpOperationSemantics.IsDictionaryStateDeclaration(member), Is.False); }
     }
 
-    private static bool CheckDictionaryStateIntrinsic(CSharpCompilation references, bool wrongClaim, bool referenceValues = false, bool opaqueValues = false, bool genericKeys = false, bool sourceParameters = false)
+    private static bool CheckDictionaryStateIntrinsic(CSharpCompilation references, bool wrongClaim, bool referenceValues = false, bool opaqueValues = false, bool genericKeys = false, bool sourceParameters = false, bool capacity = false)
     {
         ArgumentNullException.ThrowIfNull(references);
         var body = genericKeys
@@ -48,6 +48,8 @@ public sealed partial class DotnetApiInventoryTests
                 "static bool Has<K, V>(System.Collections.Generic.Dictionary<K, V> data, K key) => data.ContainsKey(key); " +
                 "static int Size<K, V>(System.Collections.Generic.Dictionary<K, V> data) => data.Count;";
         }
+        if (capacity)
+        { body = body.Replace(">();", ">(3);", StringComparison.Ordinal); }
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int " + (opaqueValues || genericKeys ? "Target<T>()" : "Target()") + " { " + body + " } " + helpers + " }");
         var compilation = references.AddSyntaxTrees(tree);
         if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))

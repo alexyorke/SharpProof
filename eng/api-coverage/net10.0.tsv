@@ -1190,7 +1190,7 @@ System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collec
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IEnumerable{System.Collections.Generic.KeyValuePair{`0,`1}})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IEnumerable{System.Collections.Generic.KeyValuePair{`0,`1}},System.Collections.Generic.IEqualityComparer{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IEqualityComparer{`0})	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=fresh-default-dictionary-construction-state;intrinsic=capacity-dictionary-construction-state
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Int32,System.Collections.Generic.IEqualityComparer{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.Add(`0,`1)	Method	partially-modeled	intrinsic=fresh-default-integer-key-dictionary-state;intrinsic=constructor-origin-dictionary-state;intrinsic=opaque-dictionary-value-storage

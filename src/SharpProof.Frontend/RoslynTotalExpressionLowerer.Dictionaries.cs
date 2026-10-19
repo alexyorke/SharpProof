@@ -99,14 +99,33 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return null; }
         if (CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation))
         {
-            var constructor = ((IObjectCreationOperation)operation).Constructor!;
+            var creation = (IObjectCreationOperation)operation;
+            var constructor = creation.Constructor!;
+            var constructorValues = new IrTerm[creation.Arguments.Length];
+            foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+            {
+                var value = LowerBodyValue(argument.Value, block, depth + 1);
+                if (!value.Classification.IsExact)
+                { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
+                value = Pin(operation, value);
+                constructorValues[argument.Parameter!.Ordinal] = value.Value;
+                block = value.Continuation;
+            }
+            if (constructorValues.Length != 0)
+            {
+                // Capacity evaluation precedes construction. Negative capacity
+                // cannot return normally; runtime initialization, backing arrays
+                // and failure retain their existing conservative effects.
+                block = ListRuntimeEffects(operation, constructor, constructorValues,
+                    _factory.Binary(IrBinaryOperator.LessThan, constructorValues[0], _factory.Integer(0)), block, initialization: true);
+            }
             var constructorKey = _context.KnownValueType(constructor.ContainingType.TypeArguments[0]) ?? constructor.ContainingType.TypeArguments[0];
             if (!CSharpOperationSemantics.IsComparisonIntegerType(constructorKey))
             {
                 // Default-comparer initialization may allocate, fault or affect
                 // arbitrary existing state. It cannot reach the unpublished result.
                 // Establish fresh logical state only after its normal continuation.
-                block = EmitOpaqueCall(operation, constructor, [], block, null, IrOpaqueCallEffects.All).Continuation;
+                block = EmitOpaqueCall(operation, constructor, constructorValues, block, null, IrOpaqueCallEffects.All).Continuation;
             }
             var allocated = AllocateValue(operation, block);
             _builder!.FieldStore(allocated.Continuation, _context.Site(operation), IrWriteRegion.Field, AsObject(allocated.Value),
