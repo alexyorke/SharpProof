@@ -470,7 +470,7 @@ other constructors and arbitrary incoming/custom comparer behavior remain open.
 ## Verified concrete Queue FIFO state
 
 Framework `Queue<T>` default and capacity constructors, Enqueue, Dequeue and Count
-now share receiver-indexed FIFO storage. Concrete nonvirtual members admit incoming
+now share receiver-indexed FIFO storage. Concrete members with fixed dispatch admit incoming
 receivers and aliases, including generic source helpers, without requiring fresh
 ownership. Incoming receivers follow the existing concrete List policy of well-formed
 typed framework state; arbitrarily corrupted private fields are outside this model.
