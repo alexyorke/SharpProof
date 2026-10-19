@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -45,13 +46,13 @@ public sealed class SpecificationContinuationReuseTests
         var first = ControlFlowGraph.Create(syntax, model)!;
         var second = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(second, Is.Not.SameAs(first));
-        foreach (var graph in new[] { first, second })
+        foreach (var graph in ImmutableArray.Create(first, second))
         {
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
             Assert.That(SymbolEqualityComparer.Default.Equals(
                 model.GetDeclaredSymbol(graph.OriginalOperation.Syntax), method), Is.True);
             Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)), Is.True);
-            var regions = Regions(graph.Root).ToArray();
+            var regions = Regions(graph.Root).ToImmutableArray();
             Assert.That(regions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Finally)), Is.True);
             Assert.That(regions.SelectMany(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals)).Any(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol.Name == "saved")), Is.EqualTo(local));
         }
@@ -67,7 +68,7 @@ public sealed class SpecificationContinuationReuseTests
             Assert.That(runtime.Invoke(null, [input]), Is.EqualTo(input));
 
             // Reuse one owned context, then switch to another authentic graph and back.
-            foreach (var graph in new[] { first, first, second, first })
+            foreach (var graph in ImmutableArray.Create(first, first, second, first))
             {
                 var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
                 Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());

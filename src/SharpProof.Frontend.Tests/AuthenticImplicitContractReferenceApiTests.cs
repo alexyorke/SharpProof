@@ -69,7 +69,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         Assert.That(implicitConsumer.References.Any(reference =>
             reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
                 implicitConsumer.GetAssemblyOrModuleSymbol(reference)))), Is.False);
-        var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToArray();
+        var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToImmutableArray();
         Assert.That(requested, Is.Not.Empty);
         foreach (var request in requested)
         {
@@ -125,7 +125,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private static void RequireNoErrors(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 

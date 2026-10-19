@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -28,7 +29,7 @@ public sealed class ConditionalElisionReceiverMutationTests
             """);
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-        var inputs = new string?[] { null, "word", "" };
+        var inputs = ImmutableArray.Create<string?>(null, "word", "");
         foreach (var input in inputs)
         { Assert.That(subject.Invoke([input!]), Is.EqualTo(10)); }
         var mutation = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))

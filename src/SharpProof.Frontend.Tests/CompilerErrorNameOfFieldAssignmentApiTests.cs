@@ -30,7 +30,7 @@ public sealed class CompilerErrorNameOfFieldAssignmentApiTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         var errors = compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
@@ -99,7 +99,7 @@ public sealed class CompilerErrorNameOfFieldAssignmentApiTests
         Assert.That(whole.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
         Assert.That(whole.ConstructionLimitExceeded, Is.False);
         var writes = whole.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrWriteInstruction>().ToArray();
+            .OfType<IrWriteInstruction>().ToImmutableArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         var replay = control.Execute(whole, []);

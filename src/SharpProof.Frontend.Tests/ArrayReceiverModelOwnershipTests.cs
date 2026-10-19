@@ -127,7 +127,7 @@ public sealed class ArrayReceiverModelOwnershipTests
             method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var rootGraph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
         var invocation = cfg ? rootGraph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
-            block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+            block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))
             .SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf())
             .OfType<IInvocationOperation>().Single() :
             (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
@@ -139,7 +139,7 @@ public sealed class ArrayReceiverModelOwnershipTests
             "The helper's immutable array-backed parameter must be specialized before lowering its body.");
         frame.TrackArrayReceivers(graph!);
         var property = graph!.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
-            block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+            block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))
             .SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf())
             .OfType<IPropertyReferenceOperation>().Single();
         Assert.That(frame.ConcreteArray(property.Instance!), Is.Not.Null,

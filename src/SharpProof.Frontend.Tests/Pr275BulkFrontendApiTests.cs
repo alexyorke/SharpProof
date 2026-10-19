@@ -235,7 +235,7 @@ public sealed class Pr275BulkFrontendApiTests
 
         var typeNames = ReferencedTypeSymbols.GetAllCached(subject.Compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(typeNames, Does.Contain("CachedApi.Outer"));
         Assert.That(typeNames, Does.Contain("CachedApi.Outer.Nested"));
 
@@ -246,7 +246,7 @@ public sealed class Pr275BulkFrontendApiTests
             _ = ReferencedTypeSymbols.GetAllCached(
                     subject.Compilation,
                     cancellation.Token)
-                .ToArray();
+                .ToImmutableArray();
         }));
         Assert.That(exception!.CancellationToken, Is.EqualTo(cancellation.Token));
     }
@@ -257,13 +257,13 @@ public sealed class Pr275BulkFrontendApiTests
         AssertArgumentNull(
             (Action)(() =>
             {
-                _ = ReferencedTypeSymbols.GetAll(null!, TestContext.CurrentContext.CancellationToken).ToArray();
+                _ = ReferencedTypeSymbols.GetAll(null!, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
             }),
             "compilation");
         AssertArgumentNull(
             (Action)(() =>
             {
-                _ = ReferencedTypeSymbols.GetAllCached(null!, TestContext.CurrentContext.CancellationToken).ToArray();
+                _ = ReferencedTypeSymbols.GetAllCached(null!, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
             }),
             "compilation");
 
@@ -274,7 +274,7 @@ public sealed class Pr275BulkFrontendApiTests
                 _ = ReferencedTypeSymbols.GetAllCached(
                         subject.Compilation,
                         referencedAssembly: null!, TestContext.CurrentContext.CancellationToken)
-                    .ToArray();
+                    .ToImmutableArray();
             }),
             "referencedAssembly");
     }

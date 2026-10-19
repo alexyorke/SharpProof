@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -72,7 +73,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
                 var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-                var writes = lowered.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrWriteInstruction>().ToArray();
+                var writes = lowered.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
                 Assert.That(writes, Has.Length.EqualTo(1));
                 Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);

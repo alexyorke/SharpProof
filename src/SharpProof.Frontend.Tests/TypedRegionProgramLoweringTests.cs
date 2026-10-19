@@ -183,7 +183,7 @@ public sealed class TypedRegionProgramLoweringTests
         Assert.That(unnamed, Is.True);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         Assert.That(instructions.OfType<IrLockInstruction>().Count(), Is.EqualTo(2));
     }

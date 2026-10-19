@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -15,7 +16,7 @@ public sealed class TypedProgramLoweringTests
 {
     public static IEnumerable<TestCaseData> ScalarCases()
     {
-        foreach (var input in new[] { int.MinValue, int.MinValue + 1, -2, -1, 0, 1, int.MaxValue })
+        foreach (var input in ImmutableArray.Create(int.MinValue, int.MinValue + 1, -2, -1, 0, 1, int.MaxValue))
         {
             yield return Case("int Target(int x) => checked(x & int.MaxValue);", input);
             yield return Case("int Target(int x) => int.MaxValue & x;", input);
@@ -33,7 +34,7 @@ public sealed class TypedProgramLoweringTests
         yield return Case("short Target(short x) { unchecked { x &= (short)-32768; return x; } }", (short)-1);
         yield return Case("uint Target(uint x, uint y) { x &= y; return x; }", uint.MaxValue, 0x80000000U);
         yield return Case("ulong Target(ulong x, ulong y) { x &= y; return x; }", ulong.MaxValue, 0x8000000000000000UL);
-        foreach (var operation in new[] { "|", "^" })
+        foreach (var operation in ImmutableArray.Create("|", "^"))
         {
             yield return Case($"int Target(int x, int y) => x {operation} y;", -1, int.MinValue);
             yield return Case($"uint Target(uint x, uint y) => checked(x {operation} y);", uint.MaxValue, 0x80000000U);
@@ -46,9 +47,9 @@ public sealed class TypedProgramLoweringTests
             yield return Case($"sbyte Target(sbyte x) {{ checked {{ x {operation}= (sbyte)-128; return x; }} }}", (sbyte)1);
             yield return Case($"ulong Target(ulong x, ulong y) {{ x {operation}= y; return x; }}", 0x00FF00FF00FF00FFUL, 0x8000000000000001UL);
         }
-        foreach (var operation in new[] { "&", "|", "^" })
+        foreach (var operation in ImmutableArray.Create("&", "|", "^"))
         {
-            foreach (var (x, y) in new[] { (false, false), (false, true), (true, false), (true, true) })
+            foreach (var (x, y) in ImmutableArray.Create((false, false), (false, true), (true, false), (true, true)))
             {
                 yield return Case($"bool Target(bool x, bool y) => x {operation} y;", x, y);
                 yield return Case($"bool Target(bool x, bool y) {{ x {operation}= y; return x; }}", x, y);
@@ -82,13 +83,13 @@ public sealed class TypedProgramLoweringTests
         yield return Case("int Target(int x) { if (x > 0) { x += 2; } else { x -= 1; } return x; }", -3);
         yield return Case("long Target(ulong a) => checked((long)a);", (ulong)long.MaxValue + 1);
         yield return Case("ulong Target(long a) => checked((ulong)a);", -1L);
-        foreach (var value in new[] { -1, 0, 255, 256 })
+        foreach (var value in ImmutableArray.Create(-1, 0, 255, 256))
         {
             yield return Case("byte Target(int a) => checked((byte)a);", value);
         }
-        foreach (var mode in new[] { "checked", "unchecked" })
+        foreach (var mode in ImmutableArray.Create("checked", "unchecked"))
         {
-            foreach (var operation in new[] { "/", "%" })
+            foreach (var operation in ImmutableArray.Create("/", "%"))
             {
                 yield return Case($"int Target(int a, int b) => {mode}(a {operation} b);", int.MinValue, -1);
                 yield return Case($"long Target(long a, long b) => {mode}(a {operation} b);", long.MinValue, -1L);
@@ -408,7 +409,7 @@ internal sealed class TypedProgramSubject : IDisposable
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         System.ArgumentNullException.ThrowIfNull(lowering);
         return new IrProgramInterpreter(Factory).Execute(lowering.Program,
-            Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
+            ImmutableDictionaryCapture.Create(Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
     }
     internal IrValue Value(IrVarId variable, object value)
     {

@@ -175,15 +175,14 @@ public sealed class ContractApiIdentityResolverTests
         });
         Assert.That(
             rejected,
-            Is.EquivalentTo(new[]
-            {
+            Is.EquivalentTo(ImmutableArray.Create(
                 ContractApiMetadata.Trusted,
                 ContractApiMetadata.EffectContract,
                 ContractApiMetadata.NotNull,
                 ContractApiMetadata.Positive,
                 ContractApiMetadata.InRange,
                 ContractApiMetadata.NotNull
-            }));
+            )));
     }
 
     private static CSharpCompilation CreateConsumer(

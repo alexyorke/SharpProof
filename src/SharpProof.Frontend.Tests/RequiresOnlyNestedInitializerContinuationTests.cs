@@ -53,7 +53,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToImmutableArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
@@ -64,7 +64,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
             ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)), Is.True);
         var additions = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Select(operation =>
             operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((Block: block, Operation: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))))
-            .Where(pair => pair.Operation is IInvocationOperation { TargetMethod.Name: "Add" }).ToArray();
+            .Where(pair => pair.Operation is IInvocationOperation { TargetMethod.Name: "Add" }).ToImmutableArray();
         Assert.That(additions, Has.Length.EqualTo(initializers ? 2 : 0));
         var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
         Assert.That(list, Is.Not.Null);

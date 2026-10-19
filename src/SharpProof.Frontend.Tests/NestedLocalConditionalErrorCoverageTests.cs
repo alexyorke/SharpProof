@@ -58,7 +58,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     public void OuterLabelInElseProducesOwnedConditionalErrorAndRefusesControlFlow()
     {
         var compilation = CreateCompilation(OuterLabelSource);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedErrorIds));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
@@ -90,7 +90,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
             var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-            foreach (var input in new[] { false, true })
+            foreach (var input in ImmutableArray.Create(false, true))
             {
                 Assert.That(target.Invoke(null, [input]), Is.EqualTo(7));
                 var parameter = context.Parameters.Single();

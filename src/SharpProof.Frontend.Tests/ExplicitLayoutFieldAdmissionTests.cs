@@ -138,9 +138,9 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
             Optimization = producer.Options.OptimizationLevel.ToString(),
-            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray(),
+            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray(),
             emission.Success,
-            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         AssertNoErrors(producer);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
@@ -294,7 +294,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
     private static void AssertNoErrors(Compilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 

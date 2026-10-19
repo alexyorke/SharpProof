@@ -41,7 +41,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
             Does.Not.Contain(SharpProof.Attributes.Contract.ConditionalSymbol));
         var model = subject.Compilation.GetSemanticModel(subject.Syntax.SyntaxTree);
         var calls = subject.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToArray();
+            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(2));
         var requiresCall = calls.Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.TargetMethod.Name == "Requires"));
         var ensuresCall = calls.Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.TargetMethod.Name == "Ensures"));
@@ -84,7 +84,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
             witness = ObserveActualArmScope(subject, model, ensuresCall, context);
         }
 
-        object[] inputs = [7, "ordinary input"];
+        ImmutableArray<object> inputs = [7, "ordinary input"];
         foreach (var input in inputs)
         {
             Assert.That(subject.Invoke(input), Is.EqualTo(7));
@@ -155,11 +155,11 @@ public sealed class RequiresOnlySwitchArmScopeTests
         var conditionalValue = condition.BranchValue!;
         Assert.That(ensuresCall.Syntax.Span.Contains(conditionalValue.Syntax.Span), Is.True);
         Assert.That(context.IsSpecificationOperation(conditionalValue), Is.True);
-        var edges = new[] { condition.FallThroughSuccessor, condition.ConditionalSuccessor };
+        var edges = ImmutableArray.Create(condition.FallThroughSuccessor, condition.ConditionalSuccessor);
         Assert.That(edges.All(edge => edge is { Destination: not null, Semantics: ControlFlowBranchSemantics.Regular } &&
             edge.FinallyRegions.IsEmpty), Is.True);
         var crossings = edges.Where(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge!.Destination!.IsReachable &&
-            !ReferenceEquals(condition.EnclosingRegion, edge.Destination.EnclosingRegion))).ToArray();
+            !ReferenceEquals(condition.EnclosingRegion, edge.Destination.EnclosingRegion))).ToImmutableArray();
         Assert.That(crossings, Is.Not.Empty);
         return new
         {
@@ -172,7 +172,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
             {
                 DestinationBlock = edge!.Destination!.Ordinal,
                 DestinationRegion = DescribeRegion(edge.Destination.EnclosingRegion)
-            })).ToArray()
+            })).ToImmutableArray()
         };
     }
 
@@ -197,7 +197,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
             Kind = region.Kind.ToString(),
             region.FirstBlockOrdinal,
             region.LastBlockOrdinal,
-            Locals = region.Locals.Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Name)).ToArray()
+            Locals = region.Locals.Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Name)).ToImmutableArray()
         };
     }
 

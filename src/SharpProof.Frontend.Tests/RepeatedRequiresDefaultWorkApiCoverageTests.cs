@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.Loader;
@@ -38,7 +39,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, [5000]), Is.EqualTo(5000 + calls));
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5000]), Is.EqualTo(5001));
             var model = compilation.GetSemanticModel(tree);
-            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+            var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
             var target = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
             var helper = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Helper"));
             Assert.That(target.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(calls));

@@ -5,8 +5,8 @@ $ErrorActionPreference = 'Stop'
 $RepositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 
 function Get-Anchors([string]$Content) {
-    $anchors = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $counts = @{}
+    $anchors = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    $counts = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, int]([StringComparer]::OrdinalIgnoreCase)
     $withoutCode = [regex]::Replace($Content, '(?ms)^\s*(```|~~~).*?^\s*\1[^\r\n]*$', '')
     foreach ($match in [regex]::Matches($withoutCode, '(?m)^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$')) {
         $slug = $match.Groups[1].Value.ToLowerInvariant()
@@ -19,21 +19,25 @@ function Get-Anchors([string]$Content) {
     foreach ($match in [regex]::Matches($withoutCode, '(?i)\b(?:id|name)=["'']([^"'']+)["'']')) {
         [void]$anchors.Add($match.Groups[1].Value)
     }
-    return , $anchors
+    return , $anchors.ToImmutable()
 }
 
 # Restrict discovery to tracked source; ignored artifacts can contain other worktrees.
 $tracked = @(& git -C $RepositoryRoot ls-files --cached --others --exclude-standard -- '*.md' ':!:eng/common/**' | Sort-Object -Unique)
 if ($LASTEXITCODE -ne 0) { throw 'Documentation discovery requires a Git source checkout.' }
-$files = @($tracked | ForEach-Object { Join-Path $RepositoryRoot $_ })
+$fileBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($relative in $tracked) { $fileBuilder.Add((Join-Path $RepositoryRoot $relative)) }
 $generated = Join-Path $RepositoryRoot 'docs/generated/source-reference.md'
-if ((Test-Path -LiteralPath $generated) -and $generated -notin $files) { $files += $generated }
+if ((Test-Path -LiteralPath $generated) -and $generated -notin $fileBuilder) { $fileBuilder.Add($generated) }
+$files = $fileBuilder.ToImmutable()
 $checked = 0
 foreach ($file in $files) {
     $content = [IO.File]::ReadAllText($file)
     $content = [regex]::Replace($content, '(?ms)^\s*(```|~~~).*?^\s*\1[^\r\n]*$', '')
-    $targets = @([regex]::Matches($content, '\[[^\]\r\n]*\]\(<?([^\s>]+)>?(?:\s+"[^"]*")?\)') | ForEach-Object { $_.Groups[1].Value })
-    $targets += @([regex]::Matches($content, '(?m)^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)>?') | ForEach-Object { $_.Groups[1].Value })
+    $targetBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    foreach ($match in [regex]::Matches($content, '\[[^\]\r\n]*\]\(<?([^\s>]+)>?(?:\s+"[^"]*")?\)')) { $targetBuilder.Add($match.Groups[1].Value) }
+    foreach ($match in [regex]::Matches($content, '(?m)^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)>?')) { $targetBuilder.Add($match.Groups[1].Value) }
+    $targets = $targetBuilder.ToImmutable()
     foreach ($target in $targets) {
         if ($target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -or $target.StartsWith('//')) { continue }
         $parts = $target.Split('#', 2)

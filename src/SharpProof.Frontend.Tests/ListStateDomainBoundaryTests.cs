@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -74,7 +75,7 @@ public sealed class ListStateDomainBoundaryTests
         var (model, syntax, _, _) = Prepare("System.Collections.Generic.List<" + element + "> data",
             "data.Add(default(" + element + ")); var item = data[0]; return data.Count;");
         var invocation = (IInvocationOperation)model.GetOperation(syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
-        var properties = syntax.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Select(node => node is null ? throw new ArgumentNullException(nameof(node)) : (IPropertyReferenceOperation)model.GetOperation(node)!).ToArray();
+        var properties = syntax.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Select(node => node is null ? throw new ArgumentNullException(nameof(node)) : (IPropertyReferenceOperation)model.GetOperation(node)!).ToImmutableArray();
         Assert.That(CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
         Assert.That(CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
         Assert.That(CSharpOperationSemantics.IsListStateMember(properties.Single().Property.GetMethod!), Is.EqualTo(contents));

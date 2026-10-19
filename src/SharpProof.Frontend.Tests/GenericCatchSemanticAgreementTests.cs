@@ -108,7 +108,7 @@ public sealed class GenericCatchSemanticAgreementTests
         Assert.That(actualHelper.IsExact, Is.True);
         Assert.That(actualHelper.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
-        foreach (var input in new[] { 2, 0 })
+        foreach (var input in ImmutableArray.Create(2, 0))
         {
             var expected = input == 0 ? 17 : 5;
             var replay = subject.Execute(lowering, [input]);

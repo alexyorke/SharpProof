@@ -18,7 +18,7 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
         var (compilation, contract) = CreateSubject(includePlatform: false);
         Assert.That(compilation.References.Count(), Is.EqualTo(1));
         Assert.That(compilation.GetTypeByMetadataName("System.Diagnostics.ConditionalAttribute"), Is.Null);
-        foreach (var special in new[] { SpecialType.System_String, SpecialType.System_Boolean, SpecialType.System_Void })
+        foreach (var special in ImmutableArray.Create(SpecialType.System_String, SpecialType.System_Boolean, SpecialType.System_Void))
         {
             var missing = compilation.GetSpecialType(special);
             Assert.That(missing.SpecialType, Is.EqualTo(special));
@@ -62,7 +62,7 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
         {
             image.Position = 0;
             var target = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var value in new[] { false, true })
+            foreach (var value in ImmutableArray.Create(false, true))
             {
                 var actual = target.Invoke(null, [value]);
                 Assert.That(actual, Is.TypeOf<bool>());

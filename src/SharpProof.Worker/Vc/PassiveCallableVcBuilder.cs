@@ -83,7 +83,6 @@ internal sealed class PassiveCallableVcBuilder
     private readonly CancellationToken _cancellationToken;
     private int _remainingWork = MaximumSteps * WorkerBudgets.DefaultMaximumExpressionDepth;
     internal PassiveCallableCandidate Candidate => _candidate;
-    internal ImmutableArray<Assumption> EntryAssumptions { get; private set; }
 
     // `this` is never null; an entry witness must respect it.
     internal const string ReceiverLabel = "input:receiver";
@@ -97,8 +96,6 @@ internal sealed class PassiveCallableVcBuilder
         return new(factory, factory.Unary(IrUnaryOperator.Not, factory.Binary(IrBinaryOperator.Equal, value, factory.Null(value.Type))),
             new LoweredJustification(site));
     }
-    internal ImmutableArray<IrTerm> Goals { get; private set; }
-    internal IrTerm NormalCompletion { get; private set; } = null!;
     internal ImmutableArray<(IrTerm Reach, IrTerm Kind)> Exceptions => _exceptions.ToImmutable();
     // Each explicit throw site carries its own exception code, so a claim can
     // admit the sites whose static type it allows.
@@ -620,8 +617,8 @@ internal sealed class PassiveCallableVcBuilder
             }
             goals.Add(goal);
         }
-        EntryAssumptions = entryAssumptions.ToImmutable();
-        Goals = goals.ToImmutable();
+        var frozenEntryAssumptions = entryAssumptions.ToImmutable();
+        var frozenGoals = goals.ToImmutable();
         IrTerm normalCompletion = _factory.Boolean(false);
         foreach (var returned in _returns)
         {
@@ -630,12 +627,12 @@ internal sealed class PassiveCallableVcBuilder
         }
         // Retain structural absence of normal exits in the kernel proof core.
         // The fresh total definition adds no restriction on inputs or paths.
-        NormalCompletion = Fresh(_factory.BooleanType);
-        Fact(Equal(NormalCompletion, normalCompletion), entry, "normal-completion");
+        var completionVariable = Fresh(_factory.BooleanType);
+        Fact(Equal(completionVariable, normalCompletion), entry, "normal-completion");
         // Preserve existing body/core labels while adding independent kind facts.
         foreach (var fact in _exceptionFacts)
         { Fact(fact.Predicate, fact.Site, "exception-kind"); }
-        return new(this, loopSearch, boundedSearch);
+        return new(this, frozenEntryAssumptions, frozenGoals, completionVariable, loopSearch, boundedSearch);
     }
 
     private int ExceptionCode(IrThrowInstruction thrown)

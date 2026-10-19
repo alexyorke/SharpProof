@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -58,7 +59,7 @@ public sealed class ConditionalThrowArgumentElisionApiTests
         Assert.That(emission.IsElided(invocation), Is.True);
         Assert.That(emission.IsElided(conditional.BranchValue!), Is.True);
         Assert.That(emission.IsElided(creation), Is.True);
-        foreach (var input in new string?[] { null, "word" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word"))
         {
             Assert.That(subject.Invoke([input!]), Is.EqualTo(7));
         }
@@ -67,7 +68,7 @@ public sealed class ConditionalThrowArgumentElisionApiTests
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = subject.Context.Parameters.Single().Entry;
         var type = subject.Factory.GetVariableInfo(parameter).Type;
-        foreach (var input in new string?[] { null, "word" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word"))
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,

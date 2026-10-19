@@ -183,7 +183,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
             compilation = CSharpCompilation.Create("IdentitySource", [coreTree, callerTree], [], compilationOptions);
         }
         var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error))
-            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)).ToArray();
+            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)).ToImmutableArray();
         if (duplicate)
         {
             Assert.That(errors, Is.EqualTo(DuplicateErrors));

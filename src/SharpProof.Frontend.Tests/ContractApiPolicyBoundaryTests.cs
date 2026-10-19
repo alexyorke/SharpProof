@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.Loader;
@@ -338,7 +339,7 @@ public sealed class ContractApiPolicyBoundaryTests
         var compilation = CSharpCompilation.Create("ContractPolicyEvidence_" + Guid.NewGuid().ToString("N"),
             [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(kind, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -409,7 +410,7 @@ public sealed class ContractApiPolicyBoundaryTests
             .Where(package => package.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency package must be an object.", nameof(package)) : (package.Name == "Microsoft.Z3"))
             .Select(package => package.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency package must be an object.", nameof(package)) : ((Version: package.Value.GetProperty("resolved").GetString()!,
                 Hash: package.Value.GetProperty("contentHash").GetString()!)))
-            .Distinct().ToArray();
+            .Distinct().ToImmutableArray();
         Assert.That(identities, Has.Length.EqualTo(1));
         var identity = identities.Single();
         var packages = Environment.GetEnvironmentVariable("NUGET_PACKAGES");

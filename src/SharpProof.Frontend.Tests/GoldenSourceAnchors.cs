@@ -11,9 +11,9 @@ internal sealed class GoldenSourceAnchors
 {
     private readonly string _document;
     private readonly ImmutableArray<SyntaxToken> _tokens;
-    private readonly ImmutableDictionary<int, int> _starts = ImmutableDictionary<int, int>.Empty;
-    private readonly ImmutableDictionary<int, int> _ends = ImmutableDictionary<int, int>.Empty;
-    private ImmutableDictionary<(int Start, int Length), string> _anchors = ImmutableDictionary<(int Start, int Length), string>.Empty;
+    private readonly ImmutableDictionary<int, int> _starts;
+    private readonly ImmutableDictionary<int, int> _ends;
+    private readonly ImmutableDictionary<(int Start, int Length), string>.Builder _anchors = ImmutableDictionary.CreateBuilder<(int Start, int Length), string>();
 
     internal GoldenSourceAnchors(SyntaxTree tree)
     {
@@ -21,11 +21,15 @@ internal sealed class GoldenSourceAnchors
         _document = tree.FilePath;
         _tokens = tree.GetRoot().DescendantTokens()
             .Where(token => token.Span.Length != 0).ToImmutableArray();
+        var starts = ImmutableDictionary.CreateBuilder<int, int>();
+        var ends = ImmutableDictionary.CreateBuilder<int, int>();
         for (var index = 0; index < _tokens.Length; index++)
         {
-            _starts = _starts.Add(_tokens[index].SpanStart, index);
-            _ends = _ends.Add(_tokens[index].Span.End, index);
+            starts.Add(_tokens[index].SpanStart, index);
+            ends.Add(_tokens[index].Span.End, index);
         }
+        _starts = starts.ToImmutable();
+        _ends = ends.ToImmutable();
     }
 
     internal string Format(string document, int start, int length)
@@ -66,14 +70,14 @@ internal sealed class GoldenSourceAnchors
             }
         }
 
-        var spellings = new string[count];
+        var spellings = ImmutableArray.CreateBuilder<string>(count);
         for (var offset = 0; offset < count; offset++)
         {
-            spellings[offset] = SymbolDisplay.FormatLiteral(_tokens[first + offset].Text, quote: true);
+            spellings.Add(SymbolDisplay.FormatLiteral(_tokens[first + offset].Text, quote: true));
         }
-        var anchor = document + ":tokens[" + string.Join(",", spellings) + "]#" +
+        var anchor = document + ":tokens[" + string.Join(",", spellings.ToImmutable()) + "]#" +
             occurrence.ToString(CultureInfo.InvariantCulture);
-        _anchors = _anchors.Add((start, length), anchor);
+        _anchors.Add((start, length), anchor);
         return anchor;
     }
 

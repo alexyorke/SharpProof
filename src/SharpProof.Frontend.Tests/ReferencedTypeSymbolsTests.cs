@@ -37,7 +37,7 @@ public sealed class ReferencedTypeSymbolsTests
         var exception = Assert.Throws<OperationCanceledException>(
             (Action)(() => ReferencedTypeSymbols.GetAll(
                 compilation,
-                cancellation.Token).ToArray()));
+                cancellation.Token).ToImmutableArray()));
 
         Assert.That(
             exception!.CancellationToken,
@@ -85,7 +85,7 @@ public sealed class ReferencedTypeSymbolsTests
             "DeepNamespaces",
             "namespace " + namespaceName + " { }");
 
-        var types = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
+        var types = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
 
         Assert.That(types, Is.Empty);
     }
@@ -150,7 +150,7 @@ public sealed class ReferencedTypeSymbolsTests
         var identities = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type =>
                 type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ContainingAssembly.Name + ":" + type.ToDisplayString()))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(
             identities,
@@ -174,7 +174,7 @@ public sealed class ReferencedTypeSymbolsTests
                 compilation,
                 contractFor!.ContainingAssembly, TestContext.CurrentContext.CancellationToken)
             .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(types, Does.Contain("Consumer.Marker"));
         Assert.That(types, Does.Not.Contain("object"));

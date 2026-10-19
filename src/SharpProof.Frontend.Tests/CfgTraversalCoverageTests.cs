@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
@@ -13,7 +14,7 @@ public sealed class CfgTraversalCoverageTests
     {
         using var subject = TypedProgramSubject.Create(
             "int Target(int x) { if (false) x = 99; return x; }");
-        var reachable = RoslynCfgReachability.ReachableBlocks(subject.Graph, TestContext.CurrentContext.CancellationToken).ToArray();
+        var reachable = RoslynCfgReachability.ReachableBlocks(subject.Graph, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
         Assert.That(reachable.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Ordinal)),
             Is.EqualTo(subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable))
                 .Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Ordinal))));
@@ -31,7 +32,7 @@ public sealed class CfgTraversalCoverageTests
         System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         var block = FaultingBlock(subject.Graph);
-        var successors = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block, TestContext.CurrentContext.CancellationToken).ToArray();
+        var successors = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
         Assert.That(successors, Is.Not.Empty);
         Assert.That(successors.Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Ordinal)), Is.Unique);
         Assert.That(successors.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.EnclosingRegion.Kind is
@@ -50,9 +51,9 @@ public sealed class CfgTraversalCoverageTests
         cancellation.Cancel();
         var block = FaultingBlock(subject.Graph);
         Assert.Throws<OperationCanceledException>((Action)(() =>
-            _ = RoslynCfgReachability.ReachableBlocks(subject.Graph, cancellation.Token).ToArray()));
+            _ = RoslynCfgReachability.ReachableBlocks(subject.Graph, cancellation.Token).ToImmutableArray()));
         Assert.Throws<OperationCanceledException>((Action)(() =>
-            _ = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block, cancellation.Token).ToArray()));
+            _ = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block, cancellation.Token).ToImmutableArray()));
     }
     private static BasicBlock FaultingBlock(ControlFlowGraph graph)
     {

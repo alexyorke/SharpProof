@@ -97,11 +97,11 @@ public sealed class CSharpScalarSemanticsTests
                 type.ToString());
         }
 
-        foreach (var type in new[] {
+        foreach (var type in ImmutableArray.Create(
                      SpecialType.System_UInt64,
                      SpecialType.System_IntPtr,
                      SpecialType.System_UIntPtr
-                 })
+                 ))
         {
             Assert.That(
                 lowerer.GetTypeId(compilation.GetSpecialType(type)),

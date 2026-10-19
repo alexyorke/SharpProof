@@ -134,7 +134,7 @@ public sealed class TypedReferenceProgramLoweringTests
 
     public static IEnumerable<TestCaseData> ArrayMutationCases()
     {
-        foreach (var index in new[] { 0U, 1U, (uint)int.MaxValue, 0x80000000U, uint.MaxValue })
+        foreach (var index in ImmutableArray.Create(0U, 1U, (uint)int.MaxValue, 0x80000000U, uint.MaxValue))
         {
             yield return Case("int Target(uint index) { int[] values = new int[1]; values[index] = 7; return values[0]; }",
                 [index], index == 0 ? 7 : typeof(IndexOutOfRangeException), index.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -144,7 +144,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("int Target() { int[] values = null; uint index = uint.MaxValue; int seen = 0; try { values[index] &= ++seen; } catch (System.NullReferenceException) { return seen; } return -1; }", [], 0);
         yield return Case("int Target() { int[] values = new int[2]; uint i = 0; values[i] = (int)(i = 1); return values[0] * 10 + values[1]; }", [], 10);
         yield return Case("int Target() { int[] values = new int[1]; int[] original = values; uint i = 0; values[i] = (values = new int[1]).Length + (int)(i = 1); return original[0] * 10 + values[0]; }", [], 20);
-        foreach (var assignment in new[] { "=", "&=" })
+        foreach (var assignment in ImmutableArray.Create("=", "&="))
         {
             var expected = assignment == "=" ? 7 : 9;
             yield return Case($"int Target(int zero) {{ int[] values = null; uint i = 0; try {{ values[i] {assignment} 1 / zero; }} catch (System.DivideByZeroException) {{ return 7; }} catch (System.NullReferenceException) {{ return 9; }} return -1; }}", [0], expected);
@@ -162,7 +162,7 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("int Target(int[] x) => x[0] & 0;", [Array.Empty<int>()], typeof(IndexOutOfRangeException));
         yield return Case("int Target(int[] x) { int seen = 0; try { return x[seen++] & 0; } catch (System.NullReferenceException) when (seen == 1) { return seen; } }", [null!], 1);
         yield return Case("int Target(int[] x) { int seen = 0; try { return x[0] & seen++; } catch (System.NullReferenceException) { return seen; } }", [null!], 0);
-        (string Type, Array Input, object Expected)[] scalars =
+        ImmutableArray<(string Type, Array Input, object Expected)> scalars =
         [
             ("sbyte", new[] { sbyte.MinValue }, sbyte.MinValue), ("byte", new[] { byte.MaxValue }, byte.MaxValue),
             ("short", new[] { short.MinValue }, short.MinValue), ("ushort", new[] { ushort.MaxValue }, ushort.MaxValue),
@@ -172,7 +172,7 @@ public sealed class TypedReferenceProgramLoweringTests
         ];
         foreach (var (type, input, expected) in scalars)
         { yield return Case($"{type} Target({type}[] x) => x[0];", [input], expected); }
-        (string Type, object Index)[] indexes =
+        ImmutableArray<(string Type, object Index)> indexes =
         [("int", -1), ("int", int.MaxValue), ("uint", uint.MaxValue)];
         foreach (var (type, index) in indexes)
         {

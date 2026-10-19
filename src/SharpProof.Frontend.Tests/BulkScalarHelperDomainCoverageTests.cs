@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -14,13 +15,13 @@ public sealed class BulkScalarHelperDomainCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(bool flag, int first, int second) => flag ? first : second;");
         var operation = (IConditionalOperation)Expression(subject);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(3));
         Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
         Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UnsupportedOperationKind);
         var clause = lowerer.LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.True);
-        foreach (var flag in new[] { true, false })
+        foreach (var flag in ImmutableArray.Create(true, false))
         {
             object[] inputs = [flag, 17, 23];
             var expected = flag ? 17 : 23;
@@ -42,7 +43,7 @@ public sealed class BulkScalarHelperDomainCoverageTests
         var operation = (IBinaryOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.OperatorMethod, Is.Not.Null);
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToArray();
+        var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(2));
         Assert.That(children.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Classification.IsExact)), Is.True);
         Closed(subject.Factory, CSharpOperationSemantics.Apply(subject.Factory, operation, [.. children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Value))]), FrontendAbstention.UserDefinedOperator);

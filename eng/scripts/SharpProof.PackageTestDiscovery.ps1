@@ -8,18 +8,18 @@ function Get-SharpProofPackageMethodsFromDiscovery {
         [Parameter(Mandatory = $true)][hashtable]$Descriptions
     )
 
-    $methodsByClass = @{}
+    $methodsByClass = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
     foreach ($className in $ClassNames) {
         $pattern = '^' + [regex]::Escape($className) + '\.(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|$)'
-        [string[]]$methods = @($FullyQualifiedNames | ForEach-Object {
-                $match = [regex]::Match($_, $pattern)
-                if ($match.Success) { $match.Groups['method'].Value }
-            } | Sort-Object -Unique -CaseSensitive)
-        if ($methods.Count -lt [int]$MinimumCounts[$className]) {
+        $methods = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($FullyQualifiedNames | ForEach-Object {
+                    $match = [regex]::Match($_, $pattern)
+                    if ($match.Success) { $match.Groups['method'].Value }
+                } | Sort-Object -Unique -CaseSensitive))
+        if ($methods.Length -lt [int]$MinimumCounts[$className]) {
             throw ([string]$Descriptions[$className] + ' discovery returned only ' +
-                $methods.Count + ' test methods.')
+                $methods.Length + ' test methods.')
         }
         $methodsByClass[$className] = $methods
     }
-    return $methodsByClass
+    return , $methodsByClass.ToImmutable()
 }

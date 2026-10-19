@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
@@ -33,7 +34,7 @@ public sealed class VisualBasicProgramTerminationApiTests
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(graph.OriginalOperation.Descendants().OfType<IEndOperation>().Count(), Is.EqualTo(terminate ? 1 : 0));
         var terminationEdges = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor))
-            .Where(edge => edge?.Semantics == ControlFlowBranchSemantics.ProgramTermination).ToArray();
+            .Where(edge => edge?.Semantics == ControlFlowBranchSemantics.ProgramTermination).ToImmutableArray();
         Assert.That(terminationEdges.Length, Is.EqualTo(terminate ? 1 : 0));
         foreach (var edge in terminationEdges)
         {

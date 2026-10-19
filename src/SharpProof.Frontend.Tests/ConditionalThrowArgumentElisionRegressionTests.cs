@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -20,7 +21,7 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
             "); return 7; } [System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool value) { }",
             preprocessorSymbols: defined ? ["ABSENT"] : []);
         var lowered = defined ? subject.LowerSourceCalls() : subject.Lower();
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         {
             var throws = defined && (!throwWhenNull || input == null);
             var kind = !throwWhenNull && input == null ? IrExceptionKind.NullReference : IrExceptionKind.Explicit;
@@ -34,7 +35,7 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
         using var subject = TypedProgramSubject.Create("int Target(string value) { Log(value != null && value.Length > 0);" +
             " return 7; } [System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool value) { }");
         var lowered = subject.Lower();
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         { AssertExecution(subject, lowered, input, 7, null); }
     }
 
@@ -48,7 +49,7 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
             " [System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool value) { }",
             preprocessorSymbols: defined ? ["ABSENT"] : []);
         var lowered = defined ? subject.LowerSourceCalls() : subject.Lower();
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         {
             var exception = !defined || input == "word" ? null :
                 input == null ? typeof(NullReferenceException) : typeof(InvalidOperationException);

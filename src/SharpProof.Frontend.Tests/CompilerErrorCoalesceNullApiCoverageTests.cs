@@ -34,7 +34,7 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToImmutableArray();
         var nullTest = operations.OfType<IIsNullOperation>().Single();
         Assert.That(nullTest.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(nullTest.Operand, Is.AssignableTo<IFlowCaptureReferenceOperation>());

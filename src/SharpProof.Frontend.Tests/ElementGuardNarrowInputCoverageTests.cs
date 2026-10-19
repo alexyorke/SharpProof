@@ -20,7 +20,7 @@ public sealed class ElementGuardNarrowInputCoverageTests
         Assert.That(subject.Invoke([Array.Empty<int>(), (byte)0]), Is.TypeOf<IndexOutOfRangeException>());
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToArray();
+        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToImmutableArray();
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
         var receiver = lowerer.LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "items")))!);
         var index = lowerer.LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "position")))!);

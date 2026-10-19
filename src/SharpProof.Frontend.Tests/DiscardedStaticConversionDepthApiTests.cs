@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -94,7 +95,7 @@ public sealed class DiscardedStaticConversionDepthApiTests
             return;
         }
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
-        var writes = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToArray();
+        var writes = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);

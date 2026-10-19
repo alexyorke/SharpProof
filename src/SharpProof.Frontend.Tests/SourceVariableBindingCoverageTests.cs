@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -83,13 +84,13 @@ public sealed class SourceVariableBindingCoverageTests
             "long Target(bool select, long left, long right) => select ? left : right;");
         var lowerer = new RoslynOperationLowerer(new IrFactory());
         var roots = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToImmutableArray();
         foreach (var operation in roots)
         {
             Assert.That(lowerer.Lower(operation).IsExact, Is.True);
         }
         var captures = roots.SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf()))
-            .OfType<IFlowCaptureReferenceOperation>().ToArray();
+            .OfType<IFlowCaptureReferenceOperation>().ToImmutableArray();
         Assert.That(captures, Is.Not.Empty);
         foreach (var capture in captures)
         {

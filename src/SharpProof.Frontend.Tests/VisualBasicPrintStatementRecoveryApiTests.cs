@@ -135,10 +135,10 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(lowered.IsExact, Is.EqualTo(depth == 255));
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(depth == 255
             ? FrontendAbstention.None : FrontendAbstention.ExpressionDepthLimit));
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.Length, Is.LessThanOrEqualTo(64));
         Assert.That(instructions.OfType<IrWriteInstruction>(), Is.Empty);
-        var havoc = instructions.OfType<IrHavocInstruction>().ToArray();
+        var havoc = instructions.OfType<IrHavocInstruction>().ToImmutableArray();
         Assert.That(havoc, Has.Length.EqualTo(depth == 255 ? 0 : 1));
         if (depth == 256)
         {
@@ -180,7 +180,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var input in new[] { -3, 0, 7 })
+            foreach (var input in ImmutableArray.Create(-3, 0, 7))
             {
                 Assert.That(method.Invoke(null, [input]), Is.EqualTo(input));
                 var entry = context.Parameters.Single().Entry;

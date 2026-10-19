@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -77,7 +78,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         Assert.That(ownerBlock.IsReachable, Is.False);
         var prefix = ownerBlock.Operations.Take(candidate.Ordinal + 1)
             .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(prefix, Is.Not.Empty);
         Assert.That(prefix.All(context.IsSpecificationOperation), Is.True);
         Assert.That(context.IsSpecificationOperation(candidate.Expression), Is.True);

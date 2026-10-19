@@ -49,7 +49,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             // Freeze actual compiled behavior before checking the proposed CFG shape.
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             {
                 if (enabled)
                 {
@@ -75,7 +75,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
             Assert.That(owner.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
             var outer = (ConditionalExpressionSyntax)ownerSyntax.ArgumentList.Arguments.Single().Expression;
             var terminal = graph.Blocks.Where(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
             Assert.That(terminal.Length, Is.GreaterThanOrEqualTo(2));
             foreach (var block in terminal)
             {
@@ -86,7 +86,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
 
             var dispatch = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
                 block.BranchValue?.Syntax.SyntaxTree == tree && block.BranchValue.Syntax.Span == outer.Condition.Span));
-            foreach (var trueArm in new[] { false, true })
+            foreach (var trueArm in ImmutableArray.Create(false, true))
             {
                 var takeConditional = trueArm == (dispatch.ConditionKind == ControlFlowConditionKind.WhenTrue);
                 var edge = takeConditional ? dispatch.ConditionalSuccessor : dispatch.FallThroughSuccessor;
@@ -104,7 +104,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                     if (!visited.Add(block))
                     { continue; }
                     Assert.That(visited.Count, Is.LessThanOrEqualTo(graph.Blocks.Length));
-                    foreach (var successor in new[] { block.FallThroughSuccessor, block.ConditionalSuccessor })
+                    foreach (var successor in ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor))
                     {
                         if (successor?.Destination is { } destination)
                         { pending = pending.Push(destination); }
@@ -112,7 +112,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                 }
                 var arm = trueArm ? outer.WhenTrue : outer.WhenFalse;
                 var captures = visited.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>()
-                    .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SyntaxTree == tree && arm.Span.Contains(operation.Syntax.Span))).ToArray();
+                    .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SyntaxTree == tree && arm.Span.Contains(operation.Syntax.Span))).ToImmutableArray();
                 Assert.That(captures, Is.Not.Empty, "Each fixed constructor argument must produce compiler scan operations.");
                 foreach (var capture in captures)
                 {
@@ -127,7 +127,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                 : lowerer.LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-            foreach (var flag in new[] { false, true })
+            foreach (var flag in ImmutableArray.Create(false, true))
             {
                 var replay = new IrProgramInterpreter(factory).Execute(lowering.Program,
                     global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(context.Parameters.Single().Entry, factory.CreateBooleanValue(flag)));

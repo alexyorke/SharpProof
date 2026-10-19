@@ -30,7 +30,7 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        foreach (var divisor in new[] { 0, 1 })
+        foreach (var divisor in ImmutableArray.Create(0, 1))
         {
             var expected = divisor == 0 ? 23 : 17;
             Assert.That(subject.Invoke([divisor]), Is.EqualTo(expected));

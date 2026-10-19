@@ -109,7 +109,7 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ if (other) { Log(flag && other); } else { Log(flag || other); } return 7; }");
         var children = subject.Graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None &&
-            block.BranchValue != null && subject.Emission.IsElided(block.BranchValue)).ToArray();
+            block.BranchValue != null && subject.Emission.IsElided(block.BranchValue)).ToImmutableArray();
         Assert.That(children, Has.Length.EqualTo(2));
         var targetBuilder = ImmutableHashSet.CreateBuilder<BasicBlock>();
         foreach (var child in children)

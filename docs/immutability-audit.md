@@ -2503,3 +2503,25 @@ accounting for shifted imports/snapshot calls; change only initializer delimiter
 Reject mismatched or unsupported nodes before any write. Run the ordinary frontend
 suite and keep reflection/rank/mutation arrays at their concrete native boundaries.
 Status: open before edits.
+
+IMM-M058-M064 verified checkpoint: M058 and the final M064 ordinary Frontend suites
+passed all 2,051 tests; M059 focused maps/anchors passed 386; M057 SMT checks passed
+368. M061 ordinary Worker suite passed all 5,590 tests, including heap builders and
+cancellation/lane publication. All .NET runs reported zero warnings and errors.
+M060 validated 713 documentation links and 20 source-document controls. M062 package
+class/case/minimum discovery and third-party positive/negative inventory controls passed.
+M063 real canonical layout passed (2,609 source files, 59 projects, 151 pinned common
+files); argument probe retained all nine arguments, including empty and spaced values.
+C# and PowerShell formatting passed. Literal comparison against master 6b062e611
+preserved 2,959 raw/interpolated tokens across 646 changed C# files. Refreshed syntax
+inventory: 1,867 C# files, 3,047 candidates; 84 PowerShell scripts, 1,096 candidates,
+zero parser errors. Classified 8 new reviewed C# builder rows and 24 PowerShell builder
+rows; remaining open rows still require coordinator review and are not completion claims.
+GoldenSourceAnchors' builder cache remains confined to synchronous local consumers;
+no concurrency contract was found. Native runtime arrays and mutable test subjects stay.
+Status: M058-M064 implementation verified; comprehensive migration remains open.
+
+Master synchronization checkpoint: fetched 7e0e485a14ff3d09511c34009008ef83cdba5964
+(opaque List values and generic helper storage, PR #330). Commit the verified batch
+before merging; retain new List provenance/storage semantics and existing immutable
+snapshots. Recheck affected tests and literals against this new master before pushing.

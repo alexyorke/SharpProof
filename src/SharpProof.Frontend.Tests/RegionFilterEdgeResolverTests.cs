@@ -200,7 +200,7 @@ public sealed class RegionFilterEdgeResolverTests
         public RoslynTotalProgramLowerer.RegionFilterEdgeResolver Resolver { get; init; } = Resolver.Equals(default(RoslynTotalProgramLowerer.RegionFilterEdgeResolver)) ? throw new System.ArgumentException("Value must be initialized.", nameof(Resolver)) : Resolver;
 
         internal IEnumerable<ControlFlowBranch> Edges => Graph.Blocks
-            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new[] { block.FallThroughSuccessor, block.ConditionalSuccessor }))
+            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
             .OfType<ControlFlowBranch>();
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
@@ -14,7 +15,7 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
     [Test]
     public void InspectPreviouslyAdmittedUnusedLocalStorage()
     {
-        (string Name, string Body)[] cases =
+        ImmutableArray<(string Name, string Body)> cases =
         [
             ("unused-decimal", "Dim unused As Decimal\nReturn 7"),
             ("unused-static", "Static unused As Integer\nReturn 7"),

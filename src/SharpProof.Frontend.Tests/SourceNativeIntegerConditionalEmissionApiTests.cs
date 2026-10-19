@@ -89,7 +89,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var method = invocation.TargetMethod;
-        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
+        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToImmutableArray();
         var raw = overloaded
             ? candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters[0].Type.SpecialType == SpecialType.System_IntPtr))
             : candidates.Single();

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
@@ -17,7 +18,7 @@ public sealed class CfgExpressionLoweringCoverageTests
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
         var operations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToImmutableArray();
         Assert.That(operations.OfType<IFlowCaptureOperation>(), Is.Not.Empty);
         foreach (var operation in operations)
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -18,7 +19,7 @@ public sealed class ElementGuardInputDomainCoverageTests
         Assert.That(subject.Invoke([null!, position]), Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToArray();
+        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToImmutableArray();
         var receiver = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "items")))!);
         var index = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "position")))!);
         Assert.That(receiver.Classification.IsExact, Is.True);

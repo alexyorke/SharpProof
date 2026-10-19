@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -53,7 +54,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
         }
         // The public wrapper provides a normal CLR entry point for every body,
         // including local functions and anonymous functions.
-        foreach (var input in new[] { -17, 0, 23 })
+        foreach (var input in ImmutableArray.Create(-17, 0, 23))
         {
             Assert.That(subject.Invoke([input]), Is.EqualTo(input + 7));
         }
@@ -97,7 +98,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            foreach (var input in new[] { -17, 0, 23 })
+            foreach (var input in ImmutableArray.Create(-17, 0, 23))
             {
                 Assert.That(method.Invoke(null, [input]), Is.EqualTo(input + 7));
             }

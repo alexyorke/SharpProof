@@ -89,7 +89,7 @@ public sealed class SharpProofWorker : IDisposable
         }
 
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        CompilerCallablePreparation[]? interruptedTargets = null;
+        ImmutableArray<CompilerCallablePreparation> interruptedTargets = default;
         CallableVerificationResult[]? interruptedResults = null;
         using var projectBoundary =
             CancellationTokenSource.CreateLinkedTokenSource(
@@ -118,13 +118,13 @@ public sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null)
         {
             var canceled = cancellationToken.IsCancellationRequested;
-            if (input != null && interruptedTargets != null && interruptedResults != null)
+            if (input != null && !interruptedTargets.IsDefault && interruptedResults != null)
             {
                 // Lanes have settled before this projection. Keep their validated
                 // publications and synthesize interruption results only for work not started.
                 var settled = interruptedTargets.Select((target, index) => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (target is null ? throw new System.ArgumentNullException(nameof(target)) : (interruptedResults[index] ?? Unknown(target,
                     canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
-                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout))))).ToArray();
+                    canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout))))).ToImmutableArray();
                 var projected = ProjectResults(settled);
                 var run = WorkerResultAssembler.Classify(projected.Callables, projected.Claims);
                 return WorkerResultAssembler.Create(input.InputHash, input.CompilerManifest.Manifest,
@@ -273,7 +273,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             ThrowIfProjectInterrupted();
             var orderedTargets = targets.OrderBy(
-                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToArray();
+                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToImmutableArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
                 CountSolverTargets(orderedTargets),
@@ -374,7 +374,7 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
 
-            var projected = ProjectResults(results);
+            var projected = ProjectResults(results.ToImmutableArray());
             var callableResults = projected.Callables;
             var claimResults = projected.Claims;
             ThrowIfProjectInterrupted();
@@ -505,7 +505,7 @@ public sealed class SharpProofWorker : IDisposable
         };
     }
 
-    private static WorkerProtocolError[] Error(string code, string message)
+    private static ImmutableArray<WorkerProtocolError> Error(string code, string message)
     {
         System.ArgumentNullException.ThrowIfNull(code);
         System.ArgumentNullException.ThrowIfNull(message);
@@ -551,7 +551,7 @@ public sealed class SharpProofWorker : IDisposable
                 _readConsumedResourceCount)];
             return LaneCreationResult.Success;
         }
-        var created = new List<VerificationLane>();
+        var created = ImmutableArray.CreateBuilder<VerificationLane>();
         try
         {
             var backendFactory = _backendFactory ??
@@ -619,30 +619,29 @@ public sealed class SharpProofWorker : IDisposable
         return (malformed, false);
     }
 
-    internal static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
+    internal static (ImmutableArray<WorkerCallableResult> Callables, ImmutableArray<WorkerClaimResult> Claims)
         ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
     {
 
         RepositoryParameterGuard.RequireInitialized(targets.IsDefault, nameof(targets), "Array must be initialized.");
         var malformed = targets.Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (Unknown(target, WorkerClaimReason.InfrastructureFailure,
-            WorkerCallableCoverageReason.MissingClaimResult))).ToArray();
+            WorkerCallableCoverageReason.MissingClaimResult))).ToImmutableArray();
         return ProjectResults(malformed);
     }
 
-    private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
-        ProjectResults(CallableVerificationResult[] results)
+    private static (ImmutableArray<WorkerCallableResult> Callables, ImmutableArray<WorkerClaimResult> Claims)
+        ProjectResults(ImmutableArray<CallableVerificationResult> results)
     {
-        System.ArgumentNullException.ThrowIfNull(results, nameof(results));
-        var callables = new WorkerCallableResult[results.Length];
-        var claims = new List<WorkerClaimResult>();
-        for (var index = 0; index < results.Length; index++)
+        RepositoryParameterGuard.RequireInitialized(results.IsDefault, nameof(results), "Array must be initialized.");
+        var callables = ImmutableArray.CreateBuilder<WorkerCallableResult>(results.Length);
+        var claims = ImmutableArray.CreateBuilder<WorkerClaimResult>();
+        foreach (var result in results)
         {
-            var result = results[index];
-            callables[index] = result.Callable;
+            callables.Add(result.Callable);
             claims.AddRange(result.Claims);
         }
 
-        return (callables, [.. claims]);
+        return (callables.ToImmutable(), claims.ToImmutable());
     }
 
     private static Func<long>? ReadResources(ISmtBackend backend)

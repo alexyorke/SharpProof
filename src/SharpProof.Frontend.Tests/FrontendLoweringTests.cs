@@ -195,7 +195,7 @@ public sealed class FrontendLoweringTests
     [Test]
     public void BoxingConversionsOfConstantsCannotLowerToNull()
     {
-        foreach (var expression in new[] { "(object)5", "(object)\"x\"", "(object)true" })
+        foreach (var expression in ImmutableArray.Create("(object)5", "(object)\"x\"", "(object)true"))
         {
             using var compiled = CompiledMethod.Create(
                 "public static object Target() => " + expression + ";");
@@ -523,7 +523,7 @@ public sealed class FrontendLoweringTests
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
             .Single()!;
         var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
-        ITypeSymbol[] types = [
+        ImmutableArray<ITypeSymbol> types = [
             subject,
             constructed,
             subject.TypeParameters[0],
@@ -537,7 +537,7 @@ public sealed class FrontendLoweringTests
             nullable.Parameters[1].Type
         ];
 
-        foreach (var symbol in new ISymbol[] { echo, value, addition })
+        foreach (var symbol in ImmutableArray.Create<ISymbol>(echo, value, addition))
         {
             Assert.That(
                 DocumentationCommentId.CreateDeclarationId(symbol),

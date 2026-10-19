@@ -30,7 +30,7 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
             $"int Target(int[] values, {type} index) => values[index];");
         int[]? values = nullArray ? null : [17];
         var native = subject.Invoke([values!, index]);
-        var bindings = subject.Context.Parameters.ToArray();
+        var bindings = subject.Context.Parameters;
         var receiver = subject.Factory.Variable(bindings[0].Current);
         var position = subject.Factory.Variable(bindings[1].Current);
         var arrayType = receiver.Type;
@@ -113,7 +113,7 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
         int[] values = [17];
         var native = subject.Invoke([values, input]);
         Assert.That(native, Is.EqualTo(input is bool ? true : (object)17));
-        var parameters = subject.Context.Parameters.ToArray();
+        var parameters = subject.Context.Parameters;
         var rule = CSharpOperationSemantics.ArrayReadScalar(subject.Factory,
             subject.Factory.Variable(parameters[0].Current), subject.Factory.Variable(parameters[1].Current));
         Assert.That(rule.Classification.IsExact, Is.False);
@@ -129,7 +129,7 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(int[] values, uint index) => values[index];");
         int[] values = [17];
         var native = subject.Invoke([values, index]);
-        var bindings = subject.Context.Parameters.ToArray();
+        var bindings = subject.Context.Parameters;
         var receiver = subject.Factory.Variable(bindings[0].Current);
         var position = subject.Factory.Variable(bindings[1].Current);
         var elementType = subject.Factory.GetTypeInfo(receiver.Type).ElementType!.Value;

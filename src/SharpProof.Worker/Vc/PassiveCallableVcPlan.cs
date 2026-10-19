@@ -24,14 +24,18 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableDictionary<ProofJustification, string> _labels;
     private readonly ImmutableDictionary<ProofJustification, OperationId> _assumes;
 
-    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
+    internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder,
+        ImmutableArray<Assumption> entryAssumptions, ImmutableArray<IrTerm> goals,
+        IrTerm normalCompletion, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
         ArgumentNullGuard.NotNull(builder, nameof(builder));
+        RepositoryParameterGuard.RequireInitialized(entryAssumptions.IsDefault, nameof(entryAssumptions), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(goals.IsDefault, nameof(goals), "Array must be initialized.");
         _candidate = builder.Candidate;
-        _entry = builder.EntryAssumptions;
+        _entry = entryAssumptions;
         _body = builder.Facts;
-        _goals = builder.Goals;
-        _normalCompletion = builder.NormalCompletion;
+        _goals = goals;
+        _normalCompletion = ArgumentNullGuard.NotNull(normalCompletion, nameof(normalCompletion));
         _exceptions = builder.Exceptions;
         _explicitSites = builder.ExplicitSites;
         _allocations = builder.Allocations;
@@ -59,7 +63,7 @@ internal sealed class PassiveCallableVcPlan
     internal PassiveCallableVcPlan? LoopSearch { get; }
     internal bool IsBoundedSearch { get; }
     internal bool HasBodyAbstraction => _candidate.IsBodyAbstraction;
-    internal bool HasUnmodeledAllocations { get; private set; }
+    internal bool HasUnmodeledAllocations { get; }
 
     internal VerificationQuery EntryQuery()
     {
@@ -99,7 +103,7 @@ internal sealed class PassiveCallableVcPlan
     {
         if (ordinal < 0 || ordinal >= CallPreconditionCount)
         { throw new ArgumentOutOfRangeException(nameof(ordinal)); }
-        var occurrences = _callPreconditions.Where(clause => clause.Ordinal == ordinal).ToArray();
+        var occurrences = _callPreconditions.Where(clause => clause.Ordinal == ordinal).ToImmutableArray();
         if (occurrences.Length == 0)
         {
             return [new(Factory, _entry, new Goal(Factory, Factory.Boolean(true),
@@ -212,7 +216,7 @@ internal sealed class PassiveCallableVcPlan
     internal bool IsReceiverWrite(IrInstructionId instruction)
     {
         RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
-        var matches = _writes.Where(write => write.Instruction == instruction).ToArray();
+        var matches = _writes.Where(write => write.Instruction == instruction).ToImmutableArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 

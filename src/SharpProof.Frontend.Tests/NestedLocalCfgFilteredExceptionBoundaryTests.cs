@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
@@ -32,15 +33,15 @@ public sealed class NestedLocalCfgFilteredExceptionBoundaryTests
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
+        var pending = ImmutableStack<ControlFlowRegion>.Empty;
+        pending = pending.Push(graph.Root);
         var ownFilter = false;
-        while (pending.Count != 0)
+        while (!pending.IsEmpty)
         {
-            var region = pending.Pop();
+            pending = pending.Pop(out var region);
             ownFilter |= region.Kind == ControlFlowRegionKind.Filter;
             foreach (var child in region.NestedRegions)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
         Assert.That(ownFilter, Is.True);
         var externalFinally = false;

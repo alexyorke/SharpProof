@@ -61,8 +61,9 @@ try {
 
     # Exercise the same membership guard used by the PDB inventory: resolving
     # an ordinary source path does not imply that it was compiled.
-    $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    [void]$compilePaths.Add('Project/Source.cs')
+    $compilePathBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    [void]$compilePathBuilder.Add('Project/Source.cs')
+    $compilePaths = $compilePathBuilder.ToImmutable()
     $compiled = Resolve-SharpProofSourceDocument -RepositoryRoot $probeRoot `
         -DocumentPath '/_/Project/Source.cs'
     Assert-SharpProofSourceDocumentCompileMembership `

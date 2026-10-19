@@ -99,7 +99,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(expectedErrors));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

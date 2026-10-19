@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -131,11 +132,11 @@ public sealed class ContractApiIdentityResolverRebuildTests
             foreach (var package in framework.Value.EnumerateObject())
             {
                 var packageDirectories = Directory.EnumerateDirectories(cache!).Where(directory =>
-                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), package.Name, StringComparison.OrdinalIgnoreCase))).ToArray();
+                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), package.Name, StringComparison.OrdinalIgnoreCase))).ToImmutableArray();
                 Assert.That(packageDirectories, Has.Length.EqualTo(1), "The exact locked package must have one actual cache directory.");
                 var version = package.Value.GetProperty("resolved").GetString()!;
                 var versionDirectories = Directory.EnumerateDirectories(packageDirectories[0]).Where(directory =>
-                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), version, StringComparison.OrdinalIgnoreCase))).ToArray();
+                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), version, StringComparison.OrdinalIgnoreCase))).ToImmutableArray();
                 Assert.That(versionDirectories, Has.Length.EqualTo(1), "The exact locked version must have one actual cache directory.");
                 var source = versionDirectories[0];
                 var suffix = Path.Combine(Path.GetFileName(packageDirectories[0]), Path.GetFileName(source));

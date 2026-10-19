@@ -53,12 +53,12 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToImmutableArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
         Assert.That(ensuresSyntax.Span.Contains(conditionals[0].BranchValue!.Syntax.Span), Is.True);
-        var thrown = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
+        var thrown = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
         Assert.That(thrown, Has.Length.EqualTo(terminalArm ? 1 : 0));
         if (terminalArm)
         {

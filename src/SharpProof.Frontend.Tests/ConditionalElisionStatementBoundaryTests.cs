@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
@@ -28,19 +29,19 @@ public sealed class ConditionalElisionStatementBoundaryTests
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         var mutations = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
             .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
-            .OfType<ICompoundAssignmentOperation>().ToArray();
+            .OfType<ICompoundAssignmentOperation>().ToImmutableArray();
         Assert.That(mutations.Length, Is.EqualTo(2));
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
         foreach (var mutation in mutations)
         { Assert.That(emission.IsElided(mutation), Is.False); }
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         { Assert.That(subject.Invoke([input!]), Is.EqualTo(10)); }
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = subject.Context.Parameters.Single().Entry;
         var type = subject.Factory.GetVariableInfo(parameter).Type;
-        foreach (var input in new string?[] { null, "word", "" })
+        foreach (var input in ImmutableArray.Create<string?>(null, "word", ""))
         {
             var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
             var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program,

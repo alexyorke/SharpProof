@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -17,17 +18,17 @@ public sealed class TypedCheckedArithmeticTests
         yield return Case("byte Target(byte x) => checked((byte)~x);", (byte)0);
         yield return Case("short Target(short x) { checked { x ^= -1; return x; } }", short.MinValue);
         yield return Case("byte Target(byte x) { checked { x |= 128; return x; } }", (byte)1);
-        foreach (var expression in new[] { "x + y", "x - y", "x * y" })
+        foreach (var expression in ImmutableArray.Create("x + y", "x - y", "x * y"))
         {
-            foreach (var pair in new[] { (int.MaxValue, 2), (int.MinValue, -1), (int.MaxValue, -1), (int.MinValue, 1),
-                (-2, -3), (2, -3), (-2, 3), (0, int.MinValue), (int.MinValue, 0), (int.MinValue, int.MinValue), (int.MaxValue, int.MaxValue) })
+            foreach (var pair in ImmutableArray.Create((int.MaxValue, 2), (int.MinValue, -1), (int.MaxValue, -1), (int.MinValue, 1),
+                (-2, -3), (2, -3), (-2, 3), (0, int.MinValue), (int.MinValue, 0), (int.MinValue, int.MinValue), (int.MaxValue, int.MaxValue)))
             { yield return Case($"int Target(int x, int y) => checked({expression});", pair.Item1, pair.Item2); }
-            foreach (var pair in new[] { (long.MaxValue, 2L), (long.MinValue, -1L), (long.MaxValue, -1L), (long.MinValue, 1L),
-                (-2L, -3L), (2L, -3L), (-2L, 3L), (0L, long.MinValue), (long.MinValue, 0L), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue) })
+            foreach (var pair in ImmutableArray.Create((long.MaxValue, 2L), (long.MinValue, -1L), (long.MaxValue, -1L), (long.MinValue, 1L),
+                (-2L, -3L), (2L, -3L), (-2L, 3L), (0L, long.MinValue), (long.MinValue, 0L), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue)))
             { yield return Case($"long Target(long x, long y) => checked({expression});", pair.Item1, pair.Item2); }
-            foreach (var pair in new[] { (uint.MaxValue, 2U), (0U, 1U), (2U, 3U), (0U, uint.MaxValue), (uint.MaxValue, 0U), (uint.MaxValue, uint.MaxValue) })
+            foreach (var pair in ImmutableArray.Create((uint.MaxValue, 2U), (0U, 1U), (2U, 3U), (0U, uint.MaxValue), (uint.MaxValue, 0U), (uint.MaxValue, uint.MaxValue)))
             { yield return Case($"uint Target(uint x, uint y) => checked({expression});", pair.Item1, pair.Item2); }
-            foreach (var pair in new[] { (ulong.MaxValue, 2UL), (0UL, 1UL), (2UL, 3UL), (0UL, ulong.MaxValue), (ulong.MaxValue, 0UL), (ulong.MaxValue, ulong.MaxValue) })
+            foreach (var pair in ImmutableArray.Create((ulong.MaxValue, 2UL), (0UL, 1UL), (2UL, 3UL), (0UL, ulong.MaxValue), (ulong.MaxValue, 0UL), (ulong.MaxValue, ulong.MaxValue)))
             { yield return Case($"ulong Target(ulong x, ulong y) => checked({expression});", pair.Item1, pair.Item2); }
             yield return Case($"int Target(short x, short y) => checked({expression});", short.MinValue, short.MinValue);
             yield return Case($"int Target(ushort x, ushort y) => checked({expression});", ushort.MaxValue, ushort.MaxValue);
@@ -36,7 +37,7 @@ public sealed class TypedCheckedArithmeticTests
         yield return Case("long Target(long x) => checked(-x);", long.MinValue);
         yield return Case("long Target(uint x) => checked(-x);", uint.MaxValue);
         yield return Case("int Target(short x) => checked(+x);", short.MinValue);
-        foreach (var type in new[] { "sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong" })
+        foreach (var type in ImmutableArray.Create("sbyte", "byte", "short", "ushort", "char", "int", "uint", "long", "ulong"))
         {
             var value = type switch
             {
@@ -125,7 +126,7 @@ public sealed class TypedCheckedArithmeticTests
         System.ArgumentNullException.ThrowIfNull(targetType);
         using var subject = TypedProgramSubject.Create(members);
         var compounds = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).SelectMany(Descendants)
-            .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>().ToArray();
+            .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>().ToImmutableArray();
         Assert.That(compounds, Is.Not.Empty);
         foreach (var operation in compounds)
         {
@@ -148,7 +149,7 @@ public sealed class TypedCheckedArithmeticTests
         var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(FrontendTestHelpers.WrapSubjectMembers("public static " + members));
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("PromotionProbe", [tree], TestMetadataReferences.Platform,
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS0266"));
     }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
@@ -69,7 +70,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
     {
         System.ArgumentNullException.ThrowIfNull(storageType);
         ArgumentNullException.ThrowIfNull(boundary);
-        foreach (var isChecked in new[] { false, true })
+        foreach (var isChecked in ImmutableArray.Create(false, true))
         {
             var source = "public class Subject { public static " + storageType + " Target(" + storageType +
                 " value, int count) { " + (isChecked ? "checked" : "unchecked") + " { value <<= count; return value; } } }";
@@ -127,7 +128,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
             binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
                 binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count)));
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, environment);
