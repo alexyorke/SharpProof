@@ -417,6 +417,33 @@ public sealed class ApiUsageRankingTests
     }
 
     [Test]
+    public void UsageScanCreditsCapacityOriginWithoutCreditingCustomComparerConstruction()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class CapacityUsageProbe {
+                public static void Target(System.Collections.Generic.IEqualityComparer<int> comparer) {
+                    var fresh = new System.Collections.Generic.Dictionary<int, int>(3);
+                    fresh.Add(1, 23); _ = fresh[1]; _ = fresh.Count;
+                    var custom = new System.Collections.Generic.Dictionary<int, int>(3, comparer);
+                    custom.Add(1, 23); _ = custom[1];
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
+        var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
+            CSharpOperationSemantics.IsDictionaryStateDeclaration(member) || member is IMethodSymbol { MethodKind: MethodKind.Constructor })
+            .ToDictionary(member => member is null ? throw new ArgumentNullException(nameof(member)) : member.ContainingAssembly.Name + "\t" + member.GetDocumentationCommentId(),
+                member => member is null ? throw new ArgumentNullException(nameof(member)) : CSharpOperationSemantics.IsDictionaryStateDeclaration(member) ? "partially-modeled" : "unmodeled", StringComparer.Ordinal);
+        var tree = compilation.SyntaxTrees.Single();
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, tree.GetRoot(), "test", "capacity", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "partially-modeled"), Is.EqualTo(4));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(2));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled"), Is.EqualTo(1));
+    }
+    [Test]
     public void UsageScanCreditsOnlyProvenPrimitiveDefaultHashSetMembership()
     {
         var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
@@ -502,8 +529,14 @@ public sealed class ApiUsageRankingTests
             node is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "fresh" }, Name.Identifier.ValueText: "Count" }).ToArray();
         Assert.That(freshMembers, Has.Length.EqualTo(5));
         Assert.That(freshMembers.All(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.True);
-        var unprovenIndexers = target.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Except(freshMembers.OfType<ElementAccessExpressionSyntax>()).ToArray();
-        Assert.That(unprovenIndexers, Has.Length.EqualTo(6));
+        var capacityMembers = target.DescendantNodes().Where(node => node is null ? throw new ArgumentNullException(nameof(node)) :
+            node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "capacity" } } } ||
+            node is ElementAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "capacity" } }).ToArray();
+        Assert.That(capacityMembers, Has.Length.EqualTo(2));
+        Assert.That(capacityMembers.All(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.True);
+        var unprovenIndexers = target.DescendantNodes().OfType<ElementAccessExpressionSyntax>()
+            .Except(freshMembers.OfType<ElementAccessExpressionSyntax>()).Except(capacityMembers.OfType<ElementAccessExpressionSyntax>()).ToArray();
+        Assert.That(unprovenIndexers, Has.Length.EqualTo(5));
         Assert.That(unprovenIndexers.Any(member => member is null ? throw new ArgumentNullException(nameof(member)) : known.Contains(member.SpanStart)), Is.False);
         var dictionary = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!;
         var inventory = dictionary.GetMembers().Where(member => member is null ? throw new ArgumentNullException(nameof(member)) :
@@ -514,8 +547,8 @@ public sealed class ApiUsageRankingTests
         Scan(compilation, target, "test", "probe", inventory, sites, gaps);
         Assert.That(gaps, Is.Empty);
         Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) :
-            site.Status == "partially-modeled" && !site.Api.Contains("#ctor", StringComparison.Ordinal)), Is.EqualTo(5));
-        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(11));
+            site.Status == "partially-modeled" && !site.Api.Contains("#ctor", StringComparison.Ordinal)), Is.EqualTo(7));
+        Assert.That(sites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Status == "unmodeled-dispatch"), Is.EqualTo(9));
     }
 
     [Test]
