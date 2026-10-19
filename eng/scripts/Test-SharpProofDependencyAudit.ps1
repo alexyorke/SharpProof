@@ -138,10 +138,10 @@ function Get-ExpectedAuditSources {
     if ($sourceNodes.Count -eq 0) {
         throw 'NuGet configuration has no approved audit source.'
     }
-    $sources = [Collections.Generic.List[string]]::new()
-    $seen = [Collections.Generic.HashSet[string]]::new(
+    $sources = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $seen = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
-    $keys = [Collections.Generic.HashSet[string]]::new(
+    $keys = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
     foreach ($sourceNode in $sourceNodes) {
         $keyAttribute = $sourceNode.Attributes['key']
@@ -161,9 +161,8 @@ function Get-ExpectedAuditSources {
         }
         $sources.Add($source)
     }
-    $result = $sources.ToArray()
-    [Array]::Sort($result, [StringComparer]::Ordinal)
-    return $result
+    $sources.Sort([StringComparer]::Ordinal)
+    return , $sources.ToImmutable()
 }
 
 function Get-SolutionProjects {
@@ -184,8 +183,8 @@ function Get-SolutionProjects {
     catch {
         throw "Solution is not valid XML: '$Path': $($_.Exception.Message)"
     }
-    $projects = [Collections.Generic.List[object]]::new()
-    $seen = [Collections.Generic.HashSet[string]]::new(
+    $projects = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $seen = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::OrdinalIgnoreCase)
     foreach ($project in @($solution.SelectNodes('/Solution//Project'))) {
         $pathAttribute = $project.Attributes['Path']
@@ -214,17 +213,17 @@ function Get-SolutionProjects {
         if (-not $seen.Add($absolutePath)) {
             throw "Solution project is duplicated: '$($pathAttribute.Value)'."
         }
-        $projects.Add([pscustomobject][ordered]@{
-                absolute = $absolutePath
-                relative = [IO.Path]::GetRelativePath(
-                    $solutionDirectory,
-                    $absolutePath).Replace('\', '/')
-            })
+        $projects.Add(([ordered]@{
+                    absolute = $absolutePath
+                    relative = [IO.Path]::GetRelativePath(
+                        $solutionDirectory,
+                        $absolutePath).Replace('\', '/')
+                }).AsReadOnly())
     }
     if ($projects.Count -eq 0) {
         throw "Solution contains no C# projects: '$Path'."
     }
-    return $projects.ToArray()
+    return , $projects.ToImmutable()
 }
 
 function Invoke-DependencyAudit {
@@ -362,13 +361,9 @@ if ([IO.File]::Exists($resolvedOutput)) {
     [IO.File]::Delete($resolvedOutput)
 }
 
-[string[]]$expectedSources = @(
-    Get-ExpectedAuditSources `
-        -ConfigurationPath $resolvedConfiguration
-)
-[object[]]$solutionProjects = @(
-    Get-SolutionProjects -Path $resolvedSolution
-)
+$expectedSources = Get-ExpectedAuditSources `
+    -ConfigurationPath $resolvedConfiguration
+$solutionProjects = Get-SolutionProjects -Path $resolvedSolution
 $reportJson = if ($PSCmdlet.ParameterSetName -eq 'Report') {
     [IO.File]::ReadAllText($resolvedReport)
 }
@@ -425,8 +420,8 @@ $sourceValue = Get-ExactProperty -Value $report -Name 'sources'
 if ($sourceValue -isnot [Array]) {
     throw "Dependency audit report property 'sources' is not an array."
 }
-$observedSources = [Collections.Generic.List[string]]::new()
-$observedSourceSet = [Collections.Generic.HashSet[string]]::new(
+$observedSources = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+$observedSourceSet = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::Ordinal)
 foreach ($sourceValueItem in @($sourceValue)) {
     $source = ConvertTo-CanonicalHttpsSource `
@@ -436,8 +431,8 @@ foreach ($sourceValueItem in @($sourceValue)) {
     }
     $observedSources.Add($source)
 }
-$observedSourceArray = $observedSources.ToArray()
-[Array]::Sort($observedSourceArray, [StringComparer]::Ordinal)
+$observedSources.Sort([StringComparer]::Ordinal)
+$observedSourceArray = $observedSources.ToImmutable()
 if ([string]::Join("`n", $observedSourceArray) -cne
     [string]::Join("`n", $expectedSources)) {
     throw (
@@ -450,9 +445,9 @@ $projectValue = Get-ExactProperty -Value $report -Name 'projects'
 if ($projectValue -isnot [Array]) {
     throw "Dependency audit report property 'projects' is not an array."
 }
-$observedProjects = [Collections.Generic.HashSet[string]]::new(
+$observedProjectBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::OrdinalIgnoreCase)
-$vulnerablePackages = [Collections.Generic.List[string]]::new()
+$vulnerablePackageBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 foreach ($project in @($projectValue)) {
     $projectPath = [string](Get-ExactProperty `
             -Value $project `
@@ -466,7 +461,7 @@ foreach ($project in @($projectValue)) {
             "'$projectPath'.")
     }
     $absoluteProjectPath = [IO.Path]::GetFullPath($projectPath)
-    if (-not $observedProjects.Add($absoluteProjectPath)) {
+    if (-not $observedProjectBuilder.Add($absoluteProjectPath)) {
         throw "Dependency audit report duplicates project '$projectPath'."
     }
     $frameworkProperty = $project.PSObject.Properties |
@@ -488,7 +483,7 @@ foreach ($project in @($projectValue)) {
             "'frameworks' array.")
     }
     $observedFrameworks =
-    [Collections.Generic.HashSet[string]]::new(
+    [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
         [StringComparer]::Ordinal)
     foreach ($framework in @($frameworkProperty.Value)) {
         $frameworkName = [string](Get-ExactProperty `
@@ -536,17 +531,19 @@ foreach ($project in @($projectValue)) {
                         'Dependency audit report contains a vulnerable ' +
                         'package with an empty identity or version.')
                 }
-                $vulnerablePackages.Add("$packageId@$resolvedVersion")
+                $vulnerablePackageBuilder.Add("$packageId@$resolvedVersion")
             }
         }
     }
 }
 
-$expectedProjectSet = [Collections.Generic.HashSet[string]]::new(
+$expectedProjectBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::OrdinalIgnoreCase)
 foreach ($solutionProject in $solutionProjects) {
-    [void]$expectedProjectSet.Add([string]$solutionProject.absolute)
+    [void]$expectedProjectBuilder.Add([string]$solutionProject.absolute)
 }
+$observedProjects = $observedProjectBuilder.ToImmutable()
+$expectedProjectSet = $expectedProjectBuilder.ToImmutable()
 if (-not $observedProjects.SetEquals($expectedProjectSet)) {
     $missing = @(
         $expectedProjectSet |
@@ -563,30 +560,32 @@ if (-not $observedProjects.SetEquals($expectedProjectSet)) {
         "Missing: $($missing -join ', '); invented: " +
         "$($invented -join ', ').")
 }
-if ($vulnerablePackages.Count -ne 0) {
+$vulnerablePackages = $vulnerablePackageBuilder.ToImmutable()
+if ($vulnerablePackages.Length -ne 0) {
     throw (
         'Dependency audit found vulnerable packages: ' +
-        (($vulnerablePackages.ToArray() | Sort-Object -Unique) -join ', '))
+        (($vulnerablePackages | Sort-Object -Unique) -join ', '))
 }
 
-[string[]]$projectPaths = @(
-    $solutionProjects |
-        ForEach-Object { [string]$_.relative }
-)
-[Array]::Sort($projectPaths, [StringComparer]::Ordinal)
-$evidence = [pscustomobject][ordered]@{
-    schemaVersion = 1
-    gate          = 'dependencyAudit'
-    passed        = $true
-    parameters    = $parameters
-    auditSources  = $observedSourceArray
-    projects      = $projectPaths
-    counts        = [pscustomobject][ordered]@{
-        projects           = $projectPaths.Count
-        vulnerablePackages = 0
-        problems           = 0
-    }
+$projectPathBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+foreach ($solutionProject in $solutionProjects) {
+    $projectPathBuilder.Add([string]$solutionProject.relative)
 }
+$projectPathBuilder.Sort([StringComparer]::Ordinal)
+$projectPaths = $projectPathBuilder.ToImmutable()
+$evidence = ([ordered]@{
+        schemaVersion = 1
+        gate          = 'dependencyAudit'
+        passed        = $true
+        parameters    = $parameters
+        auditSources  = $observedSourceArray
+        projects      = $projectPaths
+        counts        = ([ordered]@{
+                projects           = $projectPaths.Length
+                vulnerablePackages = 0
+                problems           = 0
+            }).AsReadOnly()
+    }).AsReadOnly()
 $json = ($evidence | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
 $temporaryOutput = Join-Path `
     $outputDirectory `
@@ -606,5 +605,5 @@ finally {
 }
 
 Write-Host (
-    "Dependency audit passed for $($projectPaths.Count) projects using " +
-    "$($observedSourceArray.Count) approved source(s).")
+    "Dependency audit passed for $($projectPaths.Length) projects using " +
+    "$($observedSourceArray.Length) approved source(s).")
