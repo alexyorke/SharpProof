@@ -590,3 +590,34 @@ changed-line report lists no remaining gaps in the resource metadata catalog,
 metadata binder, protocol validation or arithmetic-order kernel. The composed
 phase implementation is not part of that measurement and needs its own exact-head
 CI results after publication.
+
+## Quantitative memory implementation plan
+
+First introduce compiler-neutral allocation shapes for SZ arrays, ordinary
+non-overlapping fields, UTF-16 strings, primitive boxing, delegates, and a fresh
+closure frame plus delegate. A versioned CoreCLR 8.0.32 x64 layout model will
+derive byte intervals from typed storage slots and natural size expressions.
+Object field packing can make an interval loose; an upper byte bound must never
+be used as an exact violating cost. Unsupported shapes or incompatible model
+contexts produce Unknown with no partial interval.
+
+The layout model is conditional on its declared runtime and architecture. Its
+constants and digest bind the reviewed runtime source at commit
+`b9a49e4a6d3a444a3685e318c74a7892d01873f7`. Validate it with independent allocation
+controls in the canonical .NET 8.0.32 x64 runtime, including mixed fields and
+empty/cached results. Instance storage excludes referenced objects unless they
+are explicitly part of the allocation bundle.
+
+Then transport typed shapes in the resource program, bind layout assumptions to
+compiler-owned target/platform/reference evidence, and expose cumulative byte
+contracts through native checking and consumer results. Continue with source
+lowering for every category above, alias/escape and lifetime certificates,
+separate peak auxiliary and retained output bounds, and declared stack models.
+None of the phase C checkboxes is complete until the corresponding compiler,
+worker, protocol, consumer and independent controls pass. These steps preserve
+the full memory scope; the layout kernel is its initial implementation layer.
+
+Primary layout evidence:
+[object and array layout](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.h),
+[string sizing](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp), and
+[delegate implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Delegate.CoreCLR.cs).
