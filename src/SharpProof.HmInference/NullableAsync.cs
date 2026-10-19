@@ -456,7 +456,7 @@ public static partial class Inference
             var existing = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var warning in originalDiagnostics ?? model.Compilation.GetDiagnostics(cancellationToken))
             {
-                if (warning.Severity == DiagnosticSeverity.Warning)
+                if (warning.Severity == DiagnosticSeverity.Warning || warning.Severity == DiagnosticSeverity.Error && warning.DefaultSeverity == DiagnosticSeverity.Hidden)
                 {
                     var key = CompilerWarningKey(warning, model.Compilation);
                     existing.TryGetValue(key, out var count);
@@ -465,7 +465,7 @@ public static partial class Inference
             }
             foreach (var warning in changedDiagnostics ?? changed.GetDiagnostics(cancellationToken))
             {
-                if (warning.Severity == DiagnosticSeverity.Warning)
+                if (warning.Severity == DiagnosticSeverity.Warning || warning.Severity == DiagnosticSeverity.Error && warning.DefaultSeverity == DiagnosticSeverity.Hidden)
                 {
                     var key = CompilerWarningKey(warning, changed);
                     if (!existing.TryGetValue(key, out var count) || count == 0)

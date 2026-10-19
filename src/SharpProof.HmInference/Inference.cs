@@ -14,6 +14,15 @@ public sealed record MethodResult(string Method, string Status, string Message, 
 
 public static partial class Inference
 {
+    // Hidden-by-default compiler diagnostics describe editor style, such as unused
+    // imports. Existing style errors do not invalidate type binding; newly introduced
+    // style errors are still rejected by the diagnostic comparison below.
+    public static bool IsCompilationError(Diagnostic diagnostic)
+    {
+        if (diagnostic is null)
+        { throw new ArgumentNullException(nameof(diagnostic)); }
+        return diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.DefaultSeverity != DiagnosticSeverity.Hidden;
+    }
     public static MethodResult Analyze(MethodDeclarationSyntax method, SemanticModel model, CancellationToken cancellationToken)
     {
         if (method is null)
@@ -229,6 +238,13 @@ public static partial class Inference
             var tree = method.SyntaxTree;
             var changed = tree.WithRootAndOptions(tree.GetRoot(cancellationToken).ReplaceNode(method, candidate), tree.Options);
             var changedCompilation = model.Compilation.ReplaceSyntaxTree(tree, changed);
+            // Workspace diagnostic providers key editor configuration by syntax-tree identity.
+            // The speculative replacement must retain the source tree's settings.
+            if (model.Compilation.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
+            {
+                changedCompilation = changedCompilation.WithOptions(changedCompilation.Options.WithSyntaxTreeOptionsProvider(
+                    new CandidateTreeOptions(sourceOptions, tree, changed)));
+            }
             if (changedCompilation.GetDiagnostics(cancellationToken).Any(d =>
             {
                 if (d is null)
@@ -236,7 +252,7 @@ public static partial class Inference
                     throw new global::System.ArgumentNullException(nameof(d));
                 }
 
-                return d.Severity == DiagnosticSeverity.Error;
+                return IsCompilationError(d);
             }))
             {
                 return new(symbol.Name, "Rejected", "Inferred signature fails C# compilation or breaks a call site.");
@@ -244,7 +260,7 @@ public static partial class Inference
 
             if (IntroducesCompilerWarnings(changedCompilation))
             {
-                return new(symbol.Name, "Rejected", "Generalization introduces compiler warnings.");
+                return new(symbol.Name, "Rejected", "Generalization introduces compiler warnings or style errors.");
             }
 
             var changedMethod = changed.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m =>
@@ -1546,5 +1562,37 @@ public static partial class Inference
         }
 
         return method.ParameterList.Parameters;
+    }
+    private sealed class CandidateTreeOptions : SyntaxTreeOptionsProvider
+    {
+        private readonly SyntaxTreeOptionsProvider sourceOptions;
+        private readonly SyntaxTree source;
+        private readonly SyntaxTree candidate;
+        internal CandidateTreeOptions(SyntaxTreeOptionsProvider sourceOptions, SyntaxTree source, SyntaxTree candidate)
+        {
+            this.sourceOptions = sourceOptions ?? throw new ArgumentNullException(nameof(sourceOptions));
+            this.source = source ?? throw new ArgumentNullException(nameof(source));
+            this.candidate = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        }
+        public override GeneratedKind IsGenerated(SyntaxTree tree, CancellationToken cancellationToken)
+        {
+            if (tree is null)
+            { throw new ArgumentNullException(nameof(tree)); }
+            return sourceOptions.IsGenerated(ReferenceEquals(tree, candidate) ? source : tree, cancellationToken);
+        }
+        public override bool TryGetDiagnosticValue(SyntaxTree tree, string diagnosticId, CancellationToken cancellationToken, out ReportDiagnostic severity)
+        {
+            if (tree is null)
+            { throw new ArgumentNullException(nameof(tree)); }
+            if (diagnosticId is null)
+            { throw new ArgumentNullException(nameof(diagnosticId)); }
+            return sourceOptions.TryGetDiagnosticValue(ReferenceEquals(tree, candidate) ? source : tree, diagnosticId, cancellationToken, out severity);
+        }
+        public override bool TryGetGlobalDiagnosticValue(string diagnosticId, CancellationToken cancellationToken, out ReportDiagnostic severity)
+        {
+            if (diagnosticId is null)
+            { throw new ArgumentNullException(nameof(diagnosticId)); }
+            return sourceOptions.TryGetGlobalDiagnosticValue(diagnosticId, cancellationToken, out severity);
+        }
     }
 }

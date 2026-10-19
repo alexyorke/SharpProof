@@ -23,10 +23,19 @@
     <MicrosoftCodeAnalysisCommonVersion>4.14.0</MicrosoftCodeAnalysisCommonVersion>
     <MicrosoftCodeAnalysisCSharpVersion>4.14.0</MicrosoftCodeAnalysisCSharpVersion>
     <MicrosoftCodeAnalysisCSharpWorkspacesVersion>4.14.0</MicrosoftCodeAnalysisCSharpWorkspacesVersion>
+    <MicrosoftCodeAnalysisWorkspacesMSBuildVersion>4.14.0</MicrosoftCodeAnalysisWorkspacesMSBuildVersion>
+    <MicrosoftBuildWorkspaceDependenciesVersion>17.14.28</MicrosoftBuildWorkspaceDependenciesVersion>
+    <MicrosoftCodeAnalysisVisualBasicWorkspacesVersion>4.14.0</MicrosoftCodeAnalysisVisualBasicWorkspacesVersion>
+    <MicrosoftBuildLocatorVersion>1.11.2</MicrosoftBuildLocatorVersion>
+    <MicrosoftBuildVersion>17.14.28</MicrosoftBuildVersion>
+    <MicrosoftNETStringToolsVersion>17.14.28</MicrosoftNETStringToolsVersion>
+    <MicrosoftBuildTasksCoreVersion>17.14.28</MicrosoftBuildTasksCoreVersion>
     <MicrosoftCodeAnalysisVisualBasicVersion>4.14.0</MicrosoftCodeAnalysisVisualBasicVersion>
     <MicrosoftCodeAnalysisPublicApiAnalyzersVersion>5.6.0</MicrosoftCodeAnalysisPublicApiAnalyzersVersion>
     <MicrosoftBuildFrameworkVersion>17.7.2</MicrosoftBuildFrameworkVersion>
     <MicrosoftBuildUtilitiesCoreVersion>17.7.2</MicrosoftBuildUtilitiesCoreVersion>
+    <MicrosoftBuildFrameworkVersion Condition="'$(MSBuildProjectName)' == 'SharpProof.HmInference'">$(MicrosoftBuildWorkspaceDependenciesVersion)</MicrosoftBuildFrameworkVersion>
+    <MicrosoftBuildUtilitiesCoreVersion Condition="'$(MSBuildProjectName)' == 'SharpProof.HmInference'">$(MicrosoftBuildWorkspaceDependenciesVersion)</MicrosoftBuildUtilitiesCoreVersion>
     <MicrosoftNETTestSdkVersion>18.8.1</MicrosoftNETTestSdkVersion>
     <MicrosoftNETFrameworkReferenceAssembliesnet472Version>1.0.3</MicrosoftNETFrameworkReferenceAssembliesnet472Version>
     <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>
@@ -34,6 +43,8 @@
     <NUnit3TestAdapterVersion>6.2.0</NUnit3TestAdapterVersion>
     <SystemCollectionsImmutableVersion>9.0.18</SystemCollectionsImmutableVersion>
     <SystemCompositionAttributedModelVersion>9.0.0</SystemCompositionAttributedModelVersion>
+    <SystemSecurityCryptographyPkcsVersion>9.0.21</SystemSecurityCryptographyPkcsVersion>
+    <SystemSecurityCryptographyXmlVersion>9.0.21</SystemSecurityCryptographyXmlVersion>
     <SystemTextJsonVersion>10.0.10</SystemTextJsonVersion>
   </PropertyGroup>
 </Project>

@@ -30,7 +30,7 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                 throw new global::System.ArgumentNullException(nameof(d));
             }
 
-            return d.Severity == DiagnosticSeverity.Error;
+            return Inference.IsCompilationError(d);
         }))
         {
             return;
@@ -91,7 +91,7 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                 throw new global::System.ArgumentNullException(nameof(d));
             }
 
-            return d.Severity == DiagnosticSeverity.Error;
+            return Inference.IsCompilationError(d);
         }))
         {
             return document;

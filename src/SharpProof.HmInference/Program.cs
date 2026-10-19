@@ -54,9 +54,12 @@ internal static class Program
 
         if (args.Length == 0 || args is ["--help"])
         {
-            Program.Log.Info("HM inference prototype: <source.cs> [...] | --samples | --hm-samples | --self-test\nAnalyzes supplied files together as a library. Suggestions change APIs; review manually.");
+            Program.Log.Info("HM inference: <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore\nProject dependencies are restored by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
             return 0;
         }
+
+        if (args[0] is "--project" or "--solution" || ProjectLoading.IsProjectInput(args[0]))
+        { return await ProjectLoading.Run(args, cancellationToken).ConfigureAwait(false); }
 
         var files = args is ["--samples"] ? Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Samples"), "*.cs.txt").Order().ToArray() : args;
         foreach (var file in files)
@@ -73,29 +76,22 @@ internal static class Program
             global::System.ArgumentNullException.ThrowIfNull(file);
             return CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file, cancellationToken: cancellationToken);
         }));
-        var errors = compilation.GetDiagnostics(cancellationToken: cancellationToken).Where(d =>
-        {
-            global::System.ArgumentNullException.ThrowIfNull(d);
-            return d.Severity == DiagnosticSeverity.Error;
-        }).ToArray();
-        if (errors.Length != 0)
-        {
-            foreach (var error in errors.Take(10))
-            {
-                Program.Log.Error(error.ToString());
-            }
+        return await AnalyzeCompilationAsync(compilation, null, diagnosticsOnly: false, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
 
-            Program.Log.Error($"{errors.Length} compiler error(s); inference skipped.");
-            return 1;
-        }
+    internal static async Task<int> AnalyzeCompilationAsync(CSharpCompilation compilation, AnalyzerOptions? analyzerOptions, bool diagnosticsOnly, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        if (ReportCompilerErrors(compilation, cancellationToken))
+        { return 1; }
 
-        var results = Results(compilation, cancellationToken: cancellationToken);
+        var results = diagnosticsOnly ? [] : Results(compilation, cancellationToken: cancellationToken);
         foreach (var result in results)
         {
             Program.Log.Info($"{result.Method}: {result.Status}: {result.Signature ?? result.Message}");
         }
 
-        var diagnostics = await (compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), onAnalyzerException: null, concurrentAnalysis: true, logAnalyzerExecutionTime: false)).GetAnalyzerDiagnosticsAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var diagnostics = await (compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(analyzerOptions ?? new AnalyzerOptions([]), onAnalyzerException: null, concurrentAnalysis: true, logAnalyzerExecutionTime: false)).GetAnalyzerDiagnosticsAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
         foreach (var diagnostic in diagnostics.OrderBy(d =>
         {
             global::System.ArgumentNullException.ThrowIfNull(d);
@@ -109,12 +105,37 @@ internal static class Program
             Program.Log.Info(diagnostic.ToString());
         }
 
-        Program.Log.Info($"Methods: {results.Length}; suggestions: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Suggestion"; })}; concrete: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Concrete"; })}; rejected: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Rejected"; })}; skipped: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Skipped"; })}");
+        if (diagnosticsOnly)
+        { Program.Log.Info($"Analyzer suggestions: {diagnostics.Count(d => { ArgumentNullException.ThrowIfNull(d); return d.Id == "HM0001"; })}"); }
+        else
+        { Program.Log.Info($"Methods: {results.Length}; suggestions: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Suggestion"; })}; concrete: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Concrete"; })}; rejected: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Rejected"; })}; skipped: {results.Count(r => { global::System.ArgumentNullException.ThrowIfNull(r); return r.Status == "Skipped"; })}"); }
         return diagnostics.Any(d =>
         {
             global::System.ArgumentNullException.ThrowIfNull(d);
             return d.Id == "AD0001";
         }) ? 1 : 0;
+    }
+
+    internal static bool ReportCompilerErrors(Compilation compilation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        var errors = compilation.GetDiagnostics(cancellationToken: cancellationToken).Where(d =>
+        {
+            global::System.ArgumentNullException.ThrowIfNull(d);
+            return Inference.IsCompilationError(d) || d.Id is "CS8032" or "CS8784" or "CS8785";
+        }).ToArray();
+        if (errors.Length != 0)
+        {
+            foreach (var error in errors.Take(10))
+            {
+                Program.Log.Error(error.ToString());
+            }
+
+            Program.Log.Error($"{errors.Length} compiler error(s); inference skipped.");
+            return true;
+        }
+
+        return false;
     }
 
     internal static CSharpCompilation Compile(IEnumerable<SyntaxTree> trees)
@@ -321,6 +342,7 @@ internal static class Program
 
         passed++;
         Program.Log.Info("PASS PolymorphicRuntime");
+        passed += await CompilerPolicyChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await TypeShapeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await NominalIdentityChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await LocalFunctionChecks.Run(cancellationToken).ConfigureAwait(false);

@@ -133,18 +133,29 @@ done
 # A pattern remains valid when the source's disposal interface has no contract member.
 legacy=$(mktemp -d /tmp/hm-pattern-package-consumer.XXXXXX)
 cp "$consumer/Consumer.csproj" "$consumer/.editorconfig" "$consumer/global.json" "$legacy/"
+sed -i 's#</PropertyGroup>#<WarningsAsErrors>CS8019</WarningsAsErrors></PropertyGroup>#' "$legacy/Consumer.csproj"
+printf '%s\n' 'dotnet_diagnostic.CS8019.severity = error' >> "$legacy/.editorconfig"
 cat > "$legacy/Input.cs" <<'EOF'
 using System;using System.Threading.Tasks;using System.Runtime.CompilerServices;
+using System.Text;using System.Collections.Generic;
 namespace System {public interface IAsyncDisposable {}}
 public readonly struct LegacyAwaiter:INotifyCompletion {public bool IsCompleted=>true;public void OnCompleted(Action action)=>action();public void GetResult(){}}
 public readonly struct LegacyAwaitable {public LegacyAwaiter GetAwaiter()=>new();}
 public sealed class LegacyResource<T>(T value){public T Value=>value;public LegacyAwaitable DisposeAsync()=>default;}
-public static class LegacyProbe {public static async Task<int> LegacyDisposal(LegacyResource<int> resource){await using var copy=resource;return copy.Value;}}
+public static class LegacyProbe {public static Task Pending=Task.CompletedTask;public static async Task<int> LegacyDisposal(LegacyResource<int> resource){await using var copy=resource;return copy.Value;}}
+public static class StyleProbe {public static int StyleIdentity(int value)=>value;public static List<int> StyleList(List<int> value)=>value;}
 EOF
 NUGET_PACKAGES="$legacy/packages" dotnet build "$legacy/Consumer.csproj" -v:normal > "$legacy/build.log" 2>&1 || { tail -60 "$legacy/build.log"; exit 1; }
 if ! grep -Fq 'LegacyDisposal<T1>(global::LegacyResource<T1> resource)' "$legacy/build.log" || grep -Eq 'CS8032|AD0001' "$legacy/build.log"; then tail -60 "$legacy/build.log"; exit 1; fi
+if ! grep -Fq 'StyleIdentity<T1>(T1 value)' "$legacy/build.log"; then tail -60 "$legacy/build.log"; exit 1; fi
+# Command-line compiler builds do not expose editor-only import diagnostics like a
+# workspace compilation. Verify rejection through the project's editor snapshot.
+cli_output=$(find artifacts/bin/SharpProof.HmInference -name SharpProof.HmInference.dll -path '*/net10.0/*' | head -1)
+NUGET_PACKAGES="$legacy/packages" dotnet "$cli_output" --project "$legacy/Consumer.csproj" --no-restore > "$legacy/editor.log" 2>&1 || { tail -40 "$legacy/editor.log"; exit 1; }
+if ! grep -Fq 'StyleIdentity<T1>(T1 value)' "$legacy/editor.log" || ! grep -Fq 'LegacyDisposal<T1>' "$legacy/editor.log" || grep -Fq 'StyleList<T1>' "$legacy/editor.log"; then tail -40 "$legacy/editor.log"; exit 1; fi
+cp "$legacy/editor.log" "$evidence/package-editor-consumer.txt"
 cp "$legacy/build.log" "$evidence/package-pattern-consumer.txt"
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' | tee "$evidence/package-checks.txt"

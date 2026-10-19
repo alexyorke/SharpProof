@@ -33,13 +33,26 @@ The built CLI accepts:
 | Arguments | Behavior |
 | --- | --- |
 | `<source.cs> [...]` | Analyze supplied files together as a library |
+| `--project <project.csproj>` | Load the MSBuild project and its source project references |
+| `--solution <solution.sln/slnx/slnf>` | Load the selected solution graph |
+| `--framework <tfm> --configuration <name> --property <Name=Value>` | Set MSBuild properties for project/solution loading |
+| `--no-restore` | Use existing project assets without restoring dependencies |
 | `--samples` | Analyze bundled C# programs |
 | `--hm-samples` | Display core HM types and expected type errors |
 | `--self-test` | Run C#, HM, runtime and differential checks |
 
 For ad hoc files, build in a private container workspace and invoke
 `dotnet <output>/SharpProof.HmInference.dll <source.cs> [...]`. This uses runtime
-reference assemblies, not an MSBuild project loader. Original compilation errors
+reference assemblies. Project/solution mode uses the installed MSBuild SDK selected
+for the target directory and keeps project reference assemblies, language/nullable
+settings, preprocessor symbols, linked/excluded files, source generators and analyzer
+configuration. Dependencies are restored by default; `--no-restore` assumes current
+restore assets. Build source-generator/analyzer project dependencies when their
+binaries are required. The native MSBuild graph supplies project contexts; source
+references are compiled to fresh in-memory metadata, including Visual Basic
+references. A source reference error stops analysis even when old binaries exist.
+Project mode reports configured HM0001 diagnostics for each loaded C# target
+framework. A bare project/solution path is accepted too. Original compilation errors
 stop inference with exit code 1; missing files give exit code 2. Unsupported
 methods report a reason.
 
@@ -381,3 +394,9 @@ targeted checks.
 Evidence is exported as tests.txt, samples.txt and hm-samples.txt under
 `artifacts/hm-inference/`. The branch started from fetched master
 `e97c6c56d58fba9f5c5c20ac59f4c7f44ff4424a`.
+
+Existing hidden-by-default compiler style diagnostics promoted to errors do not
+block inference. Candidate validation retains per-file diagnostic severity and
+generated-code settings when replacing a syntax tree. A candidate that adds compiler
+warnings or promoted style errors is rejected, including imports made unused by
+the generated signature.

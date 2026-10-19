@@ -30,7 +30,7 @@ public sealed class HmInferenceAnalyzer : DiagnosticAnalyzer
                     throw new global::System.ArgumentNullException(nameof(d));
                 }
 
-                return d.Severity == DiagnosticSeverity.Error;
+                return Inference.IsCompilationError(d);
             }))
             {
                 return;
