@@ -31,14 +31,14 @@ internal static class CompilerLoweredArtifact
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
-        IReadOnlyList<CompilerCallableArtifact> artifacts,
+        ImmutableArray<CompilerCallableArtifact> artifacts,
         WorkerClaimManifest manifest,
         CompilerCompilationSnapshot compilation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
-        if (artifacts == null || artifacts is ImmutableArray<CompilerCallableArtifact> { IsDefault: true })
+        if (artifacts.IsDefault)
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
         }
@@ -49,7 +49,6 @@ internal static class CompilerLoweredArtifact
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        artifacts = artifacts.ToImmutableArray();
         var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
             static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.CallableId,
             static item => item ?? throw new System.ArgumentNullException(nameof(item)), StringComparer.Ordinal);
@@ -57,7 +56,7 @@ internal static class CompilerLoweredArtifact
             static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : group.Key,
                 static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Ordinal)).ToImmutableArray()),
                 StringComparer.Ordinal);
-        if (artifacts.Count != callables.Count)
+        if (artifacts.Length != callables.Count)
         {
             throw new InvalidDataException("The lowered callable payload does not equal the manifest.");
         }
@@ -73,7 +72,7 @@ internal static class CompilerLoweredArtifact
             }
         }
 
-        var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Count);
+        var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Length);
         foreach (var artifact in artifacts.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId), StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();

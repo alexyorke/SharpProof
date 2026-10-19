@@ -61,6 +61,11 @@ public sealed class CompilerSpecificationPackProviderTests
             Assert.That(CompilerSpecificationPackSelection.IsValid(["z.pack", "dotnet.scalar"], version, hash), Is.False);
             Assert.That(CompilerSpecificationPackSelection.IsValid(["dotnet.scalar"], version + 1, hash), Is.False);
             Assert.That(CompilerSpecificationPackSelection.IsValid(null, version, hash), Is.False);
+            System.Collections.Immutable.ImmutableArray<string>? presentDefault = default(System.Collections.Immutable.ImmutableArray<string>);
+            Assert.That(presentDefault.HasValue, Is.True);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(presentDefault, version, hash), Is.False);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(default(System.Collections.Immutable.ImmutableArray<string>), version, hash), Is.False);
+            Assert.That(CompilerSpecificationPackSelection.IsValid(System.Collections.Immutable.ImmutableArray<string>.Empty, version, hash), Is.True);
             Assert.That(CompilerSpecificationPackSelection.Matches(new CompilerManifestArtifact
             {
                 SpecificationPackIds = ["dotnet.scalar"],

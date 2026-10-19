@@ -38,7 +38,9 @@ function Get-SharpProofAcceptanceContract {
     if (-not $script:SharpProofAcceptanceContractCache.ContainsKey($path)) {
         $contract = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -AsHashtable
         $snapshot = ConvertTo-SharpProofImmutableContractValue -Value $contract
-        $script:SharpProofAcceptanceContractCache = $script:SharpProofAcceptanceContractCache.SetItem($path, $snapshot)
+        $cacheBuilder = $script:SharpProofAcceptanceContractCache.ToBuilder()
+        $cacheBuilder[$path] = $snapshot
+        $script:SharpProofAcceptanceContractCache = $cacheBuilder.ToImmutable()
     }
     return , $script:SharpProofAcceptanceContractCache[$path]
 }
@@ -127,22 +129,22 @@ function Write-SharpProofFailureOutput {
                 '^\s*(Determining projects to restore|All projects are up-to-date)',
                 '^\s*(Build started|Build succeeded|Time Elapsed)'
             )))
-    $summaryLines = @(
-        $normalized -split '\r?\n' |
-            Where-Object {
-                if ([string]::IsNullOrWhiteSpace($_)) {
+    $summaryLineBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $normalized -split '\r?\n' |
+        Where-Object {
+            if ([string]::IsNullOrWhiteSpace($_)) {
+                return $false
+            }
+            foreach ($pattern in $progressPatterns) {
+                if ($_ -match $pattern) {
                     return $false
                 }
-                foreach ($pattern in $progressPatterns) {
-                    if ($_ -match $pattern) {
-                        return $false
-                    }
-                }
-                return $true
-            } |
-            ForEach-Object { $_.TrimEnd() }
-    )
-    if ($summaryLines.Count -gt 0) {
+            }
+            return $true
+        } |
+        ForEach-Object { $summaryLineBuilder.Add($_.TrimEnd()) }
+    $summaryLines = $summaryLineBuilder.ToImmutable()
+    if ($summaryLines.Length -gt 0) {
         $Output = $summaryLines -join [Environment]::NewLine
     }
 
@@ -379,9 +381,14 @@ function Invoke-SharpProofGitText {
         $output = $outputTask.GetAwaiter().GetResult()
         $errorOutput = $errorTask.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) {
-            $details = (@($output, $errorOutput) |
-                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                    ForEach-Object { $_.Trim() }) -join [Environment]::NewLine
+            $detailBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+            if (-not [string]::IsNullOrWhiteSpace($output)) {
+                $detailBuilder.Add($output.Trim())
+            }
+            if (-not [string]::IsNullOrWhiteSpace($errorOutput)) {
+                $detailBuilder.Add($errorOutput.Trim())
+            }
+            $details = $detailBuilder.ToImmutable() -join [Environment]::NewLine
             if ([string]::IsNullOrWhiteSpace($details)) {
                 throw $FailureMessage
             }
@@ -709,21 +716,22 @@ function Get-SharpProofTestAssemblyPath {
     }
 
     [xml]$document = Get-Content -LiteralPath $project -Raw
-    $frameworks = @(
-        $document.SelectNodes("//*[local-name()='TargetFramework']") |
-            ForEach-Object { [string]$_.InnerText } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    if ($frameworks.Count -ne 1) {
+    $frameworkBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $document.SelectNodes("//*[local-name()='TargetFramework']") |
+        ForEach-Object { [string]$_.InnerText } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $frameworkBuilder.Add($_) }
+    $frameworks = $frameworkBuilder.ToImmutable()
+    if ($frameworks.Length -ne 1) {
         throw (
             'Direct vstest requires exactly one TargetFramework in ' +
             "'$ProjectPath'; use dotnet test for multi-target projects.")
     }
-    $assemblyName = @(
-        $document.SelectNodes("//*[local-name()='AssemblyName']") |
-            ForEach-Object { [string]$_.InnerText } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Select-Object -First 1)
-    if ($assemblyName.Count -eq 0) {
+    $assemblyName = $document.SelectNodes("//*[local-name()='AssemblyName']") |
+        ForEach-Object { [string]$_.InnerText } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+    if ($null -eq $assemblyName) {
         $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
     }
     $repositoryDirectory = [IO.DirectoryInfo]::new((Split-Path -Parent $project))
@@ -765,8 +773,11 @@ function Stop-SharpProofCompilerServer {
     else {
         $dotnetTarget.FullName
     }
-    $sdkVersionOutput = @(& $dotnetPath --version)
-    if ($LASTEXITCODE -ne 0 -or $sdkVersionOutput.Count -ne 1) {
+    $sdkVersionBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    & $dotnetPath --version | ForEach-Object { $sdkVersionBuilder.Add([string]$_) }
+    $sdkVersionExitCode = $LASTEXITCODE
+    $sdkVersionOutput = $sdkVersionBuilder.ToImmutable()
+    if ($sdkVersionExitCode -ne 0 -or $sdkVersionOutput.Length -ne 1) {
         throw 'Could not resolve the active .NET SDK compiler server.'
     }
     $sdkVersion = ([string]$sdkVersionOutput[0]).Trim()
@@ -1061,9 +1072,13 @@ function Invoke-SharpProofParallelDotnetTests {
                     throw "Parallel $Label tests exceeded $TimeoutSeconds seconds."
                 }
             }
-            $finished = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($running.ToImmutable() | Where-Object {
-                        $_.ExitTask.IsCompleted
-                    }))
+            $finishedBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+            foreach ($active in $running.ToImmutable()) {
+                if ($active.ExitTask.IsCompleted) {
+                    $finishedBuilder.Add($active)
+                }
+            }
+            $finished = $finishedBuilder.ToImmutable()
             foreach ($active in $finished) {
                 $active.Process.WaitForExit()
                 $stdout = $active.StandardOutput.GetAwaiter().GetResult()

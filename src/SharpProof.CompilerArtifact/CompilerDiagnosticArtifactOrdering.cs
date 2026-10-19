@@ -19,9 +19,9 @@ internal static class CompilerDiagnosticArtifactOrdering
             .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), Comparer)];
     }
 
-    internal static bool IsCanonical(IReadOnlyList<CompilerDiagnosticArtifact> diagnostics)
+    internal static bool IsCanonical(ImmutableArray<CompilerDiagnosticArtifact> diagnostics)
     {
-        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
+        RepositoryParameterGuard.RequireInitialized(diagnostics.IsDefault, nameof(diagnostics), "Array must be initialized.");
         return diagnostics.Zip(
                 diagnostics.Skip(1),
                 static (left, right) => left is null ? throw new System.ArgumentNullException(nameof(left)) : right is null ? throw new System.ArgumentNullException(nameof(right)) : (Compare(left, right) <= 0))

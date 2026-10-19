@@ -191,6 +191,58 @@ public sealed class PortableIrGraphCodecTests
             Is.EqualTo(decoded.Instructions.Length));
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void ImmutableInputsRejectDefaultWhileRetainingDecodeFailureClassification(int shape)
+    {
+        var fixture = CreateFixture();
+        var cancellationToken = TestContext.CurrentContext.CancellationToken;
+        var encoded = PortableIrGraphCodec.Encode(
+            fixture.Factory, fixture.Program, fixture.Roots,
+            variables: null, cancellationToken: cancellationToken);
+        ImmutableArray<IrVarId>? invalidVariables = default(ImmutableArray<IrVarId>);
+        ImmutableArray<int>? invalidIndices = default(ImmutableArray<int>);
+        Assert.That(invalidVariables.HasValue, Is.True);
+        Assert.That(invalidIndices.HasValue, Is.True);
+        Action operation = shape switch
+        {
+            0 => () => PortableIrGraphCodec.Encode(
+                fixture.Factory, fixture.Program, default,
+                variables: null, cancellationToken: cancellationToken),
+            1 => () => PortableIrGraphCodec.Encode(
+                fixture.Factory, fixture.Program, fixture.Roots,
+                invalidVariables, cancellationToken: cancellationToken),
+            2 => () => PortableIrGraphCodec.Encode(
+                fixture.Factory, fixture.Program, fixture.Roots,
+                variables: null, operations: default, cancellationToken: cancellationToken),
+            3 => () => PortableIrGraphCodec.Decode(
+                encoded.Graph, invalidIndices, cancellationToken),
+            4 => () => PortableIrGraphCodec.Decode(
+                encoded.Graph, externalVariableIndices: null,
+                externalOperationIndices: default, cancellationToken: cancellationToken),
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        if (shape is 3 or 4)
+        {
+            Assert.That(Assert.Throws<InvalidDataException>(operation)!.Message,
+                Is.EqualTo("The portable IR graph is malformed."));
+        }
+        else
+        {
+            var expectedParameter = shape switch
+            {
+                0 => "roots",
+                1 => "variables",
+                _ => "operations"
+            };
+            Assert.That(Assert.Throws<ArgumentException>(operation)!.ParamName,
+                Is.EqualTo(expectedParameter));
+        }
+    }
+
     [Test]
     public void RoundTripPreservesExplicitExtraVariables()
     {
@@ -202,10 +254,10 @@ public sealed class PortableIrGraphCodecTests
             fixture.Factory,
             fixture.Program,
             fixture.Roots,
-            [unused], cancellationToken: TestContext.CurrentContext.CancellationToken);
+            ImmutableArray.Create(unused), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var decoded = PortableIrGraphCodec.Decode(
             encoded.Graph,
-            [encoded.VariableIndices[unused]], cancellationToken: TestContext.CurrentContext.CancellationToken);
+            ImmutableArray.Create(encoded.VariableIndices[unused]), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var reencoded = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
@@ -254,7 +306,7 @@ public sealed class PortableIrGraphCodecTests
             factory,
             program: null,
             roots,
-            [items], cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+            ImmutableArray.Create(items), cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
         var sequenceIndex = PortableGraphChanges.FindIndex(
             graph.Types,
             static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Name == "Numbers"));

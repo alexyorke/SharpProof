@@ -139,7 +139,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     internal static CompilerTotalCallablePreparation DecodeShadowBodyCore(string ownerId,
-        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences = null)
+        CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
@@ -170,7 +170,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         ImmutableArray<WorkerAssumptionEvidence> assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
-        bool entryOnly, CancellationToken cancellationToken, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences = null)
+        bool entryOnly, CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
     {
         artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         RepositoryParameterGuard.RequireInitialized(assumptions.IsDefault, nameof(assumptions), "Array must be initialized.");
@@ -367,7 +367,7 @@ internal static class CompilerTotalCallableArtifactCodec
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
-        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, IReadOnlyList<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
+        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
     {
         if (artifact.CallPreconditions.Length == 0)
         {
@@ -531,10 +531,10 @@ internal static class CompilerTotalCallableArtifactCodec
         }
     }
 
-    private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, IReadOnlyList<CompilerReferenceSnapshot>? references)
+    private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, ImmutableArray<CompilerReferenceSnapshot>? references)
     {
         origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
-        return references != null && references.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference != null && reference.Identity == origin.AssemblyIdentity &&
+        return references is { } snapshot && !snapshot.IsDefault && snapshot.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference != null && reference.Identity == origin.AssemblyIdentity &&
             !reference.Modules.IsDefault && reference.Modules.Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module != null &&
                 module.Name == origin.ModuleName && module.Mvid == origin.ModuleMvid && module.Sha256 == origin.ImageSha256 &&
                 module.SizeBytes is > 0 and <= CompilerReferenceLimits.MaximumModuleBytes))));

@@ -39,45 +39,47 @@ internal static partial class PortableIrGraphCodec
     }
 
     private static bool IsCompleteSlots(
-        IReadOnlyList<PortableIrSlotMapping> mappings,
+        ImmutableArray<PortableIrSlotMapping> mappings,
         Type enumType)
     {
         enumType = RepositoryParameterGuard.NotNull(enumType, nameof(enumType));
-        mappings = RepositoryParameterGuard.NotNull(mappings, nameof(mappings));
+        RepositoryParameterGuard.RequireInitialized(mappings.IsDefault, nameof(mappings), "Array must be initialized.");
         return mappings.Select(static mapping => mapping.Kind)
             .SequenceEqual(Enum.GetNames(enumType), StringComparer.Ordinal);
     }
 
     internal static EncodedPortableIrGraph Encode(
         IrProgram program,
-        IReadOnlyList<IrTerm> roots,
+        ImmutableArray<IrTerm> roots,
         CancellationToken cancellationToken)
     {
-        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
+        RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
         program = ArgumentNullGuard.NotNull(program, nameof(program));
 
         return Encode(program.Factory, program, roots, variables: null, cancellationToken: cancellationToken);
     }
 
     internal static EncodedPortableIrGraph Encode(
-        IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
-        IReadOnlyList<IrVarId>? variables,
+        IrFactory factory, IrProgram? program, ImmutableArray<IrTerm> roots,
+        ImmutableArray<IrVarId>? variables,
         CancellationToken cancellationToken)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
+        RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
         return Encode(factory, program, roots, variables, [], cancellationToken);
     }
 
     internal static EncodedPortableIrGraph Encode(
-        IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
-        IReadOnlyList<IrVarId>? variables, IReadOnlyList<OperationId> operations,
+        IrFactory factory, IrProgram? program, ImmutableArray<IrTerm> roots,
+        ImmutableArray<IrVarId>? variables, ImmutableArray<OperationId> operations,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
-        roots = ArgumentNullGuard.NotNull(roots, nameof(roots));
-        operations = ArgumentNullGuard.NotNull(operations, nameof(operations));
+        RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(operations.IsDefault, nameof(operations), "Array must be initialized.");
+
+        RepositoryParameterGuard.RequireInitialized(variables is { IsDefault: true }, nameof(variables), "Array must be initialized.");
 
         if (program != null && !ReferenceEquals(factory, program.Factory))
         {
@@ -96,15 +98,15 @@ internal static partial class PortableIrGraphCodec
     private static EncodedPortableIrGraph EncodeGraph(
         IrFactory factory,
         IrProgram? program,
-        IReadOnlyList<IrTerm> roots,
-        IReadOnlyList<IrVarId> variables,
-        IReadOnlyList<OperationId> operations,
+        ImmutableArray<IrTerm> roots,
+        ImmutableArray<IrVarId> variables,
+        ImmutableArray<OperationId> operations,
         CancellationToken cancellationToken)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        operations = RepositoryParameterGuard.NotNull(operations, nameof(operations));
-        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
-        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
+        RepositoryParameterGuard.RequireInitialized(operations.IsDefault, nameof(operations), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         return new Encoder(
             factory,
             program,
@@ -116,7 +118,7 @@ internal static partial class PortableIrGraphCodec
 
     internal static DecodedPortableIrGraph Decode(
         PortableIrGraph graph,
-        IReadOnlyList<int>? externalVariableIndices,
+        ImmutableArray<int>? externalVariableIndices,
         CancellationToken cancellationToken)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
@@ -124,13 +126,10 @@ internal static partial class PortableIrGraphCodec
     }
 
     internal static DecodedPortableIrGraph Decode(
-        PortableIrGraph graph, IReadOnlyList<int>? externalVariableIndices,
-        IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken)
+        PortableIrGraph graph, ImmutableArray<int>? externalVariableIndices,
+        ImmutableArray<int> externalOperationIndices, CancellationToken cancellationToken)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
-        externalOperationIndices = ArgumentNullGuard.NotNull(
-            externalOperationIndices,
-            nameof(externalOperationIndices));
         cancellationToken.ThrowIfCancellationRequested();
 
         try
@@ -159,12 +158,12 @@ internal static partial class PortableIrGraphCodec
     private static void RequireCanonicalEncoderImage(
         PortableIrGraph graph,
         DecodedPortableIrGraph decoded,
-        IReadOnlyList<int> externalVariableIndices,
-        IReadOnlyList<int> externalOperationIndices,
+        ImmutableArray<int> externalVariableIndices,
+        ImmutableArray<int> externalOperationIndices,
         CancellationToken cancellationToken)
     {
-        externalOperationIndices = RepositoryParameterGuard.NotNull(externalOperationIndices, nameof(externalOperationIndices));
-        externalVariableIndices = RepositoryParameterGuard.NotNull(externalVariableIndices, nameof(externalVariableIndices));
+        RepositoryParameterGuard.RequireInitialized(externalOperationIndices.IsDefault, nameof(externalOperationIndices), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(externalVariableIndices.IsDefault, nameof(externalVariableIndices), "Array must be initialized.");
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var previous = -1;
         var externalVariables = ImmutableArray.CreateBuilder<IrVarId>();
@@ -461,18 +460,18 @@ internal static partial class PortableIrGraphCodec
         internal Encoder(
             IrFactory factory,
             IrProgram? program,
-            IReadOnlyList<IrTerm> roots,
-            IReadOnlyList<IrVarId> extraVariables,
-            IReadOnlyList<OperationId> extraOperations,
+            ImmutableArray<IrTerm> roots,
+            ImmutableArray<IrVarId> extraVariables,
+            ImmutableArray<OperationId> extraOperations,
             CancellationToken cancellationToken)
         {
-            extraOperations = RepositoryParameterGuard.NotNull(extraOperations, nameof(extraOperations));
-            extraVariables = RepositoryParameterGuard.NotNull(extraVariables, nameof(extraVariables));
+            RepositoryParameterGuard.RequireInitialized(extraOperations.IsDefault, nameof(extraOperations), "Array must be initialized.");
+            RepositoryParameterGuard.RequireInitialized(extraVariables.IsDefault, nameof(extraVariables), "Array must be initialized.");
             factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-            roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
+            RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
             (_factory, _program, _roots, _extraVariables, _cancellationToken) =
-                (factory, program, roots.ToImmutableArray(), extraVariables.ToImmutableArray(), cancellationToken);
-            _extraOperations = extraOperations.ToImmutableArray();
+                (factory, program, roots, extraVariables, cancellationToken);
+            _extraOperations = extraOperations;
             _types = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (TypeRow(id)));
             _identities = new(static (_, index) => index);
             _variables = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (VariableRow(id)));
@@ -713,7 +712,7 @@ internal static partial class PortableIrGraphCodec
         private readonly ImmutableHashSet<IrMemberId>.Builder _distinctMembers = ImmutableHashSet.CreateBuilder<IrMemberId>();
         private readonly ImmutableHashSet<IrId>.Builder _distinctTerms = ImmutableHashSet.CreateBuilder<IrId>();
         private readonly ImmutableList<IrTypeId>.Builder _types = ImmutableList.CreateBuilder<IrTypeId>();
-        private readonly ImmutableList<IrIdentityId>.Builder _identities = ImmutableList.CreateBuilder<IrIdentityId>();
+        private ImmutableArray<IrIdentityId> _identities = [];
         private ImmutableArray<IrVarId> _variables = [];
         private ImmutableArray<IrMemberId> _members = [];
         private ImmutableArray<OperationId> _operations = [];
@@ -865,15 +864,16 @@ internal static partial class PortableIrGraphCodec
 
         private void DecodeIdentities()
         {
-            _identities.Clear();
+            var identities = ImmutableArray.CreateBuilder<IrIdentityId>(_graph.Identities.Length);
             for (var index = 0; index < _graph.Identities.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 Require(
                     _graph.Identities[index] == index,
                     "Portable IR identities are not canonical.");
-                _identities.Add(_factory.CreateIdentity());
+                identities.Add(_factory.CreateIdentity());
             }
+            _identities = identities.MoveToImmutable();
         }
 
         private IrMemberId DecodeMember(PortableIrMember row)
@@ -940,7 +940,7 @@ internal static partial class PortableIrGraphCodec
             }
 
             var builder = new IrProgramBuilder(_factory);
-            var blockBuilder = ImmutableList.CreateBuilder<IrBlockId>();
+            var blockBuilder = ImmutableArray.CreateBuilder<IrBlockId>();
             for (var index = 0; index < _graph.Blocks.Length; index++)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
@@ -966,10 +966,10 @@ internal static partial class PortableIrGraphCodec
         }
 
         private IrInstruction Instruction(
-            IrProgramBuilder builder, IrBlockId block, ImmutableList<IrBlockId> blocks,
+            IrProgramBuilder builder, IrBlockId block, ImmutableArray<IrBlockId> blocks,
             PortableIrInstruction? row)
         {
-            blocks = RepositoryParameterGuard.NotNull(blocks, nameof(blocks));
+            RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Array must be initialized.");
             RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
             builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
@@ -1110,15 +1110,16 @@ internal static partial class PortableIrGraphCodec
             return index == -1 ? null : Variable(index);
         }
 
-        private static IrBlockId Block(int index, ImmutableList<IrBlockId> blocks)
+        private static IrBlockId Block(int index, ImmutableArray<IrBlockId> blocks)
         {
-            blocks = RepositoryParameterGuard.NotNull(blocks, nameof(blocks));
+            RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Array must be initialized.");
             return Item(index, blocks, "block");
         }
 
-        private static T Item<T>(int index, IReadOnlyList<T> values, string kind)
+        private static T Item<T>(int index, ImmutableArray<T> values, string kind)
         {
-            Check(index, values.Count, kind);
+            RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
+            Check(index, values.Length, kind);
             return values[index];
         }
 

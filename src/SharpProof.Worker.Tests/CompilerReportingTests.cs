@@ -237,6 +237,9 @@ public sealed class CompilerReportingTests
         {
             Assert.That(canonical, Is.EqualTo(ImmutableArray.Create(first, second)));
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical(canonical), Is.True);
+            Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical(ImmutableArray<CompilerDiagnosticArtifact>.Empty), Is.True);
+            Action invalidOrdering = () => CompilerDiagnosticArtifactOrdering.IsCanonical(default);
+            Assert.That(Assert.Throws<ArgumentException>(invalidOrdering)!.ParamName, Is.EqualTo("diagnostics"));
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical([second, first]), Is.False);
             Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, first), Is.Zero);
         }

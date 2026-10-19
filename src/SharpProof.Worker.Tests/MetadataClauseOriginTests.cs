@@ -135,13 +135,19 @@ public sealed class MetadataClauseOriginTests
             CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references)));
     }
 
-    [Test]
-    public void MetadataRequiresExplicitOwnershipContext()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MetadataRequiresExplicitOwnershipContext(bool presentDefault)
     {
         var (body, _, _) = Create(true);
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
+        ImmutableArray<CompilerReferenceSnapshot>? references = presentDefault
+            ? default(ImmutableArray<CompilerReferenceSnapshot>)
+            : null;
+        Assert.That(references.HasValue, Is.EqualTo(presentDefault));
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(
+                body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references)));
     }
 
     [Test]
