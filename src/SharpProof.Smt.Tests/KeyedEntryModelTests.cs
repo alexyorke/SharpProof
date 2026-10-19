@@ -53,12 +53,14 @@ public sealed class KeyedEntryModelTests
         });
     }
 
-    [Test]
-    public void OversizedListWitnessIsRejectedBeforeReplay()
+    [TestCase("list")]
+    [TestCase("queue")]
+    public void OversizedCollectionWitnessIsRejectedBeforeReplay(string collection)
     {
+        ArgumentNullException.ThrowIfNull(collection);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("owner", factory.ObjectType);
-        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:list:count", factory.IntegerType, false);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         Assert.Throws<SmtResourceLimitException>((Action)(() => Decode(factory, [variable], [
             factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(variable), factory.Null(factory.ObjectType)),
             factory.Binary(IrBinaryOperator.Equal, factory.PureOpaque(field, factory.Variable(variable)), factory.Integer(int.MaxValue))], _ => Assert.Fail("Oversized witness must not be published."))));

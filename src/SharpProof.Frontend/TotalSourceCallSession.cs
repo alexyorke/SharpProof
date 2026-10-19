@@ -199,7 +199,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Scalar, reference and opaque specialization belongs to a supported collection
         // boundary. Other generic source calls retain their existing scalar domain.
         var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsDictionaryReceiverType(parameter.Type));
+            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType &&
+                queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1");
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
         { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
@@ -310,6 +312,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
         {
+            frame.SpecializeSourceReferenceType(owner.OriginalDefinition, caller.SpecializeSourceType(owner)!);
             if (!Spend(owner.TypeArguments.Length + 1))
             { frame = null; return false; }
             for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
@@ -327,7 +330,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) != null ||
             TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
-            TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToImmutableArray();
+            TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
+            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is INamedTypeSymbol queueReceiver &&
+            queueReceiver.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1").ToImmutableArray();
         ImmutableArray<IOperation> declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -342,6 +347,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
+            if (parameter.Type.IsReferenceType && argument.Parameter.Type.IsReferenceType)
+            { frame.SpecializeSourceReferenceType(parameter.Type, caller.SpecializeSourceType(argument.Parameter.Type)!); }
             if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
             { frame.SpecializeNullableDefaultComparerParameter(parameter); }
             if (parameter.Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) is { } scalar)
@@ -349,7 +356,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 frame.SpecializeScalarParameter(parameter, scalar);
                 continue;
             }
-            if (TotalLoweringContext.IsListReceiverType(parameter.Type) && parameter.Type is INamedTypeSymbol declaredList &&
+            if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1") && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }
@@ -380,6 +387,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDictionaryOriginParameter(parameter); }
             }
         }
+        frame.RefreshSourceBindingTypes();
         if (instance != null)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))

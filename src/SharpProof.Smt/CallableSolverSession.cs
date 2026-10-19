@@ -15,6 +15,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private ImmutableDictionary<Assumption, BoolExpr> _assumptions = ImmutableDictionary<Assumption, BoolExpr>.Empty;
     private ImmutableDictionary<VerificationQuery, BoolExpr> _goals = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
     private ImmutableDictionary<VerificationQuery, BoolExpr> _smallReferences = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
+    private readonly ImmutableDictionary<VerificationQuery, BoolExpr>.Builder _nominalReferences = ImmutableDictionary.CreateBuilder<VerificationQuery, BoolExpr>();
     private long _consumedResourceCount;
     private int _assertedReferenceFacts;
 
@@ -105,10 +106,30 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     status = Check(selectors, meter);
                 }
             }
+            if (status == Status.SATISFIABLE)
+            {
+                try
+                { return CreateModel(query, meter); }
+                catch (UnsupportedIrEncodingException)
+                {
+                    // Keep already-decodable witnesses unchanged. A rejected
+                    // SAT model may get one metered nominal-membership retry;
+                    // failure of that preference never becomes a proof.
+                    if (NominalReferenceWitnesses(query, meter) is { } nominal)
+                    {
+                        selectors = selectors.Add(nominal);
+                        var retry = Check(selectors, meter);
+                        if (retry == Status.SATISFIABLE)
+                        { return CreateModel(query, meter); }
+                        if (retry == Status.UNKNOWN)
+                        { return BackendCheckResult.Unknown(SmtNativeUtilities.ClassifyUnknown(_solver.ReasonUnknown)); }
+                    }
+                    return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
+                }
+            }
             return status switch
             {
                 Status.UNSATISFIABLE => DecodeCore(_solver.UnsatCore, active, goalSelector.ToString(), meter),
-                Status.SATISFIABLE => CreateModel(query, meter),
                 _ => BackendCheckResult.Unknown(SmtNativeUtilities.ClassifyUnknown(_solver.ReasonUnknown))
             };
         }
@@ -147,6 +168,20 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         return selector;
     }
 
+    private BoolExpr? NominalReferenceWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
+    {
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        if (_nominalReferences.TryGetValue(query, out var existing))
+        { return existing; }
+        var bound = _encoder.NominalReferenceBound(query, meter);
+        if (bound == null)
+        { return null; }
+        var selector = _owner.Own(_runner.Context.MkBoolConst("n" + _nominalReferences.Count.ToString(CultureInfo.InvariantCulture)));
+        _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, bound)));
+        _nominalReferences.AddUnique(query, selector);
+        return selector;
+    }
     internal static BackendCheckResult DecodeCore<T>(IReadOnlyList<T> core, IReadOnlyDictionary<string, int> active,
         string goal, SmtQueryResourceMeter meter) where T : IDisposable
     {

@@ -19,6 +19,6 @@ block: b3 cfg:2
 block: b4 exceptional:exit
   i2 op0 ExceptionalExit source=none
 term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver width=0 signed=False value=v0
-term: ir1 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v4
-term: ir2 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v3
+term: ir1 Variable type=t6:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v4
+term: ir2 Variable type=t6:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v3
 diagnostic: op3 UnsupportedOperationKind DelegateCreation@total-override-delegate-incomplete.cs:tokens["new"]#1

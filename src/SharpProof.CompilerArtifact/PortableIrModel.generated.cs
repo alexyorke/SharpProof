@@ -45,6 +45,12 @@ internal sealed record PortableIrType
     public bool Signed { get; init; } = false;
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool ClosedSealedReference { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? ClosedClassBase { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool InterfaceReference { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<int>? ImplementedInterfaces { get; init; }
 
     [System.Text.Json.Serialization.JsonConstructor]
     public PortableIrType() { }
@@ -421,7 +427,12 @@ internal static partial class PortableIrGraphCodec
                 _factory.GetString(value.Name),
                 value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1,
                 value.Width, value.Signed)
-            { ClosedSealedReference = _factory.IsClosedSealedReferenceType(id) };
+            {
+                ClosedSealedReference = _factory.IsClosedSealedReferenceType(id),
+                ClosedClassBase = _factory.TryGetClosedClassReferenceBase(id, out var parent) ? parent.HasValue ? TypeIndex(parent.Value) : -1 : null,
+                InterfaceReference = _factory.IsInterfaceReferenceType(id),
+                ImplementedInterfaces = _factory.GetImplementedReferenceInterfaces(id) is { Length: > 0 } interfaces ? interfaces.Select(TypeIndex).OrderBy(index => index).ToImmutableArray() : null
+            };
         }
 
         private PortableIrVariable VariableRow(IrVarId id)

@@ -107,4 +107,43 @@ public sealed class IrSupportedBoundaryTests
         total.RegisterClosedSealedReferenceType(type);
         Assert.That(total.IsClosedSealedReferenceType(type), Is.True);
     }
+
+    [Test]
+    public void ClassAndInterfaceCertificatesRequireConsistentNominalMetadata()
+    {
+        var legacy = new IrFactory();
+        Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterClosedClassReferenceType(legacy.ObjectType, null)));
+        Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterInterfaceReferenceType(legacy.ObjectType)));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var parent = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Parent");
+        var child = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Child");
+        var other = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Other");
+        var face = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Interface");
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(factory.IntegerType, null)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(child, child)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(child, factory.ObjectType)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(child, parent)));
+        factory.RegisterClosedClassReferenceType(parent, null);
+        factory.RegisterClosedClassReferenceType(child, parent);
+        factory.RegisterClosedClassReferenceType(child, parent);
+        factory.RegisterClosedClassReferenceType(other, null);
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(child, other)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterInterfaceReferenceType(child)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterInterfaceReferenceType(factory.IntegerType)));
+        factory.RegisterInterfaceReferenceType(face);
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterClosedClassReferenceType(face, null)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(child, other)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(face, face)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(factory.ObjectType, face)));
+        Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(factory.IntegerType, face)));
+        factory.RegisterImplementedReferenceInterface(child, face);
+        factory.RegisterImplementedReferenceInterface(child, face);
+        Assert.That(factory.GetImplementedReferenceInterfaces(child), Is.EqualTo(new[] { face }));
+        Assert.That(factory.GetImplementedReferenceInterfaces(parent), Is.Empty);
+        Assert.That(factory.IsInterfaceReferenceType(face), Is.True);
+        Assert.That(factory.IsInterfaceReferenceType(parent), Is.False);
+        Assert.That(factory.TryGetClosedClassReferenceBase(child, out var baseType), Is.True);
+        Assert.That(baseType, Is.EqualTo(parent));
+        Assert.That(factory.TryGetClosedClassReferenceBase(face, out _), Is.False);
+    }
 }

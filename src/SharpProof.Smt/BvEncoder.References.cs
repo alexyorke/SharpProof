@@ -4,6 +4,7 @@ internal sealed partial class BvEncoder
 {
     private Sort? _referenceSort;
     private FuncDecl? _length;
+    private FuncDecl? _nominalWitnessTags;
     private Expr? _nullReference;
     private ImmutableDictionary<IrTypeId, Expr> _emptyArrays = ImmutableDictionary<IrTypeId, Expr>.Empty;
     private ImmutableList<KeyValuePair<IrTypeId, Expr>> _emptyArrayOrder = ImmutableList<KeyValuePair<IrTypeId, Expr>>.Empty;
@@ -17,7 +18,7 @@ internal sealed partial class BvEncoder
         ReferenceFacts = ReferenceFacts.Add(fact);
     }
 
-    // Witness sizes are charged when decoded. Prefer small string/array/List
+    // Witness sizes are charged when decoded. Prefer small string/array/List/Queue
     // models without restricting the unbounded query used for proofs.
     internal BoolExpr? SmallReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)
     {
@@ -37,7 +38,7 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
-            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) == IrFieldSites.Prefix + "list:count")
+            if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count")
             {
                 foreach (var observed in _fieldReads[field.Key])
                 {
@@ -51,6 +52,113 @@ internal sealed partial class BvEncoder
         return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds.ToImmutable().ToArray()));
     }
 
+    internal BoolExpr? NominalReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)
+    {
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        var bounds = new List<BoolExpr>();
+        // This preference follows a rejected SAT model. A
+        // bounded set of nominal types covers every requested view, rather
+        // than sampling SSA values whose later aliases can evade the sample.
+        // Compatible types may share tags; uncertain required aliases can
+        // still abstain. These are never proof premises.
+        var groups = new Dictionary<IrTypeId, int>();
+        foreach (var field in _fieldOrder)
+        {
+            meter.Consume();
+            AddType(factory.GetMemberInfo(field.Key).ReturnType);
+        }
+        foreach (var variable in query.ModelVariables)
+        {
+            meter.Consume();
+            AddType(factory.GetVariableInfo(variable).Type);
+        }
+        if (groups.Count != 0)
+        {
+            if (_nominalWitnessTags == null)
+            {
+                using var result = context.MkBitVecSort(MaximumNominalWitnessTypes);
+                _nominalWitnessTags = context.MkFreshFuncDecl("nominal_witness_tags", [ReferenceSort], result);
+            }
+            var masks = new ulong[groups.Count];
+            foreach (var first in groups)
+            {
+                var mask = 1UL << first.Value;
+                foreach (var second in groups)
+                {
+                    meter.Consume();
+                    if (!KnownNominalCompatibility(first.Key, second.Key, meter))
+                    { mask |= 1UL << second.Value; }
+                }
+                masks[first.Value] = mask;
+            }
+            foreach (var field in _fieldOrder)
+            {
+                meter.Consume();
+                if (!groups.TryGetValue(factory.GetMemberInfo(field.Key).ReturnType, out var group))
+                { continue; }
+                foreach (var observed in _fieldReads[field.Key])
+                {
+                    meter.Consume();
+                    var application = observed.Key == null ? context.MkApp(field.Value, observed.Owner)
+                        : context.MkApp(field.Value, observed.Owner, observed.Key);
+                    AddMembership(group, owner.Own(application));
+                }
+            }
+            foreach (var variable in query.ModelVariables)
+            {
+                meter.Consume();
+                if (groups.TryGetValue(factory.GetVariableInfo(variable).Type, out var group))
+                { AddMembership(group, GetVariable(variable, meter)); }
+            }
+
+            void AddMembership(int group, Expr value)
+            {
+                RepositoryParameterGuard.ThrowIfInvalid(group < 0 || group >= masks.Length, nameof(group));
+                value = RepositoryParameterGuard.NotNull(value, nameof(value));
+                meter.Consume();
+                var tags = (BitVecExpr)owner.Own(context.MkApp(_nominalWitnessTags, value));
+                var masked = owner.Own(context.MkBVAND(tags, owner.Own(context.MkBV(masks[group], MaximumNominalWitnessTypes))));
+                bounds.Add(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
+                    owner.Own(context.MkEq(masked, owner.Own(context.MkBV(1UL << group, MaximumNominalWitnessTypes)))))));
+            }
+        }
+        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));
+
+        void AddType(IrTypeId type)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+            meter.Consume();
+            if (groups.Count < MaximumNominalWitnessTypes && type != factory.ObjectType &&
+                factory.GetTypeInfo(type).Kind == IrTypeKind.Reference && !groups.ContainsKey(type))
+            { groups.Add(type, groups.Count); }
+        }
+    }
+    private bool KnownNominalCompatibility(IrTypeId first, IrTypeId second, SmtQueryResourceMeter meter)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(first.IsDefault, nameof(first));
+        RepositoryParameterGuard.ThrowIfInvalid(second.IsDefault, nameof(second));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        return first == second || IsBase(first, second) || IsBase(second, first) ||
+            factory.IsInterfaceReferenceType(first) && factory.IsInterfaceReferenceType(second) ||
+            factory.GetImplementedReferenceInterfaces(first).Contains(second) || factory.GetImplementedReferenceInterfaces(second).Contains(first);
+
+        bool IsBase(IrTypeId ancestor, IrTypeId descendant)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(ancestor.IsDefault, nameof(ancestor));
+            RepositoryParameterGuard.ThrowIfInvalid(descendant.IsDefault, nameof(descendant));
+            for (IrTypeId? current = descendant; current.HasValue && factory.TryGetClosedClassReferenceBase(current.Value, out var parent); current = parent)
+            {
+                meter.Consume();
+                if (current == ancestor)
+                { return true; }
+            }
+            return false;
+        }
+    }
+
+    // A type-group cap, independent of the small string/array/count size.
+    private const int MaximumNominalWitnessTypes = 64;
     private const int MaximumSmallReference = 64;
 
     private Expr EncodeStringLiteral(IrStringTerm term, SmtQueryResourceMeter meter)
@@ -172,6 +280,7 @@ internal sealed partial class BvEncoder
         var aliases = ImmutableDictionary.CreateBuilder<(IrTypeId Type, string Token), IrValue>();
         var certifiedTypes = ImmutableDictionary.CreateBuilder<string, IrTypeId>(StringComparer.Ordinal);
         var shared = ImmutableDictionary.CreateBuilder<string, object>(StringComparer.Ordinal);
+        var classTypes = ImmutableDictionary.CreateBuilder<string, ImmutableArray<IrTypeId>.Builder>(StringComparer.Ordinal);
         foreach (var empty in _emptyArrayOrder)
         {
             meter.Consume();
@@ -224,6 +333,19 @@ internal sealed partial class BvEncoder
             certifiedTypes[token] = type;
         }
 
+        bool IsClassBase(IrTypeId ancestor, IrTypeId descendant)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(ancestor.IsDefault, nameof(ancestor));
+            RepositoryParameterGuard.ThrowIfInvalid(descendant.IsDefault, nameof(descendant));
+            for (IrTypeId? current = descendant; current.HasValue && factory.TryGetClosedClassReferenceBase(current.Value, out var parent); current = parent)
+            {
+                meter.Consume();
+                if (current == ancestor)
+                { return true; }
+            }
+            return false;
+        }
+
         // An object decodes once per model token; its fields, references
         // included, decode after it is registered, so cycles terminate.
         IrValue Decode(IrTypeId type, Expr evaluated)
@@ -246,6 +368,24 @@ internal sealed partial class BvEncoder
             {
                 meter.Consume();
                 CertifyType(token, type);
+            }
+            // Distinct nominal views need positive runtime compatibility. Missing
+            // certificates, including legacy and open generic views, cannot
+            // make an impossible alias into an authoritative counterexample.
+            if (info.Kind == IrTypeKind.Reference && type != factory.ObjectType)
+            {
+                if (!classTypes.TryGetValue(token, out var previousTypes))
+                { classTypes.AddUnique(token, previousTypes = ImmutableArray.CreateBuilder<IrTypeId>()); }
+                foreach (var previous in previousTypes)
+                {
+                    meter.Consume();
+                    if (type != previous && !IsClassBase(type, previous) && !IsClassBase(previous, type) &&
+                        !(factory.IsInterfaceReferenceType(type) && factory.IsInterfaceReferenceType(previous)) &&
+                        !factory.GetImplementedReferenceInterfaces(type).Contains(previous) && !factory.GetImplementedReferenceInterfaces(previous).Contains(type))
+                    { throw new UnsupportedIrEncodingException(); }
+                }
+                if (!previousTypes.Contains(type))
+                { previousTypes.Add(type); }
             }
             if (aliases.TryGetValue((type, token), out var value))
             { return value; }
@@ -330,6 +470,7 @@ internal sealed partial class BvEncoder
         foreach (var element in _elementOrder)
         { element.Dispose(); }
         _length?.Dispose();
+        _nominalWitnessTags?.Dispose();
         DisposeStrings();
         DisposeFields();
         _referenceSort?.Dispose();

@@ -43,6 +43,9 @@ public static class CompilerIdentityBridge
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
+        if (symbol is ITypeSymbol type)
+        { return InternType(factory, type); }
+
         return factory.InternExternalIdentity<ISymbol>(
             symbol,
             SymbolEqualityComparer.Default);
@@ -54,7 +57,72 @@ public static class CompilerIdentityBridge
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        return InternSymbol(factory, type);
+        return factory.InternExternalIdentity<ITypeSymbol>(type, RuntimeTypeComparer.Instance);
+    }
+
+    internal static bool SameRuntimeType(ITypeSymbol left, ITypeSymbol right)
+    {
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
+        var same = RuntimeTypeComparer.Compare(left, right, out var incomplete);
+        return same || incomplete;
+    }
+
+    private sealed class RuntimeTypeComparer : IEqualityComparer<ITypeSymbol>
+    {
+        internal static readonly RuntimeTypeComparer Instance = new();
+        public bool Equals(ITypeSymbol? left, ITypeSymbol? right)
+        { return Compare(left, right, out _); }
+
+        internal static bool Compare(ITypeSymbol? left, ITypeSymbol? right, out bool incomplete)
+        {
+            var remaining = 4096;
+            var limited = false;
+            bool Equal(ITypeSymbol? a, ITypeSymbol? b, int depth)
+            {
+                if (SymbolEqualityComparer.Default.Equals(a, b))
+                { return true; }
+                if (a == null || b == null)
+                { return false; }
+                if (depth > 64 || --remaining < 0)
+                { limited = true; return false; }
+                if (a is INamedTypeSymbol { IsTupleType: true, TupleUnderlyingType: { } firstTuple })
+                { a = firstTuple; }
+                if (b is INamedTypeSymbol { IsTupleType: true, TupleUnderlyingType: { } secondTuple })
+                { b = secondTuple; }
+                if (a.TypeKind == TypeKind.Dynamic && b.SpecialType == SpecialType.System_Object ||
+                    b.TypeKind == TypeKind.Dynamic && a.SpecialType == SpecialType.System_Object)
+                { return true; }
+                if (a is IArrayTypeSymbol firstArray && b is IArrayTypeSymbol secondArray)
+                { return firstArray.Rank == secondArray.Rank && firstArray.IsSZArray == secondArray.IsSZArray && Equal(firstArray.ElementType, secondArray.ElementType, depth + 1); }
+                if (a is not INamedTypeSymbol first || b is not INamedTypeSymbol second ||
+                    !SymbolEqualityComparer.Default.Equals(first.OriginalDefinition, second.OriginalDefinition) ||
+                    first.TypeArguments.Length != second.TypeArguments.Length || !Equal(first.ContainingType, second.ContainingType, depth + 1))
+                { return false; }
+                for (var index = 0; index < first.TypeArguments.Length; index++)
+                {
+                    if (!Equal(first.TypeArguments[index], second.TypeArguments[index], depth + 1))
+                    { return false; }
+                }
+                return true;
+            }
+            var result = Equal(left, right, 0);
+            incomplete = limited;
+            return result;
+        }
+
+        public int GetHashCode(ITypeSymbol type)
+        {
+            type = ArgumentNullGuard.NotNull(type, nameof(type));
+            if (type is INamedTypeSymbol { IsTupleType: true, TupleUnderlyingType: { } tuple })
+            { type = tuple; }
+            if (type.TypeKind == TypeKind.Dynamic || type.SpecialType == SpecialType.System_Object)
+            { return (int)SpecialType.System_Object; }
+            // Arguments do not enter the bucket hash: nested tuple names and
+            // dynamic spellings erase at runtime. Equality still checks them.
+            return type is INamedTypeSymbol named ? SymbolEqualityComparer.Default.GetHashCode(named.OriginalDefinition) :
+                type is IArrayTypeSymbol ? (int)TypeKind.Array : SymbolEqualityComparer.Default.GetHashCode(type);
+        }
     }
 
     internal static IrIdentityId InternOperation(

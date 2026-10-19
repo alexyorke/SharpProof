@@ -774,7 +774,7 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference &&
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && row.ImplementedInterfaces == null &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
@@ -818,6 +818,35 @@ internal static partial class PortableIrGraphCodec
             var info = _factory.GetTypeInfo(_types[index]);
             if (row.ClosedSealedReference)
             { _factory.RegisterClosedSealedReferenceType(_types[index]); }
+            if (row.InterfaceReference)
+            {
+                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !row.ClosedSealedReference && row.ClosedClassBase == null,
+                    "Only Total nominal interfaces may carry interface certificates.");
+                _factory.RegisterInterfaceReferenceType(_types[index]);
+            }
+            if (row.ClosedClassBase.HasValue)
+            {
+                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && row.ClosedClassBase >= -1,
+                    "Only Total nominal reference types may carry class certificates.");
+                var parent = row.ClosedClassBase == -1 ? (IrTypeId?)null : DecodeType(row.ClosedClassBase.Value, depth + 1);
+                Require(!parent.HasValue || _factory.TryGetClosedClassReferenceBase(parent.Value, out _),
+                    "A class certificate requires a certified base.");
+                _factory.RegisterClosedClassReferenceType(_types[index], parent);
+            }
+            if (row.ImplementedInterfaces is { } implementedInterfaces)
+            {
+                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !implementedInterfaces.IsDefault && implementedInterfaces.Length is > 0 and <= 128,
+                    "Implemented interface metadata requires a bounded nominal reference type.");
+                var previous = -1;
+                foreach (var implemented in implementedInterfaces)
+                {
+                    Require(implemented > previous, "Implemented interfaces must be ordered distinct type indices.");
+                    var interfaceType = DecodeType(implemented, depth + 1);
+                    Require(_factory.IsInterfaceReferenceType(interfaceType), "Implemented interfaces require certified interface types.");
+                    _factory.RegisterImplementedReferenceInterface(_types[index], interfaceType);
+                    previous = implemented;
+                }
+            }
             Require(
                 info.Kind == row.Kind &&
                 info.Width == row.Width && info.Signed == row.Signed &&
