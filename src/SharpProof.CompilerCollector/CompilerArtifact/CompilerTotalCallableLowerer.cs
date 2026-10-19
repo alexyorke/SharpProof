@@ -138,7 +138,8 @@ internal static class CompilerTotalCallableLowerer
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
-        ImmutableArray<TotalInputBinding> inputs = isBodyAbstraction ? [.. context.Parameters] : context.Inputs;
+        ImmutableArray<TotalInputBinding> inputs = isBodyAbstraction
+            ? [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input)] : context.Inputs;
         return new(target.Entry.CallableId, program,
             [.. inputs.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState)))],
             context.Result,
