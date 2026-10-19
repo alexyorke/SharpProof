@@ -162,7 +162,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Assert.That(emitted.Success, Is.True);
             await File.WriteAllBytesAsync(producerPath, image.GetBuffer().AsMemory(0, checked((int)image.Length)));
         }
-        var producerBytes = await File.ReadAllBytesAsync(producerPath);
+        var producerBytes = (await File.ReadAllBytesAsync(producerPath)).ToImmutableArray();
         var producerPe = DescribePe(producerBytes);
         await Save(directory, "producer-pe.json", producerPe);
         var shadow = MetadataReference.CreateFromFile(producerPath,
@@ -185,15 +185,15 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         await QualifyCompiler(directory, scenario, source, producerSource, settings, symbols, shadow,
             compilation, root, model, targetSyntax, logSyntax, target, log, discovery, producerPe);
-        byte[] callerBytes;
+        ImmutableArray<byte> callerBytes;
         using (var image = new MemoryStream())
         {
             var emitted = compilation.Emit(image);
             await Save(directory, "caller-emit-diagnostics.json", Diagnostics(emitted.Diagnostics));
             Assert.That(emitted.Success, Is.True);
-            callerBytes = image.ToArray();
+            callerBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         }
-        await File.WriteAllBytesAsync(Path.Combine(directory, "caller.dll"), callerBytes);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "caller.dll"), callerBytes.AsMemory());
         var callerPe = DescribePe(callerBytes);
         await Save(directory, "caller-pe.json", callerPe);
         await ObserveClr(directory, producerBytes, callerBytes, producerPe, callerPe, settings,
@@ -558,15 +558,21 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(workerClaim.Outcome, Is.EqualTo(throws ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven));
     }
 
-    private static async Task ObserveClr(string directory, byte[] producerBytes, byte[] callerBytes,
+    private static async Task ObserveClr(string directory, ImmutableArray<byte> producerBytes, ImmutableArray<byte> callerBytes,
         PeObservation producerPe, PeObservation callerPe, CaseSettings settings, bool retained, bool throws, ImmutableArray<int> inputs)
     {
-        System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
+        if (callerBytes.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(callerBytes));
+        }
         if (inputs.IsDefault)
         {
             throw new ArgumentException("Array must be initialized.", nameof(inputs));
         }
-        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        if (producerBytes.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(producerBytes));
+        }
         System.ArgumentNullException.ThrowIfNull(callerPe);
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(producerPe);
@@ -574,9 +580,9 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var context = new AssemblyLoadContext("ConditionalOracle_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var producerImage = new MemoryStream(producerBytes);
+            using var producerImage = new MemoryStream(producerBytes.ToArray(), writable: false);
             var producerAssembly = context.LoadFromStream(producerImage);
-            using var callerImage = new MemoryStream(callerBytes);
+            using var callerImage = new MemoryStream(callerBytes.ToArray(), writable: false);
             var callerAssembly = context.LoadFromStream(callerImage);
             var type = callerAssembly.GetType("Fixture")!;
             var targetMethod = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
@@ -686,22 +692,26 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         }
     }
 
-    private static PeObservation DescribePe(byte[] bytes)
+    private static PeObservation DescribePe(ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        if (bytes.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(bytes));
+        }
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
-        return new(Hash(bytes), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
+        return new(Hash(bytes.AsSpan()), bytes.Length, metadata.GetString(metadata.GetAssemblyDefinition().Name),
             metadata.GetGuid(metadata.GetModuleDefinition().Mvid));
     }
 
-    private static IlObservation DecodeIl(MethodInfo method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodInfo method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(method);
-        using var image = new MemoryStream(bytes);
-        using var pe = new PEReader(image);
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         var il = pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()!;
@@ -765,9 +775,8 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             JsonSerializer.Serialize(value, WorkerProtocolJson.SharedOptions) + "\n");
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans hash the empty payload */ bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 
