@@ -2640,3 +2640,15 @@ lengths becomes an immutable hash set. Keep concurrent analyzer exception collec
 assembly resources, generated-source text, reflection object[] and actual int[] CLR
 inputs/copies intact. Validate exact replay plus ref-state/runtime coverage controls.
 Status: open before edits.
+
+IMM-M071: Coordinator and read-only review traced coverage shard evidence and package
+identity metadata. Read-only filesystem/XML/ZIP/name/path vectors can be immutable while
+preserving enumeration, Sort-Object comparers/duplicates and archive lifetimes. Keep
+coverage Expected/Completed input arrays and inner mutable descriptor references, since
+regression controls intentionally mutate Target. Preserve existing Ordinal builders and
+conflicting-definition checks. Freeze identity construction in file order and publish
+immutable identity/commit snapshots to internal consumers; keep explicit native arrays
+at JSON tasks/files boundaries and preserve ordered wire records. Validate coverage
+receipt negatives and real facade package identity controls, then bounded shard hash/
+file-set controls for manifest publication.
+Status: open before edits.
