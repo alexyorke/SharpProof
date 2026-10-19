@@ -122,7 +122,7 @@ public sealed partial class TotalLoweringContext
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        return new(Factory, target, _document, 0, allowGenericContainer: true) { AllowObjectWidening = AllowObjectWidening, _sourceTypeCompilation = Compilation ?? _sourceTypeCompilation };
+        return new(Factory, target, _document, 0, allowGenericContainer: true) { _sourceTypeCompilation = Compilation ?? _sourceTypeCompilation };
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {

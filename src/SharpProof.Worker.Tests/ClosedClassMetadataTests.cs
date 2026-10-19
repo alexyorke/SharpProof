@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -45,32 +46,34 @@ public sealed class ClosedClassMetadataTests
         var graph = total.Graph;
         var derived = graph.Variables[total.Parameters[1].Entry].Type;
         var parent = graph.Types[derived].ClosedClassBase!.Value;
+        var types = graph.Types.ToBuilder();
         switch (mutation)
         {
             case "cycle":
-                graph.Types[derived].ClosedClassBase = derived;
+                types[derived] = types[derived] with { ClosedClassBase = derived };
                 break;
             case "missing-parent":
-                graph.Types[parent].ClosedClassBase = null;
+                types[parent] = types[parent] with { ClosedClassBase = null };
                 break;
             case "negative":
-                graph.Types[derived].ClosedClassBase = -2;
+                types[derived] = types[derived] with { ClosedClassBase = -2 };
                 break;
             case "invalid-index":
-                graph.Types[derived].ClosedClassBase = graph.Types.Length;
+                types[derived] = types[derived] with { ClosedClassBase = graph.Types.Length };
                 break;
             case "scalar-parent":
-                graph.Types[derived].ClosedClassBase = 0;
+                types[derived] = types[derived] with { ClosedClassBase = 0 };
                 break;
             case "object-parent":
-                graph.Types[derived].ClosedClassBase = 3;
+                types[derived] = types[derived] with { ClosedClassBase = 3 };
                 break;
             case "scalar-class":
-                graph.Types[0].ClosedClassBase = -1;
+                types[0] = types[0] with { ClosedClassBase = -1 };
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mutation));
         }
+        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total with { Graph = graph with { Types = types.ToImmutable() } } }) };
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, TestContext.CurrentContext.CancellationToken)));
     }
@@ -83,8 +86,15 @@ public sealed class ClosedClassMetadataTests
         var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken));
         var expected = SharpProof.Worker.Protocol.WorkerProtocolJson.ComputeSha256(bytes);
         var graph = artifact.Callables.Single().Total!.Graph;
-        foreach (var row in graph.Types.Where(row => row is null ? throw new ArgumentNullException(nameof(row)) : row.ClosedClassBase.HasValue))
-        { row.ClosedClassBase = omit ? null : -1; }
+        var types = graph.Types.ToBuilder();
+        for (var index = 0; index < types.Count; index++)
+        {
+            var row = types[index];
+            ArgumentNullException.ThrowIfNull(row);
+            if (row.ClosedClassBase.HasValue)
+            { types[index] = row with { ClosedClassBase = omit ? null : -1 }; }
+        }
+        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph with { Types = types.ToImmutable() } } }) };
         var changed = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken));
         Assert.Throws<InvalidDataException>((Action)(() => ArtifactValidator.Decode(changed, expected, TestContext.CurrentContext.CancellationToken)));
     }
@@ -95,14 +105,16 @@ public sealed class ClosedClassMetadataTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public class A { } public class B { } public class Holder { public A First; public B Second; } " +
             "public static class C { public static bool Target(Holder h) { Contract.Requires(h != null && h.First != null && h.Second != null); " +
             "Contract.Ensures(Contract.Result<bool>()); return !object.ReferenceEquals(h.First, h.Second); } }");
-        foreach (var callable in artifact.Callables)
+        var callables = artifact.Callables.ToBuilder();
+        for (var index = 0; index < callables.Count; index++)
         {
+            var callable = callables[index];
             if (callable.Total is { } total)
             {
-                foreach (var type in total.Graph.Types)
-                { type.ClosedClassBase = null; }
+                callables[index] = callable with { Total = total with { Graph = total.Graph with { Types = total.Graph.Types.Select(type => type is null ? throw new ArgumentNullException(nameof(type)) : type with { ClosedClassBase = null }).ToImmutableArray() } } };
             }
         }
+        artifact = artifact with { Callables = callables.ToImmutable() };
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
@@ -129,39 +141,41 @@ public sealed class ClosedClassMetadataTests
         var face = graph.Variables[total.Parameters[0].Entry].Type;
         var implementation = graph.Variables[total.Parameters[1].Entry].Type;
         Assert.That(graph.Types[face].InterfaceReference, Is.True);
-        Assert.That(graph.Types[implementation].ImplementedInterfaces, Has.Length.EqualTo(2));
+        Assert.That(graph.Types[implementation].ImplementedInterfaces!.Value, Has.Length.EqualTo(2));
+        var types = graph.Types.ToBuilder();
         switch (mutation)
         {
             case "missing-interface":
-                graph.Types[face].InterfaceReference = false;
+                types[face] = types[face] with { InterfaceReference = false };
                 break;
             case "scalar-interface":
-                graph.Types[0].InterfaceReference = true;
+                types[0] = types[0] with { InterfaceReference = true };
                 break;
             case "class-interface":
-                graph.Types[implementation].InterfaceReference = true;
+                types[implementation] = types[implementation] with { InterfaceReference = true };
                 break;
             case "self-cycle":
-                graph.Types[face].ImplementedInterfaces = [face];
+                types[face] = types[face] with { ImplementedInterfaces = ImmutableArray.Create(face) };
                 break;
             case "negative-index":
-                graph.Types[implementation].ImplementedInterfaces = [-1];
+                types[implementation] = types[implementation] with { ImplementedInterfaces = ImmutableArray.Create(-1) };
                 break;
             case "duplicate":
-                graph.Types[implementation].ImplementedInterfaces = [face, face];
+                types[implementation] = types[implementation] with { ImplementedInterfaces = ImmutableArray.Create(face, face) };
                 break;
             case "empty":
-                graph.Types[implementation].ImplementedInterfaces = [];
+                types[implementation] = types[implementation] with { ImplementedInterfaces = ImmutableArray<int>.Empty };
                 break;
             case "oversized":
-                graph.Types[implementation].ImplementedInterfaces = Enumerable.Repeat(face, 129).ToArray();
+                types[implementation] = types[implementation] with { ImplementedInterfaces = Enumerable.Repeat(face, 129).ToImmutableArray() };
                 break;
             case "interface-base":
-                graph.Types[implementation].ClosedClassBase = face;
+                types[implementation] = types[implementation] with { ClosedClassBase = face };
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mutation));
         }
+        artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total with { Graph = graph with { Types = types.ToImmutable() } } }) };
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, TestContext.CurrentContext.CancellationToken)));
     }
