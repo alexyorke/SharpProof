@@ -355,9 +355,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     declaration.Variables.Count != 1 || declaration.Type is not RefTypeSyntax refType ||
                     local.Type.SpecialType != SpecialType.System_Int32 ||
                     declaration.Parent is not LocalDeclarationStatementSyntax localStatement ||
-                    localStatement.Parent is not BlockSyntax block)
+                    localStatement.Parent is not (BlockSyntax or SwitchSectionSyntax))
                 {
-                    return (null, Unsupported("ref State is not a local int alias in a block"));
+                    return (null, Unsupported("ref State is not a local int alias in a block or switch section"));
                 }
 
                 var aliasReferences = root.DescendantNodes().OfType<IdentifierNameSyntax>()
@@ -365,9 +365,13 @@ public sealed class AnalyzerPipelineLongFuzzTests
                         model.GetSymbolInfo(identifier).Symbol, local)).ToArray();
                 if (local.RefKind == RefKind.Ref && refType.ReadOnlyKeyword.IsKind(SyntaxKind.None))
                 {
-                    var index = block.Statements.IndexOf(localStatement);
-                    if (index < 0 || index + 1 >= block.Statements.Count ||
-                        block.Statements[index + 1] is not ExpressionStatementSyntax writeStatement ||
+                    // Switch labels own a statement list without an intervening block.
+                    // Require the store in that same list, never across case sections.
+                    var statements = localStatement.Parent is BlockSyntax block
+                        ? block.Statements : ((SwitchSectionSyntax)localStatement.Parent).Statements;
+                    var index = statements.IndexOf(localStatement);
+                    if (index < 0 || index + 1 >= statements.Count ||
+                        statements[index + 1] is not ExpressionStatementSyntax writeStatement ||
                         writeStatement.Expression is not AssignmentExpressionSyntax assignment ||
                         !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                         assignment.Right is RefExpressionSyntax ||
