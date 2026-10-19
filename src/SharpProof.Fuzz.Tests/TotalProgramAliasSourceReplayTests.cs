@@ -25,7 +25,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             ? "public static bool Target0(object x, object y) { return x == y; }"
             : "public static bool Target0(object x, object y, object z) { return x == y && y == z; }";
         var shared = new object();
-        object?[] arguments = [.. Enumerable.Range(0, parameterCount)
+        ImmutableArray<object?> arguments = [.. Enumerable.Range(0, parameterCount)
             .Select(_ => sharedIdentity ? shared : new object())];
         Assert.That(ReferenceEquals(arguments[0], arguments[1]), Is.EqualTo(sharedIdentity));
         if (parameterCount == 3)
@@ -35,7 +35,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         AssertActualCompilerAndInterpreter(member, arguments, sharedIdentity);
 
         var replay = new TotalProgramSourceReplay(12350 + parameterCount);
-        await replay.CompareBatchAsync([new(member, arguments.ToImmutableArray(), false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
             string.Join("\n", result.Failures.Select(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.Detail))) +
@@ -49,9 +49,10 @@ public sealed class TotalProgramAliasSourceReplayTests
     }
 
     private static void AssertActualCompilerAndInterpreter(string member,
-        object?[] arguments, bool expected)
+        ImmutableArray<object?> arguments, bool expected)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(member);
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " + member + " }",
             new CSharpParseOptions(LanguageVersion.CSharp12), "total-object-alias-control.cs");
@@ -74,7 +75,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             image.Position = 0;
             var actualType = runtime.LoadFromStream(image).GetType("TotalGenerated")!;
             var actualValue = actualType.GetMethod("Target0", BindingFlags.Public | BindingFlags.Static)!
-                .Invoke(null, arguments);
+                .Invoke(null, arguments.ToArray());
             Assert.That(actualValue, Is.EqualTo(expected));
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, declared);
