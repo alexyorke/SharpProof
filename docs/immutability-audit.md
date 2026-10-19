@@ -3501,3 +3501,9 @@ final serialization; preserve each forwarded SDK argument object's live alias ac
 Execute and all native reflection argument adapters. Pinned runtime host diagnostic
 metadata remains observable; no earlier forwarded snapshot is justified. Validate actual
 pinned production inventory queries and diagnostic JSON order/shape. Status: open before edits.
+IMM-M126: Review 27 additional Contracts test candidates: ten synchronous pre-state
+callback trace collectors plus seventeen fixed case/diagnostic/clause/boolean/BigInteger
+vectors and read-only snapshots. Use ordered array builders, freeze callback traces after
+each producer including partial-failure traces, and immutable helper parameter contracts.
+Preserve generated pre-state names, native reflection arguments, source text and runtime
+mutable subjects. Validate all Contracts tests after the full batch. Status: open before edits.
