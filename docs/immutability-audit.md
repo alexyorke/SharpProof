@@ -3282,4 +3282,11 @@ retain the valid-syntax short circuit, sorted unique output line numbers, duplic
 request paths and request order. Publish immutable result/line arrays to JSON. Compare
 baseline/current classifier outputs through the canonical PS helper, including invalid
 syntax, primary constructors, executable initializers and duplicate ordered requests.
+Status: open before edits.IMM-M108: Main verified every session-policy assignment. OpaqueCalls, OpaqueEffects,
+ApproximateElementReads and PinElementReads are configured only before lowering or
+in two test constructors. Append optional constructor/factory arguments and expose
+get-only properties. Preserve null callback fallback and deferred callback invocation,
+factory parameter guard timing and fresh per-pass session policy. Update the production
+factory call and test constructors; validate full Frontend plus Worker source-call paths.
+TotalLoweringContext phase/model state requires separate analysis, not blind init setters.
 Status: open before edits.
