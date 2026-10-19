@@ -1484,3 +1484,46 @@ The latest completed published coverage aggregate is string head 18d11e69c.
 All four shards passed, but 3299/3501 changed trusted lines (94.23%) left 202 gaps
 against the unchanged 100% floor. That aggregate predates this replay-path fix and
 its new boundary controls; it cannot qualify this checkpoint.
+
+## Compiler field initialization and finite scalar state
+
+Eligible direct source-class construction now materializes CLR zero/null
+initialization as scoped typed field stores, after allocation and before source
+initializers and constructor execution. This uses the existing instruction model
+rather than inferring member defaults from byte storage certificates. It includes
+backing fields and preserves reference/owner identity across aliases.
+
+Memory extraction records known integer and Boolean field values, resolves scalar
+reads into guards and extents, and clears stale facts after unknown writes. It
+supports safe constant conversions and uses mathematical integer values rather
+than a signed intermediary, including UInt64.MaxValue. Independent replay continues
+to derive actual sizes, values, identities and completed paths from execution.
+Truncating conversions without already-folded typed facts remain unsupported.
+
+Initial native controls passed default reference reads, default/updated scalar
+extents, Boolean guards, source field initializers, backing fields, aliases and
+separate instances. A constructor-body control exposed approximation at new Node()
+before allocation; it is an explicit Unknown boundary, not a source of invented
+default facts. Broader constructor/call lifetime admission remains required.
+The scalar overwrite control prevents an unknown input from reusing default zero.
+
+All 682 IR tests, 2122 frontend tests and 1416 analyzer tests passed, along with
+four actual packaged default-field/scalar proof and refutation cases. One lowering
+golden gained the reviewed zero stores and instruction renumbering; both original
+and reformatted source controls passed in the full frontend run. An initial
+truncation test was corrected to prevent the factory from folding its constant
+before memory analysis. The final affected native/protocol/artifact/acceptance/
+golden gate passed all 723 cases.
+
+Protocol 32, cache 34 and compiler artifact 47 invalidate older capabilities and
+cached compiler results. Acceptance worker/cache constants and artifact snapshots
+move together. Manifest 6, resource program/evidence 4, expression 1 and declared
+layout/lifetime model identities remain unchanged. Phase C and remaining E/F work,
+unchanged 100% changed-trusted-code coverage and exact-head CI remain required.
+
+Quality/compatibility categories and complete canonical formatting passed. The
+new package cases bring the cumulative validated lifetime package controls to 38.
+Published replay-head 5567c1bb0 passed all four coverage shards, then reported
+3338/3518 changed trusted lines (94.88%), with 180 gaps against the unchanged
+100% floor. That improves on the preceding 202 gaps but predates field-default
+analysis and cannot qualify this checkpoint. Fresh exact-head CI remains required.

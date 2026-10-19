@@ -1,10 +1,92 @@
 using NUnit.Framework;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeResourceContractTests
 {
+    [TestCase("public class Node { public int Count; }", "var root=new Node(); return new int[root.Count];", 24, 24)]
+    [TestCase("public class Node { public int Count; }", "var root=new Node(); root.Count=3; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count=2; }", "var root=new Node(); return new int[root.Count];", 24, 32)]
+    [TestCase("public class Node { public int Count; }", "var root=new Node(); var alias=root; alias.Count=3; return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count; }", "var first=new Node(); var second=new Node(); second.Count=3; return new int[first.Count];", 48, 24)]
+    [TestCase("public class Node { public int Count { get; } }", "var root=new Node(); return new int[root.Count];", 24, 24)]
+    [TestCase("public class Node { public bool Flag; }", "var root=new Node(); if(!root.Flag) return new int[1]; return new int[3];", 24, 32)]
+    [TestCase("public class Node { public bool Flag; }", "var root=new Node(); root.Flag=true; if(root.Flag==false) return new int[3]; return new int[1];", 24, 32)]
+    [TestCase("public class Node { public ulong Count; }", "var root=new Node(); root.Count=ulong.MaxValue; if(root.Count>0) return new int[1]; return new int[3];", 24, 32)]
+    [TestCase("public class Node { public int[] Child { get; } }", "var root=new Node(); return root.Child;", 24, 0)]
+    public async Task CompilerFieldDefaultsAndScalarStoresDetermineFiniteMemory(string declaration, string body, int auxiliary, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 5, 6 })
+        {
+            var upper = metric == 5 ? auxiliary : retained;
+            foreach (var violates in new[] { false, true })
+            {
+                if (violates && upper == 0)
+                { continue; }
+                var source = "using SharpProof.Attributes; " + declaration + " public static class C { " +
+                    $"[ResourceUpperBound((ResourceMetric){metric},{(violates ? upper - 1 : upper)})] public static int[] Target() {{ {body} }} }}";
+                var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+                var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+                var unsupported = new List<string>();
+                if (result.Outcome == WorkerClaimOutcome.Unknown)
+                {
+                    foreach (var block in target.Total!.Program.Blocks)
+                    {
+                        foreach (var instruction in block.Instructions)
+                        {
+                            if (instruction is IrCallInstruction call)
+                            { unsupported.Add("call:" + target.Total.Program.Factory.GetString(target.Total.Program.Factory.GetMemberInfo(call.Member).Name)); }
+                            else if (instruction is IrHavocInstruction havoc)
+                            {
+                                var span = target.Total.Program.Factory.GetOperationInfo(havoc.Operation).SourceSpan;
+                                unsupported.Add("havoc:" + havoc.Origin + ":" + havoc.HavocKind + ":" +
+                                    (span != null && span.Start >= 0 && span.Length >= 0 && span.Start <= source.Length - span.Length
+                                        ? source.Substring(span.Start, span.Length) : "no-source"));
+                            }
+                            else if (instruction is IrAssumeInstruction or IrAssertInstruction)
+                            { unsupported.Add(instruction.GetType().Name); }
+                        }
+                    }
+                }
+                Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason + " " + string.Join(",", unsupported));
+                Assert.That(violates ? result.ResourceBound!.ObservedLowerBound : result.ResourceBound!.InferredUpperBound,
+                    Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
+    [Test]
+    public async Task UnknownScalarStoreCannotReuseTheFieldsDefaultZero()
+    {
+        var source = "using SharpProof.Attributes; public class Node { public int Count; } public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static int[] Target(int n) { var root=new Node(); root.Count=n; return new int[root.Count]; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
+    [Test]
+    public async Task OpaqueConstructorCannotInventDefaultFieldEvidence()
+    {
+        var source = "using SharpProof.Attributes; public class Node { public int Count; public Node() { if(Count==0) Count=2; } } public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static int[] Target() { var root=new Node(); return new int[root.Count]; } }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(target.Total!.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+            .Any(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction is IrHavocInstruction { Origin: IrHavocOrigin.Approximation }), Is.True);
+    }
+
     [TestCase("return new string('x', 0);", 0, 0)]
     [TestCase("return new string('x', 3);", 0, 32)]
     [TestCase("var first=new string('x', 3); var saved=first; first=new string('y', 6); return saved;", 40, 32)]
@@ -76,16 +158,16 @@ public sealed partial class NativeResourceContractTests
     }
 
     [Test]
-    public async Task UnwrittenFieldReadsRemainUnknownWithoutMemberStorageFacts()
+    public async Task FreshUnwrittenReferenceFieldReturnsItsCompilerInitializedNull()
     {
         var source = "using SharpProof.Attributes; public class Node { public int[] Child; } public static class C { " +
             "[ResourceUpperBound(ResourceMetric.RetainedBytes,100)] public static int[] Target() { var root=new Node(); return root.Child; } }";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
-        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
-        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
     }
 
     [TestCase(5, 0)]

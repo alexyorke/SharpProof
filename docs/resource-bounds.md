@@ -441,7 +441,8 @@ stored owned references, last-use root drops,
 literal copies through compiler temporaries and proven constant guards. Shared
 children and cycles count once by identity; overwritten field edges can release
 former children. Unproved branches, repeated regions, borrowed references,
-unwritten field reads, source-call lifetime effects and unsupported storage
+field reads without compiler initialization/store facts, source-call lifetime
+effects and unsupported storage
 return Unknown without partial numbers or used layout dependencies. Numerical
 refutations in the admitted finite family require a validated feasible entry and
 an independently observed completed execution. Replay reconstructs identities,
@@ -498,3 +499,23 @@ goto target or observed Boolean branch decision. A missing or reordered callback
 including an omitted field store, cannot publish partial numbers. Foreign and
 repeated instructions, unknown branch decisions, approximation, cancellation and
 exceeded observation/graph budgets also cannot supply lifetime evidence.
+
+### Compiler field defaults and scalar facts
+
+For a certified direct source-class construction, lowering emits typed zero/null
+stores immediately after allocation, before source field/property initializers,
+constructor execution and object initializers. Scoped member identities preserve
+backing fields and distinguish separate instances. These are compiler facts about
+actual initialization; storage size alone never implies a field's value.
+
+Finite memory analysis propagates known integer/Boolean field stores through
+aliases, copies, Boolean guards and array/string extents. Unknown stores clear
+prior scalar facts. Integer comparisons use mathematical values, including the
+full UInt64 range. Constant integer conversions are admitted when they preserve
+the value within the target range; unsupported conversions remain Unknown.
+
+A fresh default reference read can therefore prove retained bytes of zero while
+the containing object's auxiliary storage is still charged. Reads without a known
+compiler store, opaque constructions and unproved control remain Unknown. Some
+explicit constructor bodies still lower to approximation before allocation; this
+phase does not fabricate defaults or numerical evidence for those constructions.

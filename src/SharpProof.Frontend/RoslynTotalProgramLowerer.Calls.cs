@@ -121,12 +121,30 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
             var allocatedType = _context.Type(creation.Type);
+            var initializeDefaults = false;
             if (CSharpOperationSemantics.CompleteObjectStorage(creation.Type, _cancellationToken) is { } storage &&
                 _context.Factory.TryGetClosedClassReferenceBase(allocatedType, out var parent) && !parent.HasValue)
-            { _context.Factory.RegisterObjectStorageType(allocatedType, storage); }
+            {
+                _context.Factory.RegisterObjectStorageType(allocatedType, storage);
+                initializeDefaults = true;
+            }
             var allocated = _expressions.AllocateValue(creation, current);
             created = allocated.Value;
             current = allocated.Continuation;
+            // CLR zero initialization precedes source initializers and constructor
+            // execution. Materialize each certified slot with its scoped field ID.
+            if (initializeDefaults && creation.Type is INamedTypeSymbol owner)
+            {
+                foreach (var member in owner.GetMembers())
+                {
+                    if (member is not IFieldSymbol { IsStatic: false, IsConst: false } field)
+                    { continue; }
+                    SpendRegion();
+                    var value = CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Type(field.Type));
+                    if (!_expressions.StoreInitializer(field, created, creation, value, current))
+                    { throw new RegionIncompleteException(); }
+                }
+            }
             foreach (var (field, initializer) in initializers)
             {
                 SpendRegion();

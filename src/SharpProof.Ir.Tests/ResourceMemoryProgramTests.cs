@@ -7,6 +7,52 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(false, 40)]
+    [TestCase(true, 32)]
+    public void UnsignedGuardConstantsDoNotPassThroughASignedIntermediary(bool maximum, int retained)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var integer = factory.GetOrCreateIntegerType(64, signed: false);
+        var value = factory.CreateVariable("value", integer);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var yes = builder.CreateBlock();
+        var no = builder.CreateBlock();
+        builder.Assign(entry, factory.CreateOperation(), value, factory.Integer(integer, maximum ? ulong.MaxValue : 0UL));
+        builder.Branch(entry, factory.CreateOperation(), factory.Binary(IrBinaryOperator.GreaterThan,
+            factory.Variable(value), factory.Cast(integer, factory.Integer(0))), yes, no);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var result = factory.CreateVariable("result", array);
+        builder.Allocate(yes, factory.CreateOperation(), array, result, factory.Integer(1));
+        builder.Return(yes, factory.CreateOperation(), factory.Variable(result));
+        builder.Allocate(no, factory.CreateOperation(), array, result, factory.Integer(3));
+        builder.Return(no, factory.CreateOperation(), factory.Variable(result));
+        var program = builder.Build();
+        var check = ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(retained, retained, 0, 0, retained, retained)));
+    }
+
+    [Test]
+    public void TruncatingIntegerConversionsDoNotBecomeValuePreservingConstants()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var small = factory.GetOrCreateIntegerType(8, signed: false);
+        var wide = factory.CreateVariable("wide", factory.IntegerType);
+        var count = factory.CreateVariable("count", small);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Assign(entry, factory.CreateOperation(), wide, factory.Integer(256));
+        builder.Assign(entry, factory.CreateOperation(), count, factory.Cast(small, factory.Variable(wide)));
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var target = factory.CreateVariable("array", array);
+        builder.Allocate(entry, factory.CreateOperation(), array, target, factory.Cast(factory.IntegerType, factory.Variable(count)));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.Not.Null.And.Not.Empty);
+    }
+
     [TestCase(0, 0)]
     [TestCase(1, 24)]
     [TestCase(3, 32)]

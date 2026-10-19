@@ -252,6 +252,8 @@ internal sealed class ResourceMemoryReplay
         { lastUse[variable.Variable] = index; return true; }
         if (term is IrCastTerm cast)
         { return ReadVariables(cast.Operand, factory, lastUse, index, depth + 1); }
+        if (term is IrUnaryTerm unary)
+        { return ReadVariables(unary.Operand, factory, lastUse, index, depth + 1); }
         if (term is IrBinaryTerm binary)
         { return ReadVariables(binary.Left, factory, lastUse, index, depth + 1) && ReadVariables(binary.Right, factory, lastUse, index, depth + 1); }
         if (term is IrOpaqueTerm { Receiver: { } owner, Arguments.IsEmpty: true } && IrFieldSites.IsFieldRead(factory, term))
