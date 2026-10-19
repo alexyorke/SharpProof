@@ -60,6 +60,6 @@ internal static partial class CSharpTypes
         { throw new ArgumentNullException(nameof(arguments)); }
         template = template.Root;
         return new HmType(template.Name, template.NestedTypeName is null ? arguments : new[] { template.Arguments[0] }.Concat(arguments).ToArray())
-        { NestedTypeName = template.NestedTypeName, IsValueType = template.IsValueType };
+        { CSharpSymbol = template.CSharpSymbol, NestedTypeName = template.NestedTypeName, IsValueType = template.IsValueType };
     }
 }

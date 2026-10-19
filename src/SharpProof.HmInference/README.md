@@ -86,7 +86,7 @@ method/local-function declarations supply schemes instantiated per call.
 
 | Feature | Behavior |
 | --- | --- |
-| Primitive and nominal parameter types | Generalize unconstrained leaves |
+| Primitive and nominal parameter types | Generalize unconstrained leaves; retain assembly identity and generic-parameter scopes, verify spelling through extern aliases and shadowed nested names |
 | Func, tuples, named tuples, generic/nested containers | Preserve owner/inner arguments, nullable annotations and tuple names |
 | Ref-like types, Span and ReadOnlySpan | Infer element types, indexing/slicing, ref stores/returns and ref iteration; synthesize allows ref struct when supported |
 | Nullable reference/value types | Preserve annotations; synthesize required class/struct constraints |

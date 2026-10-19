@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace SharpProof.HmInference;
 // A mutable substitution graph with path compression. Each inference session owns it.
@@ -13,6 +14,7 @@ public sealed class HmType(string name, params HmType[] arguments)
         "string" or "object" or "Func" or CSharpTypes.NullableReference => false,
         _ => null
     };
+    internal ITypeSymbol? CSharpSymbol { get; set; }
     internal string? NestedTypeName { get; set; }
     internal bool NeedsRefLikePermission { get; set; }
     public HmType? Link { get; private set; }
@@ -26,7 +28,7 @@ public sealed class HmType(string name, params HmType[] arguments)
         { throw new ArgumentNullException(nameof(arguments)); }
         if (arguments.Length != Arguments.Length)
         { throw new ArgumentException("Constructor arity must be preserved.", nameof(arguments)); }
-        return new(Name, arguments) { IsValueType = IsValueType, NestedTypeName = NestedTypeName, NeedsRefLikePermission = NeedsRefLikePermission };
+        return new(Name, arguments) { CSharpSymbol = CSharpSymbol, IsValueType = IsValueType, NestedTypeName = NestedTypeName, NeedsRefLikePermission = NeedsRefLikePermission };
     }
 
     public static HmType Variable()
@@ -108,11 +110,13 @@ public sealed class HmType(string name, params HmType[] arguments)
                 right.Name == CSharpTypes.NullableParameter ? right.Arguments[0] : right);
             return;
         }
-        if (left.Name != right.Name || left.NestedTypeName != right.NestedTypeName || left.Arguments.Length != right.Arguments.Length)
+        if (left.Name != right.Name || left.CSharpSymbol is not null && right.CSharpSymbol is not null && CSharpTypes.ConstructorIdentity(left.CSharpSymbol) != CSharpTypes.ConstructorIdentity(right.CSharpSymbol) || left.NestedTypeName != right.NestedTypeName || left.Arguments.Length != right.Arguments.Length)
         {
             throw new InferenceException($"Conflicting types: {left.Name} and {right.Name}.");
         }
 
+        left.CSharpSymbol ??= right.CSharpSymbol;
+        right.CSharpSymbol ??= left.CSharpSymbol;
         left.IsValueType ??= right.IsValueType;
         right.IsValueType ??= left.IsValueType;
         for (var i = 0; i < left.Arguments.Length; i++)

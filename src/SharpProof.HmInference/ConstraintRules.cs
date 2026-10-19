@@ -144,7 +144,10 @@ public static partial class Inference
                             if (!variables.ContainsKey(free))
                             { throw new InferenceException("A constraint-only type variable cannot be inferred from method arguments."); }
                         }
-                        var type = requirement.Type.Format(variables, nullableAnnotations);
+                        var type = requirement.Type.Root.CSharpSymbol is { } declared
+                            ? CSharpTypes.Render(requirement.Type, declared, variables, nullableAnnotations, model,
+                                currentMethod!.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration ? declaration.ParameterList.Span.End : 0, preserveDeclaredAnnotations: false)
+                            : requirement.Type.Format(variables, nullableAnnotations);
                         if (!types.Contains(type))
                         { if (requirement.BaseClass) { types.Insert(0, type); } else { types.Add(type); } }
                         hasBaseClass |= requirement.BaseClass;

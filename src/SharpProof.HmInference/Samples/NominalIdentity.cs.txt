@@ -1,0 +1,12 @@
+#nullable enable
+#pragma warning disable CS0693 // Deliberate legal shadowing of the outer T.
+using System.Threading.Tasks;
+
+public class ShadowedOuter<T>
+{
+    public class Inner<T>
+    {
+        public static Inner<T>? Keep(Inner<T>? value, bool ignored) => value;
+        public static async Task<Inner<T>?> Await(Task<Inner<T>?> value, bool ignored) => await value;
+    }
+}

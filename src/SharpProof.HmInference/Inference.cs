@@ -203,10 +203,10 @@ public static partial class Inference
                 }
 
                 return CSharpTypes.Render(t, symbol.Parameters[i].Type, variables,
-                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0);
+                    (model.GetNullableContext(method.Parameters()[i].Type!.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End);
             }).ToArray();
             var returnName = CSharpTypes.Render(result, symbol.ReturnType, variables,
-                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0);
+                (model.GetNullableContext(method.ReturnType.SpanStart) & NullableContext.AnnotationsEnabled) != 0, model, method.ParameterList.Span.End);
             TypeSyntax returnSyntax = returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName);
             returnSyntax = method.ReturnType is RefTypeSyntax refReturn ? refReturn.WithType(returnSyntax.WithTriviaFrom(refReturn.Type)) : returnSyntax.WithTriviaFrom(method.ReturnType);
             var candidate = method.WithReturnType(returnSyntax).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
@@ -257,6 +257,29 @@ public static partial class Inference
                 return m.SpanStart == method.SpanStart;
             });
             var changedModel = changedCompilation.GetSemanticModel(changed);
+            var changedSymbol = changedModel.GetDeclaredSymbol(changedMethod, cancellationToken)!;
+            var signatureCopies = new Dictionary<HmType, HmType>();
+            HmType CopySignature(HmType type)
+            {
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                type = type.Root;
+                if (signatureCopies.TryGetValue(type, out var copied))
+                { return copied; }
+                copied = type.WithArguments(type.Arguments.Select(CopySignature).ToArray());
+                signatureCopies.Add(type, copied);
+                return copied;
+            }
+            try
+            {
+                foreach (var variable in variables)
+                { HmType.Unify(CopySignature(variable.Key), CSharpTypes.Rigid(changedSymbol.TypeParameters.Single(p => { if (p is null) { throw new ArgumentNullException(nameof(p)); } return p.Name == variable.Value; }))); }
+                for (var i = 0; i < parameters.Length; i++)
+                { HmType.Unify(CopySignature(parameters[i]), CSharpTypes.Rigid(changedSymbol.Parameters[i].Type)); }
+                HmType.Unify(CopySignature(result), CSharpTypes.Rigid(changedSymbol.ReturnType));
+            }
+            catch (InferenceException)
+            { return new(symbol.Name, "Rejected", "Rendered signature changes a nominal constructor or generic parameter scope."); }
             // Validate statically resolved calls in every supplied file. Merely
             // compiling callers does not preserve conversions or overload selection
             // when this method becomes generic or its result narrows.
@@ -999,13 +1022,13 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(before)); }
             if (after is null)
             { throw new ArgumentNullException(nameof(after)); }
-            if (before.Parameters.Length != after.Parameters.Length || CSharpTypes.Display(before.ReturnType) != CSharpTypes.Display(after.ReturnType))
+            if (before.Parameters.Length != after.Parameters.Length || !CSharpTypes.SameSignatureType(before.ReturnType, after.ReturnType))
             {
                 return false;
             }
             for (var i = 0; i < before.Parameters.Length; i++)
             {
-                if (CSharpTypes.Display(before.Parameters[i].Type) != CSharpTypes.Display(after.Parameters[i].Type))
+                if (!CSharpTypes.SameSignatureType(before.Parameters[i].Type, after.Parameters[i].Type))
                 {
                     return false;
                 }

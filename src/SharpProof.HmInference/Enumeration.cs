@@ -56,8 +56,8 @@ public static partial class Inference
             if (iteratorReturn!.Arity == 0)
             { return declared; }
             return declared.Name == CSharpTypes.NullableReference
-                ? new(CSharpTypes.NullableReference, new HmType(declared.Arguments[0].Name, iteratorElement!))
-                : new(declared.Name, iteratorElement!);
+                ? new(CSharpTypes.NullableReference, CSharpTypes.ReplaceOwnArguments(declared.Arguments[0], iteratorElement!))
+                : CSharpTypes.ReplaceOwnArguments(declared, iteratorElement!);
         }
 
         private static void AddNamedArguments(INamedTypeSymbol named, Dictionary<ITypeParameterSymbol, HmType> mapping)
@@ -193,7 +193,7 @@ public static partial class Inference
         }
 
         private static string? ProtocolMember(ISymbol? symbol)
-        { return symbol?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat); }
+        { return symbol is null ? null : symbol.ContainingAssembly.Identity + ":" + symbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat); }
 
         private static bool SameProtocolConversion(Conversion left, Conversion right)
         {
