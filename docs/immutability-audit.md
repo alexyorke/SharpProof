@@ -3616,3 +3616,18 @@ zero failures/build warnings/errors; 87 exact embedded PDB outputs. Independent 
 confirms ordinal atomic cache GetOrAdd behavior, nested expected dependencies, fixed
 vector order and preserved native PNG scratch/input subjects. M131/M133 targeted gates
 and M132 workflow complete; M134 script implementation remains open.
+M134 follow-up scope: freeze Doctor runtime stdout and Loop HEAD stdout after capture; preserve existing exit-status validation and HEAD error order. Native output alone is not a mutability exception.
+
+IMM-M134 verified: 74 baseline/current controls pass for formatter native argv and
+errors, tracked sources, HEAD validation, path merge/comparison, runtime output,
+retained seeds, fuzz failures/wire arrays, Doctor unique versions, developer-plan
+validation/build argv, and coverage identity/module order/parallel result cardinality.
+Actual Doctor JSON/text/configuration/direct-central-transitive package regressions
+pass. All 87 PowerShell and 19 shell files are format-clean; 713 local documentation
+links and the canonical container contract pass. Independent review found no defect.
+IMM-M135: Convert 31 reviewed Horn test snapshot rows in eleven Smt test files:
+state/substitution dictionaries use scoped indexer builders and freeze once; clause
+vectors and two private CounterSystem tuple results become immutable. Preserve
+intentional wrong-arity input, clause order, default key equality and mutable native
+solver ownership. Validate the affected Horn fixtures in the canonical container.
+Status: planned before edits.

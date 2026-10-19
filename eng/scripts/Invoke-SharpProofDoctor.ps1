@@ -17,7 +17,7 @@ else { Add-Check 'sdk' 'ok' $sdk }
 if ($sdk -notmatch '^\d+\.\d+\.\d+' -or [version](($sdk -split '-')[0]) -lt [version]'9.0.300') {
     Add-Check 'portable-host' 'error' 'Portable analysis requires SDK 9.0.300 / Roslyn 4.14 or later.' 'Install a supported SDK and check global.json.'
 }
-$runtimes = @(& dotnet --list-runtimes 2>$null)
+$runtimes = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& dotnet --list-runtimes 2>$null))
 $configuration = $null
 $packages = @()
 $resolvedPackages = @()
@@ -72,8 +72,8 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
             }
         }
         $versionPackages = if ($resolvedPackages.Count) { $resolvedPackages } else { $packages }
-        $versions = @($versionPackages | ForEach-Object { $_.version } | Where-Object { $_ } | Select-Object -Unique)
-        if ($versions.Count -gt 1) { Add-Check 'package-versions' 'warning' 'SharpProof package versions differ.' 'Align SharpProof package versions; existing resolved assets take precedence over evaluated direct version expressions.' }
+        $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($versionPackages | ForEach-Object { $_.version } | Where-Object { $_ } | Select-Object -Unique))
+        if ($versions.Length -gt 1) { Add-Check 'package-versions' 'warning' 'SharpProof package versions differ.' 'Align SharpProof package versions; existing resolved assets take precedence over evaluated direct version expressions.' }
         if ($configuration.TargetFrameworks -and -not $TargetFramework) {
             Add-Check 'framework' 'warning' 'This is an outer multi-target evaluation.' 'Repeat doctor with -TargetFramework for each target framework.'
         }

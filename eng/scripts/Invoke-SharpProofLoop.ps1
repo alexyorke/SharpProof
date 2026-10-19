@@ -99,8 +99,8 @@ function Get-GitUntrackedPaths {
 }
 
 function Get-RequiredHead {
-    $head = @(& $gitPath -C $repositoryRoot rev-parse HEAD)
-    if ($LASTEXITCODE -ne 0 -or $head.Count -ne 1) {
+    $head = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& $gitPath -C $repositoryRoot rev-parse HEAD))
+    if ($LASTEXITCODE -ne 0 -or $head.Length -ne 1) {
         throw 'Could not resolve the host checkout HEAD.'
     }
     $value = ([string]$head[0]).Trim()
@@ -176,10 +176,13 @@ try {
         throw 'Could not capture the host tracked-source patch.'
     }
 
-    $untrackedPaths = @(Get-GitUntrackedPaths)
-    $packagePaths = @(Get-GitUntrackedPaths -IgnoredPackages)
-    $sourcePaths = @($untrackedPaths + $packagePaths)
-    $sourcePaths = @($sourcePaths | Sort-Object -Unique -CaseSensitive)
+    $untrackedPaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-GitUntrackedPaths))
+    $packagePaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(Get-GitUntrackedPaths -IgnoredPackages))
+    $sourcePathBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    [void]$sourcePathBuilder.AddRange([string[]]@($untrackedPaths))
+    [void]$sourcePathBuilder.AddRange([string[]]@($packagePaths))
+    $sourcePaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            $sourcePathBuilder.ToImmutable() | Sort-Object -Unique -CaseSensitive))
     $manifest = [IO.File]::Open(
         $sourceManifest,
         [IO.FileMode]::CreateNew,
@@ -231,15 +234,15 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not verify the host tracked-source patch.'
     }
-    $verificationPaths = @(
-        Get-GitUntrackedPaths
-        Get-GitUntrackedPaths -IgnoredPackages)
-    $verificationUntracked = @(
-        $verificationPaths | Sort-Object -Unique -CaseSensitive)
+    $verificationPaths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            Get-GitUntrackedPaths
+            Get-GitUntrackedPaths -IgnoredPackages))
+    $verificationUntracked = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            $verificationPaths | Sort-Object -Unique -CaseSensitive))
     if ($verificationHead -cne $head -or
         @(Compare-Object `
-                -ReferenceObject $sourcePaths `
-                -DifferenceObject $verificationUntracked `
+                -ReferenceObject ([string[]]@($sourcePaths)) `
+                -DifferenceObject ([string[]]@($verificationUntracked)) `
                 -CaseSensitive `
                 -SyncWindow 0).Count -ne 0 -or
         -not (Test-ExactFileBytes `
