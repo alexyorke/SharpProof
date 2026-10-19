@@ -3521,3 +3521,11 @@ byte-identical, including forwarded arguments and runtime metadata. The M124 sym
 validator compiles through its actual Add-Type boundary. Its behavioral regression
 controls and the remaining shared/M120-M124/M126-M127 project gates are still pending.
 M118/M119/M122 Release Worker build passes zero warnings/errors; full ordinary tests run.
+IMM-M128: Review twelve remaining PowerShell compound construction rows across seven
+scripts. Use scoped immutable argv, service-name, framework-package and XML-reference
+builders with ordered frozen publication and final native string[] adapters. Preserve
+case-sensitive service membership, Windows-only pack order, XML node identity, duplicate
+entries, ++index option parsing and missing-value errors. Freeze the sample package
+allow-list as ordinal membership. Compute documentation heading stages and final anchor
+without scalar root reassignment. Validate baseline/current controls for all branches
+and canonical script formatting before committing implementation. Status: open before edits.
