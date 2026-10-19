@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -33,7 +34,7 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
         Assert.That(captured, Has.Count.EqualTo(2));
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
         var complete = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            captured, null, authority, TestContext.CurrentContext.CancellationToken);
+            captured.ToImmutableArray(), null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(complete.Callers, Has.Length.EqualTo(1));
         Assert.That(complete.Callers.Single().Body.CallPreconditions, Has.Length.EqualTo(1));
 
@@ -41,13 +42,13 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
         var incomplete = captured.GetRange(0, 1);
         Assert.That(incomplete[0], Is.SameAs(captured[0]));
         var rejected = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            incomplete, null, authority, TestContext.CurrentContext.CancellationToken);
+            incomplete.ToImmutableArray(), null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(rejected.Callers, Is.Empty);
         Assert.That(rejected.Gaps, Has.Length.EqualTo(1));
         Assert.That(rejected.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
         Assert.That(rejected.Gaps.Single().TreeOrdinal, Is.EqualTo(0));
         Assert.Throws<OperationCanceledException>((Action)(() =>
             CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-                incomplete, null, authority, new CancellationToken(true))));
+                incomplete.ToImmutableArray(), null, authority, new CancellationToken(true))));
     }
 }

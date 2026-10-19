@@ -50,7 +50,7 @@ internal sealed partial class BvEncoder
                 }
             }
         }
-        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds.ToImmutable().ToArray()));
+        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds.ToImmutable()));
     }
 
     internal BoolExpr? NominalReferenceBound(VerificationQuery query, SmtQueryResourceMeter meter)

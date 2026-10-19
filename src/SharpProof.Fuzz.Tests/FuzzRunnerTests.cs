@@ -135,7 +135,7 @@ public sealed class FuzzRunnerTests
 
         static void Collect(
             GeneratedCSharpExpression expression,
-            ISet<GeneratedExpressionKind> observed)
+            ImmutableHashSet<GeneratedExpressionKind>.Builder observed)
         {
             System.ArgumentNullException.ThrowIfNull(expression);
             System.ArgumentNullException.ThrowIfNull(observed);

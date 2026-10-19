@@ -8,6 +8,15 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerReferenceModuleSelectionTests
 {
+    [Test]
+    public void SelectionRequiresAnInitializedMatchArray()
+    {
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerMetadataResolution.SelectReferenceModules(
+                default, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.ParamName, Is.EqualTo("matches"));
+    }
+
     private ImmutableArray<byte> _firstImage = [];
     private ImmutableArray<byte> _secondImage = [];
 

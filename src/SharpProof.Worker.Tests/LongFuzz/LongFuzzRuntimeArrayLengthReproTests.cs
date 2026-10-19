@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
@@ -85,9 +86,10 @@ public sealed class LongFuzzRuntimeArrayLengthReproTests
             context.Unload();
         }
 
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var countsBuilder = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         var result = await AnalyzerPipelineLongFuzzTests.RunCase(source, mode,
-            key => { System.ArgumentNullException.ThrowIfNull(key); counts[key] = counts.GetValueOrDefault(key) + 1; });
+            key => { System.ArgumentNullException.ThrowIfNull(key); countsBuilder[key] = countsBuilder.GetValueOrDefault(key) + 1; });
+        var counts = countsBuilder.ToImmutable();
         TestContext.WriteLine($"Native: {result.Outcome} {result.Reason}; default runtime: {result.Runtime}");
         TestContext.WriteLine(string.Join("\n", result.Problems.Select(problem => problem.Kind + ": " + problem.Details)));
         Assert.That(counts.GetValueOrDefault("compiled"), Is.EqualTo(1));

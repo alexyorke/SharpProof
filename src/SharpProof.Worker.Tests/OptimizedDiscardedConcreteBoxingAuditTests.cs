@@ -130,10 +130,10 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
-        var observations = new List<RuntimeObservation>();
+        var observationsBuilder = ImmutableArray.CreateBuilder<RuntimeObservation>();
         var runtime = new AssemblyLoadContext("OptimizedDiscardOracle_" + shape, isCollectible: true);
         try
         {
@@ -165,16 +165,17 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
                     var before = Measure(control, witness, sentinel);
                     var subject = Measure(target, witness, sentinel);
                     var after = Measure(control, witness, sentinel);
-                    observations.Add(new(witness.ToString(CultureInfo.InvariantCulture), round,
+                    observationsBuilder.Add(new(witness.ToString(CultureInfo.InvariantCulture), round,
                         subject.Bytes, subject.Result, before.Bytes, before.Result, after.Bytes, after.Result));
                 }
             }
         }
         finally { runtime.Unload(); }
+        var observations = observationsBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "clr-measurements.json"),
             JsonSerializer.Serialize(observations, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
-            $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}; " +
+            $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
             $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
             $"warmup={WarmupIterations}; measured={MeasuredIterations}; rounds={MeasurementRounds}; " +
             $"framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; " +

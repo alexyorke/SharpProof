@@ -155,10 +155,10 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "caller-emit-diagnostics.txt"),
             string.Join("\n", emission.Diagnostics) + "\n");
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes.AsMemory());
         image.Position = 0;
-        var rows = new List<MeasurementObservation>();
+        var rowsBuilder = ImmutableArray.CreateBuilder<MeasurementObservation>();
         var runtime = new AssemblyLoadContext("NullableDefaultBoxingOracle", isCollectible: true);
         bool firstNull;
         bool secondNull;
@@ -206,7 +206,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
                 var subject = Measure(target);
                 var after = Measure(control);
                 var identity = MeasureIdentity(echo);
-                rows.Add(new(round, subject.Bytes, subject.Result == null, before.Bytes, before.Result == null,
+                rowsBuilder.Add(new(round, subject.Bytes, subject.Result == null, before.Bytes, before.Result == null,
                     after.Bytes, after.Result == null, identity.Bytes, identity.Result == null));
             }
             GC.KeepAlive(first);
@@ -214,10 +214,11 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
             GC.KeepAlive(_escaped);
         }
         finally { runtime.Unload(); }
+        var rows = rowsBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "clr-measurements.json"),
             JsonSerializer.Serialize(rows, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "compilation-identity.txt"),
-            $"assembly={compilation.Assembly.Identity}; PE_SHA256={WorkerProtocolJson.ComputeSha256(imageBytes)}; " +
+            $"assembly={compilation.Assembly.Identity}; PE_SHA256={Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(imageBytes.AsSpan()))}; " +
             $"boundaryAssembly={external.Assembly.Identity}; boundaryPE_SHA256={WorkerProtocolJson.ComputeSha256(boundaryBytes)}; " +
             $"sourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(SubjectSource))}; " +
             $"boundarySourceSHA256={WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(BoundarySource))}; " +

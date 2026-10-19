@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -97,7 +98,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").Single();
         var identity = SemanticClaimIdentity.CreateCallableId(method);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps, Is.Empty);
         var body = batch.Callers.Single(caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.CallableId == identity)).Body;

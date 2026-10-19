@@ -9,6 +9,26 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerReportingTests
 {
     [Test]
+    public void LineMapIdentityRequiresAnInitializedEntryArray()
+    {
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerReportingIdentity.ComputeLineMapSha256(default)));
+        Assert.That(error!.ParamName, Is.EqualTo("entries"));
+    }
+
+    [Test]
+    public void ReportingMapLookupRejectsNullableContainingDefaultTrees()
+    {
+        ImmutableArray<CompilerSyntaxTreeSnapshot>? defaultTrees =
+            default(ImmutableArray<CompilerSyntaxTreeSnapshot>);
+        Assert.That(defaultTrees.HasValue, Is.True);
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerSourceCoordinates.FindUniqueTree(
+                Location(), defaultTrees, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.ParamName, Is.EqualTo("syntaxTrees"));
+    }
+
+    [Test]
     public void DefaultAdditionalFilesCaptureAsAnEmptyCollection()
     {
         var compilation = TestCompilation.Create("DefaultAdditionalFiles",

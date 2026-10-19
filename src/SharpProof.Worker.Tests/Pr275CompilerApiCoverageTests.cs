@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -48,18 +49,18 @@ public sealed class Pr275CompilerApiCoverageTests
                     _ = CompilerTotalCallableLowerer.PrepareEntry(
                         missing == "compilation" ? null! : Compilation,
                         missing == "target" ? null! : target,
-                        missing == "capturedTrees" ? null! : trees, default);
+                        missing == "capturedTrees" ? default(ImmutableArray<CompilerSyntaxTreeSnapshot>) : trees.ToImmutableArray(), default);
                     break;
                 case "callable":
                     _ = CompilerTotalCallableLowerer.Prepare(
                         missing == "compilation" ? null! : Compilation,
                         missing == "target" ? null! : target,
-                        missing == "capturedTrees" ? null! : trees, null, packs, default);
+                        missing == "capturedTrees" ? default(ImmutableArray<CompilerSyntaxTreeSnapshot>) : trees.ToImmutableArray(), null, packs, default);
                     break;
                 case "callers":
                     _ = CompilerTotalCallableLowerer.PrepareShadowCallers(
                         missing == "compilation" ? null! : Compilation, WorkerFeatureSet.All,
-                        missing == "capturedTrees" ? null! : trees, null, packs, default);
+                        missing == "capturedTrees" ? default(ImmutableArray<CompilerSyntaxTreeSnapshot>) : trees.ToImmutableArray(), null, packs, default);
                     break;
                 case "initialization":
                     _ = CompilerTotalCallableLowerer.HasNoEffectEntryInitialization(
@@ -74,6 +75,31 @@ public sealed class Pr275CompilerApiCoverageTests
         Assert.That(exception!.ParamName, Is.EqualTo(missing));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void DefaultReferenceSnapshotIsRejectedBeforeAdmission(bool shadow)
+    {
+        var target = new ClaimManifestBuilder(Compilation).Build().Targets.Values.Single();
+        var trees = CompilerCompilationCapture.CaptureTrees(Compilation, default).ToImmutableArray();
+        var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
+        var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            if (shadow)
+            {
+                _ = CompilerTotalCallableLowerer.PrepareShadowCallers(
+                    Compilation, WorkerFeatureSet.All, trees,
+                    default(ImmutableArray<CompilerReferenceSnapshot>), packs, default);
+            }
+            else
+            {
+                _ = CompilerTotalCallableLowerer.Prepare(
+                    Compilation, target, trees,
+                    default(ImmutableArray<CompilerReferenceSnapshot>), packs, default);
+            }
+        }));
+        Assert.That(exception!.ParamName, Is.EqualTo("capturedReferences"));
+    }
+
     [Test]
     public void CapturedScalarSourceHasEntryAndBodyPreparations()
     {
@@ -81,8 +107,8 @@ public sealed class Pr275CompilerApiCoverageTests
         var trees = CompilerCompilationCapture.CaptureTrees(Compilation, default);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
 
-        var entry = CompilerTotalCallableLowerer.PrepareEntry(Compilation, target, trees, default);
-        var callable = CompilerTotalCallableLowerer.Prepare(Compilation, target, trees, null, packs, default);
+        var entry = CompilerTotalCallableLowerer.PrepareEntry(Compilation, target, trees.ToImmutableArray(), default);
+        var callable = CompilerTotalCallableLowerer.Prepare(Compilation, target, trees.ToImmutableArray(), null, packs, default);
 
         Assert.That(entry, Is.Not.Null);
         Assert.That(callable, Is.Not.Null);

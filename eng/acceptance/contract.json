@@ -370,6 +370,7 @@
       {
         "name": "irModelCatalog",
         "paths": [
+          "src/SharpProof.Ir/ImmutableDictionaryCapture.cs",
           "src/SharpProof.Ir/IrIdentifierAliases.cs",
           "src/SharpProof.Ir/ScopedIrId.cs",
           "eng/shared/ArgumentNullGuard.cs",
@@ -380,6 +381,7 @@
       {
         "name": "compilerWireCatalog",
         "paths": [
+          "src/SharpProof.CompilerArtifact/PortableIrArrayJsonConverter.cs",
           "src/SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "src/SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]

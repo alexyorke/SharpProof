@@ -1140,7 +1140,7 @@ $summary = ([ordered]@{
             -FailureMessage 'Could not resolve the current repository commit.' `
             -TrimOutput
         reportCount   = $reports.Count
-        reportFiles   = @($reportFiles | Sort-Object path)
+        reportFiles   = @($reportFiles | Sort-Object { $_.path })
         authority     = ([ordered]@{
                 schemaVersion      = 1
                 commit             = [string]$recomputedAuthority.commit

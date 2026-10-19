@@ -488,19 +488,20 @@ public sealed class NativeWorkerRoutingTests
         foreach (var sourceCase in cases)
         {
             using var project = new ShadowTestProject(WorkerVcShadowSourceGateTests.CreateGateArtifact(sourceCase));
-            var expected = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
+            var expectedBuilder = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, check =>
-                    { System.ArgumentNullException.ThrowIfNull(check); expected[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
+                    { System.ArgumentNullException.ThrowIfNull(check); expectedBuilder[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check); }, TestContext.CurrentContext.CancellationToken);
             }
+            var expected = expectedBuilder.ToImmutable();
             using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True, sourceCase.Name);
             var postIds = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-                .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToHashSet(StringComparer.Ordinal);
+                .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
             posts += postIds.Count;
-            var actual = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (postIds.Contains(result.ClaimId))).ToDictionary(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal);
+            var actual = ImmutableDictionaryCapture.Create(response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (postIds.Contains(result.ClaimId))), result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), static result => result ?? throw new System.ArgumentNullException(nameof(result)), StringComparer.Ordinal);
             Assert.That(actual.Keys, Is.EquivalentTo(postIds), sourceCase.Name);
             if (sourceCase.Name == "golden:vc-shadow-unsupported-lock-local")
             {

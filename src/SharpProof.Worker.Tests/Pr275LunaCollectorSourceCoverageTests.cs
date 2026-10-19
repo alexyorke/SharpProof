@@ -79,7 +79,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             compilation,
             new IrFactory(),
             packs,
-            trees,
+            trees.ToImmutableArray(),
             references).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifact = CreateArtifact(compilation, discovery);
         var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)

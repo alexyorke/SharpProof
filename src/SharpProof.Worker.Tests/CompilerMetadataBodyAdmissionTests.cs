@@ -42,8 +42,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
         var compilation = CreateGuardCompilation();
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees, TestContext.CurrentContext.CancellationToken);
-        var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees, null,
+        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees.ToImmutableArray(), TestContext.CurrentContext.CancellationToken);
+        var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees.ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(entry, Is.Not.Null);
         Assert.That(body, Is.Not.Null);

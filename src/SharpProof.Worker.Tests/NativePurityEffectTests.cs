@@ -320,11 +320,12 @@ public sealed class NativePurityEffectTests
         var total = preparation.Total!;
         var factory = total.Program.Factory;
         var entries = total.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
-        var writes = new List<IrWriteRegion>();
+        var writesBuilder = ImmutableArray.CreateBuilder<IrWriteRegion>();
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
                     factory.CreateReferenceValue(factory.GetVariableInfo(entries[0]).Type, new object())).SetItem(entries[1], initiallyNull ? factory.CreateReferenceValue(factory.GetVariableInfo(entries[1]).Type, new object()) :
-                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)), 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writes.Add(write.Region); } });
+                    factory.CreateNullValue(factory.GetVariableInfo(entries[1]).Type)), 10000, new IrProgramReplayOptions(_ => null) { WriteObserver = write => { System.ArgumentNullException.ThrowIfNull(write); writesBuilder.Add(write.Region); } });
+        var writes = writesBuilder.ToImmutable();
         Assert.That(execution.Status, Is.EqualTo(initiallyNull ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(writes.Contains(IrWriteRegion.Parameter), Is.EqualTo(!initiallyNull));
@@ -428,7 +429,7 @@ public sealed class NativePurityEffectTests
         var attempts = 0;
         var allocations = 0;
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
-            total.Parameters.ToDictionary(parameter => parameter.Entry, parameter =>
+            ImmutableDictionaryCapture.Create(total.Parameters, parameter => parameter.Entry, parameter =>
                 ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (factory.GetTypeInfo(factory.GetVariableInfo(parameter.Entry).Type).Kind == IrTypeKind.Integer ?
                     factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 1L) :
                     factory.CreateReferenceValue(factory.GetVariableInfo(parameter.Entry).Type, new object())))),

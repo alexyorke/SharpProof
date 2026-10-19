@@ -35,7 +35,7 @@ public sealed class CorpusGateTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
             SharpProof.Worker.Protocol.WorkerFeatureSet.All,
-            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
@@ -99,7 +99,7 @@ public sealed class CorpusGateTests
                 new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest);
             var batch = SharpProof.CompilerArtifact.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 SharpProof.Worker.Protocol.WorkerFeatureSet.All,
-                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+                SharpProof.CompilerArtifact.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
                 SharpProof.CompilerArtifact.CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
             Assert.That(System.Text.Json.JsonSerializer.Serialize(
                 new SharpProof.CompilerArtifact.ClaimManifestBuilder(compilation).Build().Manifest),

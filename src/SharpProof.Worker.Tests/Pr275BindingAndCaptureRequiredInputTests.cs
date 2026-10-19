@@ -11,6 +11,18 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275BindingAndCaptureRequiredInputTests
 {
+    [Test]
+    public void ReachableSourceCollectionRequiresAnInitializedTreeSnapshot()
+    {
+        var compilation = CreateCompilation();
+        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values;
+        var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
+            CompilerReachableSourceCollector.Collect(
+                compilation, targets, default, packs, default)));
+        Assert.That(error!.ParamName, Is.EqualTo("trees"));
+    }
+
     private static CSharpCompilation CreateCompilation()
     {
         return TestCompilation.Create("Pr275RequiredBindingCapture",

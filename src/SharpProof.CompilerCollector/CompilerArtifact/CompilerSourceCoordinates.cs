@@ -151,7 +151,7 @@ internal static class CompilerSourceCoordinates
         ImmutableArray<CompilerSyntaxTreeSnapshot>? syntaxTrees,
         CancellationToken cancellationToken)
     {
-        if (location == null || syntaxTrees == null)
+        if (location == null || syntaxTrees is null)
         {
             return -1;
         }

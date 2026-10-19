@@ -114,18 +114,20 @@ public sealed class NativeMetadataReferenceOwnerTests
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
-    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, IReadOnlyList<CompilerReferenceSnapshot> references, bool enabled)
+    private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, ImmutableArray<CompilerReferenceSnapshot> references, bool enabled)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new System.ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: enabled);
     }
 
-    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, IReadOnlyList<CompilerReferenceSnapshot> references)
+    private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, ImmutableArray<CompilerReferenceSnapshot> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new System.ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(body);
         return CompilerDecodedShadowBody.Decode(body.CallableId, JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(
             JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(body)))!, TestContext.CurrentContext.CancellationToken, references);

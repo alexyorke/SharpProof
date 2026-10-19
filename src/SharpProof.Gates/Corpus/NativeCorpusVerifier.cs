@@ -106,7 +106,7 @@ internal static class NativeCorpusVerifier
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), cancellationToken);
         var methodBuilder = ImmutableDictionary.CreateBuilder<string, IMethodSymbol>(StringComparer.Ordinal);
         foreach (var tree in compilation.SyntaxTrees)

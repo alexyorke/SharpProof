@@ -33,6 +33,33 @@ public sealed class IrInputSnapshotTests
     }
 
     [Test]
+    public void ReadObserverCannotChangeReadOnlyDictionaryFallbackSnapshot()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var first = factory.CreateVariable("first", factory.IntegerType);
+        var second = factory.CreateVariable("second", factory.IntegerType);
+        // Mutating this backing input during observation is the subject under test.
+        var backing = new Dictionary<IrVarId, IrValue>
+        {
+            [first] = factory.CreateIntegerValue(10),
+            [second] = factory.CreateIntegerValue(20)
+        };
+        var variables = new System.Collections.ObjectModel.ReadOnlyDictionary<IrVarId, IrValue>(backing);
+        var term = factory.Binary(IrBinaryOperator.Add, factory.Variable(first), factory.Variable(second));
+        var result = new IrInterpreter(factory).Evaluate(term, variables, variable =>
+        {
+            if (variable.IsDefault)
+            { throw new ArgumentException("Value must be initialized.", nameof(variable)); }
+            if (variable == first)
+            { backing[second] = factory.CreateIntegerValue(99); }
+        }, TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Integer, Is.EqualTo(30));
+        Assert.That(backing[second].Integer, Is.EqualTo(99));
+    }
+
+    [Test]
     public void CapturedDictionaryPreservesItsKeyComparer()
     {
         var otherFactory = new IrFactory(IrExecutionSemantics.Total);

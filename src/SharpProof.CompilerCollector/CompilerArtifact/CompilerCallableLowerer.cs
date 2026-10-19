@@ -29,13 +29,13 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         IrFactory factory,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
-        IReadOnlyList<CompilerSyntaxTreeSnapshot>? capturedTrees = null,
-        IReadOnlyList<CompilerReferenceSnapshot>? capturedReferences = null)
+        ImmutableArray<CompilerSyntaxTreeSnapshot>? capturedTrees = null,
+        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
-        _capturedTrees = capturedTrees?.ToImmutableArray();
-        _capturedReferences = capturedReferences?.ToImmutableArray();
+        _capturedTrees = capturedTrees is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedTrees)) : capturedTrees;
+        _capturedReferences = capturedReferences is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedReferences)) : capturedReferences;
         _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
     }

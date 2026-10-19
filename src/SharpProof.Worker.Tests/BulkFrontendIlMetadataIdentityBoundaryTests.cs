@@ -170,7 +170,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(identityBytes, Is.EqualTo(longIdentity ? 4194 : 2022));
             TestContext.WriteLine($"longIdentity={longIdentity}; calleeIdentityBytes={identityBytes}");
             var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken,
                 enableMetadataRequires: true);
             if (longIdentity)

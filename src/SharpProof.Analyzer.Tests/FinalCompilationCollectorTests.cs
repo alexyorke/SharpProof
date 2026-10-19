@@ -350,7 +350,7 @@ public sealed class FinalCompilationCollectorTests
             var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
             var capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
-            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
+            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees.ToImmutableArray(), capturedReferences,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken), Is.Null);
             foreach (var location in discovery.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location))
                          .Append(target.Entry.Location))

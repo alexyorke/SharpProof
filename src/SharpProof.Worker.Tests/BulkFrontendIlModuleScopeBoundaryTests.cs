@@ -184,7 +184,7 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             Assert.That(identityBytes, Is.LessThanOrEqualTo(4096));
             TestContext.WriteLine($"moduleScopeLength={moduleScopeLength}; actualScopeLength={savedScopeName.Length}; calleeIdentityBytes={identityBytes}");
             var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken,
                 enableMetadataRequires: true);
             if (moduleScopeLength == 4097)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.Loader;
@@ -65,7 +66,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
             Assert.That(inventory.Owners.Select(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.DiscoveryComplete)), Is.All.True);
         }
         var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
-            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken),
+            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(),
             null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {

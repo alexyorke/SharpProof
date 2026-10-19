@@ -98,41 +98,47 @@ function New-SharpProofWeightedBuckets {
         [Parameter(Mandatory = $true)][int]$BucketCount
     )
 
-    $buckets = @(
-        for ($index = 0; $index -lt $BucketCount; $index++) {
-            [pscustomobject]@{
-                Index                 = $index
-                Methods               = [Collections.Generic.List[string]]::new()
-                EstimatedMilliseconds = 0L
-            }
-        })
-    $orderedMethods = @($Methods | Sort-Object `
-        @{ Expression     = {
-                if ($HistoricalMilliseconds.ContainsKey($_)) {
-                    [long]$HistoricalMilliseconds[$_]
-                }
-                else {
-                    $DefaultMilliseconds
-                }
-            }; Descending = $true
-        }, `
-        @{ Expression = { $_ }; Descending = $false })
+    $bucketBuilders = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $estimatedMilliseconds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[int, long]()
+    for ($index = 0; $index -lt $BucketCount; $index++) {
+        $bucketBuilders.Add(([ordered]@{
+                    Index   = $index
+                    Methods = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+                }).AsReadOnly())
+        $estimatedMilliseconds.Add($index, 0L)
+    }
+    $orderedMethods = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
+            $Methods | Sort-Object -Property @(
+                @{ Expression     = {
+                        if ($HistoricalMilliseconds.ContainsKey($_)) {
+                            [long]$HistoricalMilliseconds[$_]
+                        }
+                        else { $DefaultMilliseconds }
+                    }; Descending = $true
+                },
+                @{ Expression = { $_ }; Descending = $false })))
     foreach ($method in $orderedMethods) {
-        $bucket = $buckets | Sort-Object `
-            EstimatedMilliseconds, `
-        @{ Expression = { $_.Methods.Count } }, `
-            Index | Select-Object -First 1
+        $bucket = $bucketBuilders | Sort-Object -Property @(
+            @{ Expression = { $estimatedMilliseconds[$_.Index] } },
+            @{ Expression = { $_.Methods.Count } },
+            @{ Expression = { $_.Index } }) | Select-Object -First 1
         $bucket.Methods.Add($method)
-        $bucket.EstimatedMilliseconds +=
+        $estimatedMilliseconds[$bucket.Index] +=
         $(if ($HistoricalMilliseconds.ContainsKey($method)) {
                 [long]$HistoricalMilliseconds[$method]
             }
-            else {
-                $DefaultMilliseconds
-            })
+            else { $DefaultMilliseconds })
     }
 
-    return $buckets
+    $buckets = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($bucket in $bucketBuilders) {
+        $buckets.Add(([ordered]@{
+                    Index                 = $bucket.Index
+                    Methods               = $bucket.Methods.ToImmutable()
+                    EstimatedMilliseconds = $estimatedMilliseconds[$bucket.Index]
+                }).AsReadOnly())
+    }
+    return $buckets.ToImmutable()
 }
 
 function Get-SharpProofBucketMaximum {

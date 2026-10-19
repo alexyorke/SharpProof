@@ -13,6 +13,30 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void PortableArrayConverterRejectsNonArrayTokens()
+    {
+        Assert.Throws<JsonException>((Action)(() =>
+            JsonSerializer.Deserialize<PortableIrMember>(
+                "{\"parameterTypes\":1}", WorkerProtocolJson.Options)));
+    }
+
+    [Test]
+    public void PortableArrayConverterRejectsIncompleteReader()
+    {
+        var options = WorkerProtocolJson.Options;
+        var converter =
+            (System.Text.Json.Serialization.JsonConverter<ImmutableArray<int>>)
+            new PortableIrArrayJsonConverter().CreateConverter(
+                typeof(ImmutableArray<int>), options);
+        Assert.Throws<JsonException>((Action)(() =>
+        {
+            var reader = new Utf8JsonReader("[1"u8, isFinalBlock: false, state: default);
+            Assert.That(reader.Read(), Is.True);
+            _ = converter.Read(ref reader, typeof(ImmutableArray<int>), options);
+        }));
+    }
+
+    [Test]
     public void WireArraysPreserveOmittedEmptyAndExplicitNull()
     {
         var omitted = JsonSerializer.Deserialize<PortableIrMember>("{}", WorkerProtocolJson.Options)!;

@@ -126,14 +126,14 @@ public sealed class ClaimManifestBuilderTests
         var trees = CompilerCompilationCapture.CaptureTrees(first, TestContext.CurrentContext.CancellationToken);
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(second, WorkerFeatureSet.All,
-            trees, null, authority, TestContext.CurrentContext.CancellationToken);
+            trees.ToImmutableArray(), null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() =>
             CompilerTotalCallableLowerer.PrepareShadowCallers(first, WorkerFeatureSet.All,
-                trees, null, authority, cancellation.Token)));
+                trees.ToImmutableArray(), null, authority, cancellation.Token)));
     }
 
     [Test]
@@ -185,7 +185,7 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.Effects,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason)), Has.Some.EqualTo("UnsupportedOwnContracts"));
@@ -211,7 +211,7 @@ public sealed class ClaimManifestBuilderTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
     }
 

@@ -3,6 +3,9 @@ namespace SharpProof.CompilerArtifact;
 // Projects eligible compiler effect evidence atomically against a runtime assembly.
 internal static class CompilerExceptionConstraintEvidence
 {
+    private static readonly ImmutableArray<IrExceptionKind> ExceptionKinds =
+        Enum.GetValues(typeof(IrExceptionKind)).Cast<IrExceptionKind>().ToImmutableArray();
+
     internal static ImmutableArray<CompilerTotalExceptionConstraint> Project(
         IAssemblySymbol core, IEnumerable<CompilerEffectClaimArtifact> claims)
     {
@@ -14,7 +17,7 @@ internal static class CompilerExceptionConstraintEvidence
                 evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
                 (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
             var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
-            foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
+            foreach (var kind in ExceptionKinds)
             {
                 var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
                 if (runtime == null)

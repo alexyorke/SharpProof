@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -79,7 +80,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         if (innerHasClaim)
         {
