@@ -128,6 +128,10 @@ internal static class DotnetApiInventory
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
             evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");
+            evidence.Add("intrinsic=constructor-origin-dictionary-state");
+            if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)" or
+                "P:System.Collections.Generic.Dictionary`2.Item(`0)")
+            { evidence.Add("intrinsic=opaque-dictionary-value-storage"); }
             if (symbol.OriginalDefinition.GetDocumentationCommentId() is "M:System.Collections.Generic.Dictionary`2.#ctor" or "P:System.Collections.Generic.Dictionary`2.Count")
             { evidence.Add("intrinsic=fresh-default-dictionary-construction-state"); }
         }

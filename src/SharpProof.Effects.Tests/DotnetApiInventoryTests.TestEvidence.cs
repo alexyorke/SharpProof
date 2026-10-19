@@ -31,18 +31,28 @@ public sealed partial class DotnetApiInventoryTests
             if (row.Evidence.Contains("intrinsic=fresh-default-integer-key-dictionary-state", StringComparison.Ordinal))
             {
                 var genericKeys = row.Evidence.Contains("intrinsic=fresh-default-dictionary-construction-state", StringComparison.Ordinal);
+                var constructorOrigin = row.Evidence.Contains("intrinsic=constructor-origin-dictionary-state", StringComparison.Ordinal);
+                var opaqueStorage = row.Evidence.Contains("intrinsic=opaque-dictionary-value-storage", StringComparison.Ordinal);
                 var opaqueState = row.Id is "M:System.Collections.Generic.Dictionary`2.#ctor" or
                     "M:System.Collections.Generic.Dictionary`2.ContainsKey(`0)" or "P:System.Collections.Generic.Dictionary`2.Count";
                 var scope = "compiled Int32-key dictionary state with scalar/reference values, aliases, identity/null, Count and membership; nine integer key boundaries and CLR/IR replay checked by DictionaryStateOracleTests" +
                     (opaqueState ? "; empty generic-value construction/Count/membership versus decimal runtime without value interpretation" : "") +
-                    (genericKeys ? "; generic-key constructor/Count normal state versus string runtime, with initialization effects retained" : "");
+                    (genericKeys ? "; generic-key constructor/Count normal state versus string runtime, with initialization effects retained" : "") +
+                    (constructorOrigin ? "; immutable generic source-helper Add/get/set/ContainsKey/Count share constructor-origin storage versus runtime; default-comparer heap guard retained after publication" : "") +
+                    (opaqueStorage ? "; generic opaque Add/get/set copy distinct atoms and decimal CLR bits through direct and source-helper storage" : "");
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, scope,
                     () => CheckDictionaryStateIntrinsic(compilation, false) && CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true) &&
                         (!opaqueState || CheckDictionaryStateIntrinsic(compilation, false, opaqueValues: true)) &&
-                        (!genericKeys || CheckDictionaryStateIntrinsic(compilation, false, genericKeys: true)),
+                        (!genericKeys || CheckDictionaryStateIntrinsic(compilation, false, genericKeys: true)) &&
+                        (!constructorOrigin || CheckDictionaryStateIntrinsic(compilation, false, sourceParameters: true) &&
+                            CheckDictionaryStateIntrinsic(compilation, false, referenceValues: true, sourceParameters: true)) &&
+                        (!opaqueStorage || CheckOpaqueDictionaryStorageIntrinsic(compilation, false) && CheckOpaqueDictionaryStorageIntrinsic(compilation, false, direct: true)),
                     () => CheckDictionaryStateIntrinsic(compilation, true) || CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true) ||
                         opaqueState && CheckDictionaryStateIntrinsic(compilation, true, opaqueValues: true) ||
-                        genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true));
+                        genericKeys && CheckDictionaryStateIntrinsic(compilation, true, genericKeys: true) ||
+                        constructorOrigin && (CheckDictionaryStateIntrinsic(compilation, true, sourceParameters: true) ||
+                            CheckDictionaryStateIntrinsic(compilation, true, referenceValues: true, sourceParameters: true)) ||
+                        opaqueStorage && (CheckOpaqueDictionaryStorageIntrinsic(compilation, true) || CheckOpaqueDictionaryStorageIntrinsic(compilation, true, direct: true)));
             }
 
             if (row.Evidence.Contains("intrinsic=concrete-stack-state", StringComparison.Ordinal))

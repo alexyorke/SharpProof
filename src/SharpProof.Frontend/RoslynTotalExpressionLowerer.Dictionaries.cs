@@ -2,21 +2,64 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
-    private readonly Dictionary<(IrTypeId Owner, string Name, IrTypeId Value, IrTypeId? Key), IrMemberId> _dictionaryFields = [];
+    private readonly Dictionary<(string Name, IrTypeId Value, IrTypeId? Key), IrMemberId> _dictionaryFields = [];
 
-    private IrMemberId DictionaryField(INamedTypeSymbol type, string name, IrTypeId value, IrTypeId? key = null)
+    private IrMemberId DictionaryField(string name, IrTypeId value, IrTypeId? key = null)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
-        var storage = (_context.Type(type), name, value, key);
+        var storage = (name, value, key);
         if (_dictionaryFields.TryGetValue(storage, out var field))
         { return field; }
-        field = _factory.GetOrCreateMember(_factory.InternExternalIdentity(storage,
-            EqualityComparer<(IrTypeId Owner, string Name, IrTypeId Value, IrTypeId? Key)>.Default), _factory.ObjectType,
+        field = _factory.GetOrCreateMember(_factory.InternExternalIdentity(("dictionary", name, value, key),
+            EqualityComparer<(string, string, IrTypeId, IrTypeId?)>.Default), _factory.ObjectType,
             IrFieldSites.Prefix + "dictionary:" + name, value, false, key is { } index ? [index] : []);
         _dictionaryFields.Add(storage, field);
         return field;
+    }
+
+    private GuardedExpression? DictionaryClause(IOperation operation, TotalParameterState state, int depth)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        var invocation = operation as IInvocationOperation;
+        var property = operation as IPropertyReferenceOperation;
+        var method = invocation?.TargetMethod ?? property?.Property.GetMethod;
+        var instance = invocation?.Instance ?? property?.Instance;
+        if (method == null || instance == null)
+        { return null; }
+        var keyType = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(0));
+        var valueType = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(1));
+        if (!CSharpOperationSemantics.IsDefaultDictionaryStateMember(method, keyType, valueType) ||
+            !_context.IsDefaultDictionaryOrigin(instance))
+        { return null; }
+        var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
+        if (name is not ("Count" or "Item" or "ContainsKey"))
+        { return null; }
+        var receiver = LowerClause(instance, state, depth + 1);
+        if (!receiver.Classification.IsExact)
+        { return Failed(operation, receiver.Classification.Abstention); }
+        var owner = AsObject(receiver.Value);
+        var safe = And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type))));
+        if (name == "Count")
+        {
+            return new(_factory.Binary(IrBinaryOperator.BitwiseAnd,
+                _factory.PureOpaque(DictionaryField("count", _factory.IntegerType), owner), _factory.Integer(int.MaxValue)),
+                safe, FrontendSubsetClassification.Exact);
+        }
+        var argument = (invocation?.Arguments ?? property!.Arguments)[0];
+        var key = LowerClause(argument.Value, state, depth + 1);
+        if (!key.Classification.IsExact)
+        { return Failed(operation, key.Classification.Abstention); }
+        // This is a modeling guard, not an imported assumption. Source call
+        // preconditions record it as an obligation and still execute the body.
+        // Unknown writers can invalidate the comparer even for a known origin.
+        safe = And(safe, And(key.SafeCondition,
+            _factory.PureOpaque(DictionaryField("default-comparer", _factory.BooleanType), owner)));
+        var present = _factory.PureOpaque(DictionaryField("present", _factory.BooleanType, key.Value.Type), owner, key.Value);
+        return name == "ContainsKey"
+            ? new(present, safe, FrontendSubsetClassification.Exact)
+            : new(_factory.PureOpaque(DictionaryField("value", _context.Type(method.ReturnType), key.Value.Type), owner, key.Value),
+                And(safe, present), FrontendSubsetClassification.Exact);
     }
 
     private IrBlockId DictionaryInitialization(IOperation operation, IMethodSymbol method, IrTerm[] values, IrBlockId block)
@@ -26,7 +69,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var source = _factory.GetOperationInfo(_context.Site(operation)).SourceSpan;
-        var site = _factory.CreateOperation(IrOpaqueCallSite.DictionaryInitialization(method.ContainingType.TypeArguments[0].SpecialType.ToString()), source);
+        var keyType = _context.KnownValueType(method.ContainingType.TypeArguments[0]) ?? method.ContainingType.TypeArguments[0];
+        var site = _factory.CreateOperation(IrOpaqueCallSite.DictionaryInitialization(keyType.SpecialType.ToString()), source);
         var initialize = _context.Temporary(_factory.BooleanType);
         _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, initialize);
         var effects = _builder.CreateBlock("dictionary:framework-initialization");
@@ -57,14 +101,18 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation))
         {
             var constructor = ((IObjectCreationOperation)operation).Constructor!;
-            if (!CSharpOperationSemantics.IsComparisonIntegerType(constructor.ContainingType.TypeArguments[0]))
+            var constructorKey = _context.KnownValueType(constructor.ContainingType.TypeArguments[0]) ?? constructor.ContainingType.TypeArguments[0];
+            if (!CSharpOperationSemantics.IsComparisonIntegerType(constructorKey))
             {
                 // Default-comparer initialization may allocate, fault or affect
                 // arbitrary existing state. It cannot reach the unpublished result.
                 // Establish fresh logical state only after its normal continuation.
                 block = EmitOpaqueCall(operation, constructor, [], block, null, IrOpaqueCallEffects.All).Continuation;
             }
-            return AllocateValue(operation, block);
+            var allocated = AllocateValue(operation, block);
+            _builder!.FieldStore(allocated.Continuation, _context.Site(operation), IrWriteRegion.Field, AsObject(allocated.Value),
+                DictionaryField("default-comparer", _factory.BooleanType), _factory.Boolean(true));
+            return allocated;
         }
         var assigned = (operation as ISimpleAssignmentOperation)?.Value;
         var access = operation is ISimpleAssignmentOperation assignment ? assignment.Target : operation;
@@ -72,14 +120,19 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var property = access as IPropertyReferenceOperation;
         var method = invocation?.TargetMethod ?? (assigned == null ? property?.Property.GetMethod : property?.Property.SetMethod);
         var instance = invocation?.Instance ?? property?.Instance;
-        if (method == null || instance == null || !CSharpOperationSemantics.IsDefaultDictionaryStateMember(method) ||
-            !_context.IsDefaultDictionary(instance))
+        if (method == null || instance == null)
+        { return null; }
+        var knownKey = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(0));
+        var knownValue = _context.KnownValueType(method.ContainingType.TypeArguments.ElementAtOrDefault(1));
+        if (!CSharpOperationSemantics.IsDefaultDictionaryStateMember(method, knownKey, knownValue) ||
+            !_context.IsDefaultDictionaryOrigin(instance))
         { return null; }
         var name = method.AssociatedSymbol is IPropertySymbol { IsIndexer: true } ? "Item" : method.AssociatedSymbol?.Name ?? method.Name;
         var arguments = invocation?.Arguments ?? property!.Arguments;
         var receiver = LowerBodyValue(instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
         { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
+        receiver = Pin(operation, receiver);
         block = receiver.Continuation;
         var values = new IrTerm[arguments.Length + (assigned == null ? 0 : 1)];
         foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
@@ -87,6 +140,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
+            value = Pin(operation, value);
             values[argument.Parameter!.Ordinal] = value.Value;
             block = value.Continuation;
         }
@@ -95,26 +149,58 @@ internal sealed partial class RoslynTotalExpressionLowerer
             var value = LowerBodyValue(assigned, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
+            value = Pin(operation, value);
             values[values.Length - 1] = value.Value;
             block = value.Continuation;
         }
         block = CheckReceiver(operation, receiver.Value, block);
         var owner = AsObject(receiver.Value);
-        var type = method.ContainingType;
-        var count = DictionaryField(type, "count", _factory.IntegerType);
+        var count = DictionaryField("count", _factory.IntegerType);
         if (name == "Count")
         { return new(_factory.Binary(IrBinaryOperator.BitwiseAnd, _factory.PureOpaque(count, owner), _factory.Integer(int.MaxValue)), block, FrontendSubsetClassification.Exact); }
+        if (_context.IsDefaultDictionary(instance))
+        { return DefaultDictionaryState(operation, method, owner, values, name, assigned != null, block); }
+
+        // Constructor lineage survives publication, but its comparer does not.
+        // An opaque writer invalidates this heap fact along with the contents.
+        var site = _context.Site(operation);
+        var primitive = _builder!.CreateBlock("dictionary:default-comparer");
+        var custom = _builder.CreateBlock("dictionary:unknown-comparer");
+        var done = _builder.CreateBlock("dictionary:comparer-joined");
+        _builder.Branch(block, site, _factory.PureOpaque(DictionaryField("default-comparer", _factory.BooleanType), owner), primitive, custom);
+        var modeled = DefaultDictionaryState(operation, method, owner, values, name, assigned != null, primitive);
+        var opaque = EmitOpaqueCall(operation, method, [owner, .. values], custom, null, IrOpaqueCallEffects.All);
+        var result = _context.Temporary(modeled.Value.Type);
+        _builder.Assign(modeled.Continuation, site, result, modeled.Value);
+        _builder.Goto(modeled.Continuation, site, done);
+        _builder.Assign(opaque.Continuation, site, result,
+            assigned != null ? values[values.Length - 1] : method.ReturnsVoid ? _factory.Boolean(false) : opaque.Value);
+        _builder.Goto(opaque.Continuation, site, done);
+        return new(_factory.Variable(result), done, FrontendSubsetClassification.Exact);
+    }
+
+    private TotalBodyValue DefaultDictionaryState(IOperation operation, IMethodSymbol method, IrTerm owner, IrTerm[] values,
+        string name, bool assigned, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var type = method.ContainingType;
+        var count = DictionaryField("count", _factory.IntegerType);
         var keyType = _context.Type(type.TypeArguments[0]);
         var valueType = _context.Type(type.TypeArguments[1]);
-        var membership = DictionaryField(type, "present", _factory.BooleanType, keyType);
-        var contents = DictionaryField(type, "value", valueType, keyType);
+        var membership = DictionaryField("present", _factory.BooleanType, keyType);
+        var contents = DictionaryField("value", valueType, keyType);
         block = DictionaryInitialization(operation, method, values, block);
         var key = values[0];
         var present = _factory.PureOpaque(membership, owner, key);
         if (name == "ContainsKey")
         { return new(present, block, FrontendSubsetClassification.Exact); }
         var site = _context.Site(operation);
-        if (name == "Item" && assigned == null)
+        if (name == "Item" && !assigned)
         {
             var found = _builder!.CreateBlock("dictionary:found");
             var missing = _builder.CreateBlock("dictionary:missing");
@@ -154,6 +240,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
         _builder.FieldStore(insert, site, IrWriteRegion.Field, owner, contents, valueToStore, key);
         _builder.FieldStore(insert, site, IrWriteRegion.Field, owner, membership, _factory.Boolean(true), key);
         _builder.Goto(insert, site, continuation);
-        return new(assigned == null ? _factory.Boolean(false) : valueToStore, continuation, FrontendSubsetClassification.Exact);
+        return new(!assigned ? _factory.Boolean(false) : valueToStore, continuation, FrontendSubsetClassification.Exact);
     }
 }
