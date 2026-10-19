@@ -2874,3 +2874,12 @@ the same instance's digest and synchronization preparation aliases the sealed cl
 Changing it to init/with would alter the subject under test. Reviewed stale owned
 builder inventory rows and native PE/hash/params adapters can be classified separately.
 Status: open before edits.
+
+IMM-M082: Specs instantiation already snapshots public substitution inputs, and template
+slot/validated-term maps are immutable. Narrow only the private Instantiation constructor
+and three retained fields; give the existing captured substitutions a typed local name.
+Narrow validator variables through Validate, ValidateAndCompile and ValidationContext;
+all callers supply the same immutable bySlot map. Preserve guard/evaluation order and
+DeclarationReferenceComparer, validation builders and final table publication. Public
+input API and failure contracts remain unchanged. Validate the ordinary Specs project.
+Status: open before edits.
