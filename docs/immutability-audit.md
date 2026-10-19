@@ -2393,3 +2393,28 @@ precedence, exact IrValue/object references and ConsumedApproximation timing. In
 mutable execution flags remain live evaluation outcome state. Review consumers for
 ordering/concrete Dictionary assumptions and validate heap/array/keyed/snapshot tests.
 Status: open before edits.
+
+M049-M057 validation checkpoint: M049 passed 219 frontend tests; M050 passed 12 native
+call-trace tests; M051 passed all four real governance controls including RS0016/RS0041
+negative controls and restored baseline. Two bypass-entrypoint attempts failed Git safe-
+directory setup; the canonical host wrapper dev entrypoint supplied correct metadata
+configuration and the actual control rerun passed. M052 passed 156 Worker cache/launcher
+and 76 package launcher/SARIF tests. M053-M055 targeted artifact/replay cohort passed
+344 tests. M056 passed 13 real metadata/total differential and emission lifecycle tests.
+M057 passed all 485 IR tests. The M054 Release semantic source snapshot (before M055-M057)
+passed 11,734 tests with zero failures/skips and zero build warnings/errors in six
+scheduler tasks. Source/script format checks pass (87 PowerShell, 19 shell scripts).
+All implementation diffs received separate read-only semantic review and coordinator
+verification. Later M055-M057 changes remain covered by targeted cohorts rather than
+being misrepresented as part of that earlier full semantic snapshot.
+
+IMM-M058: Read-only exhaustive Frontend.Tests review identified 159 live ToArray calls:
+142 ordinary/eager read-only snapshots and 17 required native/alias subjects. Coordinator
+verified the exclusion locations against regenerated source, correcting two shifted
+FrontendLoweringTests IDs. Use Roslyn syntax spans to replace only selected invocation
+names with ToImmutableArray, preserving embedded source text, eager ordering and exact
+IrValue/IOperation/runtime element references. Add immutable imports only where absent.
+Preserve rank buffers, Roslyn Construct arguments, PE/file/Assembly byte arrays, params
+interpreter arguments and the two distinct-copy alias witnesses. Compile the complete
+frontend project and run its ordinary suite; fix internal readonly helper type assumptions
+where necessary without changing native argument contracts. Status: open before edits.
