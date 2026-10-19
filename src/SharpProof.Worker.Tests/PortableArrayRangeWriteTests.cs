@@ -30,8 +30,8 @@ public sealed class PortableArrayRangeWriteTests
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(range ? 0 : 7));
         Assert.That(result.ConsumedApproximation, Is.False);
-        row.Items = [];
-        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        var malformedGraph = encoded.Graph.ReplaceRow(row, row with { Items = [] });
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(malformedGraph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(0)]
@@ -52,12 +52,13 @@ public sealed class PortableArrayRangeWriteTests
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
         var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [factory.Boolean(true), factory.Integer(factory.GetOrCreateIntegerType(64, true), 0)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var row = encoded.Graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).Single(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Kind == IrInstructionKind.Write);
-        if (corruption == 3)
-        { row.A = (int)IrWriteRegion.Field; }
-        else if (corruption == 4)
-        { row.C = encoded.Graph.Roots[1]; }
-        else
-        { row.Items = corruption == 2 ? [row.Items[0], row.Items[1], row.Items[1]] : [row.Items[0], encoded.Graph.Roots[corruption]]; }
-        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        var malformedRow = corruption switch
+        {
+            3 => row with { A = (int)IrWriteRegion.Field },
+            4 => row with { C = encoded.Graph.Roots[1] },
+            _ => row with { Items = corruption == 2 ? [row.Items[0], row.Items[1], row.Items[1]] : [row.Items[0], encoded.Graph.Roots[corruption]] }
+        };
+        var malformedGraph = encoded.Graph.ReplaceRow(row, malformedRow);
+        Assert.Throws<InvalidDataException>((Action)(() => PortableIrGraphCodec.Decode(malformedGraph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 }
