@@ -3631,3 +3631,18 @@ vectors and two private CounterSystem tuple results become immutable. Preserve
 intentional wrong-arity input, clause order, default key equality and mutable native
 solver ownership. Validate the affected Horn fixtures in the canonical container.
 Status: planned before edits.
+
+IMM-M135 verified: all 18 affected Horn tests pass in Release/net10.0, zero
+failures/skips/build warnings/errors; 19 exact embedded PDB outputs. Canonical
+whitespace requires zero changes. Main and independent review confirm all 31 rows,
+private tuple coupling, indexer semantics, wrong arity and clause order preserved.
+Inventory refresh: 1,878 C# units / 2,381 candidates / 1,394 Open, and 84 PowerShell
+units / 1,097 candidates / 701 Open, zero parse failures. New pending source owners
+were excluded from automatic verified-builder classification; candidates are not
+all violations. Current verified implementation through M134 is pushed to draft #323.
+IMM-M136: Convert twelve production Fuzz replay snapshot/map/requirements rows in
+MetadataProgramSourceReplay and TotalProgramSourceReplay. Use strict duplicate
+capture, preserve parameter order explicitly for requirements, freeze ordered clause
+builders after alias relations are appended, and preserve inner reflection arrays
+and mutable reference-identity alias state. Validate all ordinary Fuzz tests.
+Status: planned before edits.

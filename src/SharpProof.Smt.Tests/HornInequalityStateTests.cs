@@ -23,8 +23,10 @@ public sealed class HornInequalityStateTests
         var next = factory.Binary(IrBinaryOperator.Subtract, current, factory.Integer(type, 1));
         var safety = factory.Binary(IrBinaryOperator.NotEqual, current, factory.Integer(type, -1));
         var compoundBody = factory.Binary(IrBinaryOperator.AndAlso, atom, safety);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [initial], atom),
             Query(factory, [compoundBody, guard], factory.PureOpaque(relation, null, next)),

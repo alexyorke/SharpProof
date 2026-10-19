@@ -22,8 +22,10 @@ public sealed class HornUnboundedAffineStateTests
         var atom = factory.PureOpaque(relation, null, x, y);
         var nextX = factory.Binary(IrBinaryOperator.Add, x, factory.Integer(1));
         var nextY = factory.Binary(IrBinaryOperator.Add, y, factor);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [x, y] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [x, y];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [affine], atom),
             Query(factory, [atom], factory.PureOpaque(relation, null, nextX, nextY)),

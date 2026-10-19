@@ -24,8 +24,10 @@ public sealed class HornAffineStateTests
         var nextY = factory.Binary(IrBinaryOperator.Add, y, factory.Integer(2));
         var safety = factory.Binary(IrBinaryOperator.Equal, y,
             factory.Binary(IrBinaryOperator.Multiply, x, factory.Integer(2)));
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [x, y] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [x, y];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [initialX, initialY], atom),
             Query(factory, [atom, guard], factory.PureOpaque(relation, null, nextX, nextY)),

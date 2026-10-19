@@ -22,8 +22,10 @@ public sealed class HornBooleanDataflowTests
         var next = factory.Binary(IrBinaryOperator.Add, current, factory.Integer(1));
         var one = factory.Binary(IrBinaryOperator.Equal, current, factory.Integer(1));
         var safety = factory.Binary(IrBinaryOperator.Equal, done, one);
-        var states = new Dictionary<IrMemberId, ImmutableArray<IrTerm>> { [relation] = [done, current] };
-        VerificationQuery[] clauses =
+        var statesBuilder = ImmutableDictionary.CreateBuilder<IrMemberId, ImmutableArray<IrTerm>>();
+        statesBuilder[relation] = [done, current];
+        var states = statesBuilder.ToImmutable();
+        ImmutableArray<VerificationQuery> clauses =
         [
             Query(factory, [notDone, zero], atom),
             Query(factory, [atom, notDone], factory.PureOpaque(relation, null, factory.Boolean(true), next)),
