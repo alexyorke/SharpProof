@@ -2883,3 +2883,19 @@ all callers supply the same immutable bySlot map. Preserve guard/evaluation orde
 DeclarationReferenceComparer, validation builders and final table publication. Public
 input API and failure contracts remain unchanged. Validate the ordinary Specs project.
 Status: open before edits.
+
+Coordinator checked 105 stale Open production rows against current source and the
+read-only builder/ownership traces: owned immutable builders remain within lowering,
+validation, traversal or capture owners; publication uses frozen collections. These
+rows are classified as verified, not counted as additional source conversions.
+
+IMM-M083: Worker.Tests Q-Z read-only audit covers 160 materializations: seven existing
+builders, 110 read-only ToArray projections, fourteen strict map captures, four set
+captures and 25 native/test-mutation boundaries. This batch selects only the 110
+read-only array projections. Preserve enumeration/reference order and narrow coupled
+helper signatures where needed; directly reuse already immutable roots. Keep native
+PE/metadata/char/reflection/params buffers and Array.Reverse mutation fixtures.
+TestProject source paths become immutable through its private constructor, with the
+existing initialized-input guard retained. Main reviews exact invocation excerpts before
+writes and validates the ordinary Worker project. Other maps/builders remain in scope.
+Status: open before edits.
