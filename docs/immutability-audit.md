@@ -2899,3 +2899,10 @@ TestProject source paths become immutable through its private constructor, with 
 existing initialized-input guard retained. Main reviews exact invocation excerpts before
 writes and validates the ordinary Worker project. Other maps/builders remain in scope.
 Status: open before edits.
+
+M083 coordinator correction before edits: RES-F7DEB076725D3937 is MemoryStream.ToArray
+feeding File.WriteAllBytesAsync, not an enumerable projection. Preserve this native PE
+buffer; select 109 rows. IndependentPath uses an immutable path plus LIFO immutable
+stack; compiled outputs retain their already immutable publication type. TestProject
+requires an immutable overload alongside its native params adapter. Reuse proof/core
+roots that are already immutable rather than copying them again.
