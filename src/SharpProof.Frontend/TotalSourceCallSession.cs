@@ -301,7 +301,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
         {
-            frame.SpecializeSourceReferenceType(owner.OriginalDefinition, owner);
+            frame.SpecializeSourceReferenceType(owner.OriginalDefinition, caller.SpecializeSourceType(owner)!);
             if (!Spend(owner.TypeArguments.Length + 1))
             { frame = null; return false; }
             for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
@@ -336,7 +336,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
             if (parameter.Type.IsReferenceType && argument.Parameter.Type.IsReferenceType)
-            { frame.SpecializeSourceReferenceType(parameter.Type, argument.Parameter.Type); }
+            { frame.SpecializeSourceReferenceType(parameter.Type, caller.SpecializeSourceType(argument.Parameter.Type)!); }
             if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
             { frame.SpecializeNullableDefaultComparerParameter(parameter); }
             if (parameter.Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) is { } scalar)
@@ -375,6 +375,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeDictionaryOriginParameter(parameter); }
             }
         }
+        frame.RefreshSourceBindingTypes();
         if (instance != null)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))
