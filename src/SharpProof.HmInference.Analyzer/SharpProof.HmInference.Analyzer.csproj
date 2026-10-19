@@ -13,6 +13,7 @@
     <Compile Include="../SharpProof.HmInference/AsyncBuilders.cs" Link="AsyncBuilders.cs" />
     <Compile Include="../SharpProof.HmInference/NamedTypeShapes.cs" Link="NamedTypeShapes.cs" />
     <Compile Include="../SharpProof.HmInference/UnsafeInference.cs" Link="UnsafeInference.cs" />
+    <Compile Include="../SharpProof.HmInference/Pinning.cs" Link="Pinning.cs" />
     <Compile Include="../SharpProof.HmInference/Resources.cs" Link="Resources.cs" />
     <Compile Include="../SharpProof.HmInference/Interpolation.cs" Link="Interpolation.cs" />
     <Compile Include="../SharpProof.HmInference/UserOperators.cs" Link="UserOperators.cs" />

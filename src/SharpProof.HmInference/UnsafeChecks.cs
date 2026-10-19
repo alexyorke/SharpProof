@@ -101,6 +101,7 @@ internal static class UnsafeChecks
             { throw new InvalidOperationException("An uninferrable method-address caller must reject the candidate: " + result); }
         }
         Program.Log.Info("PASS FunctionPointerBareAddressCallersRequireInferableTypeArguments");
-        return tests.Length + uninferrableCallers.Length + await UnsafeRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        return tests.Length + uninferrableCallers.Length + await UnsafeRuntimeChecks.Run(cancellationToken).ConfigureAwait(false)
+            + await PinningChecks.Run(cancellationToken).ConfigureAwait(false);
     }
 }

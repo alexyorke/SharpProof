@@ -307,6 +307,8 @@ public static partial class Inference
                 var afterModel = changedCompilation.GetSemanticModel(afterTree);
                 var beforeRoot = sourceTree.GetRoot(cancellationToken);
                 var afterRoot = afterTree.GetRoot(cancellationToken);
+                if (!PreservesPinningBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes the selected pinning pattern."); }
                 if (!PreservesForEachBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol or implicit await."); }
                 if (!PreservesCollectionBindings(beforeRoot, afterRoot, beforeModel, afterModel))
@@ -423,6 +425,9 @@ public static partial class Inference
             }
 
             var builderEmission = needsBuilderEmission || IsUsedBuilderMember(symbol);
+            if (!builderEmission && (requiresPinningEmission || method.DescendantNodes().OfType<FixedStatementSyntax>().Any())
+                && ValidateProtocolEmission(changedModel, "pinning") is string pinningFailure)
+            { return new(symbol.Name, "Rejected", pinningFailure); }
             if (builderEmission && ValidateBuilderEmission(method, changedMethod, changedModel) is string builderFailure)
             { return new(symbol.Name, "Rejected", builderFailure); }
             if (!builderEmission && (requiresInterpolationEmission || method.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>().Any(interpolation =>
@@ -563,7 +568,7 @@ public static partial class Inference
                         flow = Branch(unsafeBlock.Block);
                         break;
                     case FixedStatementSyntax pinned:
-                        flow = Scoped(() => { Declare(pinned.Declaration); return Branch(pinned.Statement); });
+                        flow = Scoped(() => { DeclarePinned(pinned.Declaration); return Branch(pinned.Statement); });
                         break;
                     case LockStatementSyntax locked:
                         // Retain Monitor versus System.Threading.Lock lowering and receiver conversions.

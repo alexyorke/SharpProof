@@ -416,12 +416,12 @@ the generated signature.
 Data pointer shapes support dereference, indexing/stores, address-taking, updates,
 arithmetic, nested pointers and pointer arrays. Generic pointer elements acquire
 required unmanaged constraints, including constraints on actual struct storage.
-Unused generic struct arguments remain free. Explicit pointer locals and fixed
-initializers retain their storage types. Stack allocation infers implicit elements
+Unused generic struct arguments remain free. Explicit pointer locals retain their
+storage types. Stack allocation infers implicit elements
 and preserves explicit element types and conversions; pointer and span targets are
 supported. Applied IDE-fix runtime checks cover aliases, stores, element stride,
-byte/struct payloads and stack allocation. Full pinning-pattern
-validation remains open. Project mode uses the project's unsafe setting; loose files
+byte/struct payloads and stack allocation. Project mode uses the project's unsafe
+setting; loose files
 require `--unsafe`.
 
 Function pointer signatures retain managed/unmanaged calling conventions, explicit
@@ -435,3 +435,13 @@ and long payloads. Explicit local storage and conversion endpoints stay fixed.
 Candidates are rejected when a supplied bare method-address call cannot infer the
 new C# type arguments. Typed callback variables provide their complete signatures
 for inference; this call-site distinction has regression coverage.
+Fixed declarations preserve their explicit pointer storage types while inferring
+array elements and instance, inherited, readonly and extension pinning patterns.
+Unrelated generic arguments remain free; void-pointer pinning imports unmanaged
+requirements for the actual element. Specialized extension bindings keep their
+concrete receiver domain. Selected pinning methods are rechecked across supplied
+files, reconstructing extension type arguments inferred from the receiver. Both
+fixed bodies and generalized implicit helpers undergo compiler emission checks.
+Fixed-size buffers have read/store coverage through ref parameters, pointers and
+managed owners. Applied IDE fixes verify storage and dispatch, null/empty sources,
+compacting GC pinning, unrelated managed tags and new unmanaged element domains.

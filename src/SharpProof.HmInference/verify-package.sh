@@ -125,7 +125,12 @@ root = true
 dotnet_diagnostic.HM0001.severity = warning
 EOF
 cat > "$consumer/Unsafe.cs" <<'EOF'
+public class PackagePin<TTag,TValue>{public TValue Value=default!;public ref TValue GetPinnableReference()=>ref Value;}
+public unsafe struct PackageBuffer<TTag>{public fixed int Values[4];public TTag Tag;}
 public unsafe static class PointerPackageProbe {
+    public static int PinPattern(PackagePin<int,int> value){fixed(int* pointer=value){return *pointer;}}
+    public static bool PinVoid(int[] values){fixed(void* pointer=values){return pointer==null;}}
+    public static int PinBuffer(ref PackageBuffer<int> value){fixed(int* pointer=value.Values){return pointer[0];}}
     public static int PointerRead(int* value)=>*value;
     public static int* PointerStore(int* destination,int value){*destination=value;return destination;}
     public static int PointerStack(int value){var buffer=stackalloc[]{value};return buffer[0];}
@@ -134,7 +139,7 @@ public unsafe static class PointerPackageProbe {
 }
 EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
-for expected in 'IndirectPointer<T1, T2>(delegate*<T1, T2> pointer, T1 value)' 'NativePointer<T1, T2>(delegate* unmanaged[Cdecl]<T1, T2> pointer, T1 value)'; do
+for expected in 'PinPattern<T1>(global::PackagePin<T1, int> value)' 'PinVoid<T1>(T1[] values) where T1 : unmanaged' 'PinBuffer<T1>(ref global::PackageBuffer<T1> value)' 'IndirectPointer<T1, T2>(delegate*<T1, T2> pointer, T1 value)' 'NativePointer<T1, T2>(delegate* unmanaged[Cdecl]<T1, T2> pointer, T1 value)'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
@@ -170,4 +175,4 @@ cp "$legacy/build.log" "$evidence/package-pattern-consumer.txt"
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' 'PASS NuGetExtensionAndImplicitAwaitEnumeration' 'PASS NuGetNestedAndRefLikeTypeShapes' 'PASS NuGetRefLikeTargetCompatibility' 'PASS NuGetCustomBuilderAwaiterConstraints' 'PASS NuGetLocalFunctionCaptureInference' 'PASS NuGetReferenceCallsAndDelegates' 'PASS NuGetExpressionTreeInference' 'PASS NuGetAnonymousAndWithValues' 'PASS NuGetCollectionExpressionsAndParams' 'PASS NuGetUserOperatorsNullableAndAsyncConversions' 'PASS NuGetFormattableStringsAndHandlers' 'PASS NuGetHandlerConstructorCollections' 'PASS NuGetHandlerAppendCollectionsAndConversions' 'PASS NuGetCollectionAddCallShapes' 'PASS NuGetNullableAndAsyncResourceInference' 'PASS NuGetContractlessAsyncDisposalPattern' 'PASS NuGetConsumerEditorWorkspaceValidation' 'PASS NuGetPointersAndStackAllocation' 'PASS NuGetFunctionPointerSignaturesAndCalls' 'PASS NuGetPinningPatternsAndFixedBuffers' | tee "$evidence/package-checks.txt"
