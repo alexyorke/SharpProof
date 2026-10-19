@@ -3,7 +3,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("var data = new System.Collections.Generic.HashSet<int>(); return data.Count;", 0)]
     [TestCase("var data = new System.Collections.Generic.HashSet<int>(1); var added = data.Add(17); var duplicate = data.Add(17); return added && !duplicate && data.Contains(17) && data.Count == 1 ? 1 : 0;", 1)]
