@@ -59,6 +59,9 @@ public sealed partial class DotnetApiInventoryTests
             {
                 ArgumentNullException.ThrowIfNull(request);
                 var description = factory.GetOperationInfo(request.Site).Description is { } id ? factory.GetString(id) : "";
+                if (type == "ulong" && number > long.MaxValue && request.Origin == IrHavocOrigin.Approximation &&
+                    factory.GetVariableInfo(request.Variable).Type == factory.BooleanType && description == "framework-integral-convert-overflow-ancillary")
+                { return factory.CreateBooleanValue(false); }
                 if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
                     description != "framework-integral-convert-ready:" + primitive)
                 { return null; }

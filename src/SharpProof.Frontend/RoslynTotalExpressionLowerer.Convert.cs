@@ -30,6 +30,33 @@ internal sealed partial class RoslynTotalExpressionLowerer
             [new(IrExceptionKind.Unknown, _factory.Variable(fails))], FrontendSubsetClassification.Exact), initialized).Continuation;
     }
 
+    private IrBlockId IntegralConvertOverflowEffects(IInvocationOperation invocation, IrTerm argument, IrTerm outside, IrBlockId block)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
+        outside = RepositoryParameterGuard.NotNull(outside, nameof(outside));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var site = _context.Site(invocation);
+        var invalid = _builder!.CreateBlock("convert:overflow-resource");
+        var continuation = _builder.CreateBlock("convert:within-int64");
+        _builder.Branch(block, site, outside, invalid, continuation);
+        // The managed overflow helper resolves resources through user culture
+        // code, which can mutate caller memory or throw before OverflowException.
+        var effects = IrOpaqueCallSite.WithCapabilities(IrOpaqueCallEffects.All | IrOpaqueCallEffects.ReadsAmbient, int.MaxValue);
+        var member = OpaqueCallMember(invocation.TargetMethod, [argument], _factory.BooleanType, out var display);
+        _builder.Call(invalid, _context.OpaqueCallSite(invocation, effects, display + ":overflow-resource"), null, member, null, [argument]);
+        var source = _factory.GetOperationInfo(site).SourceSpan;
+        var ancillary = _factory.CreateOperation("framework-integral-convert-overflow-ancillary", source);
+        var mayThrow = _context.Temporary(_factory.BooleanType);
+        _builder.Havoc(invalid, ancillary, IrHavocKind.Variables, IrHavocOrigin.Approximation, mayThrow);
+        invalid = ApplyRule(invocation, new TotalScalarRule(_factory.Boolean(true),
+            [new(IrExceptionKind.Unknown, _factory.Variable(mayThrow))], FrontendSubsetClassification.Exact), invalid).Continuation;
+        _builder.Allocate(invalid, site, _factory.ObjectType);
+        _builder.Throw(invalid, site, IrExceptionKind.Overflow,
+            ExceptionTarget?.Invoke(IrExceptionKind.Overflow, site) ?? _exceptionalExit);
+        return continuation;
+    }
+
     private TotalBodyValue? IntegralConvertBody(IInvocationOperation invocation, IrBlockId block, int depth)
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
@@ -40,6 +67,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (!argument.Classification.IsExact)
         { return Approximate(invocation, argument.Continuation, argument.Classification.Abstention); }
         block = IntegralConvertInitialization(invocation, argument.Value, argument.Continuation);
-        return ApplyRule(invocation, CSharpOperationSemantics.IntegralConvertToInt64(_factory, argument.Value), block);
+        var converted = CSharpOperationSemantics.IntegralConvertToInt64(_factory, argument.Value);
+        foreach (var fault in converted.Throws)
+        { block = IntegralConvertOverflowEffects(invocation, argument.Value, fault.Condition, block); }
+        return ApplyRule(invocation, new TotalScalarRule(converted.Value, [], converted.Classification), block);
     }
 }

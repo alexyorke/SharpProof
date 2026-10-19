@@ -78,6 +78,7 @@ public sealed class IntegralConvertInitializationReplayTests
     [TestCase("framework-integral-convert-ready:")]
     [TestCase("source:System.Convert.ToInt64(System.Int32)")]
     [TestCase("framework-scalar-dictionary-ready:System_Int32")]
+    [TestCase("framework-integral-convert-overflow-ancillary")]
     public void MalformedOrUnrelatedSitesNeverRunConvertObservation(string description)
     {
         ArgumentNullException.ThrowIfNull(description);

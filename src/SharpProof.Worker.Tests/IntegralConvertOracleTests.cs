@@ -139,10 +139,14 @@ public sealed class IntegralConvertOracleTests
             var irValue = argument is bool boolean ? factory.CreateBooleanValue(boolean)
                 : argument is ulong unsigned ? factory.CreateIntegerValue(irType, unsigned)
                 : factory.CreateIntegerValue(irType, long.Parse(input, CultureInfo.InvariantCulture));
-            var options = new IrProgramReplayOptions(static request =>
+            var overflow = type == "ulong" && ulong.Parse(input, CultureInfo.InvariantCulture) > long.MaxValue;
+            var options = new IrProgramReplayOptions(request =>
             {
                 ArgumentNullException.ThrowIfNull(request);
-                return null;
+                var description = factory.GetOperationInfo(request.Site).Description is { } id ? factory.GetString(id) : "";
+                return overflow && request.Origin == IrHavocOrigin.Approximation &&
+                    factory.GetVariableInfo(request.Variable).Type == factory.BooleanType &&
+                    description == "framework-integral-convert-overflow-ancillary" ? factory.CreateBooleanValue(false) : null;
             })
             {
                 ConcreteHavocValueProvider = request =>
@@ -153,7 +157,7 @@ public sealed class IntegralConvertOracleTests
             };
             var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
                 new Dictionary<IrVarId, IrValue> { [parameter] = irValue }, 5000, options);
-            Assert.That(execution.ConsumedApproximation, Is.False);
+            Assert.That(execution.ConsumedApproximation, Is.EqualTo(overflow));
             if (fault is null)
             {
                 Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), execution.Unsupported?.Detail);

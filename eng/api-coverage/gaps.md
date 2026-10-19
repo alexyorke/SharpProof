@@ -473,10 +473,13 @@ Framework `Convert.ToInt64` now lowers the eight signed/unsigned integer overloa
 `Char` and `Boolean` in executable bodies. Integer values retain their complete
 domains and the result is a signed 64-bit value. Boolean maps to zero or one;
 Char maps its UTF-16 code unit, including unpaired surrogates. UInt64 conversion
-checks against Int64.MaxValue and throws OverflowException above that limit even
-in an unchecked source context.
+checks against Int64.MaxValue and reaches its managed overflow helper above that
+limit even in an unchecked source context. Resource lookup can invoke user
+CultureInfo callbacks before the intended OverflowException. Caller memory
+writes, allocation, ambient effects and arbitrary ancillary faults remain
+possible on that path; a catch of OverflowException does not restore heap facts.
 
-Pinned runtime 10.0.13 has a beforefieldinit Convert initializer that reads
+Pinned runtime 10.0.13 has a `beforefieldinit` Convert initializer that reads
 DBNull.Value and stores Convert.DBNull; DBNull initialization allocates its
 singleton. The body model retains optional allocation, static writes, other
 initialization effects and failure. Neither a scalar argument nor an UInt64 range
@@ -488,7 +491,9 @@ clause purity or initializer safety.
 The pre-change dispatch reproduced eight Unknown value-preservation claims.
 Native proof/refutation pairs exercise the numeric relation while keeping those
 initialization effects open. CLR/IR differential tests check signed/unsigned
-limits, the UInt64 overflow boundary and UTF-16 code units. Concrete normal replay
+limits, the UInt64 overflow boundary and UTF-16 code units. Overflow-path
+comparisons explicitly select ancillary normal return and remain approximate;
+no generic fault replay authority is granted. Concrete normal replay
 requires actual Convert class initialization and observations of the matching
 fixed primitive overload. Failed, mismatching, malformed or unapproved readiness
 observations never certify a normal path. Source lookalikes and floating, decimal,
