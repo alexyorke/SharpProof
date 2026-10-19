@@ -39,23 +39,44 @@ internal sealed class ResourceMemoryReplay
         { return Unknown("MemoryReplayIncomplete"); }
         if (_program.Blocks.Length > ResourceMemoryTrace.MaximumEvents / 4)
         { return Unknown("MemoryReplayBudgetExceeded"); }
-        var owned = new HashSet<IrInstruction>();
+        var owned = new Dictionary<IrInstruction, (IrBasicBlock Block, int Index)>();
         foreach (var block in _program.Blocks)
         {
             cancellation.ThrowIfCancellationRequested();
             if (block.Instructions.Length > ResourceMemoryTrace.MaximumEvents - owned.Count)
             { return Unknown("MemoryReplayBudgetExceeded"); }
-            foreach (var instruction in block.Instructions)
-            { owned.Add(instruction); }
+            for (var index = 0; index < block.Instructions.Length; index++)
+            { owned.Add(block.Instructions[index], (block, index)); }
         }
         var seen = new HashSet<IrInstruction>();
         var lastUse = new Dictionary<IrVarId, int>();
+        IrBasicBlock? previousBlock = null;
+        var previousIndex = -1;
         for (var index = 0; index < _observed.Count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
             var instruction = _observed[index].Instruction;
-            if (!owned.Contains(instruction) || !seen.Add(instruction))
+            if (!owned.TryGetValue(instruction, out var location) || !seen.Add(instruction))
             { return Unknown("MemoryReplayInstructionUnowned"); }
+            bool follows;
+            if (previousBlock == null)
+            { follows = location.Block.Id == _program.Entry && location.Index == 0; }
+            else if (previousIndex + 1 < previousBlock.Instructions.Length)
+            { follows = ReferenceEquals(location.Block, previousBlock) && location.Index == previousIndex + 1; }
+            else
+            {
+                follows = location.Index == 0 && (previousBlock.Instructions[previousIndex] switch
+                {
+                    IrGotoInstruction next => location.Block.Id == next.Target,
+                    IrBranchInstruction branch when _observed[index - 1].Value is { Kind: IrValueKind.Boolean } condition &&
+                        condition.Type == _program.Factory.BooleanType => location.Block.Id == (condition.Boolean ? branch.WhenTrue : branch.WhenFalse),
+                    _ => false
+                });
+            }
+            if (!follows)
+            { return Unknown("MemoryReplayTraceIncomplete"); }
+            previousBlock = location.Block;
+            previousIndex = location.Index;
             var reads = 0;
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))
             {

@@ -777,6 +777,7 @@ public sealed partial class IrBranchInstruction
         if (conditionValue && state.ReplayOptions?.SourceLoopEntryObserver is { } observe &&
             IrSourceLoopEntry.IsGuard(state.Interpreter._factory, this.Operation))
         { observe(this, state.Values.ConsumedApproximation); }
+        state.CompletedValue = condition.Value;
         state.Current = conditionValue ? this.WhenTrue : this.WhenFalse;
         state.Transfer = true;
         return null;

@@ -487,3 +487,14 @@ strings, nonempty literals, negative construction lengths and unproved lifetime
 control flow also return Unknown without partial numbers. Numeric lifetime
 violations still require an independently observed normal completion satisfying
 all entry conditions, under the owned runtime/layout assumption.
+
+### Complete observation paths
+
+A lifetime refutation requires the complete ordered callback path from the owned
+entry instruction through normal return. Within each block, every instruction
+before its terminator must be followed by the next instruction. Transfers follow
+the actual
+goto target or observed Boolean branch decision. A missing or reordered callback,
+including an omitted field store, cannot publish partial numbers. Foreign and
+repeated instructions, unknown branch decisions, approximation, cancellation and
+exceeded observation/graph budgets also cannot supply lifetime evidence.

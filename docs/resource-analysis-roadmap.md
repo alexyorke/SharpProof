@@ -1434,3 +1434,53 @@ formatting gate passed after that correction, including 87 PowerShell files,
 The earlier package/consumer/
 release, documentation and security workflows passed. Native string changes
 remain subject to fresh exact-head CI and unchanged coverage qualification.
+
+## Completed replay path integrity and boundary controls
+
+Coverage review identified missing controls around lifetime replay validation.
+A regression reproduced acceptance of omitted and reordered callbacks from an
+otherwise completed real execution. In particular, omitting a returned-graph
+field store could misclassify the child as auxiliary storage. Instruction ownership
+and the final return alone did not establish a complete observation path.
+
+Replay now indexes each owned instruction's block and position. Observations must
+start at the entry instruction, remain contiguous inside each block, and follow
+the preceding terminator. The interpreter supplies the actual evaluated Boolean
+at branch completion; replay requires the next block to match that decision.
+Missing stores, missing entry instructions, reordering and missing/contradictory
+branch observations produce MemoryReplayTraceIncomplete without numeric evidence.
+Foreign or repeated instructions remain unsupported, and approximation/budget
+failures remain sticky even when later callbacks arrive.
+
+Additional controls exercise primitive storage widths, incompatible layouts,
+reference-element and initialized arrays, uncertified objects, allocations without
+a result target,
+borrowed copies/returns, graph/observation budgets, legacy semantics, actual
+completed repetition and cancellation. These are boundary controls around existing
+admission rules; they do not add a repetition or borrowed-ownership model.
+All 679 IR tests passed. A test setup initially supplied Total replay options to
+the legacy interpreter and was corrected to observe an actual legacy completion.
+All 517 selected native/golden/cache-identity cases and 17 packaged lifetime
+proof/refutation cases passed.
+
+Protocol 31, cache 33 and compiler artifact 46 remain unchanged: this hardens an
+internal callback invariant and adds no wire fields or newly admitted source
+capability. Worker binary identity includes every SharpProof companion assembly,
+including SharpProof.Ir.dll, so changed interpreter/replay code invalidates caches.
+A dedicated control mutates that companion module and checks the digest changes,
+while an unrelated module leaves it stable. Fresh exact-head CI and unchanged
+100% changed-trusted-code coverage qualification remain required, along with all
+other unfinished C/E/F roadmap items.
+
+Final validation passed all 679 IR tests, 517 selected worker/golden/cache-identity
+cases and 17 packaged lifetime cases. Repository quality categories passed after
+correcting two documentation spelling findings; complete canonical formatting,
+including script-tool checks and full C# formatting, passed. Documentation
+generation and 724 local links passed. These controls do not establish the final
+coverage percentage; the unchanged 100% aggregate floor and the full remaining
+roadmap stay open.
+
+The latest completed published coverage aggregate is string head 18d11e69c.
+All four shards passed, but 3299/3501 changed trusted lines (94.23%) left 202 gaps
+against the unchanged 100% floor. That aggregate predates this replay-path fix and
+its new boundary controls; it cannot qualify this checkpoint.
