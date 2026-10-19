@@ -2325,3 +2325,16 @@ nullable source restoration in their existing finally blocks. Required process a
 file bytes and text operations remain adapters. Validate the actual four controls in
 the canonical container: baseline, RS0016 missing files, RS0041 nullable metadata, restored.
 Status: open before edits.
+
+IMM-M052: Coordinator read the worker cache eviction and launcher parser/projection
+sources, including the read-only agent findings. Freeze sorted cache file observations
+with ToImmutableArray; actual filesystem metadata remains live. Launcher callable-ID
+lookup maps use strict ImmutableDictionaryCapture.Create with Ordinal keys, preserving
+Dictionary duplicate/null failures. Parser construction uses an Ordinal builder and
+TryAdd's false-on-duplicate behavior, freezing before arguments retention. Presentation
+assumption vectors/membership and path candidate vectors can be immutable snapshots.
+SARIF's normalized path segment stack uses an array builder with identical RemoveAt
+semantics, freezing before Join. Preserve serializer dictionary property order, native
+CLI/string[] and PE/file byte[] adapters, and runtime mutable lane/result buffers until
+their synchronization/indexed-write contracts are separately addressed. Validate launcher,
+SARIF, cache eviction and path admission tests. Status: open before edits.
