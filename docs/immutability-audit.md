@@ -3246,3 +3246,15 @@ callback assignment preceding cancellation. Entry callback/backend ownership and
 counters are mutable subjects and remain unchanged. Validate repeated verification,
 shared budget, entry publication, legacy lowering, refutation and cancellation cases.
 Status: open before edits.
+
+IMM-M105: Main traced eight remaining bounded Worker Q-Z construction sites across
+seven files plus three adjacent read-only vectors/sets. Freeze Windows path observations,
+API substitution input, checked-goal IDs, resource reads, backend creation order and
+precision evidence. Launcher construction uses a builder and retains the native array
+at RunMain. Saved environment data uses an ordinal builder plus first-seen key order,
+then freezes in finally before restoration; retain strict Add/nonoverwriting TryAdd and
+restore ordering. Keep actual environment/console mutations, backend resource counters,
+parser mutations and measurement timing as mutable test subjects. Backend factories are
+created serially and renewal is under the existing lane lock. Validate real launcher,
+resource, backend disposal and native precision controls through Worker/semantic tests.
+Status: open before edits.
