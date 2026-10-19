@@ -81,12 +81,12 @@ public sealed class IrTraversalTests
                 Is.EqualTo(shape.Children),
                 shape.Kind.ToString());
 
-            var pending = new Stack<IrTerm>();
-            IrTraversal.PushChildren(shape.Term, pending);
+            var pending = IrTraversal.PushChildren(shape.Term, ImmutableStack<IrTerm>.Empty);
             var pushed = ImmutableArray.CreateBuilder<IrTerm>();
-            while (pending.Count != 0)
+            while (!pending.IsEmpty)
             {
-                pushed.Add(pending.Pop());
+                pushed.Add(pending.Peek());
+                pending = pending.Pop();
             }
             Assert.That(
                 pushed.ToImmutable(),

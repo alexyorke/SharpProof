@@ -1328,7 +1328,7 @@ public sealed class FrontendLoweringTests
                 emit.Success,
                 Is.True,
                 string.Join(Environment.NewLine, emit.Diagnostics));
-            var assembly = AssemblyLoadContextHandle.Load(stream.ToArray());
+            var assembly = AssemblyLoadContextHandle.Load(ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
             var method = assembly.Assembly
                 .GetType("Subject")!
                 .GetMethod(
@@ -1496,13 +1496,16 @@ public sealed class FrontendLoweringTests
             get;
         }
 
-        internal static AssemblyLoadContextHandle Load(byte[] image)
+        internal static AssemblyLoadContextHandle Load(ImmutableArray<byte> image)
         {
-            System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+            if (image.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(image));
+            }
             var context = new System.Runtime.Loader.AssemblyLoadContext(
                 "SharpProof.Frontend.Test." + Guid.NewGuid().ToString("N"),
                 isCollectible: true);
-            using var stream = new MemoryStream(image, writable: false);
+            using var stream = new MemoryStream(image.ToArray(), writable: false);
             return new AssemblyLoadContextHandle(
                 context,
                 context.LoadFromStream(stream));

@@ -208,7 +208,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             profile: "advisory",
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047", "SP0047"]);
     }
 
     [Test]
@@ -326,7 +326,7 @@ public sealed class ContractApiIdentityAnalyzerTests
         {
             throw new System.ArgumentException("Array must be initialized.", nameof(diagnostics));
         }
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         var message = diagnostics.Single().GetMessage(
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.That(
@@ -369,8 +369,7 @@ public sealed class ContractApiIdentityAnalyzerTests
                 "UnreadableContractApiFixture",
                 [CSharpSyntaxTree.ParseText(source)],
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)),
-            "SP0050");
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)), ["SP0050"]);
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null);
 
@@ -415,8 +414,7 @@ public sealed class ContractApiIdentityAnalyzerTests
                 "WrongPayloadContractApiFixture",
                 [CSharpSyntaxTree.ParseText(source)],
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)),
-            "SP0047");
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)), ["SP0047"]);
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
@@ -424,7 +422,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             profile: "advisory",
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0047"]);
         Assert.That(
             diagnostics.Single().GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),

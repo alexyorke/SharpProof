@@ -37,7 +37,7 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
 
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", analyzer: new SharpProofAnalyzer(factory));
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
         Assert.That(factory.Session, Is.Not.Null);
         var session = factory.Session!;

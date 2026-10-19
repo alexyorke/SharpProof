@@ -31,7 +31,7 @@ public sealed class EffectContractAttributeDiagnosticsTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
             Assert.That(
                 diagnostics.Select(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start)),

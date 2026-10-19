@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -97,7 +98,7 @@ public sealed class PartialDeclarationValidationControlTests
             Assert.That(diagnostics, Is.Empty);
             return;
         }
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         var expectedTree = compilation.SyntaxTrees.Single(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath.Contains(
             attributeOnDefinition ? "Definition" : "Implementation", StringComparison.Ordinal)));
         Assert.That(diagnostics.Single().Location.SourceTree, Is.SameAs(expectedTree));

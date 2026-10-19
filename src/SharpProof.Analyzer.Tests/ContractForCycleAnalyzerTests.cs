@@ -71,7 +71,7 @@ public sealed class ContractForCycleAnalyzerTests
             }
             """);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0009", "SP0047");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0009", "SP0047"]);
         Assert.That(
             diagnostics[0].GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),

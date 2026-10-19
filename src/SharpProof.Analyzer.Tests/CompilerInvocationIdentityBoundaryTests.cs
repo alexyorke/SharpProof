@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -49,22 +50,24 @@ public sealed class CompilerInvocationIdentityBoundaryTests
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         Assert.That(invocation.Arguments, Has.Length.EqualTo(arity));
         Assert.That(SymbolEqualityComparer.Default.Equals(model.GetEnclosingSymbol(syntax.SpanStart), owner), Is.True);
-        var pending = new Stack<IOperation>();
-        pending.Push(invocation);
-        var anonymousParameters = new List<IParameterSymbol>();
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(invocation);
+        var anonymousParameterBuilder = ImmutableArray.CreateBuilder<IParameterSymbol>();
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is IParameterReferenceOperation parameter &&
                 parameter.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
             {
-                anonymousParameters.Add(parameter.Parameter);
+                anonymousParameterBuilder.Add(parameter.Parameter);
             }
             foreach (var child in current.ChildOperations)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
+        var anonymousParameters = anonymousParameterBuilder.ToImmutable();
         Assert.That(anonymousParameters, Is.Not.Empty);
         var anonymousDeclaration = anonymousParameters.First().ContainingSymbol.DeclaringSyntaxReferences.First().GetSyntax();
         Assert.That(anonymousDeclaration is AnonymousFunctionExpressionSyntax,

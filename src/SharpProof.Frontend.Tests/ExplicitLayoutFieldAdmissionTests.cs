@@ -144,15 +144,14 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         });
         AssertNoErrors(producer);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var imageBytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-producer.dll"), imageBytes);
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "emitted-producer.dll"), imageBytes.ToArray());
         var constructed = scenario == "metadata-constructed-auto";
         var typeName = constructed ? "GenericCell\u00601" : "Cell";
         var sourceOwner = producer.GetTypeByMetadataName(typeName);
         Assert.That(sourceOwner, Is.Not.Null);
         await VerifySourceBinding(evidenceDirectory, scenario, producer, sourceOwner!);
-        using var peStream = new MemoryStream(imageBytes, writable: false);
-        using var pe = new PEReader(peStream);
+        using var pe = new PEReader(imageBytes);
         var reader = pe.GetMetadataReader();
         var typeHandle = reader.TypeDefinitions.Single(handle => reader.GetString(reader.GetTypeDefinition(handle).Name) == typeName);
         var typeDefinition = reader.GetTypeDefinition(typeHandle);
@@ -179,7 +178,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         await Save(evidenceDirectory, "pe-layout-binding.json", new
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
-            EmittedPeSha256 = Hash(imageBytes),
+            EmittedPeSha256 = Hash(imageBytes.AsSpan()),
             ModuleMvid = reader.GetGuid(reader.GetModuleDefinition().Mvid),
             TypeToken = MetadataTokens.GetToken(typeHandle),
             ValueToken = MetadataTokens.GetToken(valueHandle),
@@ -250,7 +249,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             Case = scenario,
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
-            EmittedPeSha256 = Hash(imageBytes),
+            EmittedPeSha256 = Hash(imageBytes.AsSpan()),
             Imported = imported,
             Constructed = constructed,
             OwnerMetadataToken = selectedOwner.MetadataToken,
@@ -403,9 +402,8 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans have a valid SHA256 digest */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 

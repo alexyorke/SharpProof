@@ -87,7 +87,7 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
                 public Subject() : base(1) => _ = Contract.Result<int>();
             }
             """, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result").And.Contain("<placement>"));
     }
@@ -107,7 +107,7 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
             }
             """;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(source, "contracts", []);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(source.Substring(diagnostics[0].Location.SourceSpan.Start, diagnostics[0].Location.SourceSpan.Length),

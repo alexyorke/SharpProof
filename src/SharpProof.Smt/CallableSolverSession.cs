@@ -58,7 +58,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         {
             _encoder.ValidateQuery(query, meter, cancellationToken);
             var active = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
-            var selectors = ImmutableArray.CreateBuilder<Expr>();
+            var selectors = ImmutableArray.CreateBuilder<BoolExpr>();
             for (var index = 0; index < query.Assumptions.Length; index++)
             {
                 meter.Consume();
@@ -140,7 +140,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         }
     }
 
-    private Status Check(ImmutableArray<Expr> selectors, SmtQueryResourceMeter meter)
+    private Status Check(ImmutableArray<BoolExpr> selectors, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (selectors.IsDefault)
@@ -151,7 +151,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         using var interruptParameter = _runner.Context.MkSymbol("ctrl_c");
         parameters.Add(interruptParameter, false);
         _solver.Parameters = parameters;
-        return SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
+        return SmtNativeCheck.Run(_solver, selectors, meter);
     }
 
     // A model preference for string and array lengths, inactive in proof checks.

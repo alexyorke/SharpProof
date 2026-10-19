@@ -405,14 +405,15 @@ public sealed class IrTotalExecutionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var unknown = factory.CreateVariable("unknown", factory.IntegerType);
         var missing = factory.CreateVariable("missing", factory.IntegerType);
-        var arguments = scenario == "missing-first" ? new IrTerm[] { factory.Variable(missing), factory.Variable(unknown) }
-            : new IrTerm[] { scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown) };
-        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
-            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToArray());
+        ImmutableArray<IrTerm> arguments = scenario == "missing-first"
+            ? [factory.Variable(missing), factory.Variable(unknown)]
+            : [scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown)];
+        var member = factory.GetOrCreateMemberSnapshot(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
+            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToImmutableArray());
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
-        builder.Call(entry, factory.CreateOperation(), null, member, null, arguments);
+        builder.CallSnapshot(entry, factory.CreateOperation(), null, member, null, arguments);
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100,
             new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)));

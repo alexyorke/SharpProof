@@ -69,19 +69,17 @@ public sealed class GeneratedContractForAnalyzerTests
             {
                 public static int Check(Service receiver, int value) => value;
             }
-            """,
-            ("""
+            """, [("""
              public partial class Service
              {
                  public partial int Check(int value);
              }
-             """, "Service.Definition.cs"),
-            ("""
+             """, "Service.Definition.cs"), ("""
              public partial class Service
              {
                  public partial int Check(int value) => value;
              }
-             """, "Service.Implementation.cs"));
+             """, "Service.Implementation.cs")]);
 
         Assert.That(diagnostics, Is.Empty);
     }
@@ -107,7 +105,7 @@ public sealed class GeneratedContractForAnalyzerTests
             }
             """);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0001"]);
     }
 
     [TestCase("advisory", "contracts", true)]
@@ -143,7 +141,7 @@ public sealed class GeneratedContractForAnalyzerTests
             RejectedContractForSource,
             hintName: "PeerContracts.cs");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0001"]);
     }
 
     [Test]
@@ -153,7 +151,7 @@ public sealed class GeneratedContractForAnalyzerTests
             EmptyServiceContractsSource,
             hintName: "PeerContracts.cs");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0004");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0004"]);
     }
 
     [Test]
@@ -203,7 +201,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             handwritten);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0002", "SPCF0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0002", "SPCF0002"]);
         Assert.That(
             diagnostics.Select(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (Path.GetFileName(diagnostic.Location.SourceTree?.FilePath))),
@@ -298,7 +296,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             additionalDiagnosticIds: ["SP0024"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -392,9 +390,12 @@ public sealed class GeneratedContractForAnalyzerTests
     private static async Task<ImmutableArray<Diagnostic>>
         AnalyzeGeneratedAcrossInputFilesAsync(
             string generatedSource,
-            params (string Source, string FilePath)[] inputFiles)
+            ImmutableArray<(string Source, string FilePath)> inputFiles)
     {
-        System.ArgumentNullException.ThrowIfNull(inputFiles, nameof(inputFiles));
+        if (inputFiles.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(inputFiles));
+        }
         System.ArgumentNullException.ThrowIfNull(generatedSource);
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")

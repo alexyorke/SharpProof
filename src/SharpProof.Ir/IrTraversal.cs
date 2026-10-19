@@ -35,49 +35,6 @@ internal static class IrTraversal
         return pending;
     }
 
-    internal static void PushChildren(
-        IrTerm term,
-        Stack<IrTerm> pending)
-    {
-        ArgumentNullGuard.NotNull(term, nameof(term));
-        ArgumentNullGuard.NotNull(pending, nameof(pending));
-        switch (term)
-        {
-            case IrOpaqueTerm opaque:
-                if (opaque.Receiver is { } receiver)
-                {
-                    pending.Push(receiver);
-                }
-                for (var index = 0; index < opaque.Arguments.Length; index++)
-                {
-                    pending.Push(opaque.Arguments[index]);
-                }
-                break;
-            case IrUnaryTerm unary:
-                pending.Push(unary.Operand);
-                break;
-            case IrBinaryTerm binary:
-                pending.Push(binary.Left);
-                pending.Push(binary.Right);
-                break;
-            case IrConditionalTerm conditional:
-                pending.Push(conditional.Condition);
-                pending.Push(conditional.WhenTrue);
-                pending.Push(conditional.WhenFalse);
-                break;
-            case IrCastTerm cast:
-                pending.Push(cast.Operand);
-                break;
-            case IrLengthTerm length:
-                pending.Push(length.Value);
-                break;
-            case IrSequenceAccessTerm access:
-                pending.Push(access.Sequence);
-                pending.Push(access.Index);
-                break;
-        }
-    }
-
     internal static bool Any(IrTerm root, Func<IrTerm, bool> predicate)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));

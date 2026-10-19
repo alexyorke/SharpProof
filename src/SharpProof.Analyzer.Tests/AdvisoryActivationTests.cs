@@ -46,7 +46,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
         }
     }
 
@@ -142,7 +142,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
     }
 
@@ -174,7 +174,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
     }
 
@@ -213,8 +213,8 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(closedContractDiagnostics, "SP0027");
-        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, "SP0046");
+        AnalyzerTestHost.AssertIds(closedContractDiagnostics, ["SP0027"]);
+        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, ["SP0046"]);
     }
 
     [Test]
@@ -270,7 +270,7 @@ public sealed class AdvisoryActivationTests
             profile: "advisory",
             features: "effects");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
     }
 
     [Test]

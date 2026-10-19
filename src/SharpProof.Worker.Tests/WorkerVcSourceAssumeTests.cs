@@ -162,24 +162,22 @@ public sealed class WorkerVcSourceAssumeTests
             """);
         var total = artifact.Callables.Single().Total!;
         var originalClauses = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)).ToImmutableArray();
-        var clauses = originalClauses;
+        var clauseBuilder = originalClauses.ToBuilder();
         var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToImmutableArray();
         switch (mutation)
         {
             case "id":
-                { clauses = clauses.SetItem(0, clauses[0] with { AssumptionId = "foreign" }); }
+                { clauseBuilder[0] = clauseBuilder[0] with { AssumptionId = "foreign" }; }
                 break;
             case "swap-ids":
                 {
-                    var changedFixture = (clauses[1].AssumptionId, clauses[0].AssumptionId);
-                    var clauseBuilder = clauses.ToBuilder();
+                    var changedFixture = (clauseBuilder[1].AssumptionId, clauseBuilder[0].AssumptionId);
                     clauseBuilder[0] = clauseBuilder[0] with { AssumptionId = changedFixture.Item1 };
                     clauseBuilder[1] = clauseBuilder[1] with { AssumptionId = changedFixture.Item2 };
-                    clauses = clauseBuilder.ToImmutable();
                 }
                 break;
             case "site":
-                { clauses = clauses.SetItem(0, clauses[0] with { Operation = clauses[1].Operation }); }
+                { clauseBuilder[0] = clauseBuilder[0] with { Operation = clauseBuilder[1].Operation }; }
                 break;
             case "predicate":
                 {
@@ -210,6 +208,7 @@ public sealed class WorkerVcSourceAssumeTests
                 }
                 break;
         }
+        var clauses = clauseBuilder.ToImmutable();
         for (var index = 0; index < clauses.Length; index++)
         {
             total = total with { Clauses = total.Clauses.ReplaceReference(originalClauses[index], clauses[index]) };

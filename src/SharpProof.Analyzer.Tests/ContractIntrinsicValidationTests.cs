@@ -52,7 +52,7 @@ public sealed class ContractIntrinsicValidationTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result")
@@ -87,7 +87,7 @@ public sealed class ContractIntrinsicValidationTests
     {
         if (diagnostics.IsDefault)
         { throw new ArgumentNullException(nameof(diagnostics)); }
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),

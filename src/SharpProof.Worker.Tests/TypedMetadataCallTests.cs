@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -232,7 +233,7 @@ public sealed class TypedMetadataCallTests
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, captured);
         var owned = provider.Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(owned, Is.Not.Null);
-        Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
+        Assert.That(owned.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image.ToArray())));
         subject.MutateImage((bytes, _, il) => { System.ArgumentNullException.ThrowIfNull(bytes); if ((uint)il >= (uint)bytes.Length) { throw new ArgumentOutOfRangeException(nameof(il)); } bytes[il] = 0x26; });
         Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(owned));
         Assert.That(owned.Instructions[0].Code, Is.EqualTo("Ldarg"));
@@ -389,7 +390,7 @@ internal sealed class MetadataTestSubject : IDisposable
     internal CSharpCompilation Compilation { get; }
     internal MethodInfo Method { get; }
     internal string ImagePath { get; }
-    internal byte[] Image { get; }
+    internal ImmutableArray<byte> Image { get; }
     internal MethodInfo RootMethod { get; }
 
     internal MetadataTestSubject(string librarySource, string source, Platform platform = Platform.AnyCpu)
@@ -404,10 +405,10 @@ internal sealed class MetadataTestSubject : IDisposable
             using var stream = new MemoryStream();
             var emitted = implementation.Emit(stream);
             Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-            Image = stream.ToArray();
+            Image = ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
             ImagePath = Path.Combine(_directory.FullName, "implementation.dll");
-            File.WriteAllBytes(ImagePath, Image);
-            using var runtimeImage = new MemoryStream(Image, writable: false);
+            File.WriteAllBytes(ImagePath, Image.ToArray());
+            using var runtimeImage = new MemoryStream(Image.ToArray(), writable: false);
             var assembly = _runtime.LoadFromStream(runtimeImage);
             Method = assembly.GetType("Library")!.GetMethod("Target")!;
             Compilation = CSharpCompilation.Create("TypedIlSubject_" + Guid.NewGuid().ToString("N"),
@@ -453,7 +454,7 @@ internal sealed class MetadataTestSubject : IDisposable
         System.ArgumentNullException.ThrowIfNull(mutation);
         var bytes = Image.ToArray();
         int header;
-        using (var image = new PEReader(new MemoryStream(Image, writable: false)))
+        using (var image = new PEReader(Image))
         {
             var definition = image.GetMetadataReader().GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(Method.MetadataToken & 0x00ffffff));
             var section = image.PEHeaders.SectionHeaders[image.PEHeaders.GetContainingSectionIndex(definition.RelativeVirtualAddress)];

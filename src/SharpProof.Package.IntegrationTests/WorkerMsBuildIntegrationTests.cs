@@ -129,19 +129,16 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
         var normal = await BuildOkAsync(project.BuildAsync(
-            verify: null,
-            (
+            verify: null, [            (
                 "SharpProofWorkerPath",
-                Path.Combine(projectDirectory, "missing-worker.dll")),
-            (
+                Path.Combine(projectDirectory, "missing-worker.dll")),             (
                 "SharpProofLauncherPath",
-                Path.Combine(projectDirectory, "missing-launcher.dll"))));
+                Path.Combine(projectDirectory, "missing-launcher.dll"))]));
         Assert.That(File.Exists(project.RequestPath), Is.False);
         Assert.That(File.Exists(project.ResultPath), Is.False);
 
         var designTime = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("DesignTimeBuild", "true")));
+            verify: true, [("DesignTimeBuild", "true")]));
         Assert.That(File.Exists(project.RequestPath), Is.False);
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
@@ -159,8 +156,7 @@ public sealed class WorkerMsBuildIntegrationTests
             new System.Text.UTF8Encoding(false));
 
         var build = await project.BuildAsync(
-            verify: null,
-            ("SharpProofRunAnalyzersForPackageTests", "true"));
+            verify: null, [("SharpProofRunAnalyzersForPackageTests", "true")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -184,12 +180,11 @@ public sealed class WorkerMsBuildIntegrationTests
         System.ArgumentNullException.ThrowIfNull(profile);
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var verified = await BuildOkAsync(project.BuildAsync(verify: true));
+        var verified = await BuildOkAsync(project.BuildAsync(verify: true, []));
         Assert.That(File.Exists(project.ResultPath), Is.True);
 
         var disabled = await BuildOkAsync(project.BuildAsync(
-            verify,
-            ("SharpProofProfile", profile)));
+            verify, [("SharpProofProfile", profile)]));
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
 
@@ -208,8 +203,7 @@ public sealed class WorkerMsBuildIntegrationTests
             : project.CompilerManifestPath;
 
         var build = await project.BuildAsync(
-            verify: true,
-            (property, value));
+            verify: true, [(property, value)]);
 
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("exact package-owned runtime closure"));
@@ -230,10 +224,9 @@ public sealed class WorkerMsBuildIntegrationTests
             ? foreign
             : Path.Combine(foreign, "foreign.dll");
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            (property, value));
+            IdentitySource, [(property, value)]);
 
-        var build = await project.BuildAsync(verify: true);
+        var build = await project.BuildAsync(verify: true, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -250,10 +243,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         System.ArgumentNullException.ThrowIfNull(property);
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            (property, "legacy-path-override"));
+            IdentitySource, [(property, "legacy-path-override")]);
 
-        var build = await project.BuildAsync(verify: null);
+        var build = await project.BuildAsync(verify: null, []);
 
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(
@@ -269,18 +261,10 @@ public sealed class WorkerMsBuildIntegrationTests
             Path.GetTempPath(),
             "absolute-collector");
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("_SharpProofTestAnalyzerDirectory", analyzerDirectory),
-            ("_SharpProofTestCollectorDirectory", collectorDirectory),
-            ("_SharpProofTestCompilerCollectorPath", " "),
-            ("_SharpProofTestContractForGeneratorPath", " "));
+            IdentitySource, [("_SharpProofTestAnalyzerDirectory", analyzerDirectory), ("_SharpProofTestCollectorDirectory", collectorDirectory), ("_SharpProofTestCompilerCollectorPath", " "), ("_SharpProofTestContractForGeneratorPath", " ")]);
 
         var properties = await project.EvaluatePropertiesAsync(
-            "_SharpProofAnalyzerDirectory",
-            "_SharpProofAnalyzerPath",
-            "_SharpProofContractForGeneratorPath",
-            "_SharpProofCollectorDirectory",
-            "_SharpProofCompilerCollectorPath");
+["_SharpProofAnalyzerDirectory", "_SharpProofAnalyzerPath", "_SharpProofContractForGeneratorPath", "_SharpProofCollectorDirectory", "_SharpProofCompilerCollectorPath"]);
 
         var expectedAnalyzerDirectory = Path.GetFullPath(
             Path.Combine(project.Root, analyzerDirectory));
@@ -344,8 +328,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var sarifPath = project.VerifyOutputPath("net8.0", "result.sarif");
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifySarifFile", sarifPath)));
+            verify: true, [("SharpProofVerifySarifFile", sarifPath)]));
         Assert.That(build.Output, Does.Contain("SharpProof Proven"));
         Assert.That(File.Exists(project.RequestPath), Is.True);
         Assert.That(File.Exists(project.ResultPath), Is.True);
@@ -457,7 +440,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "DOTNET_STARTUP_HOOKS",
                 typeof(global::StartupHook).Assembly.Location);
             Environment.SetEnvironmentVariable("TMPDIR", hookDirectory);
-            build = await BuildOkAsync(project.BuildAsync(verify: true));
+            build = await BuildOkAsync(project.BuildAsync(verify: true, []));
         }
         finally
         {
@@ -500,13 +483,12 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             """);
 
-        var disabledBuild = await BuildOkAsync(project.BuildAsync(verify: true));
+        var disabledBuild = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var disabled = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
 
         var enabledBuild = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofSpecificationPacks", "dotnet.scalar")));
+            verify: true, [("SharpProofSpecificationPacks", "dotnet.scalar")]));
         var enabled = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
 
@@ -535,8 +517,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateWithPercentPath(
-            IdentitySource,
-            ("TargetFrameworks", "netstandard2.0"));
+            IdentitySource, [("TargetFrameworks", "netstandard2.0")]);
         var requestPath = project.VerifyOutputPath(
             "netstandard2.0",
             "request.json");
@@ -547,7 +528,7 @@ public sealed class WorkerMsBuildIntegrationTests
             "netstandard2.0",
             "compiler-manifest.json");
 
-        var build = await project.BuildAsync(verify: true);
+        var build = await project.BuildAsync(verify: true, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -563,8 +544,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFrameworks", "netstandard2.0"));
+            IdentitySource, [("TargetFrameworks", "netstandard2.0")]);
         var segment = new string('l', 48);
         var publicationDirectory = Path.Combine(
             project.Root,
@@ -594,12 +574,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(resultPath.Length, Is.GreaterThan(260));
 
         var dotnet = await project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyRequestFile", configuredRequestPath),
-            ("SharpProofVerifyResultFile", configuredResultPath),
-            ("SharpProofCompilerManifestFile", configuredManifestPath),
-            ("SharpProofVerifyCacheDirectory", cachePath),
-            ("SharpProofVerifySarifFile", sarifPath));
+            verify: true, [("SharpProofVerifyRequestFile", configuredRequestPath), ("SharpProofVerifyResultFile", configuredResultPath), ("SharpProofCompilerManifestFile", configuredManifestPath), ("SharpProofVerifyCacheDirectory", cachePath), ("SharpProofVerifySarifFile", sarifPath)]);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(dotnet.ExitCode, Is.Zero, dotnet.Output);
@@ -617,8 +592,8 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.CreateWithLongPath(IdentitySource);
         Assert.That(project.Root.Length, Is.GreaterThan(239));
 
-        var restore = await project.RestoreAsync();
-        var build = await project.BuildAsync(verify: true);
+        var restore = await project.RestoreAsync([]);
+        var build = await project.BuildAsync(verify: true, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -638,8 +613,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFrameworks", "netstandard2.0"));
+            IdentitySource, [("TargetFrameworks", "netstandard2.0")]);
         var publicationDirectory = Directory.CreateDirectory(
             Path.Combine(project.Root, "long-basename-publication"));
         var configuredRequestPath = Path.Combine(
@@ -664,17 +638,9 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(Path.GetFileName(sarifPath).Length, Is.EqualTo(226));
 
         var first = await project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyRequestFile", configuredRequestPath),
-            ("SharpProofVerifyResultFile", configuredResultPath),
-            ("SharpProofCompilerManifestFile", configuredManifestPath),
-            ("SharpProofVerifySarifFile", sarifPath));
+            verify: true, [("SharpProofVerifyRequestFile", configuredRequestPath), ("SharpProofVerifyResultFile", configuredResultPath), ("SharpProofCompilerManifestFile", configuredManifestPath), ("SharpProofVerifySarifFile", sarifPath)]);
         var second = await project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyRequestFile", configuredRequestPath),
-            ("SharpProofVerifyResultFile", configuredResultPath),
-            ("SharpProofCompilerManifestFile", configuredManifestPath),
-            ("SharpProofVerifySarifFile", sarifPath));
+            verify: true, [("SharpProofVerifyRequestFile", configuredRequestPath), ("SharpProofVerifyResultFile", configuredResultPath), ("SharpProofCompilerManifestFile", configuredManifestPath), ("SharpProofVerifySarifFile", sarifPath)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -699,7 +665,7 @@ public sealed class WorkerMsBuildIntegrationTests
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
 
-        var build = await BuildOkAsync(project.BuildAsync(verify: true));
+        var build = await BuildOkAsync(project.BuildAsync(verify: true, []));
         Assert.That(File.Exists(project.CompilerManifestPath), Is.True);
         var manifest = await File.ReadAllTextAsync(project.CompilerManifestPath);
         var request = WorkerProtocolJson.DeserializeRequest(
@@ -731,8 +697,7 @@ public sealed class WorkerMsBuildIntegrationTests
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyCacheDirectory", " ")));
+            verify: true, [("SharpProofVerifyCacheDirectory", " ")]));
 
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
@@ -747,9 +712,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource, ("TargetFrameworks", "net8.0;net9.0"));
+            IdentitySource, [("TargetFrameworks", "net8.0;net9.0")]);
 
-        var build = await BuildOkAsync(project.BuildParallelAsync(verify: true));
+        var build = await BuildOkAsync(project.BuildParallelAsync(verify: true, []));
         foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var request = WorkerProtocolJson.DeserializeRequest(
@@ -776,14 +741,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFrameworks", "net8.0;net9.0"),
-            ("BuildInParallel", "false"),
-            ("SharpProofVerifyRequestFile", "evidence/request.json"),
-            ("SharpProofVerifyResultFile", "evidence/result.json"),
-            ("SharpProofCompilerManifestFile", "evidence/compiler-manifest.json"));
+            IdentitySource, [("TargetFrameworks", "net8.0;net9.0"), ("BuildInParallel", "false"), ("SharpProofVerifyRequestFile", "evidence/request.json"), ("SharpProofVerifyResultFile", "evidence/result.json"), ("SharpProofCompilerManifestFile", "evidence/compiler-manifest.json")]);
 
-        var build = await BuildOkAsync(project.BuildAsync(verify: true));
+        var build = await BuildOkAsync(project.BuildAsync(verify: true, []));
         foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var directory = Path.Combine(project.Root, "evidence", framework);
@@ -809,11 +769,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFrameworks", "net8.0;net9.0"),
-            ("SharpProofVerifySarifFile", "evidence/result.sarif"));
+            IdentitySource, [("TargetFrameworks", "net8.0;net9.0"), ("SharpProofVerifySarifFile", "evidence/result.sarif")]);
 
-        var build = await BuildOkAsync(project.BuildParallelAsync(verify: true));
+        var build = await BuildOkAsync(project.BuildParallelAsync(verify: true, []));
         foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var sarif = Path.Combine(
@@ -833,30 +791,25 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFrameworks", "net9.0;net8.0;netstandard2.0"),
-            ("BuildInParallel", "false"));
+            IdentitySource, [("TargetFrameworks", "net9.0;net8.0;netstandard2.0"), ("BuildInParallel", "false")]);
         var configured = Path.Combine(
             project.Root,
             "absolute-evidence",
             "verification.sarif");
 
         var first = await BuildOkAsync(project.BuildSerialAsync(
-            verify: true,
-            ("SharpProofVerifySarifFile", configured)));
+            verify: true, [("SharpProofVerifySarifFile", configured)]));
         AssertFrameworkScopedSarif(first.Output);
         // Keep one serial build to exercise the explicit BuildInParallel=false
         // contract. The incremental and clean builds verify the same
         // framework-scoped outputs through the normal parallel dispatch path,
         // avoiding three repeated analyzer passes on one scheduler lane.
         var incremental = await BuildOkAsync(project.BuildParallelAsync(
-            verify: true,
-            ("SharpProofVerifySarifFile", configured)));
+            verify: true, [("SharpProofVerifySarifFile", configured)]));
         AssertFrameworkScopedSarif(incremental.Output);
 
         var rebuilt = await project.RebuildParallelAsync(
-            verify: true,
-            ("SharpProofVerifySarifFile", configured));
+            verify: true, [("SharpProofVerifySarifFile", configured)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -895,9 +848,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: false));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: false, []));
 
-        var build = await project.RunVerificationTargetAsync();
+        var build = await project.RunVerificationTargetAsync([]);
 
         Assert.That(build.ExitCode, Is.Not.Zero);
         using (Assert.EnterMultipleScope())
@@ -920,43 +873,40 @@ public sealed class WorkerMsBuildIntegrationTests
         var sarifPath = project.VerifyOutputPath(
             "net8.0", "stale-result.sarif");
         var baseline = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifySarifFile", sarifPath)));
+            verify: true, [("SharpProofVerifySarifFile", sarifPath)]));
         var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
 
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath",
-                project.CompilerManifestPath + ".missing"));
+[            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".missing")]);
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath",
-                project.CompilerManifestPath + ".invocation"),
-            ("SharpProofLauncherPath",
-                project.CompilerManifestPath + ".missing-launcher.dll"));
+[            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),             ("SharpProofLauncherPath",
+                project.CompilerManifestPath + ".missing-launcher.dll")]);
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath",
-                project.CompilerManifestPath + ".invocation"),
-            ("SharpProofWorkerPath",
-                project.CompilerManifestPath + ".missing-worker.dll"));
+[            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),             ("SharpProofWorkerPath",
+                project.CompilerManifestPath + ".missing-worker.dll")]);
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath",
-                project.CompilerManifestPath + ".invocation"),
-            ("SharpProofVerifyPolicy", "invalid"));
+[            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),             ("SharpProofVerifyPolicy", "invalid")]);
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath",
-                project.CompilerManifestPath + ".invocation"),
-            ("SharpProofVerifyQueryRlimit", "0"));
+[            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),             ("SharpProofVerifyQueryRlimit", "0")]);
 
         async Task AssertInvalidatedAsync(
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             await File.WriteAllBytesAsync(project.ResultPath, stableResult);
             await File.WriteAllTextAsync(sarifPath, "stale");
 
-            var failure = await project.RunVerificationTargetAsync([
-                .. properties,
-                ("SharpProofVerifySarifFile", sarifPath)
-            ]);
+            var propertyBuilder = properties.ToBuilder();
+            propertyBuilder.Add(("SharpProofVerifySarifFile", sarifPath));
+            var failure = await project.RunVerificationTargetAsync(propertyBuilder.ToImmutable());
 
             Assert.That(failure.ExitCode, Is.Not.Zero, failure.Output);
             Assert.That(
@@ -971,19 +921,19 @@ public sealed class WorkerMsBuildIntegrationTests
     public async Task PublicationRejectsCompilerOwnedOutputsBeforeMutation()
     {
         RequireContainerWorker();
-        (string PublicationProperty, string OutputKind)[] collisions = new[]
-        {
+        ImmutableArray<(string PublicationProperty, string OutputKind)> collisions =
+        [
             ("SharpProofVerifyResultFile", "target"),
             ("SharpProofVerifyRequestFile", "intermediate"),
             ("SharpProofCompilerManifestFile", "documentation"),
             ("SharpProofVerifySarifFile", "debug-symbols"),
             ("SharpProofVerifyRequestFile", "reference-assembly"),
             ("SharpProofCompilerManifestFile", "generated-editorconfig")
-        };
-        var collisionProjects = new List<(
+        ];
+        var collisionProjects = ImmutableArray.CreateBuilder<(
             (string PublicationProperty, string OutputKind) Collision,
             ConsumerProject Project,
-            (string Name, string Value)[] Properties)>(collisions.Length);
+            ImmutableArray<(string Name, string Value)> Properties)>(collisions.Length);
         try
         {
             foreach (var collision in collisions)
@@ -991,10 +941,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 var project = ConsumerProject.Create(IdentitySource);
                 var compilerOutput = project.CompilerOutputPath(
                     collision.OutputKind);
-                var properties = new List<(string Name, string Value)>
-                {
-                    (collision.PublicationProperty, compilerOutput)
-                };
+                var properties = ImmutableArray.CreateBuilder<(string Name, string Value)>();
+                properties.Add((collision.PublicationProperty, compilerOutput));
                 if (collision.OutputKind == "documentation")
                 {
                     properties.Add(("DocumentationFile", compilerOutput));
@@ -1003,18 +951,19 @@ public sealed class WorkerMsBuildIntegrationTests
                 collisionProjects.Add((
                     collision,
                     project,
-                    properties.ToArray()));
+                    properties.ToImmutable()));
             }
 
             // Every project and compiler-owned path is independent, so run the
             // negative builds together instead of serializing six full builds.
-            var builds = await Task.WhenAll(collisionProjects.Select(
+            var projects = collisionProjects.ToImmutable();
+            var builds = await Task.WhenAll(projects.Select(
                 static item => item.Project.BuildAsync(
                     verify: true,
                     item.Properties)));
-            for (var index = 0; index < collisionProjects.Count; index++)
+            for (var index = 0; index < projects.Length; index++)
             {
-                var (collision, project, _) = collisionProjects[index];
+                var (collision, project, _) = projects[index];
                 var compilerOutput = project.CompilerOutputPath(
                     collision.OutputKind);
                 var build = builds[index];
@@ -1044,13 +993,12 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         using var incremental = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(incremental.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(incremental.BuildAsync(verify: true, []));
         var targetPath = incremental.CompilerOutputPath("target");
         var targetBytes = await File.ReadAllBytesAsync(targetPath);
 
         var rejected = await incremental.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyResultFile", targetPath));
+            verify: true, [("SharpProofVerifyResultFile", targetPath)]);
 
         Assert.That(rejected.ExitCode, Is.Not.Zero, rejected.Output);
         Assert.That(
@@ -1066,14 +1014,11 @@ public sealed class WorkerMsBuildIntegrationTests
         System.ArgumentNullException.ThrowIfNull(outputKind);
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            ExecutableIdentitySource,
-            ("OutputType", "Exe"),
-            ("UseAppHost", "true"));
+            ExecutableIdentitySource, [("OutputType", "Exe"), ("UseAppHost", "true")]);
         var compilerOutput = project.CompilerOutputPath(outputKind);
 
         var build = await project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyResultFile", compilerOutput));
+            verify: true, [("SharpProofVerifyResultFile", compilerOutput)]);
 
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("compiler-owned outputs"));
@@ -1095,8 +1040,7 @@ public sealed class WorkerMsBuildIntegrationTests
             new System.Text.UTF8Encoding(false));
 
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: null,
-            ("SharpProofProfile", "strict")));
+            verify: null, [("SharpProofProfile", "strict")]));
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         var artifact = await CompilerManifestArtifact.ReadAsync(
@@ -1158,8 +1102,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(source);
 
         var build = await project.BuildAsync(
-            verify: null,
-            ("SharpProofProfile", "strict"));
+            verify: null, [("SharpProofProfile", "strict")]);
 
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("error SP0051"), build.Output);
@@ -1211,8 +1154,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
 
         var build = await project.BuildAsync(
-            verify: false,
-            ("SharpProofProfile", "strict"));
+            verify: false, [("SharpProofProfile", "strict")]);
 
         Assert.That(build.ExitCode, Is.Not.Zero);
         Assert.That(
@@ -1228,15 +1170,10 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            ReadReadmeMinimalContract(),
-            ("SharpProofProfile", "strict"),
-            ("SharpProofFeatures", "all"),
-            ("SharpProofVerifyPolicy", "require-proven"),
-            ("SharpProofAssumptionPolicy", "error"),
-            ("CheckForOverflowUnderflow",
-                checkOverflowUnderflow ? "true" : "false"));
+            ReadReadmeMinimalContract(), [            ("SharpProofProfile", "strict"),             ("SharpProofFeatures", "all"),             ("SharpProofVerifyPolicy", "require-proven"),             ("SharpProofAssumptionPolicy", "error"),             ("CheckForOverflowUnderflow",
+                checkOverflowUnderflow ? "true" : "false")]);
 
-        var build = await project.BuildAsync(verify: true);
+        var build = await project.BuildAsync(verify: true, []);
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
         var claim = response.ClaimResults.Single();
@@ -1265,13 +1202,9 @@ public sealed class WorkerMsBuildIntegrationTests
                     return value + 1;
                 }
             }
-            """,
-            ("SharpProofProfile", "strict"),
-            ("SharpProofFeatures", "all"),
-            ("SharpProofVerifyPolicy", "require-proven"),
-            ("SharpProofAssumptionPolicy", "error"));
+            """, [("SharpProofProfile", "strict"), ("SharpProofFeatures", "all"), ("SharpProofVerifyPolicy", "require-proven"), ("SharpProofAssumptionPolicy", "error")]);
 
-        var build = await project.BuildAsync(verify: true);
+        var build = await project.BuildAsync(verify: true, []);
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
         var claim = response.ClaimResults.Single();
@@ -1291,11 +1224,9 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var strict = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("SharpProofProfile", "strict"),
-            ("SharpProofFeatures", "contracts"));
+            IdentitySource, [("SharpProofProfile", "strict"), ("SharpProofFeatures", "contracts")]);
 
-        var strictBuild = await BuildOkAsync(strict.BuildAsync(verify: null));
+        var strictBuild = await BuildOkAsync(strict.BuildAsync(verify: null, []));
         var strictRequest = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(strict.RequestPath))!;
         var strictArtifact = await CompilerManifestArtifact.ReadAsync(
@@ -1314,9 +1245,8 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         using var legacy = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("SharpProofMode", "contracts"));
-        var legacyBuild = await legacy.BuildAsync(verify: true);
+            IdentitySource, [("SharpProofMode", "contracts")]);
+        var legacyBuild = await legacy.BuildAsync(verify: true, []);
 
         Assert.That(legacyBuild.ExitCode, Is.Not.Zero);
         Assert.That(
@@ -1341,20 +1271,16 @@ public sealed class WorkerMsBuildIntegrationTests
             """);
 
         var advisory = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyPolicy", "advisory")));
+            verify: true, [("SharpProofVerifyPolicy", "advisory")]));
         Assert.That(advisory.Output, Does.Contain("info SP0047"));
         var invocationManifest = project.CopyCompilerManifestForInvocation();
 
         var warning = await BuildOkAsync(project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", invocationManifest),
-            ("SharpProofVerifyPolicy", "warn-on-unknown")));
+[("_SharpProofCompilerManifestPath", invocationManifest), ("SharpProofVerifyPolicy", "warn-on-unknown")]));
         Assert.That(warning.Output, Does.Contain("warning SP0047"));
 
         var promotedWarning = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", invocationManifest),
-            ("SharpProofVerifyPolicy", "warn-on-unknown"),
-            ("MSBuildWarningsAsErrors", "SP0047"));
+[("_SharpProofCompilerManifestPath", invocationManifest), ("SharpProofVerifyPolicy", "warn-on-unknown"), ("MSBuildWarningsAsErrors", "SP0047")]);
         Assert.That(
             promotedWarning.ExitCode,
             Is.Not.Zero,
@@ -1362,8 +1288,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(promotedWarning.Output, Does.Contain("SP0047"));
 
         var required = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", invocationManifest),
-            ("SharpProofVerifyPolicy", "require-proven"));
+[("_SharpProofCompilerManifestPath", invocationManifest), ("SharpProofVerifyPolicy", "require-proven")]);
         Assert.That(required.ExitCode, Is.Not.Zero);
         Assert.That(required.Output, Does.Contain("error SP0047"));
         Assert.That(
@@ -1381,16 +1306,14 @@ public sealed class WorkerMsBuildIntegrationTests
             "return;\n" +
             "// trailing comment\n";
         using var project = ConsumerProject.CreateConfigured(
-            source,
-            ("OutputType", "Exe"));
+            source, [("OutputType", "Exe")]);
 
         Assert.That(
             await File.ReadAllTextAsync(Path.Combine(project.Root, "Subject.cs")),
             Is.EqualTo(source));
 
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyPolicy", "advisory")));
+            verify: true, [("SharpProofVerifyPolicy", "advisory")]));
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
         var callable = response.Manifest.Callables.Single();
@@ -1428,9 +1351,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
 
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyPolicy", " Advisory "),
-            ("SharpProofAssumptionPolicy", " Allow ")));
+            verify: true, [("SharpProofVerifyPolicy", " Advisory "), ("SharpProofAssumptionPolicy", " Allow ")]));
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         using (Assert.EnterMultipleScope())
@@ -1449,8 +1370,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource,
-            ("TargetFramework", "netstandard2.0"));
+            IdentitySource, [("TargetFramework", "netstandard2.0")]);
         var publication = Directory.CreateDirectory(
             Path.Combine(project.Root, "publication"));
         var request = Path.Combine(publication.FullName, "request.json");
@@ -1463,22 +1383,13 @@ public sealed class WorkerMsBuildIntegrationTests
             System.ArgumentNullException.ThrowIfNull(features);
             System.ArgumentNullException.ThrowIfNull(name);
             return project.BuildNoRestoreAsync(
-                verify: true,
-                ("BaseIntermediateOutputPath",
+                verify: true, [                ("BaseIntermediateOutputPath",
                     Path.Combine(project.Root, "obj-" + name) +
-                    Path.DirectorySeparatorChar),
-                ("BaseOutputPath",
+                    Path.DirectorySeparatorChar),                 ("BaseOutputPath",
                     Path.Combine(project.Root, "bin-" + name) +
-                    Path.DirectorySeparatorChar),
-                ("DefaultItemExcludesInProjectFolder",
-                    "obj-*/**"),
-                ("SharedCompilationId",
-                    s_sharedCompilationServerId + "-" + name),
-                ("SharpProofFeatures", features),
-                ("SharpProofVerifyRequestFile", request),
-                ("SharpProofVerifyResultFile", result),
-                ("SharpProofCompilerManifestFile", manifest),
-                ("SharpProofVerifySarifFile", sarif));
+                    Path.DirectorySeparatorChar),                 ("DefaultItemExcludesInProjectFolder",
+                    "obj-*/**"),                 ("SharedCompilationId",
+                    s_sharedCompilationServerId + "-" + name),                 ("SharpProofFeatures", features),                 ("SharpProofVerifyRequestFile", request),                 ("SharpProofVerifyResultFile", result),                 ("SharpProofCompilerManifestFile", manifest),                 ("SharpProofVerifySarifFile", sarif)]);
         }
 
         var firstIntermediate = Path.Combine(project.Root, "obj-first") +
@@ -1486,8 +1397,8 @@ public sealed class WorkerMsBuildIntegrationTests
         var secondIntermediate = Path.Combine(project.Root, "obj-second") +
             Path.DirectorySeparatorChar;
         var restores = await Task.WhenAll(
-            project.RestoreAsync(("BaseIntermediateOutputPath", firstIntermediate)),
-            project.RestoreAsync(("BaseIntermediateOutputPath", secondIntermediate)));
+            project.RestoreAsync([("BaseIntermediateOutputPath", firstIntermediate)]),
+            project.RestoreAsync([("BaseIntermediateOutputPath", secondIntermediate)]));
         Assert.That(restores, Has.All.Matches<BuildResult>(
             static restore => restore.ExitCode == 0));
 
@@ -1518,7 +1429,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var requestPath = project.VerifyOutputPath(
             "net8.0", "in-process-malformed-request.json");
         var resultPath = project.VerifyOutputPath(
@@ -1555,7 +1466,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var requestPath = project.VerifyOutputPath(
             "net8.0", "in-process-unclassified-request.json");
         var resultPath = project.VerifyOutputPath(
@@ -1598,7 +1509,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var requestPath = project.VerifyOutputPath(
             "net8.0", "in-process-canceled-request.json");
         var resultPath = project.VerifyOutputPath(
@@ -1629,15 +1540,12 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var nativeZ3Path = ContainerContract.ResolveZ3LibraryRequired();
         var baseline = await BuildOkAsync(project.BuildAsync(
-            verify: false,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path)));
+            verify: false, [("_SharpProofPackageNativeZ3Path", nativeZ3Path)]));
 
         var prelaunchId = Guid.NewGuid().ToString("N");
         var prelaunchRoot = project.CreateInvocationRunRoot(prelaunchId);
         var prelaunch = await project.RunVerificationTargetWithInvocationIdAsync(
-            prelaunchId,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path),
-            ("SharpProofVerifyPolicy", "invalid"));
+            prelaunchId, [("_SharpProofPackageNativeZ3Path", nativeZ3Path), ("SharpProofVerifyPolicy", "invalid")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1656,13 +1564,10 @@ public sealed class WorkerMsBuildIntegrationTests
             "{}");
         var launchFailure =
             await project.RunVerificationTargetWithInvocationIdAsync(
-                launchFailureId,
-                ("_SharpProofPackageNativeZ3Path", nativeZ3Path),
-                ("_SharpProofCompilerManifestPath", Path.Combine(
+                launchFailureId, [                ("_SharpProofPackageNativeZ3Path", nativeZ3Path),                 ("_SharpProofCompilerManifestPath", Path.Combine(
                     launchFailureRoot,
-                    "compiler-manifest.json")),
-                ("_SharpProofDotNetHost",
-                    Path.Combine(launchFailureRoot, "not-dotnet")));
+                    "compiler-manifest.json")),                 ("_SharpProofDotNetHost",
+                    Path.Combine(launchFailureRoot, "not-dotnet"))]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1684,8 +1589,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var nativeZ3Path = ContainerContract.ResolveZ3LibraryRequired();
         var baseline = await BuildOkAsync(project.BuildAsync(
-            verify: false,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path)));
+            verify: false, [("_SharpProofPackageNativeZ3Path", nativeZ3Path)]));
 
         var sentinelDirectory = Path.Combine(
             project.Root,
@@ -1699,13 +1603,7 @@ public sealed class WorkerMsBuildIntegrationTests
             .Replace(Path.DirectorySeparatorChar, '/');
 
         var result = await project.RunVerificationTargetWithInvocationIdAsync(
-            traversalId,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path),
-            ("_SharpProofInvocationIdIsSafe", "True"),
-            ("_SharpProofInvocationDirectoryIsContained", "True"),
-            ("_SharpProofCleanupInvocationIdIsSafe", "True"),
-            ("_SharpProofCleanupInvocationDirectoryIsContained", "True"),
-            ("SharpProofVerifyPolicy", "invalid"));
+            traversalId, [("_SharpProofPackageNativeZ3Path", nativeZ3Path), ("_SharpProofInvocationIdIsSafe", "True"), ("_SharpProofInvocationDirectoryIsContained", "True"), ("_SharpProofCleanupInvocationIdIsSafe", "True"), ("_SharpProofCleanupInvocationDirectoryIsContained", "True"), ("SharpProofVerifyPolicy", "invalid")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1744,8 +1642,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var nativeZ3Path = ContainerContract.ResolveZ3LibraryRequired();
         var baseline = await BuildOkAsync(project.BuildAsync(
-            verify: false,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path)));
+            verify: false, [("_SharpProofPackageNativeZ3Path", nativeZ3Path)]));
 
         var invocationId = Guid.NewGuid().ToString("N");
         var invocationRoot = project.CreateInvocationRunRoot(invocationId);
@@ -1757,9 +1654,7 @@ public sealed class WorkerMsBuildIntegrationTests
         try
         {
             failure = await project.RunVerificationTargetWithInvocationIdAsync(
-                invocationId,
-                ("_SharpProofPackageNativeZ3Path", nativeZ3Path),
-                ("SharpProofVerifyPolicy", "invalid"));
+                invocationId, [("_SharpProofPackageNativeZ3Path", nativeZ3Path), ("SharpProofVerifyPolicy", "invalid")]);
         }
         finally
         {
@@ -1794,11 +1689,9 @@ public sealed class WorkerMsBuildIntegrationTests
         var nativeZ3Path = ContainerContract.ResolveZ3LibraryRequired();
 
         var first = await project.BuildAsync(
-            verify: true,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path));
+            verify: true, [("_SharpProofPackageNativeZ3Path", nativeZ3Path)]);
         var second = await project.BuildAsync(
-            verify: true,
-            ("_SharpProofPackageNativeZ3Path", nativeZ3Path));
+            verify: true, [("_SharpProofPackageNativeZ3Path", nativeZ3Path)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1817,11 +1710,9 @@ public sealed class WorkerMsBuildIntegrationTests
             "public static class Subject { public static int Broken() { int unused; return 0; } }");
 
         var first = await project.BuildAsync(
-            verify: true,
-            ("WarningsAsErrors", "CS0168"));
+            verify: true, [("WarningsAsErrors", "CS0168")]);
         var second = await project.BuildAsync(
-            verify: true,
-            ("WarningsAsErrors", "CS0168"));
+            verify: true, [("WarningsAsErrors", "CS0168")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1843,9 +1734,7 @@ public sealed class WorkerMsBuildIntegrationTests
             "net8.0", "publication-failure.sarif");
         var failedManifestPath = project.CompilerManifestPath + ".failed";
         var baseline = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofCompilerManifestFile", failedManifestPath),
-            ("SharpProofVerifySarifFile", sarifPath)));
+            verify: true, [("SharpProofCompilerManifestFile", failedManifestPath), ("SharpProofVerifySarifFile", sarifPath)]));
         var request = await File.ReadAllTextAsync(project.RequestPath);
         var failedInvocationManifest =
             project.CompilerManifestPath + ".failed-invocation";
@@ -1864,12 +1753,7 @@ public sealed class WorkerMsBuildIntegrationTests
         try
         {
             failed = await project.RunVerificationTargetWithInvocationIdAsync(
-                invocationId,
-                ("_SharpProofCompilerManifestPath", failedInvocationManifest),
-                ("SharpProofCompilerManifestFile", failedManifestPath),
-                ("SharpProofVerifyPolicy", "advisory"),
-                ("SharpProofVerifySarifFile", sarifPath),
-                ("SharpProofVerifyCacheEnabled", "false"));
+                invocationId, [("_SharpProofCompilerManifestPath", failedInvocationManifest), ("SharpProofCompilerManifestFile", failedManifestPath), ("SharpProofVerifyPolicy", "advisory"), ("SharpProofVerifySarifFile", sarifPath), ("SharpProofVerifyCacheEnabled", "false")]);
         }
         finally
         {
@@ -1901,9 +1785,20 @@ public sealed class WorkerMsBuildIntegrationTests
         System.ArgumentNullException.ThrowIfNull(scenario);
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        _ = await BuildOkAsync(project.BuildAsync(verify: true));
+        _ = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var stableMembers = ImmutableArray.Create(project.RequestPath, project.ResultPath, project.CompilerManifestPath);
-        var original = stableMembers.ToDictionary(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), File.ReadAllBytes, StringComparer.Ordinal);
+        var originalBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
+        foreach (var path in stableMembers)
+        {
+            System.ArgumentNullException.ThrowIfNull(path);
+            var bytes = (await File.ReadAllBytesAsync(path)).ToImmutableArray();
+            if (originalBuilder.ContainsKey(path))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + path);
+            }
+            originalBuilder.Add(path, bytes);
+        }
+        var original = originalBuilder.ToImmutable();
         var invocationManifest = project.CopyCompilerManifestForInvocation();
         var privateRequest = project.VerifyOutputPath("net8.0", "parent-request.json");
         var privateResult = project.VerifyOutputPath("net8.0", "parent-result.json");
@@ -2021,13 +1916,12 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var request = await File.ReadAllTextAsync(project.RequestPath);
         var result = await File.ReadAllTextAsync(project.ResultPath);
 
         var failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofVerifyResultFile", project.RequestPath));
+[("_SharpProofCompilerManifestPath", project.CompilerManifestPath), ("SharpProofVerifyResultFile", project.RequestPath)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2044,8 +1938,7 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofVerifySarifFile", project.RequestPath));
+[("_SharpProofCompilerManifestPath", project.CompilerManifestPath), ("SharpProofVerifySarifFile", project.RequestPath)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2062,8 +1955,7 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofVerifySarifFile", project.ResultPath));
+[("_SharpProofCompilerManifestPath", project.CompilerManifestPath), ("SharpProofVerifySarifFile", project.ResultPath)]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2091,11 +1983,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var companionBytes = await File.ReadAllBytesAsync(collisionCompanion);
         var privateManifest = project.CopyCompilerManifestForInvocation();
         var failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", privateManifest),
-            ("SharpProofWorkerPath", collisionWorker),
-            ("_SharpProofTestWorkerPath", collisionWorker),
-            ("SharpProofVerifyResultFile", collisionCompanion),
-            ("_SharpProofSkipTestInvalidation", "true"));
+[("_SharpProofCompilerManifestPath", privateManifest), ("SharpProofWorkerPath", collisionWorker), ("_SharpProofTestWorkerPath", collisionWorker), ("SharpProofVerifyResultFile", collisionCompanion), ("_SharpProofSkipTestInvalidation", "true")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2137,11 +2025,7 @@ public sealed class WorkerMsBuildIntegrationTests
             File.CreateSymbolicLink(declaredWorker, collisionWorker);
         }
         var failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", project.CopyCompilerManifestForInvocation()),
-            ("SharpProofWorkerPath", declaredWorker),
-            ("_SharpProofTestWorkerPath", declaredWorker),
-            ("SharpProofVerifyResultFile", symbolicAlias),
-            ("_SharpProofSkipTestInvalidation", "true"));
+[("_SharpProofCompilerManifestPath", project.CopyCompilerManifestForInvocation()), ("SharpProofWorkerPath", declaredWorker), ("_SharpProofTestWorkerPath", declaredWorker), ("SharpProofVerifyResultFile", symbolicAlias), ("_SharpProofSkipTestInvalidation", "true")]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2160,7 +2044,7 @@ public sealed class WorkerMsBuildIntegrationTests
         ConsumerProject project)
     {
         System.ArgumentNullException.ThrowIfNull(project);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
 
         var sourceWorker = WorkerOutputPath();
         var collisionWorker = project.CollisionWorkerPath;
@@ -2182,7 +2066,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
+        var baseline = await BuildOkAsync(project.BuildAsync(verify: true, []));
 
         var stableRequest = await File.ReadAllBytesAsync(project.RequestPath);
         var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
@@ -2191,8 +2075,7 @@ public sealed class WorkerMsBuildIntegrationTests
         foreach (var cachePath in ImmutableArray.Create(project.ResultPath, project.RequestPath, project.CompilerManifestPath, WorkerOutputPath()))
         {
             var failed = await project.RunVerificationTargetAsync(
-                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-                ("SharpProofVerifyCacheDirectory", cachePath));
+[("_SharpProofCompilerManifestPath", project.CompilerManifestPath), ("SharpProofVerifyCacheDirectory", cachePath)]);
 
             using (Assert.EnterMultipleScope())
             {
@@ -2241,19 +2124,16 @@ public sealed class WorkerMsBuildIntegrationTests
             """);
 
         var allowed = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofAssumptionPolicy", "allow")));
+            verify: true, [("SharpProofAssumptionPolicy", "allow")]));
         Assert.That(allowed.Output, Does.Contain("info SP0048"));
         var invocationManifest = project.CopyCompilerManifestForInvocation();
 
         var warning = await BuildOkAsync(project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", invocationManifest),
-            ("SharpProofAssumptionPolicy", "warn")));
+[("_SharpProofCompilerManifestPath", invocationManifest), ("SharpProofAssumptionPolicy", "warn")]));
         Assert.That(warning.Output, Does.Contain("warning SP0048"));
 
         var error = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", invocationManifest),
-            ("SharpProofAssumptionPolicy", "error"));
+[("_SharpProofCompilerManifestPath", invocationManifest), ("SharpProofAssumptionPolicy", "error")]);
         Assert.That(error.ExitCode, Is.Not.Zero);
         Assert.That(error.Output, Does.Contain("error SP0048"));
         Assert.That(
@@ -2278,9 +2158,7 @@ public sealed class WorkerMsBuildIntegrationTests
             """);
 
         var build = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("SharpProofFeatures", "effects"),
-            ("SharpProofAssumptionPolicy", "allow")));
+            verify: true, [("SharpProofFeatures", "effects"), ("SharpProofAssumptionPolicy", "allow")]));
         Assert.That(build.Output, Does.Contain("info SP0048"));
 
         var request = WorkerProtocolJson.DeserializeRequest(
@@ -2318,8 +2196,7 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             """);
         var declared = await trusted.BuildAsync(
-            verify: true,
-            ("SharpProofAssumptionPolicy", "error"));
+            verify: true, [("SharpProofAssumptionPolicy", "error")]);
         Assert.That(declared.ExitCode, Is.Not.Zero);
         Assert.That(declared.Output, Does.Contain("error SP0048"));
         Assert.That(
@@ -2335,11 +2212,11 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var first = await BuildOkAsync(project.BuildAsync(verify: true));
+        var first = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var firstJson = await File.ReadAllTextAsync(project.ResultPath);
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
-        var second = await BuildOkAsync(project.BuildAsync(verify: true));
+        var second = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var secondJson = await File.ReadAllTextAsync(project.ResultPath);
         var secondWrite = File.GetLastWriteTimeUtc(project.ResultPath);
         var firstResponse = WorkerProtocolJson.DeserializeResponse(firstJson)!;
@@ -2370,11 +2247,10 @@ public sealed class WorkerMsBuildIntegrationTests
         const uint changedMethodRlimit =
             WorkerBudgets.DefaultMethodRlimit - 1;
         var changed = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            (
+            verify: true, [            (
                 "SharpProofVerifyMethodRlimit",
                 changedMethodRlimit.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture))));
+                    System.Globalization.CultureInfo.InvariantCulture))]));
         var changedRequest = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         var changedResponse = WorkerProtocolJson.DeserializeResponse(
@@ -2395,20 +2271,13 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var first = await BuildOkAsync(project.BuildAsync(verify: true));
+        var first = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var firstResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
         var changed = await BuildOkAsync(project.BuildAsync(
-            verify: true,
-            ("LangVersion", "13.0"),
-            ("Nullable", "annotations"),
-            ("CheckForOverflowUnderflow", "true"),
-            ("Optimize", "false"),
-            ("AllowUnsafeBlocks", "true"),
-            ("Deterministic", "false"),
-            ("PlatformTarget", "x64")));
+            verify: true, [("LangVersion", "13.0"), ("Nullable", "annotations"), ("CheckForOverflowUnderflow", "true"), ("Optimize", "false"), ("AllowUnsafeBlocks", "true"), ("Deterministic", "false"), ("PlatformTarget", "x64")]));
         var changedRequest = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         var changedResponse = WorkerProtocolJson.DeserializeResponse(
@@ -2445,7 +2314,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         using var project = ConsumerProject.Create(IdentitySource);
 
-        var build = await project.BuildAsync(verify: true);
+        var build = await project.BuildAsync(verify: true, []);
 
         Assert.That(build.ExitCode, Is.Not.Zero);
         Assert.That(
@@ -2479,7 +2348,7 @@ public sealed class WorkerMsBuildIntegrationTests
             .GroupBy(
                 static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName),
                 StringComparer.Ordinal)
-            .ToDictionary(
+            .ToImmutableDictionary(
                 static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
                 static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Last().Value),
                 StringComparer.Ordinal);
@@ -2872,7 +2741,7 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             """,
             useSpaces: true);
-        var build = await BuildOkAsync(project.BuildAsync(verify: true));
+        var build = await BuildOkAsync(project.BuildAsync(verify: true, []));
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         var artifact = await CompilerManifestArtifact.ReadAsync(
@@ -2902,7 +2771,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 }
             }
             """);
-        var refutedBuild = await refuted.BuildAsync(verify: true);
+        var refutedBuild = await refuted.BuildAsync(verify: true, []);
         Assert.That(refutedBuild.ExitCode, Is.Not.Zero);
         Assert.That(refutedBuild.Output, Does.Contain("SP0051"));
         var response = WorkerProtocolJson.DeserializeResponse(
@@ -2917,7 +2786,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var refutedInvocationManifest =
             refuted.CopyCompilerManifestForInvocation();
         var repeatedRefutation = await refuted.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", refutedInvocationManifest));
+[("_SharpProofCompilerManifestPath", refutedInvocationManifest)]);
         Assert.That(
             repeatedRefutation.ExitCode,
             Is.Not.Zero,
@@ -2928,11 +2797,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         using var timedOut = ConsumerProject.Create(IdentitySource);
         var timedOutBuild = await timedOut.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyPolicy", "advisory"),
-            ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
-            ("SharpProofVerifyProjectWallTimeMilliseconds", "1"),
-            ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
+            verify: true, [("SharpProofVerifyPolicy", "advisory"), ("SharpProofVerifyMethodWallTimeMilliseconds", "1"), ("SharpProofVerifyProjectWallTimeMilliseconds", "1"), ("SharpProofVerifyTerminationGraceMilliseconds", "1")]);
         Assert.That(File.Exists(timedOut.ResultPath), Is.True, timedOutBuild.Output);
         var timedOutResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(timedOut.ResultPath))!;
@@ -2966,11 +2831,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         using var strictTimeout = ConsumerProject.Create(IdentitySource);
         var strictTimeoutBuild = await strictTimeout.BuildAsync(
-            verify: true,
-            ("SharpProofVerifyPolicy", "require-proven"),
-            ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
-            ("SharpProofVerifyProjectWallTimeMilliseconds", "1"),
-            ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
+            verify: true, [("SharpProofVerifyPolicy", "require-proven"), ("SharpProofVerifyMethodWallTimeMilliseconds", "1"), ("SharpProofVerifyProjectWallTimeMilliseconds", "1"), ("SharpProofVerifyTerminationGraceMilliseconds", "1")]);
         Assert.That(strictTimeoutBuild.ExitCode, Is.Not.Zero);
         Assert.That(
             strictTimeoutBuild.Output,
@@ -3322,18 +3183,24 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal static ConsumerProject CreateConfigured(
             string source,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             System.ArgumentNullException.ThrowIfNull(source);
             return CreateCore(source, useSpaces: false, properties);
         }
 
         internal static ConsumerProject CreateWithPercentPath(
             string source,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             System.ArgumentNullException.ThrowIfNull(source);
             return CreateCore(
                 source,
@@ -3362,10 +3229,13 @@ public sealed class WorkerMsBuildIntegrationTests
         private static ConsumerProject CreateCore(
             string source,
             bool useSpaces,
-            (string Name, string Value)[] properties,
+            ImmutableArray<(string Name, string Value)> properties,
             string? explicitName = null)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             System.ArgumentNullException.ThrowIfNull(source);
             var name = explicitName ?? (useSpaces
                 ? "consumer project " + Guid.NewGuid().ToString("N")
@@ -3400,9 +3270,12 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> BuildAsync(
             bool? verify,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return BuildCoreAsync(
                 verify,
                 buildInParallel: null,
@@ -3411,9 +3284,12 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> BuildNoRestoreAsync(
             bool? verify,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return BuildCoreAsync(
                 verify,
                 buildInParallel: null,
@@ -3423,9 +3299,12 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> BuildSerialAsync(
             bool? verify,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return BuildCoreAsync(
                 verify,
                 buildInParallel: false,
@@ -3434,9 +3313,12 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> BuildParallelAsync(
             bool? verify,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return BuildCoreAsync(
                 verify,
                 buildInParallel: true,
@@ -3446,10 +3328,13 @@ public sealed class WorkerMsBuildIntegrationTests
         private async Task<BuildResult> BuildCoreAsync(
             bool? verify,
             bool? buildInParallel,
-            (string Name, string Value)[] properties,
+            ImmutableArray<(string Name, string Value)> properties,
             bool forceNoRestore = false)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             var restoreSensitive = properties.Any(
                 static property => IsRestoreSensitiveProperty(property.Name));
             if (restoreSensitive)
@@ -3507,9 +3392,12 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         internal async Task<BuildResult> RestoreAsync(
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             var restoreSensitive = properties.Any(
                 static property => IsRestoreSensitiveProperty(property.Name));
             if (restoreSensitive)
@@ -3558,9 +3446,12 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> RebuildParallelAsync(
             bool? verify,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return RebuildCoreAsync(
                 verify,
                 buildInParallel: true,
@@ -3570,9 +3461,12 @@ public sealed class WorkerMsBuildIntegrationTests
         private Task<BuildResult> RebuildCoreAsync(
             bool? verify,
             bool? buildInParallel,
-            (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             var arguments = ImmutableArray.CreateBuilder<string>();
             arguments.AddRange((ImmutableArray<string>)[
                 "build",
@@ -3603,10 +3497,13 @@ public sealed class WorkerMsBuildIntegrationTests
             return RunDotNetAsync(arguments.ToImmutable());
         }
 
-        internal async Task<IReadOnlyDictionary<string, string>>
-            EvaluatePropertiesAsync(params string[] propertyNames)
+        internal async Task<ImmutableDictionary<string, string>>
+            EvaluatePropertiesAsync(ImmutableArray<string> propertyNames)
         {
-            System.ArgumentNullException.ThrowIfNull(propertyNames, nameof(propertyNames));
+            if (propertyNames.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(propertyNames));
+            }
             var result = await RunDotNetAsync([
                 "msbuild",
                 ProjectPath,
@@ -3618,19 +3515,27 @@ public sealed class WorkerMsBuildIntegrationTests
                 throw new InvalidOperationException(result.Output);
             }
             using var document = JsonDocument.Parse(result.Output);
-            return propertyNames.ToDictionary(
-                static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
-                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (document.RootElement
-                    .GetProperty("Properties")
-                    .GetProperty(name)
-                    .GetString() ?? string.Empty),
-                StringComparer.Ordinal);
+            var properties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+            foreach (var name in propertyNames)
+            {
+                System.ArgumentNullException.ThrowIfNull(name);
+                var value = document.RootElement.GetProperty("Properties").GetProperty(name).GetString() ?? string.Empty;
+                if (properties.ContainsKey(name))
+                {
+                    throw new ArgumentException("An item with the same key has already been added. Key: " + name);
+                }
+                properties.Add(name, value);
+            }
+            return properties.ToImmutable();
         }
 
         internal Task<BuildResult> RunVerificationTargetAsync(
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             return RunVerificationTargetCoreAsync(
                 Guid.NewGuid().ToString("N"),
                 properties);
@@ -3647,18 +3552,24 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal Task<BuildResult> RunVerificationTargetWithInvocationIdAsync(
             string invocationId,
-            params (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             System.ArgumentNullException.ThrowIfNull(invocationId);
             return RunVerificationTargetCoreAsync(invocationId, properties);
         }
 
         private Task<BuildResult> RunVerificationTargetCoreAsync(
             string invocationId,
-            (string Name, string Value)[] properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             System.ArgumentNullException.ThrowIfNull(invocationId);
             var arguments = ImmutableArray.CreateBuilder<string>();
             arguments.AddRange((ImmutableArray<string>)[
@@ -3756,9 +3667,12 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         private static string CreateProjectXml(
-            IEnumerable<(string Name, string Value)> properties)
+            ImmutableArray<(string Name, string Value)> properties)
         {
-            System.ArgumentNullException.ThrowIfNull(properties);
+            if (properties.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(properties));
+            }
             var template = s_projectTemplate.Value;
             var configuredProperties = string.Join(
                 Environment.NewLine,

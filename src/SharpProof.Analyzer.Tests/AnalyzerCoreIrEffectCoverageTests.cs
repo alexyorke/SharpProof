@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -115,7 +116,7 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
             "using SharpProof.Attributes; public static class Fixture { " +
             "[AllowedCapabilities(SharpProofCapability.None)] public static int Target() => Api.Value(); }",
             "effects", ["SP0016"], new SharpProofAnalyzer(factory), additionalReferences: [external]);
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0016");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0016"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "IO");
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         var compilation = (CSharpCompilation)factory.Session!.Compilation;

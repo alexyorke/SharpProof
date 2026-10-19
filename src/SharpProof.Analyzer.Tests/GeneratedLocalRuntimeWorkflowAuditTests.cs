@@ -53,6 +53,6 @@ public sealed class GeneratedLocalRuntimeWorkflowAuditTests
         });
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,
             profile: profile, features: "effects");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
     }
 }

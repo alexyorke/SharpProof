@@ -42,7 +42,7 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         Assert.That(suppressed, Is.EqualTo(suppressing && hasReason));
         if (!hasReason)
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
             Assert.That(diagnostics[0].Location, Is.SameAs(Location.None));
         }

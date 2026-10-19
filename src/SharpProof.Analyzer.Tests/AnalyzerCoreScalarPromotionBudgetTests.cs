@@ -41,7 +41,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         Assert.That(factory.Session, Is.Not.Null);
         Assert.That(targetOutcomeCount, Is.EqualTo(1));
         Assert.That(actualOutcome, Is.EqualTo(testCase.ExpectedOutcome));
-        AnalyzerTestHost.AssertIds(diagnostics, testCase.ExpectedDiagnosticIds.ToArray());
+        AnalyzerTestHost.AssertIds(diagnostics, testCase.ExpectedDiagnosticIds);
     }
 
     private static CompilerObservation InspectCompiler(FrozenCase testCase)
@@ -122,15 +122,16 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
     {
         System.ArgumentNullException.ThrowIfNull(root);
         var count = 0;
-        var pending = new Stack<IOperation>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             count++;
             foreach (var child in current.ChildOperations)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
 
@@ -141,11 +142,12 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
     {
         System.ArgumentNullException.ThrowIfNull(root);
         var count = 0;
-        var pending = new Stack<IOperation>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        var pending = ImmutableStack<IOperation>.Empty;
+        pending = pending.Push(root);
+        while (!pending.IsEmpty)
         {
-            var current = pending.Pop();
+            var current = pending.Peek();
+            pending = pending.Pop();
             if (current is IConversionOperation { IsImplicit: true } conversion &&
                 conversion.Operand.Type?.SpecialType == SpecialType.System_Int32 &&
                 conversion.Type?.SpecialType == SpecialType.System_Int64)
@@ -155,7 +157,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
 
             foreach (var child in current.ChildOperations)
             {
-                pending.Push(child);
+                pending = pending.Push(child);
             }
         }
 

@@ -40,11 +40,11 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         using var image = new MemoryStream();
         var emitted = producer.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
-        var imageBytes = image.ToArray();
+        var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllTextAsync(Path.Combine(directory, "producer-source.cs"), OrdinarySource);
-        await File.WriteAllBytesAsync(Path.Combine(directory, "emitted-producer.dll"), imageBytes);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "emitted-producer.dll"), imageBytes.ToArray());
 
-        using var ownedModule = ModuleMetadata.CreateFromImage(ImmutableArray.CreateRange(imageBytes));
+        using var ownedModule = ModuleMetadata.CreateFromImage(imageBytes);
         using var ownedAssembly = AssemblyMetadata.Create(ownedModule);
         var reference = ownedAssembly.GetReference();
         var consumer = CreateCompilation("OwnedStorageConsumer", "public sealed class Consumer { }\n",
@@ -108,7 +108,7 @@ public sealed class ExplicitLayoutFieldAuthorityFallbackTests
         await Save(directory, "live-metadata-binding.json", new
         {
             SourceSHA256 = Hash(OrdinarySource),
-            PESHA256 = Convert.ToHexString(SHA256.HashData(imageBytes)),
+            PESHA256 = Convert.ToHexString(SHA256.HashData(imageBytes.AsSpan())),
             OwnerToken = ownerToken,
             FieldToken = fieldToken,
             Mvid = mvid,

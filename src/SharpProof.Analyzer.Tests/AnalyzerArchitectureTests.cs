@@ -259,14 +259,14 @@ public sealed class AnalyzerArchitectureTests
         }
     }
 
-    private static Dictionary<string, ReleaseRule>
+    private static ImmutableDictionary<string, ReleaseRule>
         ReadReleaseSection(
             string path,
             string section)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         System.ArgumentNullException.ThrowIfNull(section);
-        var result = new Dictionary<string, ReleaseRule>(
+        var result = ImmutableDictionary.CreateBuilder<string, ReleaseRule>(
             StringComparer.Ordinal);
         var inSection = false;
         foreach (var line in File.ReadLines(path))
@@ -301,11 +301,12 @@ public sealed class AnalyzerArchitectureTests
                 columns[1],
                 columns[2]);
             Assert.That(
-                result.TryAdd(rule.Id, rule),
+                !result.ContainsKey(rule.Id),
                 Is.True,
                 "Duplicate release row " + rule.Id + " in " + path + ".");
+            result.Add(rule.Id, rule);
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static string ReleaseSeverity(

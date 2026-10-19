@@ -416,7 +416,12 @@ public sealed partial class TotalLoweringContext
                 var arguments = named.TypeArguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : Substitute(argument, depth + 1)!).ToImmutableArray();
                 if (!SymbolEqualityComparer.Default.Equals(definition, named.ConstructedFrom) ||
                     arguments.Where((argument, index) => argument is null ? throw new ArgumentNullException(nameof(argument)) : !SymbolEqualityComparer.Default.Equals(argument, named.TypeArguments[index])).Any())
-                { return arguments.Length == 0 ? definition : definition.Construct(arguments.ToArray()); }
+                {
+                    var annotations = arguments.Select(static argument => argument is null
+                        ? throw new ArgumentNullException(nameof(argument))
+                        : argument.NullableAnnotation).ToImmutableArray();
+                    return arguments.Length == 0 ? definition : definition.Construct(arguments, annotations);
+                }
             }
             return value;
         }

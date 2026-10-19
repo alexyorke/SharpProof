@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -71,7 +72,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
             new DictionaryAnalyzerConfigOptions([(key, value)]));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation, options, new SharpProofAnalyzer());
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0025"]);
         Assert.That(diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("compilation-global"));
     }
@@ -95,7 +96,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
 
         using (Assert.EnterMultipleScope())
         {
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0025", "SP0025");
+            AnalyzerTestHost.AssertIds(diagnostics, ["SP0025", "SP0025"]);
             Assert.That(
                 diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
                     CultureInfo.InvariantCulture))),

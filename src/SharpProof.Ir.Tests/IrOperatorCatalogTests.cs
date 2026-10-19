@@ -124,7 +124,7 @@ public sealed class IrOperatorCatalogTests
     }
 
     private static void AssertOperatorMetadata<TEnum, TMetadata>(
-        IReadOnlyDictionary<TEnum, TMetadata> expected,
+        ImmutableDictionary<TEnum, TMetadata> expected,
         ImmutableArray<TEnum> values,
         Func<TEnum, int> numericValue,
         Func<TMetadata, int> expectedNumericValue,

@@ -97,7 +97,7 @@ public sealed partial class NativeSpecifiedCallTests
         {
             var runtime = load.LoadFromStream(emitted).GetType("C")!.GetMethod("Target")!;
             var runtimeElement = runtime.GetParameters()[0].ParameterType.GetElementType()!;
-            object[] boundaries = element switch
+            ImmutableArray<object> boundaries = element switch
             {
                 "bool" => [false, true],
                 "char" => [char.MinValue, '\ud800', char.MaxValue],

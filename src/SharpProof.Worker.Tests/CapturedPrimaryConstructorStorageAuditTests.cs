@@ -182,18 +182,24 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
 
         var manifestPath = Path.Combine(evidence, "public-compiler-manifest.json");
         Assert.That(File.Exists(manifestPath), Is.False);
-        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        ImmutableArray<(string Key, string Value)> optionEntries =
+        [
+            ("build_property._SharpProofCompilerManifestPath", manifestPath),
+            ("build_property._SharpProofCompilationTargetFramework", "net9.0"),
+            ("build_property._SharpProofProjectDirectory", evidence),
+            ("build_property.SharpProofVerifyMaximumExpressionDepth", WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture)),
+            ("build_property.SharpProofProfile", "advisory"),
+            ("build_property.SharpProofFeatures", "all"),
+            ("build_property.SharpProofVerifyPolicy", "advisory"),
+            ("build_property.SharpProofAssumptionPolicy", "allow")
+        ];
+        var optionsBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in optionEntries)
         {
-            ["build_property._SharpProofCompilerManifestPath"] = manifestPath,
-            ["build_property._SharpProofCompilationTargetFramework"] = "net9.0",
-            ["build_property._SharpProofProjectDirectory"] = evidence,
-            ["build_property.SharpProofVerifyMaximumExpressionDepth"] = WorkerBudgets.DefaultMaximumExpressionDepth.ToString(CultureInfo.InvariantCulture),
-            ["build_property.SharpProofProfile"] = "advisory",
-            ["build_property.SharpProofFeatures"] = "all",
-            ["build_property.SharpProofVerifyPolicy"] = "advisory",
-            ["build_property.SharpProofAssumptionPolicy"] = "allow"
-        };
-        await Save(evidence, "collector-options.json", options);
+            optionsBuilder[key] = value;
+        }
+        var options = optionsBuilder.ToImmutable();
+        await SaveOptions(evidence, optionEntries);
         var analyzerOptions = new AnalyzerOptions([], new OptionsProvider(options));
         var collectorDiagnostics = await compilation.WithAnalyzers([new FinalCompilationCollectorAnalyzer()], analyzerOptions)
             .GetAnalyzerDiagnosticsAsync();
@@ -576,7 +582,27 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         await File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value));
     }
 
-    private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
+    private static async Task SaveOptions(string directory, ImmutableArray<(string Key, string Value)> entries)
+    {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        if (entries.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(entries));
+        }
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var (key, value) in entries)
+            {
+                writer.WriteString(key, value);
+            }
+            writer.WriteEndObject();
+        }
+        await File.WriteAllBytesAsync(Path.Combine(directory, "collector-options.json"), stream.ToArray());
+    }
+
+    private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
         public override AnalyzerConfigOptions GlobalOptions => _options;
@@ -594,9 +620,9 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    private sealed class DictionaryOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
     {
-        private readonly ImmutableDictionary<string, string> _guarded_values = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase, values ?? throw new System.ArgumentNullException(nameof(values)));
+        private readonly ImmutableDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
             if (_guarded_values.TryGetValue(key, out var found))

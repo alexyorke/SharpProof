@@ -166,7 +166,7 @@ public static class HornInvariantSearch
                     _relations.AddUnique(name, relation);
                     _relationOrder.Add(relation);
                 }
-                return Own(context.MkApp(relation, arguments.ToArray()));
+                return Own(context.MkApp(relation, arguments));
             }
             if (expression.IsConst && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
@@ -209,9 +209,9 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_IMPLIES => context.MkImplies((BoolExpr)operands[0], (BoolExpr)operands[1]),
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
-                Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers.ToArray()),
+                Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers),
                 Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers.ToArray()),
-                Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers.ToArray()),
+                Z3_decl_kind.Z3_OP_BMUL when arithmetic => context.MkMul(numbers),
                 Z3_decl_kind.Z3_OP_BNEG when arithmetic => context.MkUnaryMinus(numbers[0]),
                 Z3_decl_kind.Z3_OP_SIGN_EXT when arithmetic => operands[0],
                 // The signed reading of the extended value, read unsigned.

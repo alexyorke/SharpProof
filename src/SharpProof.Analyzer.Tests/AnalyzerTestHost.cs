@@ -38,9 +38,12 @@ internal static class AnalyzerTestHost
 
     internal static void AssertIds(
         IEnumerable<Diagnostic> diagnostics,
-        params string[] expected)
+        ImmutableArray<string> expected)
     {
-        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
+        if (expected.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(expected));
+        }
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         var actual = diagnostics.ToImmutableArray();
         Assert.That(
@@ -129,9 +132,12 @@ internal static class AnalyzerTestHost
 
     internal static CSharpCompilation WithEnabledDiagnostics(
         CSharpCompilation compilation,
-        params string[] enabledIds)
+        ImmutableArray<string> enabledIds)
     {
-        System.ArgumentNullException.ThrowIfNull(enabledIds, nameof(enabledIds));
+        if (enabledIds.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(enabledIds));
+        }
         System.ArgumentNullException.ThrowIfNull(compilation);
         var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
         var options = compilation.Options.WithSpecificDiagnosticOptions(

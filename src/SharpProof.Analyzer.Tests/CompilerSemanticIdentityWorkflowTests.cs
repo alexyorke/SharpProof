@@ -130,11 +130,12 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
             var operation = (IInvocationOperation)model.GetOperation(ensures)!;
             var foundAnonymousParameter = false;
-            var pending = new Stack<IOperation>();
-            pending.Push(operation);
-            while (pending.Count != 0)
+            var pending = ImmutableStack<IOperation>.Empty;
+            pending = pending.Push(operation);
+            while (!pending.IsEmpty)
             {
-                var current = pending.Pop();
+                var current = pending.Peek();
+                pending = pending.Pop();
                 if (current is IParameterReferenceOperation parameterReference &&
                     parameterReference.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction } owner)
                 {
@@ -144,7 +145,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 }
                 foreach (var child in current.ChildOperations)
                 {
-                    pending.Push(child);
+                    pending = pending.Push(child);
                 }
             }
             Assert.That(foundAnonymousParameter, Is.True, "The actual SDK predicate must contain an anonymous-function-owned parameter.");

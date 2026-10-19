@@ -48,7 +48,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         AssertNoCompilationErrors(compilation);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [Test]
@@ -95,7 +95,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         }
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [TestCase(false)]
@@ -153,7 +153,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         AssertNoCompilationErrors(compilation);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     private static async Task AssertMisuseAsync(

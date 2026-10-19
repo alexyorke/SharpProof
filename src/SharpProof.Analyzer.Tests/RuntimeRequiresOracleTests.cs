@@ -13,13 +13,14 @@ public sealed class RuntimeRequiresOracleTests
     public async Task RandomizedRequiresDiagnosticsMatchRuntimePredicates()
     {
         var random = new Random(41873);
-        var cases = Enumerable.Range(0, 192)
+        var pendingCases = Enumerable.Range(0, 192)
             .Select(index => new RangeCase(
                 index,
                 random.Next(-100, 101),
                 random.Next(-100, 101),
                 random.Next(-100, 101)))
             .ToImmutableArray();
+        var caseBuilder = ImmutableArray.CreateBuilder<RangeCase>(pendingCases.Length);
         var lines = ImmutableArray.CreateBuilder<string>();
         lines.AddRange(ImmutableArray.Create(
             "using System;",
@@ -31,14 +32,15 @@ public sealed class RuntimeRequiresOracleTests
             "    }",
             "    private static int Throwing() =>",
             "        throw new InvalidOperationException();"));
-        foreach (var item in cases)
+        foreach (var item in pendingCases)
         {
             lines.Add($"    public static void Case{item.Index:D3}() {{");
             lines.Add(
                 $"        Range({item.Value}, {item.Minimum}, {item.Maximum});");
-            item.CallLine = lines.Count - 1;
+            caseBuilder.Add(item with { CallLine = lines.Count - 1 });
             lines.Add("    }");
         }
+        var cases = caseBuilder.MoveToImmutable();
         lines.Add("    public static void ThrowingArgument() {");
         lines.Add("        Range(-1, Throwing(), 0);");
         var throwingArgumentLine = lines.Count - 1;
@@ -117,19 +119,5 @@ public sealed class RuntimeRequiresOracleTests
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
     }
 
-    private sealed class RangeCase(
-        int index,
-        int value,
-        int minimum,
-        int maximum)
-    {
-        internal int Index { get; } = index;
-        internal int Value { get; } = value;
-        internal int Minimum { get; } = minimum;
-        internal int Maximum { get; } = maximum;
-        internal int CallLine
-        {
-            get; set;
-        }
-    }
+    private sealed record RangeCase(int Index, int Value, int Minimum, int Maximum, int CallLine = 0);
 }

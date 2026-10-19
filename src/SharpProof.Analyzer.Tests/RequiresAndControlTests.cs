@@ -924,7 +924,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.StartWith(
@@ -1045,7 +1045,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027", "SP0027"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
@@ -1268,7 +1268,7 @@ public sealed class RequiresAndControlTests
             profile: "strict",
             features: "contracts");
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(
             diagnostics.Single().Severity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -1304,7 +1304,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             []);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
@@ -1489,7 +1489,7 @@ public sealed class RequiresAndControlTests
             "effects",
             ["SP0002", "SP0024"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "TrustedWithoutSummary");
     }
 

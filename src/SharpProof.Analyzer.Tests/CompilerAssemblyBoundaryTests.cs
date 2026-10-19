@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using NUnit.Framework;
@@ -32,11 +33,13 @@ public sealed class CompilerAssemblyBoundaryTests
     [Test]
     public void CollectorAndSharedSemanticsHaveNoAnalyzerRuntimeDependency()
     {
-        var pending = new Stack<Assembly>();
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        pending.Push(typeof(FinalCompilationCollectorAnalyzer).Assembly);
-        while (pending.TryPop(out var assembly))
+        var pending = ImmutableStack<Assembly>.Empty;
+        var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        pending = pending.Push(typeof(FinalCompilationCollectorAnalyzer).Assembly);
+        while (!pending.IsEmpty)
         {
+            var assembly = pending.Peek();
+            pending = pending.Pop();
             var name = assembly.GetName().Name!;
             if (!visited.Add(name))
             {
@@ -50,11 +53,12 @@ public sealed class CompilerAssemblyBoundaryTests
             {
                 if (reference.Name!.StartsWith("SharpProof.", StringComparison.Ordinal))
                 {
-                    pending.Push(Assembly.Load(reference));
+                    pending = pending.Push(Assembly.Load(reference));
                 }
             }
         }
-        Assert.That(visited, Does.Contain("SharpProof.Compiler.Semantics"));
-        Assert.That(visited, Does.Contain("SharpProof.CompilerArtifact"));
+        var visitedSnapshot = visited.ToImmutable();
+        Assert.That(visitedSnapshot, Does.Contain("SharpProof.Compiler.Semantics"));
+        Assert.That(visitedSnapshot, Does.Contain("SharpProof.CompilerArtifact"));
     }
 }

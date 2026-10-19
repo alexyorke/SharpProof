@@ -93,7 +93,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
     }
 
     [Test]
@@ -109,7 +109,7 @@ public sealed class PrimaryConstructorIntrinsicPlacementAuditTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
         Assert.That(diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result").And.Contain("<placement>")
                 .And.Contain("expected use inside Contract.Ensures"));

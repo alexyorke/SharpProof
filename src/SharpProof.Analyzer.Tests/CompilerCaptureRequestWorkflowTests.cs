@@ -53,7 +53,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 additionalFiles: [new FailingAdditionalInput()]);
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "AD0001");
+                AnalyzerTestHost.AssertIds(diagnostics, ["AD0001"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "input reader failed");
                 Assert.That(File.Exists(path), Is.False);
                 Assert.That(File.Exists(request + ".completed"), Is.False);
@@ -81,7 +81,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
 
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+                AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(),
                     "compiler capture invocation is invalid");
                 Assert.That(File.Exists(path), Is.False);
@@ -249,7 +249,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request, "dotnet.scalar; dotnet.scalar");
             using (Assert.EnterMultipleScope())
             {
-                AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
+                AnalyzerTestHost.AssertIds(diagnostics, ["SP0049"]);
                 AnalyzerTestHost.AssertMessageContains(diagnostics.Single(),
                     "must not contain duplicate identifiers");
                 Assert.That(File.Exists(path), Is.False);

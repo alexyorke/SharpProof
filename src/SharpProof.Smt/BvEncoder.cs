@@ -98,7 +98,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             relations.Add(relation.Member, declaration);
             _relationDeclarations.Add(new(relation.Member, declaration));
         }
-        return owner.Own(context.MkApp(declaration, arguments.ToArray()));
+        return owner.Own(context.MkApp(declaration, arguments));
     }
 
     private Expr EncodeOperator(IrTerm term, SmtQueryResourceMeter meter)

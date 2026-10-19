@@ -127,7 +127,7 @@ public sealed class CompilerIlByteParserTests
     public void TargetNormalizerDistinguishesAnInstructionStartFromItsOperandInterior(bool interior)
     {
         var decoded = ReadUnboundSyntax(interior ? ForwardInterior : ForwardBoundary);
-        var normalized = CompilerScalarIlDecoder.NormalizeTargets(decoded);
+        var normalized = CompilerScalarIlDecoder.NormalizeTargets(decoded.ToBuilder());
         Assert.That(normalized.IsDefault, Is.EqualTo(interior));
         if (!interior)
         {
@@ -146,7 +146,7 @@ public sealed class CompilerIlByteParserTests
     [Test]
     public void BackwardTargetResolvesToTheOriginalInstructionIndex()
     {
-        var normalized = CompilerScalarIlDecoder.NormalizeTargets(ReadUnboundSyntax(BackwardBoundary));
+        var normalized = CompilerScalarIlDecoder.NormalizeTargets(ReadUnboundSyntax(BackwardBoundary).ToBuilder());
         Assert.That(normalized.IsDefault, Is.False);
         Assert.That(normalized, Has.Length.EqualTo(2));
         Assert.That(normalized[1].Offset, Is.EqualTo(1));
@@ -177,11 +177,11 @@ public sealed class CompilerIlByteParserTests
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(subject.ImagePath)));
-        Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image))));
-        Assert.That(captured.SizeBytes, Is.EqualTo(subject.Image.LongLength));
+        Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image.AsSpan()))));
+        Assert.That(captured.SizeBytes, Is.EqualTo((long)subject.Image.Length));
         Assert.That(captured.Mvid, Is.EqualTo(subject.Method.Module.ModuleVersionId.ToString("D")));
 
-        using var pe = new PEReader(new MemoryStream(subject.Image, writable: false));
+        using var pe = new PEReader(subject.Image);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
         var body = pe.GetMethodBody(definition.RelativeVirtualAddress);
@@ -201,7 +201,7 @@ public sealed class CompilerIlByteParserTests
 
     // Parser records remain unbound. They are never wrapped in TotalIlBody or
     // supplied as compiler/worker authority; no method owner is fabricated.
-    private static ImmutableArray<TotalIlInstruction>.Builder ReadUnboundSyntax(ImmutableArray<byte> code)
+    private static ImmutableArray<TotalIlInstruction> ReadUnboundSyntax(ImmutableArray<byte> code)
     {
         if (code.IsDefault)
         {
@@ -214,6 +214,6 @@ public sealed class CompilerIlByteParserTests
             Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code.AsSpan(), ref cursor, out var instruction), Is.True);
             decoded.Add(new(instruction.Offset, instruction.RawCode, instruction.Operand, instruction.TargetByteOffset));
         }
-        return decoded;
+        return decoded.ToImmutable();
     }
 }

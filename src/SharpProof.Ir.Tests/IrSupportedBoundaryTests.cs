@@ -138,7 +138,7 @@ public sealed class IrSupportedBoundaryTests
         Assert.Throws<ArgumentException>((Action)(() => factory.RegisterImplementedReferenceInterface(factory.IntegerType, face)));
         factory.RegisterImplementedReferenceInterface(child, face);
         factory.RegisterImplementedReferenceInterface(child, face);
-        Assert.That(factory.GetImplementedReferenceInterfaces(child), Is.EqualTo(new[] { face }));
+        Assert.That(factory.GetImplementedReferenceInterfaces(child), Is.EqualTo(ImmutableArray.Create(face)));
         Assert.That(factory.GetImplementedReferenceInterfaces(parent), Is.Empty);
         Assert.That(factory.IsInterfaceReferenceType(face), Is.True);
         Assert.That(factory.IsInterfaceReferenceType(parent), Is.False);
