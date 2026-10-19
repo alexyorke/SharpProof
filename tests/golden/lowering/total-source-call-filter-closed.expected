@@ -127,7 +127,7 @@ block: b40 exception:searched
 block: b41 throw
   i60 op16 Throw Overflow -> b44 source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b42 normal
-  i61 op17 Assign v20:byte[width=8,signed=False] = (("byte"#t4)v19) source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i61 op17 Assign v20:byte[width=8,signed=False] = (("byte"#t5)v19) source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
   i62 op18 Assign v21:int[width=32,signed=True] = (("int"#t1)v20) source=total-source-call-filter-closed.cs:tokens["(","byte",")","(","value","+","256",")"]#1
   i63 op19 Assign v8:int[width=32,signed=True] = v21 source=total-source-call-filter-closed.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
   i64 op19 Write Local source=total-source-call-filter-closed.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
@@ -192,9 +192,9 @@ term: ir37 Variable type=t1:int width=32 signed=True value=v19
 term: ir38 Binary type=t0:bool width=0 signed=False value=(v19 < 0)
 term: ir39 Integer type=t1:int width=32 signed=True bits=255 value=255
 term: ir40 Binary type=t0:bool width=0 signed=False value=(v19 > 255)
-term: ir41 Cast type=t4:byte width=8 signed=False value=(("byte"#t4)v19)
+term: ir41 Cast type=t5:byte width=8 signed=False value=(("byte"#t5)v19)
 term: ir42 Integer type=t1:int width=32 signed=True bits=4 value=4
-term: ir43 Variable type=t4:byte width=8 signed=False value=v20
+term: ir43 Variable type=t5:byte width=8 signed=False value=v20
 term: ir44 Cast type=t1:int width=32 signed=True value=(("int"#t1)v20)
 term: ir45 Variable type=t1:int width=32 signed=True value=v21
 term: ir46 Variable type=t1:int width=32 signed=True value=v13
