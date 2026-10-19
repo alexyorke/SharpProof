@@ -3586,3 +3586,9 @@ cache with the same GetOrAdd factory semantics, and immutable nested dependency 
 with original indexer overwrite/comparer behavior. Retain native PNG read scratch bytes
 and mutable package/compiler subjects. Validate canonical Release package workflow.
 Status: open before edits.
+IMM-M133: Review twenty-nine Analyzer test ToArray snapshots across fourteen files.
+Consumers use Length/indexing/enumeration/LINQ/Task.WhenAll/NUnit and do not mutate or
+retain native-array contracts. Freeze with ToImmutableArray while preserving eager
+order, symbol/reference identity and diagnostics. Other Analyzer vectors, collectors,
+private return shapes and actual mutable option-provider subjects remain open. Validate
+all ordinary Analyzer tests. Status: open before edits.
