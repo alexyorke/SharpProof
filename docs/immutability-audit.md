@@ -3021,3 +3021,14 @@ freeze, join expressions and recursive finally bookkeeping; read-only review fou
 concrete defect. Inventory now records 2,776 C# syntax candidates across 1,870 files;
 52 added owned-builder rows classified. Literal check preserves 3,035 raw/interpolated
 tokens across 699 changed C# files against current master. Other Open rows remain in scope.
+
+IMM-M090: Worker A-G read-only audit covers 215 ToArray inventory rows. Main selected
+142 projection/assertion vectors across 47 files for exact-node review. Preserve native
+stream/source/destination buffers, PE/reflection/params argv, mutable aliases and separate
+map materializers. Review coupled parameter-row reversal, Array.IndexOf replacement,
+compiler-input overload selection and already immutable source properties before writes.
+Use the explicit OutputKind/IEnumerable TestCompilation overload where the former params
+path preserves exact assembly names. Reverse immutable parameter rows through LINQ and
+freeze the result; preserve metadata row order and limits. Run ordinary Worker checks
+and retain the separate remaining candidates; this selection is not a whole-scope close.
+Status: open before edits.
