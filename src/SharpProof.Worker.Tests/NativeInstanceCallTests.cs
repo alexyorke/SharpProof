@@ -169,6 +169,21 @@ public sealed class NativeInstanceCallTests
         { Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString()); }
     }
 
+    [TestCase("true", WorkerClaimOutcome.Proven)]
+    [TestCase("false", WorkerClaimOutcome.Refuted)]
+    public async Task ConstructedGenericHelperResultsKeepTheirReferenceIdentity(string expected, WorkerClaimOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var preparation = Prepare("public class Holder<T> { } public class Box<T> { public Holder<T> Echo(Holder<T> value) { return value; } } " +
+            "public static class C { public static bool Target(Box<int> box, Holder<int> value) { Contract.Requires(box != null && value != null); " +
+            "Contract.Ensures(Contract.Result<bool>() == " + expected + "); return object.ReferenceEquals(box.Echo(value), value); } }", effects: false);
+        Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
+        var results = new List<WorkerClaimResult>();
+        await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
+            check => { ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        Assert.That(results, Is.Not.Empty);
+        Assert.That(results[^1].Outcome, Is.EqualTo(outcome), results[^1].Reason.ToString());
+    }
     private static CompilerCallablePreparation Prepare(string types, bool effects = true)
     {
         System.ArgumentNullException.ThrowIfNull(types);
