@@ -2765,3 +2765,15 @@ and native bytes/atomic publication semantics are retained. TemporaryFiles publi
 immutable directory snapshot. Nine reviewed new builder rows classified across M074-M075.
 Latest inventory: 1,870 C# files, 2,980 syntax candidates, 2,370 Open. Remaining Open rows
 and semantic coverage gaps still require review; comprehensive migration remains open.
+
+IMM-M076: Coordinator validated the read-only agent's current selection of 50 fixed
+ArrayCreation and three typed collection-expression domains across 26 IR/Specs test
+files. These are read-only expectations, enumeration inputs and assertion operands;
+retain six native byte inputs, two params-array contracts and actual mutable runtime
+subjects. Use checked syntax nodes against current source, retaining element types,
+nullable/tuple typing and literal contents. Couple AssertDistinct with immutable operator/
+operand signatures and forced IrTerm element typing; tuple children become immutable;
+counting enumerable keeps its enumeration counter and AsEnumerable adapter; nullable
+facet filtering and reached.IndexOf retain original semantics. Validate all ordinary IR
+and Specs tests, keeping traversal's explicit mutable Stack overload probe intact.
+Status: open before edits.
