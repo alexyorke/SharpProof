@@ -245,19 +245,6 @@ public static partial class Inference
                 return m.SpanStart == method.SpanStart;
             });
             var changedModel = changedCompilation.GetSemanticModel(changed);
-            var beforeAwaits = method.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
-            var afterAwaits = changedMethod.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
-            for (var i = 0; i < beforeAwaits.Length; i++)
-            {
-                var beforeAwait = model.GetAwaitExpressionInfo(beforeAwaits[i]);
-                var afterAwait = changedModel.GetAwaitExpressionInfo(afterAwaits[i]);
-                if (beforeAwait.GetAwaiterMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.GetAwaiterMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
-                    || beforeAwait.GetResultMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.GetResultMethod?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
-                    || beforeAwait.IsCompletedProperty?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) != afterAwait.IsCompletedProperty?.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
-                {
-                    return new(symbol.Name, "Rejected", "Generalization changes the selected await pattern.");
-                }
-            }
             if (!PreservesForEachBindings(method, changedMethod, changedModel))
             { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol."); }
             // Validate statically resolved calls in every supplied file. Merely
@@ -271,6 +258,18 @@ public static partial class Inference
                 var afterModel = changedCompilation.GetSemanticModel(afterTree);
                 var beforeRoot = sourceTree.GetRoot(cancellationToken);
                 var afterRoot = afterTree.GetRoot(cancellationToken);
+                var beforeAwaits = beforeRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
+                var afterAwaits = afterRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
+                for (var i = 0; i < beforeAwaits.Length; i++)
+                {
+                    var beforeAwait = beforeModel.GetAwaitExpressionInfo(beforeAwaits[i]);
+                    var afterAwait = afterModel.GetAwaitExpressionInfo(afterAwaits[i]);
+                    if (!SameAwaitMethod(beforeAwait.GetAwaiterMethod, afterAwait.GetAwaiterMethod, changedMethod, changed)
+                        || !SameAwaitMethod(beforeAwait.GetResultMethod, afterAwait.GetResultMethod, changedMethod, changed)
+                        || ProtocolMember(beforeAwait.IsCompletedProperty) != ProtocolMember(afterAwait.IsCompletedProperty)
+                        || beforeAwait.IsDynamic != afterAwait.IsDynamic)
+                    { return new(symbol.Name, "Rejected", "Generalization changes the selected await pattern."); }
+                }
                 var originalCalls = beforeRoot.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
                 var changedCalls = afterRoot.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
                 for (var i = 0; i < originalCalls.Length; i++)
@@ -744,10 +743,7 @@ public static partial class Inference
 
                     if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
                     {
-                        AssignmentTarget(assignment.Left);
-                        Anchor(assignment.Left);
-                        Anchor(assignment.Right);
-                        return CSharpTypes.Rigid(model.GetTypeInfo(assignment, cancellationToken).Type!);
+                        return CoalesceAssigned(assignment);
                     }
                     if (model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
                     {

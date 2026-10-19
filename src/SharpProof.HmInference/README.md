@@ -197,15 +197,22 @@ Nullable wrappers remain distinct from their underlying types. For example,
 `int? Identity(int? x) => x` can become `T? Identity<T>(T? x) where T : struct`;
 nullable reference identities use `where T : class`. Existing constraints and
 nullable annotations are preserved when applying the IDE fix. Null comparisons,
-conditional access and assignment conversions use conservative original types.
+conditional member access and assignment conversions use conservative original types.
+Conditional array access preserves element inference and nullable lifting for
+value/reference elements, nullable elements, nested arrays and multiple dimensions.
+Null-coalescing assignments share their input/result types for identity and
+nullable-lifting conversions; widening and boxing endpoints stay concrete.
 Candidates introducing new compiler warnings (including nullable warnings) are
 rejected; existing warnings do not become evidence of correctness.
 
 Async methods returning `Task<T>` or `ValueTask<T>` infer the body result and then
 wrap it in the original task type. Non-generic Task/ValueTask bodies may fall
 through or use `return;`. Standard generic awaits preserve their result variable;
-custom awaitable operands and configured receivers are retained conservatively.
-Awaiter/GetResult/IsCompleted definitions are rechecked. Tests apply actual IDE
+custom instance, inherited and extension awaiters also propagate result variables
+through their selected GetAwaiter and GetResult signatures, importing extension
+constraints. Unsupported receiver shapes remain concrete. Awaiter/GetResult/
+IsCompleted definitions are rechecked across all supplied source files; changed
+overloads or instance members shadowing extensions reject the candidate. Tests apply actual IDE
 fixes, compile with no warnings, and execute nullable values/references and new
 Task/ValueTask types through completed/suspended awaits, cancellation and faults.
 Declared widening/boxing return conversions are retained rather than narrowing

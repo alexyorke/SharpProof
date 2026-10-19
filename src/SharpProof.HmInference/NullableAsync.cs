@@ -141,12 +141,80 @@ public static partial class Inference
                 HmType.Unify(operand, new(CSharpTypes.Rigid(named.WithNullableAnnotation(NullableAnnotation.NotAnnotated)).Name, value));
                 return value;
             }
-            // Non-generic framework awaitables and custom awaiters retain their
-            // operand types. Their result still participates in surrounding flow.
+            var selected = info.GetAwaiterMethod;
+            if (selected is not null && operandType is not null)
+            {
+                var operand = Expression(expression.Expression);
+                try
+                {
+                    var awaiter = AwaitProtocolResult(operandType, operand, selected);
+                    return AwaitProtocolResult(selected.ReturnType, awaiter, info.GetResultMethod);
+                }
+                catch (InferenceException)
+                {
+                    // A protocol can contain nested/ref-like types that never appear
+                    // in the public signature. Preserve the concrete await in that case.
+                    HmType.Unify(operand, CSharpTypes.Rigid(operandType));
+                    return CSharpTypes.Rigid(info.GetResultMethod.ReturnType);
+                }
+            }
             Anchor(expression.Expression);
             return CSharpTypes.Rigid(info.GetResultMethod.ReturnType);
         }
 
+        private bool SameAwaitMethod(IMethodSymbol? before, IMethodSymbol? after, MethodDeclarationSyntax changedMethod, SyntaxTree changedTree)
+        {
+            if (changedMethod is null)
+            { throw new ArgumentNullException(nameof(changedMethod)); }
+            if (changedTree is null)
+            { throw new ArgumentNullException(nameof(changedTree)); }
+            if (before is not null && after is not null
+                && SymbolEqualityComparer.Default.Equals((before.ReducedFrom ?? before).OriginalDefinition, currentMethod?.OriginalDefinition)
+                && after.DeclaringSyntaxReferences.Any(reference =>
+                {
+                    if (reference is null)
+                    { throw new ArgumentNullException(nameof(reference)); }
+                    return reference.SyntaxTree == changedTree && reference.Span.Start == changedMethod.SpanStart;
+                }))
+            { return SameCallSignature(before, after); }
+            return ProtocolMember(before) == ProtocolMember(after);
+        }
+        private HmType AwaitProtocolResult(ITypeSymbol receiverType, HmType receiver, IMethodSymbol selected)
+        {
+            if (receiverType is null)
+            { throw new ArgumentNullException(nameof(receiverType)); }
+            if (receiver is null)
+            { throw new ArgumentNullException(nameof(receiver)); }
+            if (selected is null)
+            { throw new ArgumentNullException(nameof(selected)); }
+            var full = selected.ReducedFrom ?? selected;
+            var definition = full.OriginalDefinition;
+            var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
+            if (full.IsStatic)
+            {
+                if (!full.IsExtensionMethod || definition.Parameters.Length != 1)
+                { throw new InferenceException("Unsupported await extension signature."); }
+                foreach (var parameter in definition.TypeParameters)
+                { mapping.Add(parameter, HmType.Variable()); }
+                var expected = CSharpTypes.Rigid(definition.Parameters[0].Type, mapping);
+                var projected = definition.Parameters[0].Type is INamedTypeSymbol owner
+                    ? ProjectDeconstructionReceiver(receiverType, receiver, owner) : receiver;
+                if (projected is null)
+                { HmType.Unify(receiver, CSharpTypes.Rigid(receiverType)); projected = CSharpTypes.Rigid(full.Parameters[0].Type); }
+                UnifyDeconstructionReceiver(expected, projected);
+                foreach (var parameter in definition.TypeParameters)
+                { ImportConstraints(parameter, mapping[parameter], mapping); }
+            }
+            else
+            {
+                var projected = ProjectDeconstructionReceiver(receiverType, receiver, full.ContainingType);
+                if (projected is null)
+                { HmType.Unify(receiver, CSharpTypes.Rigid(receiverType)); return CSharpTypes.Rigid(selected.ReturnType); }
+                for (var i = 0; i < definition.ContainingType.TypeParameters.Length; i++)
+                { mapping.Add(definition.ContainingType.TypeParameters[i], projected.Root.Arguments[i]); }
+            }
+            return CSharpTypes.Rigid(definition.ReturnType, mapping);
+        }
         private void BindNullableArgument(IOperation value, HmType expected)
         {
             if (value is null)
@@ -200,10 +268,64 @@ public static partial class Inference
             return right;
         }
 
+        private HmType CoalesceAssigned(AssignmentExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            var target = AssignmentTarget(expression.Left).Root;
+            var targetType = model.GetTypeInfo(expression.Left, cancellationToken).Type!;
+            var sourceType = model.GetTypeInfo(expression.Right, cancellationToken).Type;
+            var resultType = model.GetTypeInfo(expression, cancellationToken).Type!;
+            var underlying = targetType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+                ? nullable.TypeArguments[0] : targetType;
+            if (target.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableValue) || sourceType is null
+                || (!SymbolEqualityComparer.Default.Equals(sourceType, targetType) && !SymbolEqualityComparer.Default.Equals(sourceType, underlying)))
+            {
+                Anchor(expression.Left);
+                Anchor(expression.Right);
+                return CSharpTypes.Rigid(resultType);
+            }
+            var right = Expression(expression.Right).Root;
+            HmType.Unify(target, right.Name == target.Name ? right : new(target.Name, right));
+            if (target.Name == CSharpTypes.NullableValue)
+            {
+                return resultType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } ? target : target.Arguments[0];
+            }
+            return resultType.NullableAnnotation == NullableAnnotation.Annotated ? target : target.Arguments[0];
+        }
         private HmType ConditionalAccess(ConditionalAccessExpressionSyntax expression)
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
+            if (expression.WhenNotNull is ElementBindingExpressionSyntax binding
+                && model.GetTypeInfo(expression.Expression, cancellationToken).Type is IArrayTypeSymbol array
+                && model.GetOperation(binding, cancellationToken) is IArrayElementReferenceOperation)
+            {
+                var element = HmType.Variable();
+                var receiver = Expression(expression.Expression).Root;
+                if (receiver.Name == CSharpTypes.NullableReference)
+                { receiver = receiver.Arguments[0]; }
+                HmType.Unify(receiver, new("[" + new string(',', array.Rank - 1) + "]", element));
+                foreach (var argument in binding.ArgumentList.Arguments)
+                { Anchor(argument.Expression); }
+                var result = model.GetTypeInfo(expression, cancellationToken).Type!;
+                if (result is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+                    && array.ElementType is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+                {
+                    // The lifted temporary can disappear into ?? or another operation;
+                    // retain its value-type requirement even when absent from the API.
+                    RequireKeyword(element, "struct");
+                    return new(CSharpTypes.NullableValue, element);
+                }
+                if (result.IsReferenceType && result.NullableAnnotation == NullableAnnotation.Annotated)
+                {
+                    if (array.ElementType.NullableAnnotation == NullableAnnotation.Annotated)
+                    { HmType.Unify(element, CSharpTypes.Erase(array.ElementType)); return element; }
+                    RequireKeyword(element, "class");
+                    return new(CSharpTypes.NullableReference, element);
+                }
+                return element;
+            }
             Anchor(expression.Expression);
             foreach (var argument in expression.WhenNotNull.DescendantNodesAndSelf().OfType<ArgumentSyntax>())
             {

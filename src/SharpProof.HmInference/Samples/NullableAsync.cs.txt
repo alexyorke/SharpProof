@@ -7,8 +7,26 @@ public static class NullableAsyncSamples
     public static string? ReferenceIdentity(string? value) => value;
     public static int Fallback(int? value, int fallback) => value ?? fallback;
     public static int? Length(string? value, bool ignored) => value?.Length;
+    public static int? ConditionalElement(int[]? values, int index) => values?[index];
+    public static int ConditionalFallback(int[]? values, int index, int fallback) => values?[index] ?? fallback;
+    public static int AssignFallback(int? value, int fallback) => value ??= fallback;
+    public static async Task<int> CustomEcho(SampleAwaitBox<int> task) => await task;
+    public static async Task<int> ExtensionEcho(SampleExtensionAwaitBox<int> task) => await task;
     public static async Task<int> Echo(Task<int> task) => await task;
     public static async ValueTask<int> ValueEcho(ValueTask<int> task) => await task;
     public static async Task<string?> NullableEcho(Task<string?> task) => await task;
     public static async Task Drain(Task<int> task) { await task; }
+}
+
+public class SampleAwaitBox<T>
+{
+    public System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter() => Task.FromResult(default(T)!).GetAwaiter();
+}
+
+public class SampleExtensionAwaitBox<T> { }
+
+public static class SampleAwaitExtensions
+{
+    public static System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter<T>(this SampleExtensionAwaitBox<T> task)
+        => Task.FromResult(default(T)!).GetAwaiter();
 }
