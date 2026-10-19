@@ -22,13 +22,13 @@ internal static class CallChecks
             ("ParamsNamedArray", "static int M(int[] xs) => First(values:xs); static T First<T>(params T[] values) => values[0];", "Suggestion", "T1 M<T1>(T1[] xs)"),
             ("ParamsMixed", "static int M(int x) => First(x,1); static T First<T>(params T[] values) => values[0];", "Concrete", null),
             ("OptionalAndParams", "static int M(int x,int y) => First(0,x,y); static T First<T>(int count=0,params T[] values) => values[0];", "Suggestion", "T1 M<T1>(T1 x, T1 y)"),
-            ("RefStillSkipped", "static int M(int x) { return Id(ref x); } static int Id(ref int x) => x;", "Skipped", null),
+            ("RefCallConcrete", "static int M(int x) { return Id(ref x); } static int Id(ref int x) => x;", "Concrete", null),
             ("Extension", "static int M(int x) => x.Identity(); } static class Extensions { public static T Identity<T>(this T value) => value;", "Suggestion", "T1 M<T1>(T1 x)"),
             ("ExtensionArray", "static int M(int[] xs,int i) => xs.At(i); } static class Extensions { public static T At<T>(this T[] xs,int i) => xs[i];", "Suggestion", "T1 M<T1>(T1[] xs, int i)"),
             ("ExtensionOptional", "static int M(int x) => x.Identity(); } static class Extensions { public static T Identity<T>(this T value,int unused=0) => value;", "Suggestion", "T1 M<T1>(T1 x)"),
             ("ExtensionNamed", "static int M(int x,int y) => x.First(other:y); } static class Extensions { public static T First<T>(this T value,T other) => value;", "Suggestion", "T1 M<T1>(T1 x, T1 y)"),
             ("ExtensionConstraint", "static object M(object x) => x.Identity(); } static class Extensions { public static T Identity<T>(this T value) where T:class => value;", "Suggestion", "T1 M<T1>(T1 x) where T1 : class"),
-            ("RefExtension", "static int M(int x) => x.Identity(); } static class Extensions { public static int Identity(this ref int value) => value;", "Skipped", null),
+            ("RefExtension", "static int M(int x) => x.Identity(); } static class Extensions { public static int Identity(this ref int value) => value;", "Concrete", null),
             ("ParamsCollection", "static int M(int x) => Sum(x); static int Sum(params System.Collections.Generic.List<int> values) => values.Count;", "Skipped", null)
         ];
         var failures = new List<string>();

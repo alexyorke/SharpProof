@@ -73,8 +73,6 @@ public static partial class Inference
             if (inferred is null)
             { throw new ArgumentNullException(nameof(inferred)); }
             var invoke = declared.OriginalDefinition.DelegateInvokeMethod ?? throw new InferenceException("Unresolved delegate signature.");
-            if (invoke.ReturnsByRef || invoke.ReturnsByRefReadonly)
-            { throw new InferenceException("Ref delegate returns are unsupported."); }
             var shape = inferred.Root;
             if (shape.Name == CSharpTypes.NullableReference)
             { shape = shape.Arguments[0].Root; }
@@ -86,8 +84,6 @@ public static partial class Inference
             var inputs = new List<HmType>();
             foreach (var parameter in invoke.Parameters)
             {
-                if (parameter.RefKind != RefKind.None)
-                { throw new InferenceException("Ref delegate parameters are unsupported."); }
                 inputs.Add(CSharpTypes.Rigid(parameter.Type, mapping));
             }
             return (inputs.ToArray(), CSharpTypes.Rigid(invoke.ReturnType, mapping));
@@ -154,7 +150,7 @@ public static partial class Inference
             if (target is null)
             { throw new ArgumentNullException(nameof(target)); }
             var invoke = target.DelegateInvokeMethod ?? throw new InferenceException("Missing method group delegate signature.");
-            var identical = method.Parameters.Length == invoke.Parameters.Length
+            var identical = method.RefKind == invoke.RefKind && method.Parameters.Length == invoke.Parameters.Length
                 && SymbolEqualityComparer.IncludeNullability.Equals(method.ReturnType, invoke.ReturnType);
             for (var i = 0; identical && i < method.Parameters.Length; i++)
             {
@@ -202,8 +198,6 @@ public static partial class Inference
                 AnonymousMethodExpressionSyntax anonymous => anonymous.ParameterList?.Parameters.ToArray() ?? [],
                 _ => throw new InferenceException("Unsupported lambda.")
             };
-            if (lambda is LambdaExpressionSyntax attributed && attributed.AttributeLists.Count != 0)
-            { throw new InferenceException("Attributed lambdas are unsupported."); }
             var nominal = CSharpTypes.Erase(target);
             var signature = DelegateSignature(target, nominal);
             var previousAsync = asyncReturn;
@@ -218,8 +212,6 @@ public static partial class Inference
                     for (var i = 0; i < parameters.Length; i++)
                     {
                         var parameter = parameters[i];
-                        if (parameter.Modifiers.Count != 0 || parameter.AttributeLists.Count != 0)
-                        { throw new InferenceException("Modified lambda parameters are unsupported."); }
                         if (parameter.Type is not null)
                         { HmType.Unify(signature.Inputs[i], CSharpTypes.Rigid(model.GetTypeInfo(parameter.Type, cancellationToken).Type!)); }
                         environment.Add(model.GetDeclaredSymbol(parameter, cancellationToken)!, signature.Inputs[i]);
@@ -237,7 +229,7 @@ public static partial class Inference
                     else
                     { result = hasVoidBody ? VoidBody((BlockSyntax)body) : Block((BlockSyntax)body); }
                     if (lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null } explicitReturn)
-                    { HmType.Unify(WrapAsyncResult(result), CSharpTypes.Rigid(model.GetTypeInfo(explicitReturn.ReturnType, cancellationToken).Type!)); }
+                    { HmType.Unify(WrapAsyncResult(result), CSharpTypes.Rigid(operation.Symbol.ReturnType)); }
                     HmType.Unify(signature.Output, WrapAsyncResult(result));
                     return new(null, true);
                 });

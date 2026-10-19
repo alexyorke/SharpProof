@@ -723,7 +723,7 @@ public static partial class Inference
                 {
                     environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
                 }
-                else if (declaration.Type.IsVar)
+                else if (declaration.Type is RefTypeSyntax referenceType ? referenceType.Type.IsVar : declaration.Type.IsVar)
                 {
                     environment.Add(symbol, Expression(variable.Initializer.Value));
                 }
@@ -904,18 +904,8 @@ public static partial class Inference
                     return MethodCall(invocation);
                 case BaseObjectCreationExpressionSyntax creation:
                     var constructed = model.GetOperation(creation, cancellationToken) as IObjectCreationOperation ?? throw new InferenceException("Unsupported object construction.");
-                    if (constructed.Constructor is null || constructed.Constructor.Parameters.Any(p =>
-                    {
-                        if (p is null)
-                        {
-                            throw new global::System.ArgumentNullException(nameof(p));
-                        }
-
-                        return p.RefKind != RefKind.None;
-                    }))
-                    {
-                        throw new InferenceException("Ref constructors are unsupported.");
-                    }
+                    if (constructed.Constructor is null)
+                    { throw new InferenceException("Unresolved constructor."); }
 
                     BindArguments(constructed.Arguments, constructed.Constructor.Parameters.Select(p =>
                     {
@@ -1031,13 +1021,13 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(before)); }
             if (after is null)
             { throw new ArgumentNullException(nameof(after)); }
-            if (before.Parameters.Length != after.Parameters.Length || !CSharpTypes.SameSignatureType(before.ReturnType, after.ReturnType))
+            if (before.RefKind != after.RefKind || before.Parameters.Length != after.Parameters.Length || !CSharpTypes.SameSignatureType(before.ReturnType, after.ReturnType))
             {
                 return false;
             }
             for (var i = 0; i < before.Parameters.Length; i++)
             {
-                if (!CSharpTypes.SameSignatureType(before.Parameters[i].Type, after.Parameters[i].Type))
+                if (before.Parameters[i].RefKind != after.Parameters[i].RefKind || !CSharpTypes.SameSignatureType(before.Parameters[i].Type, after.Parameters[i].Type))
                 {
                     return false;
                 }
@@ -1109,6 +1099,8 @@ public static partial class Inference
 
         private HmType AssignmentTarget(ExpressionSyntax target)
         {
+            if (target is InvocationExpressionSyntax invocation && model.GetOperation(invocation, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true })
+            { return Expression(invocation); }
             if (target is not IdentifierNameSyntax and not ElementAccessExpressionSyntax and not MemberAccessExpressionSyntax)
             {
                 throw new InferenceException("Unsupported assignment target.");
@@ -1371,19 +1363,6 @@ public static partial class Inference
         {
             var operation = model.GetOperation(invocation, cancellationToken) as IInvocationOperation ?? throw new InferenceException("Unresolved or dynamic invocation.");
             var called = operation.TargetMethod;
-            if (called.Parameters.Any(p =>
-            {
-                if (p is null)
-                {
-                    throw new global::System.ArgumentNullException(nameof(p));
-                }
-
-                return p.RefKind != RefKind.None;
-            }))
-            {
-                throw new InferenceException("Ref calls are unsupported.");
-            }
-
             if (called.MethodKind == MethodKind.DelegateInvoke)
             {
                 var receiver = invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Invoke" } member
@@ -1469,6 +1448,9 @@ public static partial class Inference
                     continue;
                 }
 
+                if (BindReferenceArgument(argument, expected))
+                { continue; }
+
                 if (parameter.IsParams && argument.ArgumentKind is not ArgumentKind.Explicit and not ArgumentKind.ParamArray)
                 {
                     throw new InferenceException("Expanded non-array params collections are unsupported.");
@@ -1495,6 +1477,31 @@ public static partial class Inference
             }
         }
 
+        private bool BindReferenceArgument(IArgumentOperation argument, HmType expected)
+        {
+            if (argument is null)
+            { throw new ArgumentNullException(nameof(argument)); }
+            if (expected is null)
+            { throw new ArgumentNullException(nameof(expected)); }
+            var parameter = argument.Parameter ?? throw new InferenceException("Unresolved reference argument.");
+            var explicitReference = argument.Syntax is ArgumentSyntax syntax && syntax.RefKindKeyword != default;
+            if (parameter.RefKind is not (RefKind.Ref or RefKind.Out) && !(parameter.RefKind != RefKind.None && explicitReference))
+            { return false; }
+            if (argument.Value is IDiscardOperation)
+            { return true; }
+            if (argument.Value.Syntax is DeclarationExpressionSyntax declaration)
+            {
+                var original = argument.Value.Type ?? parameter.Type;
+                if (!declaration.Type.IsVar)
+                { HmType.Unify(expected, CSharpTypes.Rigid(model.GetTypeInfo(declaration.Type, cancellationToken).Type ?? original)); }
+                BindDesignation(declaration.Designation, expected, original);
+                return true;
+            }
+            // Storage passed by reference is invariant. Omitted readonly arguments
+            // continue through ordinary conversion binding, including temporaries.
+            HmType.Unify(expected, BoundExpression(argument.Value));
+            return true;
+        }
         private HmType BoundExpression(IOperation value)
         {
             return value.Syntax is ExpressionSyntax expression ? Expression(expression) : throw new InferenceException("Unsupported synthesized argument.");

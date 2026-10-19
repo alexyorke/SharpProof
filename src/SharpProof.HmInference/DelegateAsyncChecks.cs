@@ -56,7 +56,7 @@ internal static class DelegateAsyncChecks
             ("ExtensionBoxingCaller", "} static class Extensions { public static void M(this object x) {} } class Consumer { static void Use(){ 1.M(); } } class Tail {", "Rejected", null),
             ("ExtensionObjectCaller", "} static class Extensions { public static void M(this object x) {} } class Consumer { static void Use(object x)=>x.M(); } class Tail {", "Suggestion", "void M<T1>(this T1 x)"),
             ("ExtensionGroupReceiverConversion", "} static class Extensions { public static void M(this object x) {} } class Consumer { static System.Action Use(string x)=>x.M; } class Tail {", "Rejected", null),
-            ("RefDelegate", "static int M(RefMap<int> f,int x)=>f(ref x); } delegate T RefMap<T>(ref T x); class Tail {", "Skipped", null)
+            ("RefDelegate", "static int M(RefMap<int> f,int x)=>f(ref x); } delegate T RefMap<T>(ref T x); class Tail {", "Suggestion", "T1 M<T1>(global::RefMap<T1> f, T1 x)")
         ];
         var failures = new List<string>();
         foreach (var test in tests)
