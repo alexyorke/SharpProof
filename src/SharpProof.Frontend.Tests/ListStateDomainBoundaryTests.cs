@@ -66,9 +66,9 @@ public sealed class ListStateDomainBoundaryTests
     [TestCase("object", true)]
     [TestCase("string", true)]
     [TestCase("int[]", true)]
-    [TestCase("decimal", false)]
-    [TestCase("System.Guid", false)]
-    public void ElementContentsRequireAnInterpretedValueDomain(string element, bool contents)
+    [TestCase("decimal", true)]
+    [TestCase("System.Guid", true)]
+    public void ElementStorageAdmitsInterpretedAndOpaqueValueDomains(string element, bool contents)
     {
         ArgumentNullException.ThrowIfNull(element);
         var (model, syntax, _, _) = Prepare("System.Collections.Generic.List<" + element + "> data",
