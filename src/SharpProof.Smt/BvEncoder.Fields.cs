@@ -70,11 +70,15 @@ internal sealed partial class BvEncoder
                 using var value = model.Evaluate(application, true);
                 if (decode(member.ReturnType, value) is { } decoded)
                 {
-                    // Collection witnesses must describe a materializable finite size.
-                    // Charging the logical Count rejects oversized SAT witnesses,
-                    // without narrowing the SMT domain used for universal proofs.
-                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
-                    { meter.Consume((long)(decoded.IntegerBits & int.MaxValue) + 1L); }
+                    // Charge witness size without narrowing universal proofs.
+                    // HashSet/Dictionary callback state can have negative Count;
+                    // bound its magnitude instead of masking away the sign bit.
+                    if (observations.Count != 0 && decoded.Kind == IrValueKind.Integer && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count" or IrFieldSites.Prefix + "hash-set:count" or IrFieldSites.Prefix + "dictionary:count")
+                    {
+                        var size = factory.GetString(member.Name) is IrFieldSites.Prefix + "hash-set:count" or IrFieldSites.Prefix + "dictionary:count"
+                            ? System.Numerics.BigInteger.Abs(decoded.IntegerNumericValue) : decoded.IntegerBits & int.MaxValue;
+                        meter.Consume((long)size + 1L);
+                    }
                     state.Fields[field.Key] = decoded;
                 }
                 continue;

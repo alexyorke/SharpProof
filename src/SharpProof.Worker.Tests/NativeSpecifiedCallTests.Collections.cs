@@ -8,6 +8,7 @@ internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("System.Collections.Generic.List<int>")]
     [TestCase("System.Collections.Generic.Dictionary<int, int>")]
+    [TestCase("System.Collections.Generic.HashSet<int>")]
     [TestCase("System.Collections.Generic.Queue<int>")]
     [TestCase("System.Collections.Generic.Stack<int>")]
     public async Task ConcreteCountGettersProveAllocationAndExceptionClaims(string type)
@@ -38,8 +39,9 @@ internal sealed partial class NativeSpecifiedCallTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
+    // Dictionary callback state is covered by the signed Count regressions;
+    // real reentrant comparer executions refute this former nonnegative case.
     [TestCase("System.Collections.Generic.List<int>")]
-    [TestCase("System.Collections.Generic.Dictionary<int, int>")]
     [TestCase("System.Collections.Generic.Queue<int>")]
     [TestCase("System.Collections.Generic.Stack<int>")]
     public async Task CountGettersProveNonnegativeResults(string type)

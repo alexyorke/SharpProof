@@ -71,7 +71,8 @@ internal sealed partial class NativeSpecifiedCallTests
     }
 
     [TestCase("System.Collections.Generic.List<int>", WorkerClaimOutcome.Refuted)]
-    [TestCase("System.Collections.Generic.Dictionary<int, int>", WorkerClaimOutcome.Unknown)]
+    [TestCase("System.Collections.Generic.Dictionary<int, int>", WorkerClaimOutcome.Refuted)]
+    [TestCase("System.Collections.Generic.HashSet<int>", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Collections.Generic.Queue<int>", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Collections.Generic.Stack<int>", WorkerClaimOutcome.Refuted)]
     [TestCase("System.Collections.Generic.ICollection<int>", WorkerClaimOutcome.Unknown)]
