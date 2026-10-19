@@ -96,4 +96,26 @@ public sealed partial class NativeSpecifiedCallTests
         await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == 1); var data = new Strange(); System.Collections.Generic.IList<int> alias = data; alias.Insert(0, 17); return data.Count;", WorkerClaimOutcome.Unknown,
             members: "public sealed class Strange : System.Collections.Generic.List<int>, System.Collections.Generic.IList<int> { void System.Collections.Generic.IList<int>.Insert(int index, int item) { } }");
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ListRangesDoNotSeparateOpenGenericInstantiationsThatCanAlias(bool objectView)
+    {
+        var resultType = objectView ? "object" : "U";
+        var source = "using SharpProof.Attributes; public static class C { public static " + resultType + " Target" +
+            (objectView ? "<T>" : "<T,U>") + "(System.Collections.Generic.List<T> first, System.Collections.Generic.List<" + resultType + "> second, T item) where T : class " +
+            (objectView ? "" : "where U : class ") + "{ Contract.Requires(first != null && second != null && second.Count > 0); Contract.Ensures(object.ReferenceEquals(Contract.Result<" + resultType + ">(), Contract.Old(second[0]))); first.Insert(0, item); return second[0]; } }";
+        using var project = WorkerTests.TestProject.Create(source);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
+        var before = new object();
+        var replacement = new object();
+        var data = new List<object> { before };
+        var alias = data;
+        data.Insert(0, replacement);
+        Assert.That(ReferenceEquals(alias[0], before), Is.False);
+    }
 }
