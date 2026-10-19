@@ -748,7 +748,7 @@ public static partial class WorkerProtocolJson
             evidence.ExpressionModel != WorkerResourceModels.Expression || evidence.ProgramModel != WorkerResourceModels.Program ||
             evidence.DeclaredBoundSha256 != ComputeSha256(resource.UpperBound))
         { return false; }
-        if (evidence.Metric == WorkerResourceMetric.AllocatedBytes && value.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted &&
+        if (evidence.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes && value.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted &&
             value.Vacuity == WorkerVacuityKind.None && (evidence.MetadataAssumptions is null ||
                 !evidence.MetadataAssumptions.Any(static dependency => dependency is not null &&
                     dependency.WitnessIdentifier == "runtime-layout.coreclr-x64" && dependency.RuntimeModel == WorkerResourceModels.AllocationLayout)))

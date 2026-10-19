@@ -1189,3 +1189,30 @@ closure and fresh final exact-head CI remain required.
 Published closure head fcbf7a467 also passed every canonical container PR gate,
 package/consumer/release workflow, documentation and toolchain security checks.
 Its coverage threshold is the remaining failing workflow.
+
+## Native logical lifetime upper-bound contracts
+
+The public contract API now names `PeakAuxiliaryBytes` and `RetainedBytes`.
+Compiler collection binds the same reviewed layout dependency and target/reference
+evidence as cumulative bytes. A distinct lifetime cost-model identity declares
+normal-completion logical reachability; cumulative metrics keep their existing
+exceptional-prefix definition. The native worker derives finite primitive-array
+lifetime bounds from the owned typed IR, records its model and program digest,
+and projects the owned layout dependency only on a decided proof.
+
+Unsupported lifetime paths and unproved comparisons return Unknown without partial
+numbers or used assumptions. Numerical counterexamples for these metrics remain
+pending independent replay; upper estimates cannot manufacture refutations.
+Broader field/object graph extraction, borrowed ownership, exceptional-path
+composition, symbolic repetition, calls, stack and phases E/F remain required.
+
+Protocol 27, cache 29 and compiler artifact 42 invalidate older capabilities.
+Manifest 6, resource program/evidence 4, expression 1 and the allocation-layout
+identity remain unchanged. All 14 focused public contract API tests, all 1416
+analyzer tests, all 635 IR tests and 17 actual packaged-consumer cases passed.
+Full quality/compatibility categories, layout (2719 source files, 59 projects,
+151 pinned common files), documentation generation and 723 local links passed.
+The final broader worker/protocol run passed all 549 cases, including the mixed
+cumulative/peak/retained and conflicting-cost-model controls. Two initial restore failures were shared NuGet
+vulnerability-cache collisions. The affected gates passed with container-private
+HTTP caches and auditing left enabled.

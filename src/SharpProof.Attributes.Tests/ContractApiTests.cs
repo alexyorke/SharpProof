@@ -258,6 +258,8 @@ internal sealed class ContractApiTests
     [TestCase(ResourceMetric.ArrayAllocations)]
     [TestCase(ResourceMetric.AllocatedElements)]
     [TestCase(ResourceMetric.AllocatedBytes)]
+    [TestCase(ResourceMetric.PeakAuxiliaryBytes)]
+    [TestCase(ResourceMetric.RetainedBytes)]
     public void ResourceContractsPreserveDeclaredConstantAndLinearTerms(ResourceMetric metric)
     {
         var constant = new ResourceUpperBoundAttribute(metric, 3);

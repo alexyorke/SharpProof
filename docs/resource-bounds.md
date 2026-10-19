@@ -34,8 +34,8 @@ Names in expressions refer to entry parameters. Negative scalar sizes are clampe
 to zero; an invalid array dimension throws before successful allocation. In bound
 expressions, the mathematical size symbol `values.Length` is defined as zero for
 a null array; it is not an instruction to dereference a null value. Null
-array parameters may throw during execution. Bounds apply to every execution prefix, including
-early returns and exceptional exits, rather than guaranteeing normal completion.
+array parameters may throw during execution. These count bounds apply to every
+execution prefix, including early returns and exceptional exits.
 
 ## Supported proof rules
 
@@ -157,7 +157,8 @@ operations, depth 128, or 16384 expression characters return
 Loop iterations means total body entries across all loops, not CPU instructions
 or elapsed time. Array elements combine element counts regardless of primitive
 element type; they do not measure bytes. Runtime/JIT/GC infrastructure costs,
-peak live heap, retained output, and stack memory are outside the cost model.
+peak live heap, retained output, and stack memory are outside this SP0060 count model.
+Native byte and logical lifetime contracts below use separate cost-model identities.
 The result is an upper bound, not a tight Big-O classification or exact trip count.
 
 SP0060 properties expose `ResourceStatus` (`Proven` or `Unknown`) and
@@ -207,8 +208,9 @@ coefficient, and both numeric terms must be nonnegative. The compiler binds the
 name to its parameter ordinal and physical domain; arbitrary source expressions
 and property getters are not accepted as size names.
 
-Each attribute has its own result. The worker derives cumulative upper bounds
-from the closed resource program and checks the declared inequality. Unsupported
+Each attribute has its own result. For cumulative metrics, the worker derives upper
+bounds from the closed resource program. Logical lifetime contracts use the owned
+typed IR described below. The worker checks each declared inequality. Unsupported
 bodies, unstable progress, missing initialization evidence and unbound metadata
 assumptions produce Unknown. A modeled upper bound larger than the requested
 limit also remains Unknown until an actual violating execution is established;
@@ -338,8 +340,8 @@ partial declarations, property-setter/nested object initializers and unsupported
 values retain conservative replay boundaries. Inheritance, custom layout, static
 type initialization, recursive construction, COM activation, cleanup callbacks and events,
 unsupported value fields and unmodeled constructor chains also remain Unknown.
-Broader string and delegate/closure source extraction, liveness/escape, peak and
-retained space and stack models remain in the full roadmap.
+Broader string and delegate/closure extraction, graph lifetimes and stack models
+remain in the full roadmap. Finite primitive-array lifetime contracts are described below.
 
 ### Scalar boxing
 
@@ -365,7 +367,7 @@ and non-null facts while allowing conservative content; fresh storage never mean
 unequal string values. Dynamic characters, surrogate characters, other overloads
 and opaque factories remain Unknown. These are source storage bounds under the
 explicit runtime assumption, not physical JIT/GC measurements or runtime helper
-loop counts. Peak live memory and the remaining roadmap are still pending.
+loop counts. String lifetime composition and physical peak heap remain pending.
 
 ### Explicit delegates
 
@@ -402,3 +404,42 @@ unsupported loop may allocate an entry frame before zero iterations and may add 
 delegate-cache field. Its cost must not be treated as zero merely because the
 lambda expression is never reached. Broader capture placement and liveness remain
 part of the full roadmap.
+
+## Logical peak auxiliary and retained bytes
+
+`PeakAuxiliaryBytes` and `RetainedBytes` use the versioned finite strong-reference
+lifetime model on normal completion. The former excludes the final returned object
+graph throughout the execution; the latter counts owned storage reachable from the
+returned value. These are logical storage metrics, independent of when a GC runs
+or how a JIT keeps stack slots alive. Both require the same reviewed runtime layout
+and compiler-bound target/reference evidence as cumulative byte contracts.
+
+```csharp
+using SharpProof.Attributes;
+
+public static class BufferFactory
+{
+    [ResourceUpperBound(ResourceMetric.AllocatedBytes, 72)]
+    [ResourceUpperBound(ResourceMetric.PeakAuxiliaryBytes, 32)]
+    [ResourceUpperBound(ResourceMetric.RetainedBytes, 40)]
+    public static int[] Create()
+    {
+        var temporary = new int[1];
+        return new int[3];
+    }
+}
+```
+
+The initial native family is finite primitive-array allocation with constant sizes,
+reference aliases, last-use root drops, literal copies through compiler temporaries
+and proven constant guards. Unproved branches, repeated regions, borrowed output,
+source-call lifetime effects, broader object/field graphs and unsupported storage
+return Unknown without partial numbers or used layout dependencies. A bound that
+cannot be proved also remains Unknown until an independently validated numerical
+violation exists; an allocation estimate alone cannot refute it.
+
+Cumulative metrics retain their exceptional-prefix semantics. Logical lifetime
+metrics use `coreclr-8.0.32-x64-source-storage-v1:finite-owned-strong-reachability-v1:normal-completion`.
+The distinct cost-model identity, owned layout provenance and typed-program digest
+remain attached to native proof evidence. Physical peak heap, retained borrowed
+inputs, recursive stack and broader lifetime composition remain separate work.

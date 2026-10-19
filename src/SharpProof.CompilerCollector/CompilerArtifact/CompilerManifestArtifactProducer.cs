@@ -94,7 +94,7 @@ internal static class CompilerManifestArtifactProducer
             }
         }
         if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+            claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
         {
             snapshot.ResourceTargetPlatform = compilation.Options.Platform.ToString();
             resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());

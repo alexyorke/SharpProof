@@ -1,6 +1,6 @@
 namespace SharpProof.Attributes;
 
-/// <summary>Identifies a cumulative resource measured by a static bound.</summary>
+/// <summary>Identifies a resource measured by a static bound.</summary>
 public enum ResourceMetric
 {
     /// <summary>No resource metric; this value cannot declare a bound.</summary>
@@ -13,23 +13,30 @@ public enum ResourceMetric
     AllocatedElements = 3,
     /// <summary>Fresh managed instance bytes under the reviewed CoreCLR 8.0.32 x64 source storage model.</summary>
     /// <remarks>Requires a captured x64 target and an explicit trusted layout dependency in proof evidence.</remarks>
-    AllocatedBytes = 4
+    AllocatedBytes = 4,
+    /// <summary>Peak logically live owned bytes excluding the final returned graph, on normal completion.</summary>
+    /// <remarks>Uses the finite strong-reachability and reviewed runtime-layout models, not GC collection times.</remarks>
+    PeakAuxiliaryBytes = 5,
+    /// <summary>Owned bytes reachable from the returned value on normal completion.</summary>
+    /// <remarks>Borrowed input storage is outside the owned-storage model.</remarks>
+    RetainedBytes = 6
 }
 
-/// <summary>Requires a native proof of a cumulative resource upper bound.</summary>
+/// <summary>Requires a native proof of a resource upper bound.</summary>
 /// <remarks>
 /// The mathematical bound is constant plus coefficient times the nonnegative entry size.
 /// A size is an Int32/Int64 parameter name or an array parameter followed by .Length.
-/// Negative scalars and null arrays have entry size zero. Exceptional execution prefixes are included.
+/// Negative scalars and null arrays have entry size zero. Cumulative metrics include exceptional execution prefixes.
 /// This is a static contract; it does not execute the method or insert runtime checks.
 /// Unsupported operations produce Unknown. These metrics do not measure elapsed time,
-/// peak live memory, retained output, or stack memory. Byte bounds are conditional on the published runtime layout model.
+/// physical heap residency or stack memory. Logical peak/retained metrics describe normal completion under their declared model.
+/// Byte bounds are conditional on the published runtime layout model.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
 public sealed class ResourceUpperBoundAttribute : Attribute
 {
     /// <summary>Creates a constant or linear mathematical resource bound.</summary>
-    /// <param name="metric">The cumulative resource to bound.</param>
+    /// <param name="metric">The resource to bound.</param>
     /// <param name="constant">The nonnegative constant term.</param>
     /// <param name="sizeParameter">The entry parameter name or array length, or null for a constant bound.</param>
     /// <param name="coefficient">The positive size coefficient, or zero for a constant bound.</param>
@@ -51,8 +58,8 @@ public sealed class ResourceUpperBoundAttribute : Attribute
         Coefficient = coefficient;
     }
 
-    /// <summary>Gets the cumulative resource metric.</summary>
-    /// <value>The cumulative resource measured by this contract.</value>
+    /// <summary>Gets the resource metric.</summary>
+    /// <value>The resource measured by this contract.</value>
     public ResourceMetric Metric { get; }
     /// <summary>Gets the nonnegative constant term.</summary>
     /// <value>The nonnegative constant term in the mathematical bound.</value>

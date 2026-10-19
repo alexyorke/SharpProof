@@ -402,7 +402,7 @@ internal sealed partial class ClaimManifestBuilder(
                 var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
                 CollectResourceAssumptions(bounds.Program, callableId, metadataIds);
                 if (effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                    claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+                    claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
                 {
                     metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
                         _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()));
@@ -812,7 +812,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         return constraint.ResourceUpperBound is { } resource ? new WorkerResourceConstraint
         {
             Metric = (WorkerResourceMetric)resource.Metric,
-            CostModel = resource.Metric == ResourceCostMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : WorkerResourceModels.CostModel,
+            CostModel = resource.Metric == ResourceCostMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : resource.Metric is ResourceCostMetric.PeakAuxiliaryBytes or ResourceCostMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : WorkerResourceModels.CostModel,
             UpperBound = ResourceExpressionCodec.Encode(resource.Upper, cancellationToken)
         } : null;
     }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace SharpProof.Worker;
 
 internal static class NativeResourceContractVerifier
@@ -54,11 +56,35 @@ internal static class NativeResourceContractVerifier
         { return Unknown("ResourceEntryUnavailable", WorkerClaimReason.UnsupportedBody); }
         if (!owner.ValidEffectClaimIds.Contains(claim.ClaimId))
         { return Unknown("UnsupportedResourceContract", WorkerClaimReason.UnsupportedContract); }
-        if (target.ResourceProgram is null)
-        { return Unknown(target.ResourceUnknownReason ?? "ResourceProgramUnavailable", WorkerClaimReason.UnsupportedBody); }
         try
         {
             var limit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, owner, cancellation);
+            if (constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes)
+            {
+                var lifetimeLayout = new NativeResourceLayoutBinding(target);
+                var context = lifetimeLayout.Bind();
+                if (context is null)
+                { return Unknown("ResourceLayoutAssumptionsNotBound", WorkerClaimReason.UnsupportedBody); }
+                var memory = ResourceMemoryProgram.Evaluate(owner.Program, context, cancellation);
+                if (memory.Bounds is not { } bounds)
+                { return Unknown(memory.UnknownReason ?? "ResourceMemoryProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                var memoryUpper = ResourceExpression.Literal(constraint.Metric == WorkerResourceMetric.PeakAuxiliaryBytes
+                    ? bounds.PeakAuxiliaryUpper : bounds.RetainedUpper);
+                if (!ResourceBoundOrder.Proves(memoryUpper, limit, cancellation))
+                { return Unknown("ResourceBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
+                var memoryResult = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
+                    WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
+                memoryResult.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, new HashSet<string>(StringComparer.Ordinal));
+                memoryResult.ProofCore = ["native-resource:" + claim.ClaimId,
+                    "resource-memory-model:" + ResourceMemoryTrace.ModelId,
+                    "resource-memory-program:" + WorkerProtocolJson.ComputeSha256(JsonSerializer.SerializeToUtf8Bytes(
+                        PortableIrGraphCodec.Encode(owner.Program, [], cancellation).Graph))];
+                memoryResult.ResourceBound = Evidence(memoryUpper.ToDisplayString(), null);
+                lifetimeLayout.Project(memoryResult);
+                return memoryResult;
+            }
+            if (target.ResourceProgram is null)
+            { return Unknown(target.ResourceUnknownReason ?? "ResourceProgramUnavailable", WorkerClaimReason.UnsupportedBody); }
             var metadata = new NativeResourceMetadataBinding(target);
             var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, metadata.Bind, cancellation);
             if (!check.Verified)
