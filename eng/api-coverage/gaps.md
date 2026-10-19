@@ -690,7 +690,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | unmodeled-dispatch | A |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | unmodeled-dispatch | D |
 | P:System.Collections.Generic.ICollection`1.Count | read | 40 | unmodeled-dispatch | A |
-| P:System.Array.Length | read | 32 | unmodeled | R |
+| P:System.Array.Length | read | 32 | partially-modeled | R |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | call | 26 | unmodeled-dispatch | C |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | unmodeled-dispatch | D |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | unmodeled-dispatch | D |

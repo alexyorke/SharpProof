@@ -9,7 +9,7 @@ Counts are static source sites, not execution frequency. Dependency-only methods
 | P:System.Collections.Generic.IList`1.Item(System.Int32) | read | 56 | 20 | 0 | 56 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.Dictionary`2.Item(`0) | read | 40 | 23 | 0 | 40 | 0 | unmodeled-dispatch |
 | P:System.Collections.Generic.ICollection`1.Count | read | 40 | 24 | 0 | 40 | 0 | unmodeled-dispatch |
-| P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | unmodeled |
+| P:System.Array.Length | read | 32 | 18 | 0 | 32 | 0 | partially-modeled |
 | M:System.Collections.Generic.Comparer`1.Compare(`0,`0) | call | 26 | 21 | 0 | 26 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Dictionary`2.Add(`0,`1) | call | 22 | 11 | 0 | 22 | 0 | unmodeled-dispatch |
 | M:System.Collections.Generic.Dictionary`2.ContainsKey(`0) | call | 22 | 16 | 0 | 22 | 0 | unmodeled-dispatch |
