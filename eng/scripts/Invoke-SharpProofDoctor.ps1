@@ -32,9 +32,11 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
                 'SharpProofProfile', 'SharpProofFeatures', 'SharpProofVerify', 'SharpProofVerifyPolicy',
                 'SharpProofAssumptionPolicy', 'SharpProofWorkerPath', 'SharpProofVerifyResultFile',
                 'SharpProofVerifySarifFile', 'IntermediateOutputPath', 'MSBuildProjectDirectory', 'ProjectAssetsFile')))
-    $arguments = @('msbuild', $project, '-nologo', "-getProperty:$($propertyNames -join ',')", '-getItem:PackageReference')
-    if ($TargetFramework) { $arguments += "-p:TargetFramework=$TargetFramework" }
-    $raw = (& dotnet @arguments 2>$null | Out-String)
+    $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $argumentBuilder.AddRange([string[]]@('msbuild', $project, '-nologo', "-getProperty:$($propertyNames -join ',')", '-getItem:PackageReference'))
+    if ($TargetFramework) { $argumentBuilder.Add("-p:TargetFramework=$TargetFramework") }
+    [string[]]$nativeArguments = @($argumentBuilder.ToImmutable())
+    $raw = (& dotnet @nativeArguments 2>$null | Out-String)
     if ($LASTEXITCODE -ne 0) {
         Add-Check 'project' 'error' 'Project evaluation failed.' 'Check the project with dotnet msbuild; doctor does not restore dependencies.'
     }

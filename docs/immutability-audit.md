@@ -3032,3 +3032,15 @@ path preserves exact assembly names. Reverse immutable parameter rows through LI
 freeze the result; preserve metadata row order and limits. Run ordinary Worker checks
 and retain the separate remaining candidates; this selection is not a whole-scope close.
 Status: open before edits.
+
+IMM-M089 verified: 25 baseline/current controls pass for ordered argv, environment
+restoration, empty/null/null-element inputs, optional test/framework switches, zero/one/
+many Git paths (including whitespace, newline, Unicode and ignored packages), doctor
+reports and zero/one/many declaration classifications. Documentation checks 713 local
+links; formatting checks 87 PowerShell/19 shell files with zero remaining changes.
+All 84 tracked PowerShell scripts parse, zero errors, 1,094 syntax candidates.
+The first comparison caught PowerShell's string-array cast normalizing null to empty;
+Add(null) had the same coercion. The final native adapter allocates a string buffer and
+copies the immutable snapshot directly, retaining a trailing null for explicit null
+AdditionalArguments. This preserves the old API behavior and required native shape.
+Other collection captures in these scripts remain separately open.

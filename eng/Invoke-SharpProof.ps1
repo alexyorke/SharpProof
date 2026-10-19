@@ -48,17 +48,22 @@ function Invoke-Container(
     $previousComposeProgress = $env:COMPOSE_PROGRESS
     try {
         $env:COMPOSE_PROGRESS = 'quiet'
-        $arguments = @(
-            'compose', 'run', '--rm', '--no-TTY', '--quiet-pull')
+        $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $argumentBuilder.AddRange([string[]]@(
+                'compose', 'run', '--rm', '--no-TTY', '--quiet-pull'))
         foreach ($name in @($Environment.Keys | Sort-Object)) {
             $value = [string]$Environment[$name]
-            $arguments += @('-e', "$name=$value")
+            $argumentBuilder.AddRange([string[]]@('-e', "$name=$value"))
         }
         Build-ToolingImage
-        $arguments += @(
-            'tooling', $Command, '-Configuration', $CommandConfiguration)
-        $arguments += $AdditionalArguments
-        Invoke-Docker $arguments
+        $argumentBuilder.AddRange([string[]]@(
+                'tooling', $Command, '-Configuration', $CommandConfiguration))
+        if ($null -ne $AdditionalArguments) { $argumentBuilder.AddRange($AdditionalArguments) }
+        $argumentSnapshot = $argumentBuilder.ToImmutable()
+        # Copy directly so PowerShell does not normalize native null arguments to empty strings.
+        $nativeArguments = [string[]]::new($argumentSnapshot.Length + [int]($null -eq $AdditionalArguments))
+        $argumentSnapshot.CopyTo($nativeArguments)
+        Invoke-Docker $nativeArguments
     }
     finally {
         if ($null -eq $previousComposeProgress) {
@@ -96,12 +101,14 @@ switch ($BuildProfile) {
         }
     }
     'test' {
-        $arguments = @('-Target', $Target)
+        $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $argumentBuilder.AddRange([string[]]@('-Target', $Target))
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('-TestFilter', $TestFilter)
+            $argumentBuilder.AddRange([string[]]@('-TestFilter', $TestFilter))
         }
-        if ($Fast) { $arguments += '-Fast' }
-        Invoke-Container 'test' $Configuration $arguments
+        if ($Fast) { $argumentBuilder.Add('-Fast') }
+        [string[]]$nativeArguments = @($argumentBuilder.ToImmutable())
+        Invoke-Container 'test' $Configuration $nativeArguments
     }
     'test-changed' {
         $arguments = if ($Fast) { @('-Fast') } else { @() }

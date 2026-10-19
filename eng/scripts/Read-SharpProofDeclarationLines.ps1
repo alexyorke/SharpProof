@@ -28,17 +28,23 @@ $roslynPath = Join-Path $sdkPath 'Roslyn/bincore'
 $temporaryPath = Join-Path ([IO.Path]::GetTempPath()) ('SharpProofDeclarations.' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
 try {
-    $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
-            Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
+    $referenceBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $referenceBuilder.AddRange([string[]]@(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
+                Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName }))
     foreach ($name in @('Microsoft.CodeAnalysis.dll', 'Microsoft.CodeAnalysis.CSharp.dll')) {
         $assemblyPath = Join-Path $roslynPath $name
-        $references += '-reference:' + $assemblyPath
+        $referenceBuilder.Add('-reference:' + $assemblyPath)
         Copy-Item -LiteralPath $assemblyPath -Destination (Join-Path $temporaryPath $name)
     }
     $hostPath = Join-Path $temporaryPath 'SharpProof.DeclarationLines.dll'
-    $compilerArguments = @((Join-Path $roslynPath 'csc.dll'), '-nologo', '-noconfig', '-nostdlib+',
-        '-target:exe', ('-out:' + $hostPath)) + $references + @(
+    $references = $referenceBuilder.ToImmutable()
+    $compilerArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $compilerArgumentBuilder.AddRange([string[]]@((Join-Path $roslynPath 'csc.dll'), '-nologo', '-noconfig', '-nostdlib+',
+            '-target:exe', ('-out:' + $hostPath)))
+    $compilerArgumentBuilder.AddRange($references)
+    $compilerArgumentBuilder.Add(
         (Join-Path $PSScriptRoot 'SharpProof.DeclarationLines.cs'))
+    [string[]]$compilerArguments = @($compilerArgumentBuilder.ToImmutable())
     $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw ('Declaration classifier compilation failed: ' + ($compilerOutput -join [Environment]::NewLine))

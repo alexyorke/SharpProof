@@ -31,20 +31,21 @@ function Get-GitUntrackedPaths {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    $arguments = @(
-        '-C',
-        $repositoryRoot,
-        'ls-files',
-        '-z',
-        '--others',
-        '--exclude-standard')
+    $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $argumentBuilder.AddRange([string[]]@(
+            '-C',
+            $repositoryRoot,
+            'ls-files',
+            '-z',
+            '--others',
+            '--exclude-standard'))
     if ($IgnoredPackages) {
-        $arguments += @('--ignored', '--', 'nupkgs/')
+        $argumentBuilder.AddRange([string[]]@('--ignored', '--', 'nupkgs/'))
     }
     else {
-        $arguments += '--'
+        $argumentBuilder.Add('--')
     }
-    foreach ($argument in $arguments) {
+    foreach ($argument in $argumentBuilder.ToImmutable()) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
 
@@ -79,7 +80,7 @@ function Get-GitUntrackedPaths {
         throw 'Git returned a non-terminated file inventory.'
     }
 
-    $paths = [Collections.Generic.List[string]]::new()
+    $paths = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $start = 0
     for ($index = 0; $index -lt $bytes.Length; $index++) {
         if ($bytes[$index] -ne 0) {
@@ -94,7 +95,7 @@ function Get-GitUntrackedPaths {
         }
         $start = $index + 1
     }
-    return $paths.ToArray()
+    return $paths.ToImmutable()
 }
 
 function Get-RequiredHead {
