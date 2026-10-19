@@ -4,6 +4,12 @@ param(
     [string]$PackageSource,
     [ValidateRange(1, 10)]
     [int]$Iterations = 3,
+    [ValidateSet('contracts', 'resources')]
+    [string]$Workload = 'contracts',
+    [ValidatePattern('^[0-9]+(,[0-9]+)+$')]
+    [string]$InputSizes = '0,16,128,1000',
+    [ValidateRange(1, 10000)]
+    [int]$RuntimeRepetitions = 100,
     [string]$OutputDirectory = 'artifacts/consumer-performance',
     [ValidateRange(0, 3600000)]
     [int]$MaximumBuildMilliseconds = 0
@@ -11,6 +17,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$scales = @($InputSizes.Split(',') | ForEach-Object { [int]::Parse($_, [Globalization.CultureInfo]::InvariantCulture) })
+if (@($scales | Where-Object { $_ -lt 0 -or $_ -gt 1000 }).Count -gt 0 -or @($scales | Select-Object -Unique).Count -ne $scales.Count) {
+    throw 'Input sizes must be distinct integers from 0 through 1000.'
+}
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 Assert-SharpProofContainer 'Run consumer performance measurements in the canonical Linux amd64 container.'
@@ -27,14 +37,18 @@ $harnessHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
 $output = [IO.Path]::GetFullPath($OutputDirectory, $repositoryRoot)
 [IO.Directory]::CreateDirectory($output) | Out-Null
 $runDirectory = Join-Path $output ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmss') + '-' + [Guid]::NewGuid().ToString('N'))
+$compilerServerId = 'sharpproof-performance-' + [Guid]::NewGuid().ToString('N')
 [IO.Directory]::CreateDirectory($runDirectory) | Out-Null
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $workspace = Join-Path $temporaryParent ('SharpProof.ConsumerPerformance.' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($workspace) | Out-Null
 $measurements = [Collections.Generic.List[object]]::new()
+$runtimeMeasurements = [Collections.Generic.List[object]]::new()
+$runtimeComparisons = [Collections.Generic.List[object]]::new()
 $ordinal = 0
 $originalLocation = Get-Location
 $completed = $false
+$runtimeSourceHash = $null
 
 function Invoke-MeasuredDotnet {
     param([string]$Label, [string[]]$Arguments)
@@ -54,9 +68,61 @@ function Invoke-MeasuredDotnet {
 function New-SubjectSource {
     param([int]$Increment)
     $methods = foreach ($index in 1..8) {
-        "    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }"
+        if ($Workload -eq 'resources') {
+            "    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, ""n"", $Increment)] public static int[] Allocate$index(int n) { Contract.Requires(n >= 0 && n <= 1000); var result = new int[0]; for (int i = 0; i < n; i++) { result = new int[$Increment]; } return result; }"
+        }
+        else {
+            "    public static int Increment$index(int value) { Contract.Requires(value >= 0 && value <= 1000); Contract.Ensures(Contract.Result<int>() == Contract.Old(value) + $Increment); return value + $Increment; }"
+        }
     }
     return "using SharpProof.Attributes;`npublic static class Subject {`n" + ($methods -join "`n") + "`n}`n"
+}
+
+function New-RuntimeSource {
+    return @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+internal static class Program {
+    private static int Execute(int size) {
+        int checksum = 0;
+        var a = Subject.Allocate1(size); checksum += a.Length; GC.KeepAlive(a);
+        var b = Subject.Allocate2(size); checksum += b.Length; GC.KeepAlive(b);
+        var c = Subject.Allocate3(size); checksum += c.Length; GC.KeepAlive(c);
+        var d = Subject.Allocate4(size); checksum += d.Length; GC.KeepAlive(d);
+        var e = Subject.Allocate5(size); checksum += e.Length; GC.KeepAlive(e);
+        var f = Subject.Allocate6(size); checksum += f.Length; GC.KeepAlive(f);
+        var g = Subject.Allocate7(size); checksum += g.Length; GC.KeepAlive(g);
+        var h = Subject.Allocate8(size); checksum += h.Length; GC.KeepAlive(h);
+        return checksum;
+    }
+    private static void Main(string[] args) {
+        int repetitions = int.Parse(args[1], CultureInfo.InvariantCulture);
+        var measurements = new List<object>();
+        long frequency = Stopwatch.Frequency;
+        foreach (string input in args[2].Split(',')) {
+            int size = int.Parse(input, CultureInfo.InvariantCulture);
+            for (int warmup = 0; warmup < 10; warmup++) { Execute(size); }
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            long start = Stopwatch.GetTimestamp();
+            long checksum = 0;
+            for (int repeat = 0; repeat < repetitions; repeat++) { checksum += Execute(size); }
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            measurements.Add(new { inputSize = size, repetitions, kernelElapsedTicks = elapsed,
+                stopwatchFrequency = frequency, allocatedBytes = allocated, checksum });
+        }
+        File.WriteAllText(args[0], JsonSerializer.Serialize(new { runtime = RuntimeInformation.FrameworkDescription,
+            architecture = RuntimeInformation.ProcessArchitecture.ToString(), os = RuntimeInformation.OSDescription,
+            gcServer = System.Runtime.GCSettings.IsServerGC,
+            tieredCompilation = Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"), measurements }));
+    }
+}
+'@
 }
 
 try {
@@ -67,6 +133,10 @@ try {
     # One isolated package cache shared by the three variants makes restore
     # dependencies comparable. Restore is measured separately, never hidden in build.
     $cache = Join-Path $workspace 'packages'
+    $runtimeSource = if ($Workload -eq 'resources') { New-RuntimeSource } else { '' }
+    $runtimeSourceHash = if ($Workload -eq 'resources') {
+        [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($runtimeSource))).ToLowerInvariant()
+    } else { $null }
     foreach ($iteration in 1..$Iterations) {
         # Rotate the order to reduce systematic first-run/compiler warmup bias.
         $variants = @('baseline', 'portable', 'verified')
@@ -84,7 +154,9 @@ try {
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <OutputType>$(if ($Workload -eq 'resources') { 'Exe' } else { 'Library' })</OutputType>
     <LangVersion>12.0</LangVersion>
+    <SharedCompilationId>$compilerServerId</SharedCompilationId>
     <NuGetAudit>false</NuGetAudit>
     <SharpProofProfile>$verificationProfile</SharpProofProfile>
     <SharpProofVerifyResultFile>$resultFile</SharpProofVerifyResultFile>
@@ -100,6 +172,9 @@ try {
             [IO.File]::WriteAllText((Join-Path $consumer 'NuGet.config'), $config, [Text.UTF8Encoding]::new($false))
             $sourcePath = Join-Path $consumer 'Subject.cs'
             [IO.File]::WriteAllText($sourcePath, (New-SubjectSource 1), [Text.UTF8Encoding]::new($false))
+            if ($Workload -eq 'resources') {
+                [IO.File]::WriteAllText((Join-Path $consumer 'Program.cs'), $runtimeSource, [Text.UTF8Encoding]::new($false))
+            }
             Set-Location $consumer
             $restoreMilliseconds = Invoke-MeasuredDotnet "$iteration-$variant-restore" @('restore', 'Consumer.csproj', '--packages', $cache)
             $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = 'restore'; elapsedMilliseconds = $restoreMilliseconds; claims = 0; proven = 0; incomplete = 0; cacheStatus = $null })
@@ -127,6 +202,51 @@ try {
                 }
                 $measurements.Add([ordered]@{ iteration = $iteration; variant = $variant; scenario = $scenario; elapsedMilliseconds = $elapsed; claims = $claims; proven = $proven; incomplete = $incomplete; cacheStatus = $cacheStatus })
             }
+            if ($Workload -eq 'resources') {
+                $runtimeResultPath = Join-Path $consumer 'runtime.json'
+                $runtimeArguments = @((Join-Path $consumer 'bin/Release/net8.0/Consumer.dll'), $runtimeResultPath,
+                    $RuntimeRepetitions.ToString([Globalization.CultureInfo]::InvariantCulture), $InputSizes)
+                $processMilliseconds = Invoke-MeasuredDotnet "$iteration-$variant-runtime" $runtimeArguments
+                $runtimeResult = Get-Content -LiteralPath $runtimeResultPath -Raw | ConvertFrom-Json
+                if (@($runtimeResult.measurements).Count -ne $scales.Count) { throw 'Runtime input coverage changed.' }
+                $sourceHash = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
+                foreach ($sample in $runtimeResult.measurements) {
+                    $expectedChecksum = if ($sample.inputSize -eq 0) { 0 } else { 16L * $RuntimeRepetitions }
+                    if ($sample.repetitions -ne $RuntimeRepetitions -or $sample.inputSize -notin $scales -or
+                        $sample.checksum -ne $expectedChecksum -or $sample.allocatedBytes -lt 0 -or
+                        $sample.kernelElapsedTicks -lt 0 -or $sample.stopwatchFrequency -le 0) {
+                        throw 'Runtime output or measurement integrity changed.'
+                    }
+                }
+                $runtimeMeasurements.Add([ordered]@{ iteration = $iteration; variant = $variant;
+                    processElapsedMilliseconds = $processMilliseconds; sourceSha256 = $sourceHash;
+                    runtime = $runtimeResult.runtime; architecture = $runtimeResult.architecture;
+                    os = $runtimeResult.os; gcServer = $runtimeResult.gcServer;
+                    tieredCompilation = $runtimeResult.tieredCompilation;
+                    samples = @($runtimeResult.measurements) })
+            }
+        }
+    }
+    foreach ($measurement in $runtimeMeasurements) {
+        $baseline = @($runtimeMeasurements | Where-Object { $_.iteration -eq $measurement.iteration -and $_.variant -eq 'baseline' })
+        if ($baseline.Count -ne 1 -or $baseline[0].sourceSha256 -cne $measurement.sourceSha256 -or
+            $baseline[0].runtime -cne $measurement.runtime -or $baseline[0].architecture -cne $measurement.architecture -or
+            $baseline[0].os -cne $measurement.os -or $baseline[0].gcServer -ne $measurement.gcServer -or
+            $baseline[0].tieredCompilation -cne $measurement.tieredCompilation) {
+            throw 'Runtime baseline identity or coverage changed.'
+        }
+        foreach ($sample in $measurement.samples) {
+            $reference = @($baseline[0].samples | Where-Object inputSize -EQ $sample.inputSize)
+            if ($reference.Count -ne 1 -or $reference[0].repetitions -ne $sample.repetitions -or
+                $reference[0].checksum -ne $sample.checksum) { throw 'Runtime baseline output changed.' }
+            $elapsedMilliseconds = 1000.0 * $sample.kernelElapsedTicks / $sample.stopwatchFrequency
+            $baselineMilliseconds = 1000.0 * $reference[0].kernelElapsedTicks / $reference[0].stopwatchFrequency
+            $runtimeComparisons.Add([ordered]@{ iteration = $measurement.iteration; variant = $measurement.variant;
+                inputSize = $sample.inputSize; repetitions = $sample.repetitions;
+                baselineKernelMilliseconds = $baselineMilliseconds; kernelMilliseconds = $elapsedMilliseconds;
+                kernelDeltaMilliseconds = $elapsedMilliseconds - $baselineMilliseconds;
+                baselineAllocatedBytes = $reference[0].allocatedBytes; allocatedBytes = $sample.allocatedBytes;
+                allocatedDeltaBytes = $sample.allocatedBytes - $reference[0].allocatedBytes })
         }
     }
     $completed = $true
@@ -134,7 +254,7 @@ try {
 finally {
     Set-Location $originalLocation
     $report = [ordered]@{
-        schemaVersion            = 2
+        schemaVersion            = 3
         completed                = $completed
         measuredAtUtc            = [DateTime]::UtcNow.ToString('O')
         source                   = [ordered]@{
@@ -147,10 +267,17 @@ finally {
         sdk                      = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
         platform                 = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
         processorCount           = [Environment]::ProcessorCount
+        compilerServerScope      = 'One compiler server identity per run, shared by all variants and iterations; independent runs do not share analyzer loading state.'
         iterations               = $Iterations
-        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses the same single reference with strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof.'
+        workload                 = $Workload
+        runtimeSourceSha256      = $runtimeSourceHash
+        runtimeRepetitions       = $RuntimeRepetitions
+        inputSizes               = $scales
+        scope                    = 'Synthetic eight-method consumer; restore separated; baseline has Attributes only; portable uses one SharpProof reference with explicit advisory; verified uses strict verification. First build has clean outputs, not a cold OS cache. Warm rebuild reuses package/compiler caches. No-op evidence can be reused and is not a fresh proof. Resource runtime samples execute the final small-edit source with ten warmups per input. Kernel allocation is cumulative bytes on the current thread, not peak or retained memory. Process time includes startup and serialization. Measurements do not prove asymptotic, tight, expected or amortized bounds.'
         packages                 = @($packageFiles | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() } })
         measurements             = @($measurements.ToArray())
+        runtimeMeasurements      = @($runtimeMeasurements.ToArray())
+        runtimeComparisons       = @($runtimeComparisons.ToArray())
     }
     $reportPath = Join-Path $runDirectory 'measurements.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8NoBOM

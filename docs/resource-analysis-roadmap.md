@@ -71,7 +71,7 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [ ] Async/state-machine costs and allocations for an admitted execution model.
 - [ ] Concurrent/fork-join total work, allocation and live-space composition;
   document scheduler/overlap assumptions and return Unknown beyond them.
-- [ ] End-to-end runtime/allocation benchmark workflow, with input scales,
+- [x] End-to-end runtime/allocation benchmark workflow, with input scales,
   units, environmental identity and comparable baselines. Measurements must
   remain distinguishable from proofs and must not establish Big-O by themselves.
 - [ ] Cancellation, exceptional completion, shared-state and repeated-entry controls.
@@ -1330,3 +1330,54 @@ that qualification.
 The corrected acceptance contract and updated artifact snapshots passed all 122
 selected acceptance/golden worker cases. Final documentation spelling and Markdown
 checks passed.
+
+## Comparable runtime and allocation measurement workflow
+
+The existing packaged-consumer performance harness now has an explicit resource
+workload. It builds the same eight allocation kernels against an Attributes-only
+baseline, advisory analysis and strict native verification, rotating variant order
+between iterations. Restore, first build, no-op, warm rebuild and small-edit times
+stay separate. Every strict build must retain eight nonvacuous Proven resource
+claims and complete selected coverage before its measurements can be accepted.
+
+The final edited source is executed at explicit input scales with repeated calls
+and ten warmups per scale. A separate process runs each variant. Raw stopwatch
+ticks/frequency describe kernel execution; process milliseconds include startup,
+warmups and report serialization. GC thread allocation counters describe total
+bytes over the measured repetitions, including fixed entry allocation at input
+zero. They do not describe peak live or retained storage. Output checksums validate
+actual execution independently of selected source proofs.
+
+Report schema 3 records source/harness/package identities, actual runtime and
+architecture, OS, GC mode, the tiered compilation environment setting, inputs,
+repetitions, raw samples and signed comparisons with each iteration's baseline.
+Comparison admission requires matching source, environment and output. Invalid or
+duplicate scales are rejected before package loading. The resource sample and final combined controls passed against the packaged
+product, including the original contract workload, invalid-scale rejection and
+baseline report comparisons.
+
+The [consumer performance guide](consumer-performance.md) documents the command
+and interpretation.
+Measurements are explicitly separate from asymptotic/tight/expected/amortized
+proofs. Async/concurrent models, cancellation and exceptional completion remain
+required along with the other unfinished roadmap items.
+
+Final validation passed all four package integration controls. Both complete
+benchmark workloads ran concurrently. The initial combined run exposed shared
+compiler-server analyzer loading state across separate package caches; a per-run
+compiler identity now isolates independent runs while preserving sharing among
+that run's variants. The final combined run passed after this correction.
+
+The .NET 8.0.32 x64 resource smoke run used one iteration and three repetitions per
+input. Every variant observed 576, 12864 and 98880 allocated bytes for input sizes
+0, 16 and 128 respectively, with matching output checksums. These are functional
+measurement controls rather than timing conclusions; routine measurements default
+to three iterations and 100 repetitions. Raw reports are retained as test evidence.
+
+All quality/compatibility categories passed, followed by the focused PowerShell
+check after compiler isolation. Documentation generation and 724 local links passed.
+Native protocol 30, cache 32 and compiler artifact 45 remain unchanged because this
+phase adds measurement tooling rather than trusted proof capabilities. Benchmark
+report schema 3 distinguishes measured process/kernel time and allocation samples
+from source-derived resource proofs. The benchmark workflow requirement is now
+complete; all other unchecked C/E/F and final qualification requirements remain.

@@ -16,7 +16,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest SDK discovery and scoped explanation of stored evidence |
 | [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
 | [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
-| [Consumer performance](consumer-performance.md) | Comparable build measurements, quality evidence and explicit budgets |
+| [Consumer performance](consumer-performance.md) | Comparable build/runtime allocation measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
 | [Configuration](configuration.md) | Consumer MSBuild properties, selection, IDE behavior, budgets, cache, and report paths |
