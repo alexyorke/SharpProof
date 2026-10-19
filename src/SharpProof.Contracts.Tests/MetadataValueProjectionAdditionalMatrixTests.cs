@@ -160,7 +160,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         Assert.That(result.Clauses[3].Validation.Minimum, Is.EqualTo(long.MaxValue));
         Assert.That(result.Clauses[4].Validation.Maximum, Is.EqualTo(long.MinValue));
 
-        long[][] sampleValues =
+        ImmutableArray<ImmutableArray<long>> sampleValues =
         [
             [-128L, 0L, 127L],
             [0L, 1L, uint.MaxValue],
@@ -168,7 +168,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
             [0L, int.MaxValue],
             [0L, uint.MaxValue]
         ];
-        bool[][] expectedValues =
+        ImmutableArray<ImmutableArray<bool>> expectedValues =
         [
             [true, true, true],
             [true, true, true],

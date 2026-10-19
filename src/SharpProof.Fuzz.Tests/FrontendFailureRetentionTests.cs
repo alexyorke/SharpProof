@@ -27,13 +27,11 @@ public sealed class FrontendFailureRetentionTests
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(cases, Has.Count.EqualTo(269));
         Assert.That(results, Has.Length.EqualTo(cases.Count));
-        var knownFailures = new HashSet<string>(StringComparer.Ordinal)
-        {
+        var knownFailures = ImmutableHashSet.Create(StringComparer.Ordinal,
             "(values == (condition ? values : values))",
             "((condition ? values : values) == values)",
             "(values != (condition ? values : values))",
-            "((condition ? values : values) != values)"
-        };
+            "((condition ? values : values) != values)");
         var semanticFailures = 0;
         var agreements = 0;
         for (var index = 0; index < cases.Count; index++)
@@ -225,7 +223,7 @@ public sealed class FrontendFailureRetentionTests
         foreach (var parent in parents)
         {
             var candidates = CSharpStructuralShrinker.GetCandidates(parent);
-            var childSources = parent.Children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Render())).ToHashSet(StringComparer.Ordinal);
+            var childSources = parent.Children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Render())).ToImmutableHashSet(StringComparer.Ordinal);
             Assert.That(candidates.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind == parent.Kind &&
                 !childSources.Contains(candidate.Render()))), Is.True, parent.Render());
             foreach (var candidate in candidates)

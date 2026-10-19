@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Fuzz;
@@ -13,7 +14,7 @@ public sealed class MetadataProgramSourceReplayTests
     [Test]
     public async Task ActualLibraryAndCallerAgreeWithDecodedInterpreterAndNativeProofs()
     {
-        MetadataProgramSourceCase[] cases = [new(PositiveLibrary, PositiveSubject, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -37,7 +38,7 @@ public sealed class MetadataProgramSourceReplayTests
     public async Task ActualUncaughtLibraryDivisionFaultIsRetainedAfterRealArtifactPreparation()
     {
         const string library = "public static long M0(long value) => value / (value - value);";
-        MetadataProgramSourceCase[] cases = [new(library, PositiveSubject, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(library, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -67,7 +68,7 @@ public sealed class MetadataProgramSourceReplayTests
     {
         const string extra = PositiveSubject + " public static long Target1(long value) { " +
             "Contract.Ensures(true); return MetadataLibrary.M0(value); }";
-        MetadataProgramSourceCase[] cases = [new(PositiveLibrary, extra, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, extra, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -89,7 +90,7 @@ public sealed class MetadataProgramSourceReplayTests
     {
         const string subject = "public static void Target0(long value) { " +
             "Contract.Ensures(value == Contract.Old(value)); }";
-        MetadataProgramSourceCase[] cases = [new(PositiveLibrary, subject, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);

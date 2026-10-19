@@ -190,9 +190,11 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(emission.Emit.Success, Is.True, string.Join("\n", emission.Emit.Diagnostics));
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)))
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Keys, Is.EquivalentTo(names));
         var context = new AssemblyLoadContext("TotalSourceReplayControl", isCollectible: true);
         try
@@ -216,7 +218,9 @@ public sealed class TotalProgramSourceReplayTests
                 IrProgramExecutionStatus? execution = null;
                 if (lowering.IsExact)
                 {
-                    var entries = loweringContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                    var entries = ImmutableDictionaryCapture.Create(
+                        loweringContext.Parameters,
+                        binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                         binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L)));
                     execution = new IrProgramInterpreter(factory).Execute(lowering.Program, entries).Status;
                 }

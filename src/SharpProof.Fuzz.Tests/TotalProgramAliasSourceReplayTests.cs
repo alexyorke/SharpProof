@@ -87,7 +87,9 @@ public sealed class TotalProgramAliasSourceReplayTests
                 .OfType<IrCallInstruction>(), Is.Empty);
             Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrHavocInstruction>(), Is.Empty);
-            var entries = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            var entries = ImmutableDictionaryCapture.Create(
+                context.Parameters,
+                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                 binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateReferenceValue(factory.GetVariableInfo(binding.Entry).Type,
                     arguments[binding.Parameter.Ordinal]!)));
             var interpreted = new IrProgramInterpreter(factory).Execute(lowering.Program, entries);

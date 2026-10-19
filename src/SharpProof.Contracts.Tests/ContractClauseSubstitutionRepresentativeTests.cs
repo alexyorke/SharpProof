@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
@@ -15,16 +16,15 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
         var (factory, contracts) = CreateContracts();
         var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
         var result = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result)).Variable;
-        var substitutions = new Dictionary<IrVarId, IrTerm>
-        {
-            [parameter] = factory.Integer(value),
-            [result] = factory.Integer(value)
-        };
+        var substitutionsBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        substitutionsBuilder[parameter] = factory.Integer(value);
+        substitutionsBuilder[result] = factory.Integer(value);
+        var substitutions = substitutionsBuilder.ToImmutable();
         var bound = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
         Assert.That(bound.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
         Assert.That(bound.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
-            Is.EqualTo(new[] { BoundContractKind.Requires, BoundContractKind.Ensures }));
+            Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires, BoundContractKind.Ensures)));
         var interpreter = new IrInterpreter(factory);
         Assert.That(interpreter.Evaluate(bound.Clauses[0].Condition, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty).Value!.Boolean,
             Is.EqualTo(value > 0));
@@ -50,8 +50,10 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
         var wrongType = factory.Boolean(true);
         Assert.That(factory.GetVariableInfo(parameter).Type, Is.EqualTo(factory.IntegerType));
         Assert.That(wrongType.Type, Is.EqualTo(factory.BooleanType));
-        var substitutions = new Dictionary<IrVarId, IrTerm> { [parameter] = wrongType };
-        var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToArray();
+        var substitutionsBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        substitutionsBuilder[parameter] = wrongType;
+        var substitutions = substitutionsBuilder.ToImmutable();
+        var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToImmutableArray();
         Assert.Throws<ArgumentException>(new Action(() => IrSubstitution.Substitute(factory, contracts.Clauses[0].Condition, substitutions)));
         var bound = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
         Assert.That(bound.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));

@@ -123,8 +123,7 @@ public sealed class FrontendExpressionCoverageTests
         var one = GeneratedCSharpExpression.Integer(1);
         var two = GeneratedCSharpExpression.Integer(2);
         var zero = GeneratedCSharpExpression.Integer(0);
-        var cases = new (GeneratedCSharpExpression Expression, bool IsConstant, long Value)[]
-        {
+        var cases = ImmutableArray.Create<(GeneratedCSharpExpression Expression, bool IsConstant, long Value)>(
             (one, true, 1),
             (GeneratedCSharpExpression.Boolean(true), false, 0),
             (GeneratedCSharpExpression.Left(), false, 0),
@@ -160,8 +159,7 @@ public sealed class FrontendExpressionCoverageTests
                     GeneratedCSharpExpression.Boolean(false),
                     GeneratedCSharpExpression.Boolean(true)),
                 one,
-                two), true, 1)
-        };
+                two), true, 1));
 
         foreach (var (expression, isConstant, expected) in cases)
         {

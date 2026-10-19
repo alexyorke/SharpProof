@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 
@@ -25,7 +26,7 @@ public sealed class MetadataSourceNativeBoundaryControls
         };
         var subject = (family == "static-read" ? "public static long State = 7; " : "") +
             "public static long Target0(long value) { Contract.Ensures(true); " + body + " }";
-        MetadataProgramSourceCase[] cases = [new(Library, subject, 7L)];
+        ImmutableArray<MetadataProgramSourceCase> cases = [new(Library, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);

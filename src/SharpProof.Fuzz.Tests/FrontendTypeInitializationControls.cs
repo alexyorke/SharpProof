@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -49,7 +50,7 @@ public sealed class FrontendTypeInitializationControls
         var binding = lowered.Variables.Single();
         Assert.That(SymbolEqualityComparer.Default.Equals(binding.Symbol, symbol.Parameters[0]), Is.True);
         var interpreted = new IrInterpreter(factory).Evaluate(lowered.Term,
-            new Dictionary<ScopedIrId<IrVariableTag>, IrValue> { [binding.Variable] = factory.CreateIntegerValue(7) });
+            ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(binding.Variable, factory.CreateIntegerValue(7)));
         Assert.That(interpreted.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(interpreted.Value!.Integer, Is.EqualTo(7));
         var context = new AssemblyLoadContext("FrontendTypeInitializationPremise", isCollectible: true);

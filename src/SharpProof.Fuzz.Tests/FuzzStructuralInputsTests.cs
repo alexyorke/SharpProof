@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -27,7 +28,7 @@ public sealed class FuzzStructuralInputsTests
         var arithmetic = factory.Binary(IrBinaryOperator.Add, integer, factory.Integer(1));
         var cast = factory.Cast(factory.StringType,
             factory.Conditional(condition, firstObject, secondObject));
-        IrTerm[] parents =
+        ImmutableArray<IrTerm> parents =
         [
             cast,
             factory.Length(cast),

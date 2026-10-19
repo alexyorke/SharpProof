@@ -3453,3 +3453,13 @@ IrTraversal.PushChildren overload; keep params roots as an input adapter. Other 
 callback/evidence collectors remain open; options/evidence JSON needs explicit property
 order preservation before conversion. Validate Worker dictionary/coverage/producer tests.
 Status: open before edits.
+
+IMM-M115/M117 verified: all 302 ordinary Fuzz tests and all 640 Contracts tests pass,
+zero failures/skips/build warnings/errors. First Contracts compilation raised CA1062
+at existing string Split uses despite upfront guards; explicit coalescing guards at the
+same use sites preserve the already-enforced invariant and the full rerun passes.
+Independent reviews confirm strict duplicate/selector/comparer semantics, nested vectors,
+substitution overwrite and runtime/native subject preservation. Shared internal capture
+helper is reused; no public helper was added. Friend metadata layout validation remains
+pending. Latest literal checkpoint: 3,231 raw/interpolated text tokens across 750 changed
+C# files match master 16063804e. M118/M119 Worker batches remain under validation.

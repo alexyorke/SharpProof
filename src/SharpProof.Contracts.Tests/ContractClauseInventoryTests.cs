@@ -191,7 +191,7 @@ public sealed class ContractClauseInventoryTests
         var entry = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var inventory = new ContractClauseInventoryBuilder(compilation)
             .Create(entry, model.GetOperation(tree.GetRoot()));
-        ContractClausePlacement[] expected = [
+        ImmutableArray<ContractClausePlacement> expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];
@@ -231,7 +231,7 @@ public sealed class ContractClauseInventoryTests
             .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
         var wrongCallable = builder.Create(other, body);
         var declaredOther = builder.Create(other);
-        ContractClausePlacement[] expected = [
+        ImmutableArray<ContractClausePlacement> expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];

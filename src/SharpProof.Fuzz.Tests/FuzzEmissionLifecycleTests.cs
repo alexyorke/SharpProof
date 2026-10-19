@@ -98,9 +98,11 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
-        var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {
@@ -343,9 +345,11 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
-        var methods = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {

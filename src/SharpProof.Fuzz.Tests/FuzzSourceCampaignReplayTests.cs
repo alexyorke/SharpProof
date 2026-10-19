@@ -40,7 +40,7 @@ public sealed class FuzzSourceCampaignReplayTests
         {
             Text = surrogate
         };
-        FuzzSourceCampaignCase[] sources =
+        ImmutableArray<FuzzSourceCampaignCase> sources =
         [
             new(positive, OpaqueFinite, [0L], HealthyPartial, [[0L]]),
             new(negative, HealthyFinite, [0L], HealthyPartial, [[0L]]),

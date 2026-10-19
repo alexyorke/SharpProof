@@ -96,7 +96,7 @@ public sealed class ConstructedGenericContractTests
         var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var type = factory.GetVariableInfo(parameter.Variable).Type;
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -1, 1 })
+        foreach (var input in ImmutableArray.Create(-1, 1))
         {
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(type, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));

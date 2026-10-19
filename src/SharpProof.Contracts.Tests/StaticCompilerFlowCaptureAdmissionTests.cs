@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -50,8 +51,8 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         Assert.That(graph.OriginalOperation, Is.SameAs(body));
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf()))
-            .Concat(block.BranchValue?.DescendantsAndSelf() ?? []))).ToArray();
-        var references = operations.OfType<IFlowCaptureReferenceOperation>().ToArray();
+            .Concat(block.BranchValue?.DescendantsAndSelf() ?? []))).ToImmutableArray();
+        var references = operations.OfType<IFlowCaptureReferenceOperation>().ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(1));
         var capture = references.Single();
         Assert.That(capture.Syntax.SyntaxTree, Is.SameAs(tree));
@@ -86,7 +87,7 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         };
         foreach (var input in inputs)
         {
-            foreach (var choose in new[] { false, true })
+            foreach (var choose in ImmutableArray.Create(false, true))
             {
                 var supplied = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(chooseVariable, factory.CreateBooleanValue(choose)).SetItem(valueVariable, typeName switch
                 {
@@ -127,8 +128,8 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
             Assert.That(captured.Failure, Is.EqualTo(ContractBindingFailure.None));
             Assert.That(captured.Term, Is.InstanceOf<IrVariableTerm>());
             var capturedVariable = ((IrVariableTerm)captured.Term!).Variable;
-            Assert.That(captured.Variables, Is.EquivalentTo(new[] { capturedVariable }));
-            Assert.That(captureBinder.ReceiverVariables, Is.EqualTo(new[] { capturedVariable }));
+            Assert.That(captured.Variables, Is.EquivalentTo(ImmutableArray.Create(capturedVariable)));
+            Assert.That(captureBinder.ReceiverVariables, Is.EqualTo(ImmutableArray.Create(capturedVariable)));
             Assert.That(factory.GetVariableInfo(capturedVariable).Type, Is.EqualTo(captured.Term!.Type));
         }
     }

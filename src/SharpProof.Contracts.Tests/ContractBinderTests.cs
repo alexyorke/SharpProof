@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -53,7 +54,7 @@ public sealed class ContractBinderTests
         Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
         var binding = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -1L, 1L })
+        foreach (var input in ImmutableArray.Create(-1L, 1L))
         {
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding.Variable, factory.CreateIntegerValue(factory.IntegerType, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
@@ -100,7 +101,7 @@ public sealed class ContractBinderTests
         var parameterType = factory.GetVariableInfo(parameter.Variable).Type;
         Assert.That(parameterType, Is.EqualTo(factory.IntegerType));
         var interpreter = new IrInterpreter(factory);
-        foreach (var input in new[] { -1L, 1L })
+        foreach (var input in ImmutableArray.Create(-1L, 1L))
         {
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(parameterType, input));
             Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
@@ -200,7 +201,7 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var contracts = result.Contracts!;
         Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
-        var preStates = contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState)).ToArray();
+        var preStates = contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState)).ToImmutableArray();
         Assert.That(preStates, Has.Length.EqualTo(2));
         Assert.That(preStates.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.CurrentStateVariable)), Is.Unique);
         var first = (IrBinaryTerm)contracts.Clauses[0].Condition;

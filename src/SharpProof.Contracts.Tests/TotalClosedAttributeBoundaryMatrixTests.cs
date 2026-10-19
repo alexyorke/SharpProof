@@ -19,11 +19,8 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
 
     private static IEnumerable<TestCaseData> NumericCases()
     {
-        var ranges = new (long Minimum, long Maximum)[]
-        {
-            (long.MinValue, long.MaxValue), (-129, 128), (-1, 1), (0, 0), (0, 1), (127, 129),
-            (255, 257), (65535, 65537), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue)
-        };
+        var ranges = ImmutableArray.Create<(long Minimum, long Maximum)>((long.MinValue, long.MaxValue), (-129, 128), (-1, 1), (0, 0), (0, 1), (127, 129),
+            (255, 257), (65535, 65537), (long.MinValue, long.MinValue), (long.MaxValue, long.MaxValue));
         foreach (var type in Types)
         {
             yield return new TestCaseData(type, true, 0L, 0L);
@@ -68,9 +65,9 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         Assert.That(factory.GetVariableInfo(result).Type, Is.EqualTo(type));
         var domainMinimum = signed ? -(BigInteger.One << (width - 1)) : BigInteger.Zero;
         var domainMaximum = (BigInteger.One << (signed ? width - 1 : width)) - 1;
-        var values = new BigInteger[] { domainMinimum, domainMaximum, -1, 0, 1, minimum, maximum,
-            (BigInteger)minimum - 1, (BigInteger)minimum + 1, (BigInteger)maximum - 1, (BigInteger)maximum + 1 }
-            .Where(value => value >= domainMinimum && value <= domainMaximum).Distinct().ToArray();
+        var values = ImmutableArray.Create<BigInteger>(domainMinimum, domainMaximum, -1, 0, 1, minimum, maximum,
+            (BigInteger)minimum - 1, (BigInteger)minimum + 1, (BigInteger)maximum - 1, (BigInteger)maximum + 1)
+            .Where(value => value >= domainMinimum && value <= domainMaximum).Distinct().ToImmutableArray();
         var legacyFactory = new IrFactory();
         var legacy = new ContractBinder(compilation, legacyFactory).Bind(target);
         Assert.That(legacy.IsSuccess, Is.EqualTo(typeName != "ulong"));
@@ -102,8 +99,10 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
                 }
                 if (legacy.IsSuccess)
                 {
-                    var legacyValues = legacy.Contracts!.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result))
-                        .ToDictionary(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable), variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (legacyFactory.CreateIntegerValue(
+                    var legacyValues = ImmutableDictionaryCapture.Create(
+                        legacy.Contracts!.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Parameter or BoundContractVariableRole.Result)),
+                        variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable),
+                        variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (legacyFactory.CreateIntegerValue(
                             legacyFactory.GetVariableInfo(variable.Variable).Type, (long)value)));
                     Assert.That(legacy.Contracts.Clauses, Has.Length.EqualTo(2));
                     foreach (var clause in legacy.Contracts.Clauses)

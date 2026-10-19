@@ -31,7 +31,7 @@ public sealed class FuzzNativeRegenerationReceiptControls
         {
             Text = surrogate
         };
-        FuzzSourceCampaignCase[] sources =
+        ImmutableArray<FuzzSourceCampaignCase> sources =
         [
             new(positive, opaqueFinite, [0L], healthyPartial, [[0L]]),
             new(negative, healthyFinite, [0L], healthyPartial, [[0L]]),

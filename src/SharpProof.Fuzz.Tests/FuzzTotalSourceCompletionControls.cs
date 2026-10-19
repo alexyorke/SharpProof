@@ -34,8 +34,11 @@ public sealed class FuzzTotalSourceCompletionControls
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
-        var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal);
+        var methods = ImmutableDictionaryCapture.Create(
+            (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>(),
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var bindings = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;

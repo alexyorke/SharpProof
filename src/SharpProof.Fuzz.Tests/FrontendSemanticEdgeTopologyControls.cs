@@ -17,7 +17,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualSameNamedNamespaceSubjectIsRejected()
     {
-        FrontendSemanticEdgeCase[] cases =
+        ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
             Exact("long", "0L; } namespace Other { public static class SharpProofGeneratedFrontendEdges { " +
                 "public static long Other() => 0L; } } public static class Tail { public static long Value => 0L")
@@ -33,7 +33,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualOverloadedNamesKeepBothIsolatedCohorts()
     {
-        FrontendSemanticEdgeCase[] cases =
+        ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
             Exact("long", "0L"),
             Exact("/*", "*/ long EdgeTarget0(long value) => value", 7L)
@@ -54,7 +54,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualAbsentExpectedMethodIsRejected()
     {
-        FrontendSemanticEdgeCase[] cases = [Exact("/*", "*/ long EdgeTarget1() => 0L")];
+        ImmutableArray<FrontendSemanticEdgeCase> cases = [Exact("/*", "*/ long EdgeTarget1() => 0L")];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
@@ -73,7 +73,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         return new(returnType, "", expression, arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
     }
 
-    private static CompilationUnitSyntax CompileActual(FrontendSemanticEdgeCase[] cases)
+    private static CompilationUnitSyntax CompileActual(IReadOnlyList<FrontendSemanticEdgeCase> cases)
     {
         System.ArgumentNullException.ThrowIfNull(cases, nameof(cases));
         var source = new StringBuilder();
@@ -85,7 +85,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         source.AppendLine("    public static explicit operator long(SharpProofGeneratedConvertible value) => value._value;");
         source.AppendLine("}");
         source.AppendLine("public static class SharpProofGeneratedFrontendEdges {");
-        for (var index = 0; index < cases.Length; index++)
+        for (var index = 0; index < cases.Count; index++)
         {
             var generated = cases[index];
             source.Append("    public static ");

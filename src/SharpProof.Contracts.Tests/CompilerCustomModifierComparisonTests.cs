@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.Ir;
 
 namespace SharpProof.Contracts.Test;
 
@@ -31,9 +32,10 @@ public sealed class CompilerCustomModifierComparisonTests
         Assert.That(compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText),
-                syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetDeclaredSymbol(syntax)!));
+        var methods = ImmutableDictionaryCapture.Create(
+            tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>(),
+            static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText),
+            syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetDeclaredSymbol(syntax)!));
         var left = methods["Left"];
         var right = methods["Right"];
         Assert.That(SymbolEqualityComparer.Default.Equals(left.ContainingAssembly, compilation.Assembly), Is.True);
@@ -46,8 +48,8 @@ public sealed class CompilerCustomModifierComparisonTests
         Assert.That(rightSignature.RefKind, Is.EqualTo(RefKind.None));
         var leftModifiers = leftSignature.ReturnTypeCustomModifiers;
         var rightModifiers = rightSignature.ReturnTypeCustomModifiers;
-        var leftNames = leftConventions.Split(',', StringSplitOptions.TrimEntries);
-        var rightNames = rightConventions.Split(',', StringSplitOptions.TrimEntries);
+        var leftNames = (leftConventions ?? throw new ArgumentNullException(nameof(leftConventions))).Split(',', StringSplitOptions.TrimEntries);
+        var rightNames = (rightConventions ?? throw new ArgumentNullException(nameof(rightConventions))).Split(',', StringSplitOptions.TrimEntries);
         Assert.That(leftModifiers, Has.Length.EqualTo(leftNames.Length));
         Assert.That(rightModifiers, Has.Length.EqualTo(rightNames.Length));
         for (var index = 0; index < leftModifiers.Length; index++)

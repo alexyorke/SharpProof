@@ -27,11 +27,13 @@
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.Contracts" />
+    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
     <InternalsVisibleTo Include="SharpProof.Ir.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt" />
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs" Link="ArgumentNullGuard.cs" />

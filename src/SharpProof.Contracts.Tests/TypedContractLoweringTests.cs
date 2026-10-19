@@ -308,7 +308,7 @@ public sealed class TypedContractLoweringTests
         var lowering = subject.Lower();
         var binding = subject.Context.Parameters.Single();
         var result = subject.Context.Result!.Value;
-        var values = subject.Values(0).ToImmutableDictionary().Add(result, subject.Value(result, 0));
+        var values = subject.Values(0).Add(result, subject.Value(result, 0));
         var query = new VerificationQuery(subject.Factory, [],
             new Goal(subject.Factory, subject.Factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value),
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. values.Keys]);
@@ -551,7 +551,7 @@ public sealed class TypedContractLoweringTests
             TestCompilation.AssertNoErrors(compilation);
             var methods = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
                 .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target" &&
-                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" })).ToArray();
+                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" })).ToImmutableArray();
             var bodySyntax = methods.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
             var contextSyntax = implementationContext ? bodySyntax : methods[0];
             var model = compilation.GetSemanticModel(bodySyntax.SyntaxTree);
@@ -579,18 +579,23 @@ public sealed class TypedContractLoweringTests
             return new RoslynProgramLowerer(Factory).LowerCandidate(graph, Context);
         }
 
-        internal Dictionary<IrVarId, IrValue> EntryValues(params int[] inputs)
+        internal ImmutableDictionary<IrVarId, IrValue> EntryValues(params int[] inputs)
         {
             System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
-            return Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, inputs[binding.Parameter.Ordinal])));
+            return ImmutableDictionaryCapture.Create(
+                Context.Parameters,
+                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, inputs[binding.Parameter.Ordinal])));
         }
 
-        internal Dictionary<IrVarId, IrValue> Values(params int[] inputs)
+        internal ImmutableDictionary<IrVarId, IrValue> Values(params int[] inputs)
         {
             System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
-            return Context.Parameters.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new[] { binding.Entry, binding.Current, binding.PreState }
-                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal]))))))
-                .ToDictionary(pair => pair.Key, pair => pair.Value);
+            return ImmutableDictionaryCapture.Create(
+                Context.Parameters.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)
+                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal])))))),
+                pair => pair.Key,
+                pair => pair.Value);
         }
 
         internal IrValue Value(IrVarId variable, int value)
