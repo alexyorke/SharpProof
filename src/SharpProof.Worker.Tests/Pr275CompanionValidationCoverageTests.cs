@@ -90,6 +90,9 @@ public sealed class Pr275CompanionValidationCoverageTests
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
         Assert.That(ContractForCompanionValidator.ValidateRelationship(companion, relationships, diagnostics.Add), Is.True);
+        ContractForCompanionValidator.Validate(companion, Compilation,
+            new ContractClauseInventoryBuilder(Compilation), diagnostics.Add,
+            TestContext.CurrentContext.CancellationToken);
         Assert.That(diagnostics.ToImmutable(), Is.Empty);
     }
 

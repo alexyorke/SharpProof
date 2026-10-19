@@ -12,6 +12,43 @@ namespace SharpProof.Tool.Test;
 public sealed class ToolApplicationTests
 {
     [Test]
+    public void EntrypointRejectsDefaultArgumentsBeforeDispatch()
+    {
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await Program.RunMainAsync(default, TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("args"));
+    }
+
+    [Test]
+    public void ApplicationRejectsDefaultArgumentsBeforeOutputOrDiscovery()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await ToolApplication.RunAsync(default, output, error,
+                static _ => throw new AssertionException("Discovery must not start."),
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("args"));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
+    [Test]
+    public void SdkProbeRejectsDefaultArgumentsBeforeStartingProcess()
+    {
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await SdkProbe.RunAsync("must-not-start", default, TimeSpan.FromSeconds(5),
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("arguments"));
+    }
+
+    [Test]
     public async Task ActualEntrypointDocumentsSupportedCommands()
     {
         Assert.That(await Program.Main(["--help"]), Is.Zero);

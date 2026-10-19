@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 namespace SharpProof.Ir;
 
@@ -35,11 +36,10 @@ internal sealed class CanonicalHashWriter : IDisposable
         return AddNumber(ValueKind.Int64, value);
     }
 
-    internal CanonicalHashWriter Add(byte[] bytes)
+    internal CanonicalHashWriter Add(ImmutableArray<byte> bytes)
     {
-        return AddFrame(
-            ValueKind.Bytes,
-            ArgumentNullGuard.NotNull(bytes, nameof(bytes)));
+        RepositoryParameterGuard.ThrowIfMissing(bytes.IsDefault, nameof(bytes));
+        return AddFrame(ValueKind.Bytes, bytes.AsSpan());
     }
 
     internal CanonicalHashWriter Add(Stream stream)
@@ -89,11 +89,11 @@ internal sealed class CanonicalHashWriter : IDisposable
                 value.ToString(null, CultureInfo.InvariantCulture)));
     }
 
-    private CanonicalHashWriter AddFrame(ValueKind kind, byte[] bytes)
+    private CanonicalHashWriter AddFrame(ValueKind kind,
+        ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans produce valid zero-length frames */ bytes)
     {
-        bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
         AddFrameHeader(kind, bytes.Length);
-        _hash.AppendData(bytes);
+        _hash.AppendData(bytes.ToArray());
         return this;
     }
 
@@ -120,7 +120,8 @@ internal sealed class CanonicalHashWriter : IDisposable
             int integer => Add(integer),
             uint unsignedInteger => Add(unsignedInteger),
             long integer => Add(integer),
-            byte[] bytes => Add(bytes),
+            byte[] bytes => Add(bytes.ToImmutableArray()),
+            ImmutableArray<byte> bytes => Add(bytes),
             Enum enumeration => Add(enumeration),
             _ => throw new ArgumentException(
                 "Canonical hash values must use a supported exact type.",

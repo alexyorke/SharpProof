@@ -174,6 +174,21 @@ public sealed class IrRemainingLifecycleTests
     }
 
     [Test]
+    public void CallShapeBoundariesRejectDefaultArgumentVectors()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            "Static", factory.IntegerType, true);
+        var info = factory.GetMemberInfo(member);
+        var factoryFailure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            factory.ValidateCallShape(info, null, default, "arguments")));
+        var serviceFailure = Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrTermServices.ValidateCallShape(factory, info, null, default, "arguments", opaque: false)));
+        Assert.That(factoryFailure!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(serviceFailure!.ParamName, Is.EqualTo("arguments"));
+    }
+
+    [Test]
     public void MemberSignaturesDistinguishCollidingEmptyAndBooleanParameterKeys()
     {
         var factory = new IrFactory();

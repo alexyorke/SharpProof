@@ -1853,6 +1853,31 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void SharedInvalidExpectedManifestRetainsRequestBoundValidationError()
+    {
+        var response = CreateResponse(CreateManifest());
+        var manifest = response.Manifest with { Callables = default };
+        response = response with { Manifest = manifest };
+        Assert.That(response.Manifest, Is.SameAs(manifest));
+        AssertContainsErrorCode(WorkerProtocolJson.Validate(response, InputHash, manifest),
+            "response.expected_manifest");
+    }
+
+    [Test]
+    public void CanonicalCopyNormalizesDefaultCallablesWithoutReusingManifestOwner()
+    {
+        var response = CreateResponse(CreateManifest());
+        var manifest = response.Manifest with { Callables = default };
+        response = response with { Manifest = manifest };
+        var copy = WorkerProtocolJson.CanonicalizeCopy(response);
+        Assert.That(copy.Manifest, Is.Not.SameAs(manifest));
+        Assert.That(copy.Manifest.Callables.IsDefault, Is.False);
+        Assert.That(copy.Manifest.Callables, Is.Empty);
+        Assert.That(response.Manifest, Is.SameAs(manifest));
+        Assert.That(manifest.Callables.IsDefault, Is.True);
+    }
+
+    [Test]
     public void MissingResponseSubdocumentsAndInvalidExpectedManifestAreRejected()
     {
         var missingManifest = CreateResponse(CreateManifest());

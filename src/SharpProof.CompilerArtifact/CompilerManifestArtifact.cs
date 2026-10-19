@@ -92,7 +92,7 @@ internal static class WorkerBinaryIdentity
         using var hash = new CanonicalHashWriter();
         foreach (var file in files)
         {
-            hash.Add(Path.GetFileName(file)).Add(File.ReadAllBytes(file));
+            hash.Add(Path.GetFileName(file)).Add(File.ReadAllBytes(file).ToImmutableArray());
         }
         return hash.Add("z3.native").Add(z3LibrarySha256 ?? string.Empty).Finish();
     }

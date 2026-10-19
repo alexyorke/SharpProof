@@ -300,14 +300,14 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var sarifPath = project.VerifyOutputPath("net8.0", "result.sarif");
         Directory.CreateDirectory(Path.GetDirectoryName(project.ResultPath)!);
-        var request = new byte[] { 1, 2, 3 };
-        var result = new byte[] { 4, 5, 6 };
-        var manifest = new byte[] { 7, 8, 9 };
-        var sarif = new byte[] { 10, 11, 12 };
-        await File.WriteAllBytesAsync(project.RequestPath, request);
-        await File.WriteAllBytesAsync(project.ResultPath, result);
-        await File.WriteAllBytesAsync(project.CompilerManifestPath, manifest);
-        await File.WriteAllBytesAsync(sarifPath, sarif);
+        var request = ImmutableArray.Create<byte>(1, 2, 3);
+        var result = ImmutableArray.Create<byte>(4, 5, 6);
+        var manifest = ImmutableArray.Create<byte>(7, 8, 9);
+        var sarif = ImmutableArray.Create<byte>(10, 11, 12);
+        await File.WriteAllBytesAsync(project.RequestPath, request.AsMemory());
+        await File.WriteAllBytesAsync(project.ResultPath, result.AsMemory());
+        await File.WriteAllBytesAsync(project.CompilerManifestPath, manifest.AsMemory());
+        await File.WriteAllBytesAsync(sarifPath, sarif.AsMemory());
 
         var evaluation = await project.RunNonBuildingInitializationAsync(sarifPath);
 
@@ -1836,12 +1836,12 @@ public sealed class WorkerMsBuildIntegrationTests
             BuildEngine = engine,
             Executable = "dotnet",
             WorkingDirectory = Path.GetDirectoryName(project.ProjectPath)!,
-            Arguments = new[] { WorkerOutputPath(), "verify", "--worker", WorkerOutputPath(),
+            Arguments = ImmutableArray.Create(WorkerOutputPath(), "verify", "--worker", WorkerOutputPath(),
                 "--request", privateRequest, "--result", privateResult,
                 "--compiler-manifest", invocationManifest, "--verify-policy", "advisory", "--assumption-policy", "allow",
                 "--cache-enabled", "false", "--publish-request", project.RequestPath,
                 "--publish-result", scenario == "invalid-input" ? project.RequestPath : project.ResultPath,
-                "--publish-compiler-manifest", stableManifest }
+                "--publish-compiler-manifest", stableManifest)
                 .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (new Microsoft.Build.Utilities.TaskItem(argument))).ToArray()
         };
         bool completed;
@@ -3115,9 +3115,9 @@ public sealed class WorkerMsBuildIntegrationTests
             "net8.0",
             "SharpProof",
             "runs");
-        internal string[] InvocationRunRoots =>
+        internal ImmutableArray<string> InvocationRunRoots =>
             Directory.Exists(InvocationRunsDirectory)
-                ? Directory.GetDirectories(InvocationRunsDirectory)
+                ? Directory.GetDirectories(InvocationRunsDirectory).ToImmutableArray()
                 : [];
         internal string CollisionWorkerPath
         {
@@ -3801,32 +3801,33 @@ public sealed class WorkerMsBuildIntegrationTests
 
         private static ProjectTemplate CreateProjectTemplate()
         {
-            static string EscapePath(params string[] parts)
+            static string EscapePath(ImmutableArray<string> parts)
             {
-                System.ArgumentNullException.ThrowIfNull(parts, nameof(parts));
-                return SecurityElement.Escape(Path.Combine(parts));
+                if (parts.IsDefault)
+                { throw new ArgumentNullException(nameof(parts)); }
+                return SecurityElement.Escape(Path.Combine(parts.AsSpan()));
             }
 
             var repository = TestRepository.FindRoot();
-            var nativeZ3Path = EscapePath(ContainerContract.ResolveZ3LibraryRequired());
-            var attributes = EscapePath(ProductBuildOutputs.AttributesAssemblyPath());
-            var props = EscapePath(repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.props");
-            var verifierProps = EscapePath(repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.props");
+            var nativeZ3Path = EscapePath([ContainerContract.ResolveZ3LibraryRequired()]);
+            var attributes = EscapePath([ProductBuildOutputs.AttributesAssemblyPath()]);
+            var props = EscapePath([repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.props"]);
+            var verifierProps = EscapePath([repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.props"]);
             var testConfiguration = new DirectoryInfo(
                 Path.GetDirectoryName(
                     typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
                 .Parent?.Name ??
                 throw new InvalidOperationException(
                     "The test build configuration was not found.");
-            var analyzerDirectory = EscapePath(repository, "artifacts", "bin", "SharpProof.Analyzer", testConfiguration, "netstandard2.0");
-            var generatorDirectory = EscapePath(repository, "artifacts", "bin", "SharpProof.ContractForGenerator", testConfiguration, "netstandard2.0");
-            var collectorDirectory = EscapePath(repository, "artifacts", "bin", "SharpProof.CompilerCollector", testConfiguration, "netstandard2.0");
-            var targets = EscapePath(repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.targets");
-            var verifierTargets = EscapePath(repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets");
-            var worker = EscapePath(repository, "artifacts", "bin", "SharpProof.Worker", testConfiguration, "net10.0", "SharpProof.Worker.dll");
+            var analyzerDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.Analyzer", testConfiguration, "netstandard2.0"]);
+            var generatorDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.ContractForGenerator", testConfiguration, "netstandard2.0"]);
+            var collectorDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.CompilerCollector", testConfiguration, "netstandard2.0"]);
+            var targets = EscapePath([repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.targets"]);
+            var verifierTargets = EscapePath([repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets"]);
+            var worker = EscapePath([repository, "artifacts", "bin", "SharpProof.Worker", testConfiguration, "net10.0", "SharpProof.Worker.dll"]);
             var launcher = worker;
-            var protocol = EscapePath(repository, "artifacts", "bin", "SharpProof.Worker.Protocol", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll");
-            var buildTasks = EscapePath(repository, "artifacts", "bin", "SharpProof.BuildTasks", testConfiguration, "net10.0", "SharpProof.BuildTasks.dll");
+            var protocol = EscapePath([repository, "artifacts", "bin", "SharpProof.Worker.Protocol", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll"]);
+            var buildTasks = EscapePath([repository, "artifacts", "bin", "SharpProof.BuildTasks", testConfiguration, "net10.0", "SharpProof.BuildTasks.dll"]);
             var sharedDirectory = CreateSharedCompilerPayload(repository, testConfiguration);
             return new ProjectTemplate(
                 repository,

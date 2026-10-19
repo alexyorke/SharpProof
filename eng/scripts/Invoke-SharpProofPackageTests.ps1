@@ -79,6 +79,28 @@ else {
 }
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
+function ConvertTo-SharpProofTimingHistory {
+    param([AllowNull()][object]$Value)
+    $items = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($item in @($Value)) { $items.Add($item) }
+    return , $items.ToImmutable()
+}
+
+function Set-SharpProofTimingEstimate {
+    param(
+        [Parameter(Mandatory = $true)][Collections.Generic.IDictionary[string, long]]$Estimates,
+        [AllowEmptyString()][string]$Name,
+        [long]$Milliseconds
+    )
+    $storedKey = [string]::Empty
+    if ($Estimates.TryGetKey($Name, [ref]$storedKey)) {
+        $Estimates[$storedKey] = $Milliseconds
+    }
+    else {
+        $Estimates.Add($Name, $Milliseconds)
+    }
+}
+
 function Invoke-RequiredBuilds {
     param([Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Builds)
 
@@ -93,7 +115,7 @@ function Invoke-RequiredBuilds {
 function New-SharpProofWeightedBuckets {
     param(
         [Parameter(Mandatory = $true)][object[]]$Methods,
-        [Parameter(Mandatory = $true)][hashtable]$HistoricalMilliseconds,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds,
         [Parameter(Mandatory = $true)][int]$BucketCount
     )
@@ -144,7 +166,7 @@ function New-SharpProofWeightedBuckets {
 function Get-SharpProofBucketMaximum {
     param(
         [Parameter(Mandatory = $true)][object[]]$Buckets,
-        [Parameter(Mandatory = $true)][hashtable]$HistoricalMilliseconds,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyDictionary[string, long]]$HistoricalMilliseconds,
         [Parameter(Mandatory = $true)][long]$DefaultMilliseconds
     )
 
@@ -335,9 +357,9 @@ $timingOutput = Join-Path $timingDirectory (
     $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
     $(if ($useDefaultShardPlan) { '' } else { '-selected' }) +
     $timingSuffix + '.json')
-$priorMethodMilliseconds = @{}
-$priorPackageLayoutMethodMilliseconds = @{}
-$priorFilterMilliseconds = @{}
+$priorMethodMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
+$priorPackageLayoutMethodMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
+$priorFilterMillisecondsBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
 foreach ($priorTimingPath in $(if ($Fast) {
             @($canonicalTimingOutput, $timingOutput)
         }
@@ -362,42 +384,41 @@ foreach ($priorTimingPath in $(if ($Fast) {
         $hasScheduler =
         $priorTiming.PSObject.Properties.Name -contains 'scheduler'
         $methodHistory = if ($hasScheduler) {
-            @($priorTiming.scheduler.workerMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.workerMethods)
         }
         else {
-            @($priorTiming.workerMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.workerMethods)
         }
         foreach ($method in $methodHistory) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorMethodMilliseconds[[string]$method.name] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorMethodMillisecondsBuilder -Name ([string]$method.name) -Milliseconds $elapsed
             }
         }
         $packageLayoutMethodHistory = if ($hasScheduler -and
             $priorTiming.scheduler.PSObject.Properties.Name -contains
             'packageLayoutMethods') {
-            @($priorTiming.scheduler.packageLayoutMethods)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.packageLayoutMethods)
         }
         else {
-            @()
+            ([Collections.Immutable.ImmutableArray[object]]::Empty)
         }
         foreach ($method in $packageLayoutMethodHistory) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorPackageLayoutMethodMilliseconds[
-                [string]$method.name] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorPackageLayoutMethodMillisecondsBuilder -Name ([string]$method.name) -Milliseconds $elapsed
             }
         }
         $filterHistory = if ($hasScheduler) {
-            @($priorTiming.scheduler.filters)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.scheduler.filters)
         }
         else {
-            @($priorTiming.shards)
+            (ConvertTo-SharpProofTimingHistory -Value $priorTiming.shards)
         }
         foreach ($shard in $filterHistory) {
             $elapsed = [long]$shard.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorFilterMilliseconds[[string]$shard.filter] = $elapsed
+                Set-SharpProofTimingEstimate -Estimates $priorFilterMillisecondsBuilder -Name ([string]$shard.filter) -Milliseconds $elapsed
             }
         }
     }
@@ -407,6 +428,10 @@ foreach ($priorTimingPath in $(if ($Fast) {
             $_.Exception.Message)
     }
 }
+
+$priorMethodMilliseconds = $priorMethodMillisecondsBuilder.ToImmutable()
+$priorPackageLayoutMethodMilliseconds = $priorPackageLayoutMethodMillisecondsBuilder.ToImmutable()
+$priorFilterMilliseconds = $priorFilterMillisecondsBuilder.ToImmutable()
 
 try {
     if (-not $NoBuild -and -not $ReuseTestHarness) {
@@ -592,7 +617,7 @@ try {
         # those samples useful and the existing wide-wave tuning depends on it.
         $countBalancedBuckets = @(New-SharpProofWeightedBuckets `
                 -Methods $bucketWorkerMethods `
-                -HistoricalMilliseconds @{} `
+                -HistoricalMilliseconds ([Collections.Immutable.ImmutableDictionary[string, long]]::Empty) `
                 -DefaultMilliseconds 1L `
                 -BucketCount $workerShardCount)
         $weightedBuckets = @(New-SharpProofWeightedBuckets `
@@ -953,17 +978,17 @@ try {
         -ResultsRoot $results `
         -ClassName $packageLayoutClass
     foreach ($entry in $workerMethodTimings) {
-        $priorMethodMilliseconds[[string]$entry.name] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorMethodMillisecondsBuilder -Name ([string]$entry.name) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
     foreach ($entry in $packageLayoutMethodTimings) {
-        $priorPackageLayoutMethodMilliseconds[[string]$entry.name] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorPackageLayoutMethodMillisecondsBuilder -Name ([string]$entry.name) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
     foreach ($entry in $shardTimings) {
-        $priorFilterMilliseconds[[string]$entry.filter] =
-        [long]$entry.elapsedMilliseconds
+        Set-SharpProofTimingEstimate -Estimates $priorFilterMillisecondsBuilder -Name ([string]$entry.filter) -Milliseconds ([long]$entry.elapsedMilliseconds)
     }
+    $priorMethodMilliseconds = $priorMethodMillisecondsBuilder.ToImmutable()
+    $priorPackageLayoutMethodMilliseconds = $priorPackageLayoutMethodMillisecondsBuilder.ToImmutable()
+    $priorFilterMilliseconds = $priorFilterMillisecondsBuilder.ToImmutable()
     $temporaryTiming =
     $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     [pscustomobject]@{

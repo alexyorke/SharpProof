@@ -18,7 +18,7 @@ public sealed class CanonicalHashWriterTests
             .Add(42)
             .Add(uint.MaxValue)
             .Add(long.MinValue)
-            .Add(new byte[] { 0, 1, 255 });
+            .Add(ImmutableArray.Create<byte>(0, 1, 255));
 
         Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
     }
@@ -98,7 +98,7 @@ public sealed class CanonicalHashWriterTests
         using var arrayWriter = new CanonicalHashWriter();
         using var streamWriter = new CanonicalHashWriter();
         using var stream = new MemoryStream(bytes, writable: false);
-        var expected = arrayWriter.Add(bytes).Finish();
+        var expected = arrayWriter.Add(bytes.ToImmutableArray()).Finish();
 
         Assert.That(
             streamWriter.Add(stream).Finish(),
@@ -142,6 +142,28 @@ public sealed class CanonicalHashWriterTests
             Assert.Throws<ObjectDisposedException>(
                 (Action)(() => _ = writer.Finish()));
         }
+    }
+
+    [Test]
+    public void ImmutableByteFramesRejectDefaultAndRetainInitializedEmpty()
+    {
+        using var writer = new CanonicalHashWriter();
+        var failure = Assert.Throws<ArgumentNullException>(
+            (Action)(() => writer.Add(default(ImmutableArray<byte>))));
+        Assert.That(failure!.ParamName, Is.EqualTo("bytes"));
+        using var streamWriter = new CanonicalHashWriter();
+        using var emptyStream = new MemoryStream();
+        Assert.That(writer.Add(ImmutableArray<byte>.Empty).Finish(),
+            Is.EqualTo(streamWriter.Add(emptyStream).Finish()));
+    }
+
+    [Test]
+    public void BoxedImmutableAndNativeByteFramesRetainTheSameEncoding()
+    {
+        using var immutableWriter = new CanonicalHashWriter();
+        using var nativeWriter = new CanonicalHashWriter();
+        Assert.That(immutableWriter.Add((object)ImmutableArray.Create<byte>(0, 1, 255)).Finish(),
+            Is.EqualTo(nativeWriter.Add((object)new byte[] { 0, 1, 255 }).Finish()));
     }
 
     private enum TestEnum

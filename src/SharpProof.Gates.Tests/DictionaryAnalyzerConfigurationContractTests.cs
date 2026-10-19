@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -29,6 +30,17 @@ public sealed class DictionaryAnalyzerConfigurationContractTests
             Assert.That(options.TryGetValue("casekey", out _), Is.EqualTo(ignoreCase));
             Assert.That(options.TryGetValue("added", out _), Is.False);
         }
+    }
+
+    [Test]
+    public void DefaultTupleOptionsRejectBeforeCapturingEntries()
+    {
+        var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
+        {
+            _ = new DictionaryAnalyzerConfigOptions(
+                default(ImmutableArray<(string Key, string Value)>));
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo("values"));
     }
 
     [Test]

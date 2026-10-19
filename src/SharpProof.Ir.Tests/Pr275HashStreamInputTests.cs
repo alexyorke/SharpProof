@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -24,6 +25,6 @@ public sealed class Pr275HashStreamInputTests
         using var stream = new MemoryStream(new byte[] { 1, 2, 3 }, writable: false);
         stream.Position = 1;
         Assert.That(streamWriter.Add(stream).Finish(),
-            Is.EqualTo(byteWriter.Add(new byte[] { 2, 3 }).Finish()));
+            Is.EqualTo(byteWriter.Add(ImmutableArray.Create<byte>(2, 3)).Finish()));
     }
 }
