@@ -11,9 +11,11 @@ on:
 permissions:
   contents: read
 
+# A new pull-request push supersedes its older check; default-branch updater
+# runs share one group and are never cancelled.
 concurrency:
   group: docs-maintenance-${{ github.event.pull_request.number || 'updater' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   COMPOSE_PROJECT_NAME: sharpproof-docs-${{ github.run_id }}-${{ github.run_attempt }}

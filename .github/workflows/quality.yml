@@ -28,10 +28,19 @@ jobs:
       - name: Require all repository quality and link checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Build explicitly: older runner Compose versions lose service build
-        # contexts when `run --build` generates its Bake plan.
+        # Build lint on the tooling image prepared above, as compose.yaml's
+        # service:tooling context does. `docker compose build lint` would
+        # rebuild tooling without the cached Windows Z3 payload, and older
+        # runner Compose versions lose service build contexts under `run --build`.
         run: |
-          docker compose build lint
+          docker buildx build \
+            --platform linux/amd64 \
+            --file eng/lint/Dockerfile \
+            --load \
+            --tag "${COMPOSE_PROJECT_NAME}-lint:local" \
+            --build-context "canonical_tooling=docker-image://${COMPOSE_PROJECT_NAME}-tooling:local" \
+            --progress plain \
+            .
           docker compose run --rm -e GITHUB_TOKEN lint
       - name: Publish quality summary
         if: always()
