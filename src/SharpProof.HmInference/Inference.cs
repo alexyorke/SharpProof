@@ -486,6 +486,7 @@ public static partial class Inference
         private Flow Statements(StatementSyntax[] statements)
         {
             HmType? returns = null;
+            var localFunctions = new List<LocalFunctionStatementSyntax>();
             var fallsThrough = true;
             var breaks = false;
             var continues = false;
@@ -539,10 +540,8 @@ public static partial class Inference
                     case ExpressionStatementSyntax expression:
                         Expression(expression.Expression);
                         break;
-                    case LocalFunctionStatementSyntax:
-                        // C# already supplies an explicit (possibly generic) scheme.
-                        // Captures and the retained local body are compiler checked
-                        // after any change to the containing method signature.
+                    case LocalFunctionStatementSyntax localFunction:
+                        localFunctions.Add(localFunction);
                         break;
                     case ReturnStatementSyntax { Expression: null }:
                         flow = new(null, false);
@@ -633,6 +632,8 @@ public static partial class Inference
                 continues |= flow.Continues;
             }
 
+            foreach (var localFunction in localFunctions)
+            { AnalyzeLocalFunction(localFunction); }
             return new(returns, fallsThrough, breaks, continues);
         }
 

@@ -86,6 +86,7 @@ method/local-function declarations supply schemes instantiated per call.
 
 | Feature | Behavior |
 | --- | --- |
+| Local function captures | Infer supported bodies after the enclosing local declarations; retain declared local schemes and propagate capture constraints, async and iterator results |
 | Primary-constructor captures | Preserve declared instance storage types while generalizing unrelated method inputs |
 | Primitive and nominal parameter types | Generalize unconstrained leaves; retain assembly identity and generic-parameter scopes, verify spelling through extern aliases and shadowed nested names |
 | Func, tuples, named tuples, generic/nested containers | Preserve owner/inner arguments, nullable annotations and tuple names |

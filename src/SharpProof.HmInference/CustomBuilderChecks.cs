@@ -114,7 +114,7 @@ internal static class CustomBuilderChecks
             ("CustomBuilderLambdaAwaiterConstraint", "static Func<ProbeTask<int>> M(SafeTask<int> task,int x)=>async()=>{await task;return x;};", extraAwaiter, "Suggestion", "global::System.Func<global::ProbeTask<T1>> M<T1>(global::SafeTask<int> task, T1 x)"),
             ("CustomBuilderRestoresStandardOuter", "static async Task<int> M(SafeTask<int> task,int x){Func<ProbeTask<int>> nested=async()=>{await task;return 1;};await nested();return x;}", extraAwaiter, "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
             ("CustomBuilderRestoresCustomOuter", "static async ProbeTask<int> M(SafeTask<int> task,int x){Func<Task<int>> nested=async()=>1;await task;return x;}", extraAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
-            ("CustomBuilderNestedLocalEmission", "static int M(SafeTask<int> task,int x) { async ProbeTask<int> Local(){await task;return 1;} _=Local();return x; }", extraAwaiter, "Rejected", null),
+            ("CustomBuilderNestedLocalEmission", "static int M(SafeTask<int> task,int x) { async ProbeTask<int> Local(){await task;return 1;} _=Local();return x; }", extraAwaiter, "Suggestion", "T1 M<T1>(global::SafeTask<int> task, T1 x)"),
             ("CustomBuilderInvalidSetResult", "static async ProbeTask<int> M(int x,bool ignored)=>x;", invalidResult, "Skipped", null),
             ("CustomBuilderInvalidConstraint", "static async ProbeTask<string> M(string x,bool ignored)=>x;", constrained, "Skipped", null)
         ];

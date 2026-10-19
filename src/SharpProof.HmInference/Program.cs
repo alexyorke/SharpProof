@@ -201,7 +201,7 @@ internal static class Program
             ("ExplicitArray", "static int[] M(int x) => new int[] { x };", "Concrete", null),
             ("AllocateArray", "static int[] M(int n) => new int[n];", "Concrete", null),
             ("GenericLocal", "static int M(int x) { T Id<T>(T value) => value; return Id(x); }", "Suggestion", "T1 M<T1>(T1 x)"),
-            ("CapturedLocal", "static int M(int x) { int Read() => x; return Read(); }", "Rejected", null),
+            ("CapturedLocal", "static int M(int x) { int Read() => x; return Read(); }", "Concrete", null),
             ("TypedArrayLocal", "static int M(int[] xs,int i) { int[] copy=xs; return copy[i]; }", "Concrete", null)
         ];
         var passed = 0;
@@ -323,6 +323,7 @@ internal static class Program
         Program.Log.Info("PASS PolymorphicRuntime");
         passed += await TypeShapeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await NominalIdentityChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await LocalFunctionChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ProtocolEnumerationChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PatternChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CallChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

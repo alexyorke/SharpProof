@@ -79,7 +79,9 @@ public static partial class Inference
                     }
                     if (owner is LocalFunctionStatementSyntax local)
                     {
-                        converted = model.GetDeclaredSymbol(local, cancellationToken)?.ReturnType ?? converted;
+                        var localSymbol = model.GetDeclaredSymbol(local, cancellationToken);
+                        converted = localSymbol is { IsAsync: true, ReturnType: INamedTypeSymbol { Arity: 1 } localTask }
+                            ? localTask.TypeArguments[0] : localSymbol?.ReturnType ?? converted;
                         break;
                     }
                     if (owner is MethodDeclarationSyntax)

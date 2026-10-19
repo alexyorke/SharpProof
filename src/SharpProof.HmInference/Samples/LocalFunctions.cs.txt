@@ -1,0 +1,39 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public static class LocalFunctionSamples
+{
+    public static int CapturedRead(int value, bool ignored)
+    {
+        int Read() => value;
+        return Read();
+    }
+    public static int CapturedMutation(int value, bool ignored)
+    {
+        void Mutate() { value += 2; }
+        Mutate();
+        return value;
+    }
+    public static async Task<int> AwaitCaptured(Task<int> pending, int result)
+    {
+        async Task<int> Read() => await pending;
+        await Read();
+        return result;
+    }
+    public static IEnumerable<int> CapturedIterator(int value, bool ignored)
+    {
+        IEnumerable<int> Read() { yield return value; }
+        return Read();
+    }
+    public static int LocalScheme(int value)
+    {
+        T Id<T>(T item) => item;
+        return Id(value);
+    }
+    public static int MutuallyRecursive(int value, bool ignored)
+    {
+        int A(int n) => n <= 0 ? value : B(n - 1);
+        int B(int n) => A(n);
+        return A(2);
+    }
+}

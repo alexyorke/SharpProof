@@ -12,7 +12,7 @@ public static partial class Inference
         private HmType? iteratorElement;
         private ITypeSymbol? iteratorDeclaredElement;
 
-        private void SetIteratorReturn(MethodDeclarationSyntax declaration, IMethodSymbol method)
+        private void SetIteratorReturn(SyntaxNode declaration, IMethodSymbol method)
         {
             if (declaration is null)
             { throw new ArgumentNullException(nameof(declaration)); }

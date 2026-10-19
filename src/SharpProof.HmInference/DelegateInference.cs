@@ -8,6 +8,64 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private void AnalyzeLocalFunction(LocalFunctionStatementSyntax declaration)
+        {
+            if (declaration is null)
+            { throw new ArgumentNullException(nameof(declaration)); }
+            var symbol = model.GetDeclaredSymbol(declaration, cancellationToken) as IMethodSymbol
+                ?? throw new InferenceException("Unresolved local function.");
+            // The declared local scheme remains fixed. Isolate body inference so an
+            // unsupported nested construct can retain the compiler-validated path.
+            var copies = new Dictionary<HmType, HmType>();
+            HmType Copy(HmType type)
+            {
+                if (type is null)
+                { throw new ArgumentNullException(nameof(type)); }
+                type = type.Root;
+                if (copies.TryGetValue(type, out var copy))
+                { return copy; }
+                copy = type.WithArguments(type.Arguments.Select(Copy).ToArray());
+                copies.Add(type, copy);
+                return copy;
+            }
+            var nested = new Session(model, cancellationToken) { currentMethod = currentMethod };
+            foreach (var entry in environment)
+            { nested.environment.Add(entry.Key, Copy(entry.Value)); }
+            if (currentFunction is not null)
+            { nested.currentFunction = Copy(currentFunction); }
+            try
+            {
+                foreach (var parameter in symbol.Parameters)
+                { nested.environment.Add(parameter, CSharpTypes.Rigid(parameter.Type)); }
+                nested.SetIteratorReturn(declaration, symbol);
+                if (nested.iteratorReturn is null)
+                { nested.SetAsyncReturn(symbol); }
+                else
+                { HmType.Unify(nested.iteratorElement!, CSharpTypes.Rigid(nested.iteratorDeclaredElement!)); }
+                HmType result;
+                var noValue = symbol.ReturnsVoid || nested.asyncReturn is { Arity: 0 };
+                if (declaration.ExpressionBody is { } expressionBody)
+                {
+                    if (noValue)
+                    { nested.Expression(expressionBody.Expression); result = new("void"); }
+                    else
+                    { result = nested.Returned(expressionBody.Expression); }
+                }
+                else if (declaration.Body is { } body)
+                { result = nested.iteratorReturn is not null ? nested.IteratorBody(body) : noValue ? nested.VoidBody(body) : nested.Block(body); }
+                else
+                { return; }
+                result = nested.iteratorReturn is not null ? nested.WrapIteratorResult() : nested.WrapAsyncResult(result);
+                HmType.Unify(result, CSharpTypes.Rigid(symbol.ReturnType));
+            }
+            catch (InferenceException)
+            { return; }
+            foreach (var entry in copies)
+            { HmType.Unify(entry.Key, entry.Value); }
+            inferredConstraints.AddRange(nested.inferredConstraints);
+            conversionBounds.AddRange(nested.conversionBounds);
+            needsBuilderEmission |= nested.needsBuilderEmission;
+        }
         private static (HmType[] Inputs, HmType Output) DelegateSignature(INamedTypeSymbol declared, HmType inferred)
         {
             if (declared is null)
