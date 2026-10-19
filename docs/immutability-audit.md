@@ -2360,3 +2360,14 @@ records remain scheduler/serialization adapters, fully constructed before public
 native process arguments and environment maps retain their required APIs. Validate
 ordinary canonical Release semantic workflow, including scheduler and timing output.
 Status: open before edits.
+
+IMM-M055: Coordinator inspected all CompilerLoweredArtifact.Decode/DecodeEffects and
+CompilerReachableSourceValidator.Validate paths. Callable and grouped-claim maps use
+strict immutable capture with Ordinal keys. Duplicate/null effect ID validation remains
+hash-builder membership, including the first null value before later codec validation.
+Reachable-source document/body/graph maps use strict builders and phase snapshots;
+iterate the original validated artifact vectors to retain Dictionary insertion-order
+validation/cancellation order. Keep body/callee/parameter/manifest alignment checks and
+all InvalidDataException/JsonException failure gates. DFS uses an immutable stack with
+unchanged push/pop order; membership sets and call vectors can be immutable. No file,
+wire, decoder or graph semantics change. Status: open before edits.
