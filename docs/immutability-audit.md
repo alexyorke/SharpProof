@@ -3744,3 +3744,10 @@ are verified construction, not violations. Pending M142 builder rows were exclud
 from automatic verified classification until their clean gate completed.
 
 Post-M142 inventory classification: 2,253 C# candidates, 1,192 Open; 1,091 PowerShell candidates, 686 Open. All current source changes are committed and individually verified. The remaining candidates include typed native adapters, legitimate builders and pending refactors; nine Frontend configuration/phase properties remain explicitly open.
+
+IMM-M143: Reopen four previously preserved Roslyn Construct test adapters, two
+production Construct adapters, and one hidden params materialization. Pinned Roslyn
+4.14 has immutable argument/nullable-annotation overloads. Verify baseline/native
+versus immutable overloads for annotation/arity/constructed-symbol behavior before
+changing the callers, then preserve exact argument order and nullable annotations.
+The earlier claim that no immutable overload exists was incorrect. Status: planned.
