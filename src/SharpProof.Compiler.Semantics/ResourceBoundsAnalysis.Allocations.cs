@@ -2,6 +2,24 @@ namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ResourceBoundsAnalysis
 {
+    private Cost DelegateCreation(IDelegateCreationOperation creation, int depth)
+    {
+        creation = ArgumentNullGuard.NotNull(creation, nameof(creation));
+        if (!CSharpOperationSemantics.IsExplicitDelegateCreation(creation))
+        { return Unknown("UnsupportedDelegateAllocation"); }
+        var target = (IMethodReferenceOperation)creation.Target;
+        var receiver = target.Instance is { } instance ? Visit(instance, depth + 1) : Cost.Zero;
+        if (CSharpOperationSemantics.DelegateValueIsErased(creation, _compilation))
+        { return receiver; }
+        if (!target.Method.ContainingType.StaticConstructors.IsEmpty)
+        { return Unknown("DelegateTypeInitializationUnknown"); }
+        if (target.Method.IsExtern || target.Method.DeclaringSyntaxReferences.IsEmpty || _compilation is null ||
+            target.Method.DeclaringSyntaxReferences.Any(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
+                !_compilation.ContainsSyntaxTree(reference.SyntaxTree)))
+        { return Unknown("DelegateTargetBindingUnknown"); }
+        return receiver.Add(new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate())));
+    }
+
     private Cost ObjectCreation(IObjectCreationOperation creation, int depth)
     {
         creation = ArgumentNullGuard.NotNull(creation, nameof(creation));

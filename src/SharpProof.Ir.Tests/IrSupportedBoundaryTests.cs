@@ -5,6 +5,47 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrSupportedBoundaryTests
 {
+    [Test]
+    public void DelegateCertificatesAreScopedAndExcludeClassAndInterfaceCertificates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
+        Assert.That(factory.IsDelegateReferenceType(type), Is.False);
+        factory.RegisterDelegateReferenceType(type);
+        factory.RegisterDelegateReferenceType(type);
+        Assert.That(factory.IsDelegateReferenceType(type), Is.True);
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
+        var other = new IrFactory(IrExecutionSemantics.Total);
+        Assert.Throws<ArgumentException>((Action)(() => { other.RegisterDelegateReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { other.IsDelegateReferenceType(type); }));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void InvalidDelegateCertificatesAreRejected(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var nominal = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Reference");
+        if (kind == 5)
+        { factory.RegisterInterfaceReferenceType(nominal); }
+        if (kind == 6)
+        { factory.RegisterClosedClassReferenceType(nominal, null); }
+        var type = kind switch
+        {
+            1 => factory.ObjectType,
+            2 => factory.StringType,
+            3 => factory.IntegerType,
+            4 => factory.GetOrCreateSequenceType(factory.IntegerType),
+            _ => nominal
+        };
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterDelegateReferenceType(type); }));
+    }
     [TestCase(-1, 0)]
     [TestCase(0, -1)]
     [TestCase(0, 1)]

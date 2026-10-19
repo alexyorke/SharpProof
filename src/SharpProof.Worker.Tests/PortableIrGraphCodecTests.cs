@@ -12,6 +12,52 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void DelegateCertificatesRoundTripWithFreshAllocationTypes()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
+        factory.RegisterDelegateReferenceType(type);
+        var target = factory.CreateVariable("target", type);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Allocate(entry, factory.CreateOperation(), type, target);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(encoded.Graph, WorkerProtocolJson.Options);
+        var graph = JsonSerializer.Deserialize<PortableIrGraph>(bytes, WorkerProtocolJson.Options)!;
+        var decoded = PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocation = decoded.Program!.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).OfType<IrAllocationInstruction>().Single();
+        Assert.That(decoded.Factory.IsDelegateReferenceType(allocation.AllocatedType), Is.True);
+        Assert.That(new IrProgramInterpreter(decoded.Factory).Execute(decoded.Program).Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        var second = PortableIrGraphCodec.Encode(decoded.Factory, decoded.Program, [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(JsonSerializer.SerializeToUtf8Bytes(second.Graph, WorkerProtocolJson.Options), Is.EqualTo(bytes));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void DelegateCertificatesRejectNonCanonicalTypeRows(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
+        var target = factory.CreateVariable("target", type);
+        var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(target)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
+        var row = kind == 4 ? graph.Types[0] : graph.Types.Single(static row => row is null ? throw new ArgumentNullException(nameof(row)) : row.Name == "Delegate");
+        row.DelegateReference = true;
+        if (kind == 1)
+        { row.InterfaceReference = true; }
+        if (kind == 2)
+        { row.ClosedClassBase = -1; }
+        if (kind == 3)
+        { row.Kind = IrTypeKind.Integer; row.Width = 32; row.Signed = true; }
+        Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        }));
+    }
+    [Test]
     public void ArgumentOutOfRangeFaultSurvivesPortableRoundTripWithStableOlderCodes()
     {
         Assert.That((int)IrExceptionKind.Unknown, Is.EqualTo(6));

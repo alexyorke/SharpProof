@@ -1035,3 +1035,46 @@ Documentation generation and 723 local links passed. Layout passed with 2704
 source files, 59 evaluated projects and 151 pinned common files. Delegate/closure allocation work
 resumes after merge qualification; no remaining phase C/E/F requirement or the
 unchanged 100% coverage qualification is removed by this reconciliation.
+
+## Explicit delegate storage
+
+Compiler-bound delegate type certificates now survive portable IR transport and
+identify successful fresh delegate events without parsing display names. The
+factory/decoder reject built-in, legacy, class/interface-conflicting and foreign
+certificates. This uses the same compiler-fact trust boundary as other typed IR
+certificates; arbitrary producer assertions are not independent source proofs.
+
+The resource source/native path admits explicit method-bound construction with
+source targets, preserving receiver effects and skipping target method bodies.
+Each fresh delegate uses the reviewed 64-byte runtime footprint. Erased delegate
+construction contributes zero, and null receiver failures cannot create an event.
+Repeated construction composes with loop bounds. Managed delegate signatures are
+now admitted; body support remains independently checked. Discard assignments
+preserve RHS effects, including the delegate-specific erasure rule.
+
+Implicit method-group/lambda conversions, capture-frame placement/sharing,
+metadata/extern target binding, target type initialization and unmodeled dispatch
+remain Unknown. Closure frames must be placed at their actual compiler allocation
+scope; charging a bundle only at a lambda expression would miss frames allocated
+before zero-trip loops or exceptional exits. Closure/lifetime/peak/stack and phase
+E/F requirements remain open.
+
+Protocol 25, cache 27 and artifact 40 invalidate previous capability evidence;
+resource program/evidence model 4, expression model 1 and the runtime layout model
+are unchanged. Initial validation passed 77 native/codec cases and 585 IR tests.
+Final validation passed 961 focused worker cases, all 1412 analyzer tests, all
+2112 frontend tests and 13 actual package cases. All quality/compatibility
+categories passed. Independent pinned-runtime controls measured fresh static
+delegates at 64 bytes, instance-bound creation including its receiver at 88 bytes,
+and erased construction at zero; all 26 runtime layout cases passed. Layout
+evaluated 2705 source files, 59 projects and 151 pinned common files. Documentation
+generation and 723 local links passed.
+
+Published merge checkpoint 11e3a57ed restored CI eligibility. Canonical CI found
+three old target-typed constructor expectations that excluded a valid proof after
+field replay became exact. The strengthened regression now checks both the actual
+result and false postconditions under an invalid callee precondition. All seven
+constructor/callee-precondition controls passed, confirming false callee requires
+are not imported as assumptions. The same three expectations blocked the published semantic-worker coverage shard,
+so no fresh aggregate percentage is available for that merge. Coverage
+qualification and exact-head CI remain required against the unchanged 100% baseline.

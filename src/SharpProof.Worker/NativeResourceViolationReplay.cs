@@ -137,9 +137,9 @@ internal static class NativeResourceViolationReplay
                 { return; }
                 if (instruction.Target is null || factory.GetTypeInfo(instruction.AllocatedType).Kind != IrTypeKind.Reference)
                 { unsupportedByteStorage = true; return; }
-                // A concrete fresh reference instance occupies at least this
-                // amount. Unknown field packing never becomes an exact cost.
-                Observe(instruction.Operation, ResourceRuntimeLayout.MinimumObject, false);
+                // Certified delegates have a reviewed fixed footprint. Other
+                // fresh references contribute only the minimum instance cost.
+                Observe(instruction.Operation, factory.IsDelegateReferenceType(instruction.AllocatedType) ? ResourceRuntimeLayout.DelegateBytes : ResourceRuntimeLayout.MinimumObject, false);
             }, (instruction, approximation) =>
             {
                 ArgumentNullException.ThrowIfNull(instruction);

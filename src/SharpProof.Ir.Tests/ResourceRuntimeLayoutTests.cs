@@ -184,6 +184,8 @@ public sealed class ResourceRuntimeLayoutTests
         CheckMeasured(ResourceAllocationShape.Object([ResourceStorageKind.Reference, ResourceStorageKind.Word64, ResourceStorageKind.Byte]),
             static () => new MixedFields(SharedReference, 42, 1));
         CheckMeasured(ResourceAllocationShape.Delegate(), CreateDelegate);
+        Assert.That(Measure(CreateInstanceDelegate), Is.EqualTo(88));
+        Assert.That(Measure(CreateDiscardedDelegate), Is.Zero);
         CheckMeasured(ResourceAllocationShape.Closure([ResourceStorageKind.Word32]), CreateClosure);
         Assert.That(Measure(static () => new InitializedFieldCell()), Is.EqualTo(64));
         Assert.That(Measure(static () => new InitializedPropertyCell()), Is.EqualTo(64));
@@ -222,6 +224,22 @@ public sealed class ResourceRuntimeLayoutTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static object CreateDelegate()
     { return new Func<int>(Value); }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object CreateInstanceDelegate()
+    { return new Func<int>(new DelegateReceiver().Read); }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object CreateDiscardedDelegate()
+    {
+        _ = new Func<int>(Value);
+        return SharedReference;
+    }
+
+    private sealed class DelegateReceiver
+    {
+        private readonly int _value = 42;
+        internal int Read() { return _value; }
+    }
     private static int Value()
     { return 42; }
 

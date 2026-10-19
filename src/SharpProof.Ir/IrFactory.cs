@@ -12,6 +12,7 @@ public sealed class IrFactory
     private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
     private readonly Dictionary<IrTypeId, IrTypeId?> _closedClassReferenceBases = [];
     private readonly HashSet<IrTypeId> _interfaceReferenceTypes = [];
+    private readonly HashSet<IrTypeId> _delegateReferenceTypes = [];
     private readonly Dictionary<IrTypeId, HashSet<IrTypeId>> _implementedReferenceInterfaces = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
@@ -213,12 +214,35 @@ public sealed class IrFactory
         }
     }
 
+    internal void RegisterDelegateReferenceType(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference ||
+                _interfaceReferenceTypes.Contains(type) || _closedClassReferenceBases.ContainsKey(type))
+            { throw new ArgumentException("A delegate certificate requires a Total nominal delegate type.", nameof(type)); }
+            _delegateReferenceTypes.Add(type);
+        }
+    }
+
+    internal bool IsDelegateReferenceType(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _delegateReferenceTypes.Contains(type);
+        }
+    }
+
     internal void RegisterClosedClassReferenceType(IrTypeId type, IrTypeId? baseType)
     {
         lock (_gate)
         {
             if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
-                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _interfaceReferenceTypes.Contains(type) ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _interfaceReferenceTypes.Contains(type) || _delegateReferenceTypes.Contains(type) ||
                 baseType.HasValue && (baseType == type || baseType == ObjectType ||
                     !_closedClassReferenceBases.ContainsKey(baseType.Value)))
             { throw new ArgumentException("A class certificate requires a nominal type and a certified base.", nameof(type)); }
@@ -242,7 +266,7 @@ public sealed class IrFactory
         lock (_gate)
         {
             if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
-                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closedClassReferenceBases.ContainsKey(type))
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closedClassReferenceBases.ContainsKey(type) || _delegateReferenceTypes.Contains(type))
             { throw new ArgumentException("An interface certificate requires a Total nominal interface.", nameof(type)); }
             _interfaceReferenceTypes.Add(type);
         }

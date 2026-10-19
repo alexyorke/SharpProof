@@ -366,3 +366,19 @@ unequal string values. Dynamic characters, surrogate characters, other overloads
 and opaque factories remain Unknown. These are source storage bounds under the
 explicit runtime assumption, not physical JIT/GC measurements or runtime helper
 loop counts. Peak live memory and the remaining roadmap are still pending.
+
+### Explicit delegates
+
+Explicit `new Action(Callback)` construction with an admitted source method target
+has a 64-byte fresh delegate footprint under the reviewed runtime assumption.
+Receiver evaluation and allocation costs are separate; the target body does not
+run during construction. Erased constructions have zero delegate bytes, and a
+null receiver failure cannot contribute a fresh event. Delegate creation adds no
+array allocation or element counts.
+
+The compiler supplies a typed delegate certificate, retained through portable IR,
+rather than inferring storage from type labels. Managed delegate signatures are
+accepted while unsupported bodies remain Unknown. Implicit conversions, lambdas,
+capture frames, metadata/extern targets, target type initialization and unmodeled
+dispatch remain Unknown. Closure allocation scope, sharing and lifetimes remain
+required work in the full roadmap.

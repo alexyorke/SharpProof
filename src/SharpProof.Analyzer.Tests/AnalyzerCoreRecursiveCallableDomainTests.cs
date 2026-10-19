@@ -9,7 +9,7 @@ public sealed class AnalyzerCoreRecursiveCallableDomainTests
 {
     [TestCase(false)]
     [TestCase(true)]
-    public void RealRecursiveManagedSignaturesRetainSupportedAndDelegateBoundaries(bool nestedDelegate)
+    public void RecursiveManagedSignaturesIncludeDelegateReferences(bool nestedDelegate)
     {
         var type = nestedDelegate ? "List<Func<int>[]>" : "Dictionary<int, List<int[][]>>";
         var source = "using System; using System.Collections.Generic; public static class Fixture { public static " +
@@ -23,6 +23,6 @@ public sealed class AnalyzerCoreRecursiveCallableDomainTests
         Assert.That(method, Is.Not.Null);
         Assert.That(method.ReturnType, Is.AssignableTo<INamedTypeSymbol>());
         Assert.That(method.Parameters.Single().Type, Is.EqualTo(method.ReturnType));
-        Assert.That(CallableSubset.IsSupported(method, declaration), Is.EqualTo(!nestedDelegate));
+        Assert.That(CallableSubset.IsSupported(method, declaration), Is.True);
     }
 }

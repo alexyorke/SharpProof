@@ -240,6 +240,9 @@ internal sealed partial class ResourceBoundsAnalysis
                     Visit(conditional.WhenTrue, depth + 1).Max(
                         conditional.WhenFalse is { } alternative ? Visit(alternative, depth + 1) : Cost.Zero));
                 break;
+            case IDelegateCreationOperation delegateCreation:
+                result = DelegateCreation(delegateCreation, depth);
+                break;
             case IObjectCreationOperation creation:
                 result = ObjectCreation(creation, depth);
                 break;
@@ -255,6 +258,9 @@ internal sealed partial class ResourceBoundsAnalysis
                 type is { Rank: 1, IsSZArray: true } && Primitive(type.ElementType) && array.DimensionSizes.Length == 1 && array.Initializer is null:
                 var size = Size(array.DimensionSizes[0]);
                 result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.TypedArray(ResourceAllocationShape.Array(Storage(type.ElementType), size.Expression)));
+                break;
+            case ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } discarded:
+                result = Visit(discarded.Value, depth + 1);
                 break;
             case ISimpleAssignmentOperation assignment when !assignment.IsRef:
                 result = Writable(assignment.Target)

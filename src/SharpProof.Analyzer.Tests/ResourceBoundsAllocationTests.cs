@@ -51,6 +51,27 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("0"));
         Assert.That(result.Bounds.Elements.Text, Is.EqualTo("0"));
     }
+    [TestCase("return new System.Action(Callbacks.Run);")]
+    [TestCase("_ = new System.Action(Callbacks.Run); return null;")]
+    public void DelegateCreationKeepsTargetBodiesOutsideCreationCounts(string body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var result = AnalyzeSource("public static class Subject { public static System.Action Root(int n) { " + body +
+            " } } public static class Callbacks { public static void Run() { for(int i=0;i<3;i++) { var data=new int[2]; } } }");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.LoopIterations.Text, Is.EqualTo("0"));
+        Assert.That(result.Bounds.Arrays.Text, Is.EqualTo("0"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("0"));
+    }
+
+    [Test]
+    public void DiscardAssignmentsPreserveTheirArrayAllocationCosts()
+    {
+        var result = Analyze("_ = new int[3];");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("1"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("3"));
+    }
     [TestCase("object value=n;")]
     [TestCase("object value=(long)n;")]
     [TestCase("object value=true;")]

@@ -76,7 +76,7 @@ public sealed partial class ResourceBoundsTests
     [TestCase("for (int i=0; i<n; i++) { continue; }", "UnsupportedOperation:Branch")]
     [TestCase("try {} finally {}", "UnsupportedOperation:Try")]
     [TestCase("ref int x = ref n;", "UnsupportedLocal")]
-    [TestCase("System.Func<int> f = () => n;", "UnsupportedOperation:DelegateCreation")]
+    [TestCase("System.Func<int> f = () => n;", "UnsupportedDelegateAllocation")]
     public void UnsupportedBodiesReturnExplicitUnknownWithoutPartialBounds(string body, string reason)
     {
         ArgumentNullException.ThrowIfNull(body);

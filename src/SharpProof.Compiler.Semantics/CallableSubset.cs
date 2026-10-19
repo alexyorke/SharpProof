@@ -20,7 +20,7 @@ internal static class CallableSubset
 
     private static bool IsUnsupportedType(ITypeSymbol type)
     {
-        if (type.TypeKind is TypeKind.Delegate or TypeKind.Dynamic or TypeKind.FunctionPointer or TypeKind.Pointer or
+        if (type.TypeKind is TypeKind.Dynamic or TypeKind.FunctionPointer or TypeKind.Pointer or
             TypeKind.TypeParameter)
         { return true; }
         if (type is IArrayTypeSymbol array)
