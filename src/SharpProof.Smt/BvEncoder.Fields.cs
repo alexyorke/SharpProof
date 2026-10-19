@@ -59,6 +59,10 @@ internal sealed partial class BvEncoder
                 if (observedOwner.Equals(reference))
                 { observations.Add(observed); }
             }
+            // Model completion does not establish a field on an unrelated owner.
+            // Leave unobserved entry storage unavailable to concrete replay.
+            if (observations.Count == 0)
+            { continue; }
             var member = factory.GetMemberInfo(field.Key);
             if (member.ParameterTypes.IsEmpty)
             {
