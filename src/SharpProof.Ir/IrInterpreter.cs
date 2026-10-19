@@ -253,7 +253,7 @@ public sealed class IrInterpreter(IrFactory factory)
         state = RepositoryParameterGuard.NotNull(state, nameof(state));
         term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var result = term.Accept(EvaluationVisitor.Instance, (this, state));
-        state.Results = state.Results.Add(term.Id, result);
+        state.Results.Add(term.Id, result);
         return result;
     }
 
@@ -932,7 +932,7 @@ public sealed class IrInterpreter(IrFactory factory)
         internal ImmutableDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
-        internal ImmutableDictionary<IrId, IrEvaluationResult> Results { get; set; } = ImmutableDictionary<IrId, IrEvaluationResult>.Empty;
+        internal ImmutableDictionary<IrId, IrEvaluationResult>.Builder Results { get; } = ImmutableDictionary.CreateBuilder<IrId, IrEvaluationResult>();
         internal int Depth { get; set; }
         internal IrHeap? Heap { get; set; }
         internal ImmutableHashSet<IrVarId>? Snapshots { get; } = snapshots is ImmutableHashSet<IrVarId> immutable ? immutable : snapshots?.ToImmutableHashSet();

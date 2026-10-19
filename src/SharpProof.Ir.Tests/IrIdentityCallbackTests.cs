@@ -23,12 +23,13 @@ public sealed class IrIdentityCallbackTests
     {
         private bool _inserted;
         internal IrIdentityId InsertedIdentity { get; private set; }
-        internal ImmutableList<(int, int)> Comparisons { get; private set; } =
-            factory is null ? throw new System.ArgumentNullException(nameof(factory)) : ImmutableList<(int, int)>.Empty;
+        private readonly ImmutableList<(int, int)>.Builder _comparisons =
+            factory is null ? throw new System.ArgumentNullException(nameof(factory)) : ImmutableList.CreateBuilder<(int, int)>();
+        internal ImmutableList<(int, int)> Comparisons => _comparisons.ToImmutable();
 
         public bool Equals(int left, int right)
         {
-            Comparisons = Comparisons.Add((left, right));
+            _comparisons.Add((left, right));
             if (!_inserted && right == 2)
             {
                 _inserted = true;
