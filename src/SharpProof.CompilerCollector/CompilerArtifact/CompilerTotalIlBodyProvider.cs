@@ -11,8 +11,8 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, IReadOnlyList<CompilerReferenceSnapshot>? references)
 {
     private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
-    private ImmutableDictionary<string, ImmutableArray<byte>> _images = ImmutableDictionary.Create<string, ImmutableArray<byte>>(StringComparer.Ordinal);
-    private ImmutableDictionary<string, TotalIlBody?> _bodies = ImmutableDictionary.Create<string, TotalIlBody?>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, ImmutableArray<byte>>.Builder _images = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, TotalIlBody?>.Builder _bodies = ImmutableDictionary.CreateBuilder<string, TotalIlBody?>(StringComparer.Ordinal);
     private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references?.ToImmutableArray() ?? default;
 
     internal TotalIlBody? Resolve(IMethodSymbol method, CancellationToken cancellationToken)
@@ -29,7 +29,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or
             BadImageFormatException or InvalidOperationException or OverflowException)
         { result = null; }
-        _bodies = _bodies.Add(key, result);
+        _bodies.Add(key, result);
         return result;
     }
 
@@ -102,7 +102,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
             { return null; }
             bytes = input.ToImmutableArray();
-            _images = _images.Add(path, bytes);
+            _images.Add(path, bytes);
         }
         using var pe = new PEReader(bytes);
         if (!pe.HasMetadata || pe.PEHeaders.CorHeader is not { } corHeader ||

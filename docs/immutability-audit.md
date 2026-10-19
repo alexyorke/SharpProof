@@ -2940,3 +2940,9 @@ Compiler evidence uses a scoped builder, scalar-domain output is frozen, and all
 wire-enum checks still execute eagerly left-to-right before All. Main verified test
 helper consumers and publication shapes; read-only review agrees. M083/M084 remain
 pending their own validation on later source snapshots.
+
+IMM-M084 verified: all 117 targeted stream-fill, metadata body admission, scalar IL,
+typed metadata-call and relative-syntax-path tests pass, zero failures/skips/warnings/
+errors. These also cover M083's final immutable expected-vector helper and default
+guard. The cache owner, ordinal comparers and positive/negative cache identity remain
+unchanged; no synchronization or external mutation contract was added.
