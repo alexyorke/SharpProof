@@ -2842,3 +2842,15 @@ Retain scalar loop/read counters, ordered JSON dictionaries and native PE/PDB bu
 Validate release security/evidence and embedded-symbol regression scripts in the canonical
 container, plus path containment, nonexistent suffix and symlink escape controls.
 Status: open before edits.
+
+IMM-M079 verified: release security (27 policy/content cases and real SDK repository
+signature positive/wrong-pin/tampered controls), release evidence/SBOM/tool identity and
+embedded PDB malformed-input regressions all pass. Path controls pass existing files,
+missing suffixes, symlink/lexical escapes and non-directory traversal. Typed captures
+retain original order, object identity, case-sensitive membership and JSON array shape.
+Native PDB buffers and resource lifetimes remain unchanged. Current C# literal check
+preserves 2,980 raw/interpolated tokens across 671 changed files against master cd3363c63.
+
+M079 additional verification: 20 source-document checks and script formatting pass
+(87 PowerShell, 19 shell, zero changes). Canonical reflection confirms PEReader's
+ReadDebugDirectory returns ImmutableArray<DebugDirectoryEntry>; root reuse is immutable.

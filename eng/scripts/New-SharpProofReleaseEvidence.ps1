@@ -11,9 +11,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 & (Join-Path $PSScriptRoot 'Test-SharpProofThirdPartyInventory.ps1') -PackageSource $PackageSource -InventoryPath $InventoryPath
-$files = @(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object Extension -In @('.nupkg', '.snupkg') | Sort-Object Name -CaseSensitive)
+$files = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@(Get-ChildItem -LiteralPath $PackageSource -File | Where-Object Extension -In @('.nupkg', '.snupkg') | Sort-Object Name -CaseSensitive))
 if ($files.Count -ne 5) { throw 'Release evidence requires exactly three main and two symbol packages.' }
-$identitySet = Get-SharpProofPackageIdentitySet -Files $files -RequireRepository
+$identitySet = Get-SharpProofPackageIdentitySet -Files ([object[]]@($files)) -RequireRepository
 if (@($identitySet.RepositoryCommits).Count -ne 1 -or $identitySet.RepositoryCommits[0] -cne $RepositoryCommit) {
     throw 'Release package repository commit differs from the qualified source commit.'
 }
@@ -21,14 +21,14 @@ $inventory = Get-Content -LiteralPath $InventoryPath -Raw | ConvertFrom-Json -As
 $inventoryDigest = (Get-FileHash -LiteralPath $InventoryPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $created = $Timestamp.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
 $scope = 'Shipped package payload only: reviewed third-party components, archive hashes, and packaged binary hashes. Excludes SDK/build tools and dependencies not redistributed in these archives; no claim of a complete source/dependency SBOM.'
-$artifacts = @($identitySet.Identities | ForEach-Object {
-        if ($_.File.Name -cnotmatch '^[A-Za-z0-9_.+-]+\.(?:nupkg|snupkg)$') { throw 'Unsafe release package filename.' }
-        [ordered]@{
-            fileName = $_.File.Name; packageId = $_.Identity.Id; version = $_.Identity.Version
-            kind = $_.File.Extension.TrimStart('.'); bytes = $_.File.Length
-            sha256 = (Get-FileHash -LiteralPath $_.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        }
-    })
+$artifacts = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($identitySet.Identities | ForEach-Object {
+            if ($_.File.Name -cnotmatch '^[A-Za-z0-9_.+-]+\.(?:nupkg|snupkg)$') { throw 'Unsafe release package filename.' }
+            [ordered]@{
+                fileName = $_.File.Name; packageId = $_.Identity.Id; version = $_.Identity.Version
+                kind = $_.File.Extension.TrimStart('.'); bytes = $_.File.Length
+                sha256 = (Get-FileHash -LiteralPath $_.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }))
 $namespaceInput = $RepositoryCommit + $inventoryDigest + $created + (($artifacts | ForEach-Object sha256) -join '')
 $namespaceDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($namespaceInput))).ToLowerInvariant()
 $packages = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
@@ -52,7 +52,8 @@ for ($index = 0; $index -lt $artifacts.Count; $index++) {
 $archiveIds = $archiveIdBuilder.ToImmutable()
 $componentIndex = 0
 foreach ($packageId in @($inventory.packages.Keys | Sort-Object -CaseSensitive)) {
-    $artifact = @($artifacts | Where-Object { $_.packageId -ceq $packageId -and $_.kind -ceq 'nupkg' })[0]
+    $matchingArtifacts = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($artifacts | Where-Object { $_.packageId -ceq $packageId -and $_.kind -ceq 'nupkg' }))
+    $artifact = if ($matchingArtifacts.Length -gt 0) { $matchingArtifacts[0] } else { $null }
     $archive = [IO.Compression.ZipFile]::OpenRead((Join-Path $PackageSource $artifact.fileName))
     try {
         $entryIds = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
@@ -115,7 +116,7 @@ $sbom | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $sbomPath -Encoding 
 $manifest = [ordered]@{
     schemaVersion = 1; repository = 'alexyorke/SharpProof'; repositoryCommit = $RepositoryCommit
     packageVersion = $identitySet.Version; createdUtc = $created; scope = $scope
-    inventorySha256 = $inventoryDigest; artifacts = $artifacts
+    inventorySha256 = $inventoryDigest; artifacts = @($artifacts)
     sbom = [ordered]@{ fileName = 'sbom.spdx.json'; sha256 = (Get-FileHash -LiteralPath $sbomPath -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $manifestPath = Join-Path $OutputDirectory 'release-manifest.json'

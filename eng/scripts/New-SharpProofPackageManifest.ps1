@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer 'Package manifests require the canonical Linux container.'
 $packageRoot = (Resolve-Path -LiteralPath $PackageDirectory).Path
-$packages = @(Get-ChildItem -LiteralPath $packageRoot -Filter '*.nupkg' -File | Sort-Object Name)
+$packages = [Collections.Immutable.ImmutableArray]::CreateRange[IO.FileInfo]([IO.FileInfo[]]@(Get-ChildItem -LiteralPath $packageRoot -Filter '*.nupkg' -File | Sort-Object Name))
 if ($packages.Count -eq 0) { throw 'No release packages were found.' }
 $rows = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 $inventoryBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
@@ -31,7 +31,7 @@ foreach ($package in $packages) {
             try { $content.CopyTo([IO.Stream]::Null) }
             finally { $content.Dispose() }
         }
-        $specs = @($archive.Entries | Where-Object { $_.FullName -match '^[^/]+\.nuspec$' })
+        $specs = [Collections.Immutable.ImmutableArray]::CreateRange[IO.Compression.ZipArchiveEntry]([IO.Compression.ZipArchiveEntry[]]@($archive.Entries | Where-Object { $_.FullName -match '^[^/]+\.nuspec$' }))
         if ($specs.Count -ne 1) { throw 'A package must contain exactly one root nuspec.' }
         $settings = [Xml.XmlReaderSettings]::new()
         $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
