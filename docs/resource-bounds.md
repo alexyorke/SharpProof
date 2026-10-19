@@ -430,6 +430,10 @@ public static class BufferFactory
 }
 ```
 
+Lifetime layout ownership is independent of cumulative-program availability.
+A proven fixed local size can therefore support a native lifetime proof even when
+the count analyzer reports Unknown.
+
 The initial native family is finite primitive-array allocation with constant sizes,
 reference aliases, last-use root drops, literal copies through compiler temporaries
 and proven constant guards. Unproved branches, repeated regions, borrowed output,

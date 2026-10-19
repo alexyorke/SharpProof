@@ -1216,3 +1216,16 @@ The final broader worker/protocol run passed all 549 cases, including the mixed
 cumulative/peak/retained and conflicting-cost-model controls. Two initial restore failures were shared NuGet
 vulnerability-cache collisions. The affected gates passed with container-private
 HTTP caches and auditing left enabled.
+
+Native lifetime implementation 77e0aff40 is merged with latest master 7f6e25f21
+(Dictionary capacity construction) at 520600efb. Combined-state checks passed 776
+focused worker/protocol/Dictionary cases and all 2122 frontend tests, followed by
+all quality/compatibility categories. Final review separated lifetime layout
+ownership from cumulative-program availability. Two fixed-local-size source cases
+prove peak/retained bounds with a null cumulative program; the expanded affected
+worker/protocol/Dictionary run passed all 778 cases. Both added packaged-consumer
+controls and all 281 affected analyzer/collector cases passed. Together with the
+earlier 17 package cases, 19 distinct package cases now cover this milestone.
+Final quality/compatibility categories passed. The added package controls used
+the Git-aware wrapper required by Arcade packaging; a terminal restore-process
+crash was rerun successfully with the same pinned toolchain.

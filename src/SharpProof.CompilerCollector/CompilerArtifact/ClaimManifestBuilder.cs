@@ -397,23 +397,24 @@ internal sealed partial class ClaimManifestBuilder(
             var body = resourceDeclaration.Body is { } block ? resourceModel.GetOperation(block, cancellationToken) :
                 resourceDeclaration.ExpressionBody is { } arrow ? resourceModel.GetOperation(arrow.Expression, cancellationToken) : null;
             var resource = ResourceBoundsAnalysis.Analyze(target, body, cancellationToken);
+            var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
             if (resource.Bounds is { } bounds)
+            { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }
+            var requiresLifetimeLayout = effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes);
+            var requiresCumulativeLayout = resource.Bounds != null && effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes);
+            if (requiresLifetimeLayout || requiresCumulativeLayout)
             {
-                var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
-                CollectResourceAssumptions(bounds.Program, callableId, metadataIds);
-                if (effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                    claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
-                {
-                    metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
-                        _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()));
-                }
-                assumptions = assumptions.AddRange(metadataIds.Select(static id => new WorkerAssumptionEvidence
-                {
-                    Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
-                    Kind = WorkerAssumptionKind.TrustedBoundary,
-                    Used = false
-                }));
+                metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
+                    _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()));
             }
+            assumptions = assumptions.AddRange(metadataIds.Select(static id => new WorkerAssumptionEvidence
+            {
+                Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
+                Kind = WorkerAssumptionKind.TrustedBoundary,
+                Used = false
+            }));
         }
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty)

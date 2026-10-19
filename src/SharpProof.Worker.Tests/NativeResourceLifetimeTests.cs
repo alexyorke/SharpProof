@@ -84,6 +84,20 @@ public sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
     }
+    [TestCase(5, 0)]
+    [TestCase(6, 32)]
+    public async Task LifetimeProofDoesNotRequireACumulativeProgram(int metric, int upper)
+    {
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric}, {upper})] public static int[] Target() {{ var size=1; return new int[size]; }} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        Assert.That(target.ResourceProgram, Is.Null);
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+    }
+
     [Test]
     public async Task LifetimeContractsComposeWithCumulativeBytesWithoutMixingModels()
     {
