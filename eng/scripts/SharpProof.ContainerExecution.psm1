@@ -485,7 +485,7 @@ function Get-SharpProofParallelismOverride {
 function Get-SharpProofCpuBudget {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,
-        [Parameter(Mandatory = $true)][string[]]$OverrideVariables,
+        [Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[string]]$OverrideVariables,
         [string]$DivisorProperty,
         [string]$PercentProperty,
         [string]$InvalidMessage,
@@ -577,13 +577,14 @@ function Get-SharpProofConfiguredParallelism {
         [Parameter(Mandatory = $true)][string]$Policy
     )
 
-    $parameters = @{
-        RepositoryRoot = $RepositoryRoot
+    $policyValues = $script:SharpProofParallelismPolicies[$Policy]
+    if ($policyValues.ContainsKey('AllVisible') -and [bool]$policyValues['AllVisible']) {
+        return Get-SharpProofCpuBudget -RepositoryRoot $RepositoryRoot -OverrideVariables $policyValues['OverrideVariables'] -AllVisible
     }
-    foreach ($entry in $script:SharpProofParallelismPolicies[$Policy].GetEnumerator()) {
-        $parameters[$entry.Key] = $entry.Value
+    if ($policyValues.ContainsKey('DivisorProperty')) {
+        return Get-SharpProofCpuBudget -RepositoryRoot $RepositoryRoot -OverrideVariables $policyValues['OverrideVariables'] -DivisorProperty ([string]$policyValues['DivisorProperty']) -InvalidMessage ([string]$policyValues['InvalidMessage'])
     }
-    return Get-SharpProofCpuBudget @parameters
+    return Get-SharpProofCpuBudget -RepositoryRoot $RepositoryRoot -OverrideVariables $policyValues['OverrideVariables'] -PercentProperty ([string]$policyValues['PercentProperty']) -InvalidMessage ([string]$policyValues['InvalidMessage'])
 }
 
 function Get-SharpProofTestProjectParallelism {
@@ -834,7 +835,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [object[]]$Builds,
+        [Collections.Generic.IReadOnlyList[object]]$Builds,
 
         [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot,
@@ -958,7 +959,7 @@ function Invoke-SharpProofParallelDotnetTests {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [object[]]$Tests,
+        [Collections.Generic.IReadOnlyList[object]]$Tests,
 
         [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot,

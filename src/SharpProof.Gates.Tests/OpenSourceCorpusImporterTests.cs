@@ -9,6 +9,18 @@ namespace SharpProof.Gates.Test;
 public sealed class OpenSourceCorpusImporterTests
 {
     [Test]
+    public void DefaultGitArgumentsRejectBeforeStartingAProcess()
+    {
+        using var temporary = new TempDirectory("SharpProof-importer-default-arguments-");
+        var unavailableGit = Path.Combine(temporary.FullName, "missing-git");
+        var exception = Assert.ThrowsAsync<ArgumentNullException>((Func<Task>)(() =>
+            OpenSourceCorpusImporter.ReadGitAsync(temporary.FullName, default,
+                TestContext.CurrentContext.CancellationToken, unavailableGit)));
+        Assert.That(exception!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(Directory.EnumerateFileSystemEntries(temporary.FullName), Is.Empty);
+    }
+
+    [Test]
     public async Task SourceDiscoveryUsesCommittedBlobsAndSelectsAcrossFiles()
     {
         using var upstream = new TempDirectory("SharpProof-importer-");

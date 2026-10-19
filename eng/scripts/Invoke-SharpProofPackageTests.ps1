@@ -80,7 +80,7 @@ else {
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
 function Invoke-RequiredBuilds {
-    param([Parameter(Mandatory = $true)][object[]]$Builds)
+    param([Parameter(Mandatory = $true)][Collections.Generic.IReadOnlyList[object]]$Builds)
 
     Invoke-SharpProofParallelDotnetBuilds `
         -Builds $Builds `
@@ -463,13 +463,17 @@ try {
                 # The test harness builds the complete Release dependency
                 # closure. Wait for it before building the empty Verifier
                 # root, whose package payload consumes those outputs.
-                Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -EQ 'test-harness-release')
-                Invoke-RequiredBuilds -Builds @(
-                    $builds | Where-Object Name -EQ 'package-products-release')
+                $harnessBuilds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                $productBuilds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+                foreach ($build in $builds) {
+                    if ($build.Name -eq 'test-harness-release') { $harnessBuilds.Add($build) }
+                    if ($build.Name -eq 'package-products-release') { $productBuilds.Add($build) }
+                }
+                Invoke-RequiredBuilds -Builds ($harnessBuilds.ToImmutable())
+                Invoke-RequiredBuilds -Builds ($productBuilds.ToImmutable())
             }
             else {
-                Invoke-RequiredBuilds -Builds @($builds)
+                Invoke-RequiredBuilds -Builds $builds
             }
         }
     }
@@ -823,23 +827,27 @@ try {
 
     # Start high-resource shards first so reserved lanes overlap their tails
     # instead of leaving the containment process as the final wave.
-    $orderedShards = @($shards | Sort-Object `
-        @{ Expression     = {
-                $slots = if ($_.PSObject.Properties.Name -contains 'Slots') {
-                    [long]$_.Slots
-                }
-                elseif ($_.PSObject.Properties.Name -contains 'Exclusive' -and
-                    [bool]$_.Exclusive) {
-                    [long]$parallelism
-                }
-                else {
-                    1L
-                }
-                [long]$_.EstimatedMilliseconds * $slots
-            }; Descending = $true
-        }, `
-        @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-        @{ Expression = 'Name'; Descending = $false })
+    $orderedShardBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($orderedShard in ($shards | Sort-Object `
+            @{ Expression     = {
+                    $slots = if ($_.PSObject.Properties.Name -contains 'Slots') {
+                        [long]$_.Slots
+                    }
+                    elseif ($_.PSObject.Properties.Name -contains 'Exclusive' -and
+                        [bool]$_.Exclusive) {
+                        [long]$parallelism
+                    }
+                    else {
+                        1L
+                    }
+                    [long]$_.EstimatedMilliseconds * $slots
+                }; Descending = $true
+            }, `
+            @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
+            @{ Expression = 'Name'; Descending = $false }) ) {
+        $orderedShardBuilder.Add($orderedShard)
+    }
+    $orderedShards = $orderedShardBuilder.ToImmutable()
     $testPhase = [Diagnostics.Stopwatch]::StartNew()
     $preparePackageTest = {
         param([object]$shard)

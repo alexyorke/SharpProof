@@ -8,6 +8,14 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class Pr275CorpusDiagnosticCoverageTests
 {
+    [Test]
+    public void DefaultAssignmentCountsRejectBeforeInspectingDiagnostics()
+    {
+        var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
+            OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment([], default)));
+        Assert.That(exception!.ParamName, Is.EqualTo("assignmentCounts"));
+    }
+
     [TestCase(0)]
     [TestCase(2)]
     public void AssignmentCountsMustHaveOneEntryForEachDiagnostic(int count)

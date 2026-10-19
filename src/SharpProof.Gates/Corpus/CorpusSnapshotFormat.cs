@@ -94,13 +94,10 @@ internal static class CorpusSnapshotFormat
         _ = ParseCanonicalData(lines);
     }
 
+    // Both callers materialize the array or validate initialization before parsing.
     private static ImmutableArray<CorpusObservation> ParseCanonicalData(
         ImmutableArray<string> lines)
     {
-        if (lines.IsDefault)
-        {
-            throw new ArgumentException("Array must be initialized.", nameof(lines));
-        }
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             lines.Length);
         string? previousCanonical = null;

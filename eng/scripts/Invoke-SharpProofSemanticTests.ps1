@@ -457,9 +457,13 @@ foreach ($task in $taskBuilder) {
         })
 }
 $taskSnapshot = $taskBuilder.ToImmutable()
-$tasks = @($taskSnapshot | Sort-Object `
-    @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-    @{ Expression = 'Name'; Descending = $false })
+$orderedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+foreach ($orderedTask in ($taskSnapshot | Sort-Object `
+        @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
+        @{ Expression = 'Name'; Descending = $false }) ) {
+    $orderedTaskBuilder.Add($orderedTask)
+}
+$tasks = $orderedTaskBuilder.ToImmutable()
 
 $retainCanonicalResults = -not [string]::IsNullOrWhiteSpace($TestResultsDirectory)
 if ($retainCanonicalResults -and $coverageEnabled) {

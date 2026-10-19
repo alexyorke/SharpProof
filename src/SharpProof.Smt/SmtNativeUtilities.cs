@@ -267,11 +267,11 @@ internal static class SmtNativeUtilities
     // This explicitly in-place API retains partial writes on failure, as tested
     // by ArrayValueOverlayTests. Production witness construction uses copies.
     internal static void ApplyArrayObservations(IrFactory factory, IrTypeId elementType,
-        IrValue[] elements, Dictionary<int, IrValue> observed)
+        IrValue[] elements, ImmutableArray<KeyValuePair<int, IrValue>> observed)
     {
         RepositoryParameterGuard.ThrowIfInvalid(elementType.IsDefault, nameof(elementType));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        RepositoryParameterGuard.RequireInitialized(observed.IsDefault, nameof(observed), "Array must be initialized.");
         foreach (var entry in observed)
         {
             if (entry.Key < 0 || entry.Key >= elements.Length)

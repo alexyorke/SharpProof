@@ -104,7 +104,7 @@ Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
             })
     }
     Invoke-SharpProofParallelDotnetBuilds `
-        -Builds @($builds.ToImmutable()) `
+        -Builds ($builds.ToImmutable()) `
         -RepositoryRoot $repositoryRoot `
         -Parallelism $buildParallelism `
         -TimeoutSeconds $TimeoutSeconds

@@ -99,8 +99,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
         Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
 
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == subject.Method));
@@ -171,7 +171,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             SameReleaseCompilation = true,
             TypedCalls = caseIndex == 4 ? "Closed Action<int>; caller scalar stays unchanged" :
                 caseIndex == 3 ? "Closed Func<int> Read" : "Closed Action Reset and closed Func<int> Peek",
@@ -208,7 +208,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             FreshRequestedPath = manifestPath,
             OutputExists = outputExists,
@@ -246,7 +246,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             ArtifactSha256 = Hash(artifactBytes),
             project.Request.CompilerManifest.Sha256,
@@ -376,11 +376,14 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private static RuntimeObservation ObserveRuntime(byte[] bytes, string methodName, int caseIndex)
+    private static RuntimeObservation ObserveRuntime(ImmutableArray<byte> bytes, string methodName, int caseIndex)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(methodName);
-        using var stream = new MemoryStream(bytes);
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         var context = new AssemblyLoadContext("CapturedStorage_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -424,8 +427,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 reset();
                 after = peek();
             }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var field = fields.SingleOrDefault();
             return new(before, after, returned, type.Module.ModuleVersionId, metadata.GetGuid(metadata.GetModuleDefinition().Mvid),
@@ -505,13 +507,15 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         }
     }
 
-    private static IlObservation DecodeIl(MethodBase method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodBase method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(method);
         var body = method.GetMethodBody()!.GetILAsByteArray()!;
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
@@ -568,9 +572,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans hash the empty payload */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
 

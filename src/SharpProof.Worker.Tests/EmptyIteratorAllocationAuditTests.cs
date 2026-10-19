@@ -97,8 +97,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         { Assert.That(warnings.All(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8321")), Is.True); }
         else
         { Assert.That(warnings, Is.Empty); }
-        var bytes = image.ToArray();
-        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes);
+        var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
+        await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
 
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
@@ -142,7 +142,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             WarmupIterations,
             MeasuredIterations,
             MeasurementRounds,
@@ -179,7 +179,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             OutputExists = outputExists,
             Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray()
@@ -206,7 +206,7 @@ public sealed class EmptyIteratorAllocationAuditTests
         {
             subject.Name,
             SourceSha256 = sourceHash,
-            PeSha256 = Hash(bytes),
+            PeSha256 = Hash(bytes.AsSpan()),
             CallableId = callableId,
             ArtifactSha256 = Hash(artifactBytes),
             project.Request.CompilerManifest.Sha256,
@@ -326,13 +326,16 @@ public sealed class EmptyIteratorAllocationAuditTests
         { Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), "A positive warmed iterator-creation allocation cannot receive a valid allocation-free proof."); }
     }
 
-    private static RuntimeObservation ObserveRuntime(byte[] bytes, int caseIndex)
+    private static RuntimeObservation ObserveRuntime(ImmutableArray<byte> bytes, int caseIndex)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         var context = new AssemblyLoadContext("EmptyIterator_" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
-            using var stream = new MemoryStream(bytes);
+            using var stream = new MemoryStream(bytes.ToArray(), writable: false);
             var type = context.LoadFromStream(stream).GetType("Subject")!;
             var method = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
             var iteratorType = method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
@@ -345,8 +348,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 using var enumerator = sequence.GetEnumerator();
                 enumerationHasElement = enumerator.MoveNext();
             }
-            using var peStream = new MemoryStream(bytes);
-            using var pe = new PEReader(peStream);
+            using var pe = new PEReader(bytes);
             var metadata = pe.GetMetadataReader();
             var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
             var attributes = definition.GetCustomAttributes().Select(handle =>
@@ -387,17 +389,17 @@ public sealed class EmptyIteratorAllocationAuditTests
         var first = target();
         var second = target();
         s_escaped = second;
-        var rounds = new Measurement[MeasurementRounds];
+        var rounds = ImmutableArray.CreateBuilder<Measurement>(MeasurementRounds);
         for (var round = 0; round < MeasurementRounds; round++)
         {
             var before = Measure(control);
             var subject = Measure(target);
             var after = Measure(control);
-            rounds[round] = new(round, before, subject, after);
+            rounds.Add(new(round, before, subject, after));
         }
         GC.KeepAlive(first);
         GC.KeepAlive(second);
-        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds.ToImmutableArray());
+        return new(first, second, target.Method.MetadataToken, target.Method.Module.ModuleVersionId, target.Target == null, rounds.MoveToImmutable());
     }
 
     private static T? Null<T>() where T : class
@@ -481,13 +483,15 @@ public sealed class EmptyIteratorAllocationAuditTests
         }
     }
 
-    private static IlObservation DecodeIl(MethodInfo method, byte[] bytes)
+    private static IlObservation DecodeIl(MethodInfo method, ImmutableArray<byte> bytes)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        if (bytes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(bytes));
+        }
         System.ArgumentNullException.ThrowIfNull(method);
         var body = method.GetMethodBody()!.GetILAsByteArray()!;
-        using var stream = new MemoryStream(bytes);
-        using var pe = new PEReader(stream);
+        using var pe = new PEReader(bytes);
         var metadata = pe.GetMetadataReader();
         var definition = metadata.GetMethodDefinition(MetadataTokens.MethodDefinitionHandle(method.MetadataToken & 0x00ffffff));
         Assert.That(body, Is.EqualTo(pe.GetMethodBody(definition.RelativeVirtualAddress).GetILBytes()));
@@ -529,9 +533,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         };
     }
 
-    private static string Hash(byte[] bytes)
+    private static string Hash(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - empty spans hash the empty payload */)
     {
-        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
 

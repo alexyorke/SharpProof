@@ -10,6 +10,14 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusSnapshotWorkflowTests
 {
     [Test]
+    public void DefaultDataLinesRejectAtTheRenderingBoundary()
+    {
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            CorpusSnapshotFormat.Render(default(ImmutableArray<string>))));
+        Assert.That(exception!.ParamName, Is.EqualTo("lines"));
+    }
+
+    [Test]
     public async Task SnapshotUpdateReproducesTheReviewedCanonicalSnapshot()
     {
         using var temporary = new TempDirectory("SharpProof-snapshot-update-");
