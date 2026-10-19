@@ -58,11 +58,24 @@ internal static class NativeResourceContractVerifier
             var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, metadata.Bind, cancellation);
             if (!check.Verified)
             { return Unknown(check.UnknownReason ?? "ResourceProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+            var layout = new NativeResourceLayoutBinding(target);
+            ResourceExpression? bytes = null;
+            if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+            {
+                var context = layout.Bind();
+                if (context is null)
+                { return Unknown("ResourceLayoutAssumptionsNotBound", WorkerClaimReason.UnsupportedBody); }
+                var allocation = NativeResourceAllocationVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, context, cancellation);
+                if (allocation.ConditionalUpperBound is not { } allocationUpper)
+                { return Unknown(allocation.UnknownReason ?? "ResourceAllocationProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                bytes = allocationUpper;
+            }
             var upper = constraint.Metric switch
             {
                 WorkerResourceMetric.LoopBodyEntries => check.Cost!.LoopEntries,
                 WorkerResourceMetric.ArrayAllocations => check.Cost!.Arrays,
                 WorkerResourceMetric.AllocatedElements => check.Cost!.Elements,
+                WorkerResourceMetric.AllocatedBytes => bytes!,
                 _ => throw new InvalidDataException("Resource metric is unsupported.")
             };
             if (!ResourceBoundOrder.Proves(upper, limit, cancellation))
@@ -74,6 +87,8 @@ internal static class NativeResourceContractVerifier
                 "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram, cancellation))];
             result.ResourceBound = Evidence(upper.ToDisplayString(), null);
             metadata.Project(result);
+            if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+            { layout.Project(result); }
             return result;
         }
         catch (InvalidDataException) { return Unknown("MalformedResourceEvidence", WorkerClaimReason.UnsupportedContract); }
@@ -84,6 +99,7 @@ internal static class NativeResourceContractVerifier
             return new()
             {
                 Metric = constraint.Metric,
+                CostModel = constraint.CostModel,
                 DeclaredBoundSha256 = WorkerProtocolJson.ComputeSha256(constraint.UpperBound),
                 InferredUpperBound = inferred,
                 UnknownReason = reason

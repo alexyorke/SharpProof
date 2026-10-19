@@ -315,9 +315,12 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("18"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(20));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("19"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(21));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(6));
+            Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
+            Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));
+            Assert.That(WorkerResourceModels.AllocationLayout, Is.EqualTo(SharpProof.Ir.ResourceRuntimeLayout.ModelId));
             Assert.That(
                 document.RootElement.EnumerateObject()
                     .Select(static property => ((property.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(property)) : (property.Name))),
@@ -427,7 +430,7 @@ public sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("18"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("19"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(

@@ -10,7 +10,10 @@ public enum ResourceMetric
     /// <summary>Number of managed primitive-array allocations.</summary>
     ArrayAllocations = 2,
     /// <summary>Total primitive-array elements allocated, independent of element width.</summary>
-    AllocatedElements = 3
+    AllocatedElements = 3,
+    /// <summary>Fresh managed instance bytes under the reviewed CoreCLR 8.0.32 x64 source storage model.</summary>
+    /// <remarks>Requires a captured x64 target and an explicit trusted layout dependency in proof evidence.</remarks>
+    AllocatedBytes = 4
 }
 
 /// <summary>Requires a native proof of a cumulative resource upper bound.</summary>
@@ -20,7 +23,7 @@ public enum ResourceMetric
 /// Negative scalars and null arrays have entry size zero. Exceptional execution prefixes are included.
 /// This is a static contract; it does not execute the method or insert runtime checks.
 /// Unsupported operations produce Unknown. These metrics do not measure elapsed time,
-/// allocated bytes, peak live memory, retained output, or stack memory.
+/// peak live memory, retained output, or stack memory. Byte bounds are conditional on the published runtime layout model.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
 public sealed class ResourceUpperBoundAttribute : Attribute

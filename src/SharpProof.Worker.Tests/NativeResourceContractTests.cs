@@ -9,7 +9,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeResourceContractTests
+public sealed partial class NativeResourceContractTests
 {
     private static string Source(string attributes, string body)
     {
@@ -18,7 +18,7 @@ public sealed class NativeResourceContractTests
         return "using SharpProof.Attributes; public static class C { " + attributes + " public static void Target(int n, int[] values) { " + body + " } }";
     }
 
-    private static CompilerManifestArtifact CreateArtifact(string source, bool reviewedRuntime = false)
+    private static CompilerManifestArtifact CreateArtifact(string source, bool reviewedRuntime = false, bool x64 = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         var cancellation = TestContext.CurrentContext.CancellationToken;
@@ -30,6 +30,8 @@ public sealed class NativeResourceContractTests
                 .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
                 .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)));
         }
+        if (x64)
+        { initial = initial.WithOptions(initial.Options.WithPlatform(Microsoft.CodeAnalysis.Platform.X64)); }
         var trees = initial.SyntaxTrees.Select(tree => tree is null ? throw new ArgumentNullException(nameof(tree)) :
             CSharpSyntaxTree.ParseText(tree.GetText(cancellation), ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>()), tree.FilePath, cancellationToken: cancellation));
         var compilation = initial.RemoveAllSyntaxTrees().AddSyntaxTrees(trees);

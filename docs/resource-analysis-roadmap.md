@@ -740,3 +740,52 @@ The completed broad worker run for typed-program checkpoint 180d4a95a recorded
 All 81 corrected golden controls passed separately, as did the final 380-test
 native/protocol/golden run. This is distinct from an entirely green full-suite
 rerun; exact-head CI remains the authoritative delivery qualification.
+
+## Layout-bound native byte contracts
+
+Implemented public AllocatedBytes metric 4 with its distinct versioned cost model.
+Compiler capture carries target platform and only the core-library reference
+needed by selected byte claims. Discovery declares the callable-owned layout
+assumption before sealing the manifest. Native binding requires net8.0, an x64
+compiler target, a reviewed reference identity with a single consistent captured
+module hash, and the exact owned assumption. Missing/conflicting inputs yield
+Unknown. The reference identifies compiler inputs; the runtime model remains an
+explicit trusted execution assumption, never detected from a context label.
+
+Native checking now compares conditional byte envelopes to constant/linear
+contracts and projects the layout digest, runtime/source model and reference
+identity/hash into results. Protocol validation requires the layout dependency
+for nonvacuous byte proofs, including cached results, and rejects stripped or
+changed evidence. Byte and element claims retain independent outcomes. Protocol
+19, cache 21 and compiler artifact 36 invalidate earlier evidence; resource
+program/evidence model 3 and expression model 1 have cross-layer identity tests.
+
+Initial combined native/protocol/golden/consumer validation passed 397 tests.
+An invalid C# fixture mixing incompatible conditional array types was replaced
+with separate branches before this passing run. Added symbolic alignment and
+repetition cases are undergoing their final run. An actual NuGet consumer also
+passed strict/advisory/x64/AnyCPU controls: strict reports SP0048 for the trusted
+layout dependency; explicitly enabled advisory verification proves the x64 bound
+and publishes JSON/SARIF provenance, while AnyCPU returns Unknown. Earlier
+fixture formatting failures were corrected with the pinned formatter.
+
+This completes the first array byte-contract integration, not phase C. Exact
+numerical byte-event refutation still requires implementation; a failed envelope
+comparison remains Unknown with no invented prefix. Continue with that replay,
+then source extraction/effect accounting for every remaining allocation family,
+liveness/escape, peak auxiliary and retained output, and stack models. All phase
+E/F requirements and unchanged 100% coverage qualification remain open.
+
+Final byte-contract validation passed 401 focused native/protocol/golden/consumer
+tests, all 33 public attribute API tests, all 1388 analyzer tests and the actual
+NuGet consumer described above. Symbolic controls prove aligned primitive-array
+sizes and repeated per-iteration storage under the owned layout assumption.
+All quality/compatibility categories passed with zero build warnings/errors.
+Generated public API documentation was refreshed; drift and 723 local links
+passed. Layout evaluated 2661 source files, 59 projects and 151 pinned common files.
+
+Published typed-program checkpoint 180d4a95a passed every non-coverage workflow
+and all four coverage shards. Qualification failed at 2987/3062 changed trusted
+lines (97.55%), leaving 75 gaps against the unchanged 100% baseline. This report
+excludes the newer byte-contract implementation; its exact-head CI and eventual
+full qualification remain required.

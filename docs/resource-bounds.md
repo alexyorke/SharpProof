@@ -272,9 +272,33 @@ bound: sequence costs add, branch costs take a maximum, and repeated costs use
 the checked iteration envelope. Untyped arrays, opaque metadata costs, invalid
 progress and incompatible contexts yield Unknown with no partial byte bound.
 
-This internal derivation does not yet expose byte contracts, establish the target
-runtime assumption, or measure peak/retained heap or stack memory. Layout evidence
-binding and result projection remain required before publishing byte verdicts.
-Other allocation categories still need compiler extraction and effect accounting.
-Protocol 18, cache schema 20 and compiler artifact schema 35 invalidate earlier
-serialized programs. The existing three public metrics retain their meanings.
+`ResourceMetric.AllocatedBytes` declares a byte contract under
+`coreclr-8.0.32-x64-source-storage-v1:cumulative-bytes-v1`. It requires a net8.0
+target, compiler PlatformTarget x64, a reviewed captured core-library reference,
+and a callable-owned trusted layout declaration. Results expose the model digest,
+source pin, reference identity/hash and used dependency. These are explicit
+assumptions about execution under that runtime model, not runtime detection.
+Missing or incompatible evidence yields Unknown. The strict profile applies its
+existing SP0048 rejection policy to the trusted layout dependency; advisory
+verification records it when native verification is explicitly enabled.
+
+For a net8.0 project with `<PlatformTarget>x64</PlatformTarget>`:
+
+```csharp
+using SharpProof.Attributes;
+public static class ByteAllocationExample
+{
+    [ResourceUpperBound(ResourceMetric.AllocatedBytes, 40)]
+    public static int[] Allocate() { return new int[3]; }
+}
+```
+
+The inferred fresh-array storage is 40 bytes, including its header and alignment.
+This is cumulative source-owned instance storage, including returned allocations.
+It excludes runtime/JIT/GC infrastructure costs and does not measure peak live,
+retained or stack space. Larger inferred envelopes do not establish numerical
+violations; exact byte-event refutation remains to be implemented. Other
+allocation categories still need compiler extraction and effect accounting.
+Protocol 19, cache schema 21 and compiler artifact schema 36 invalidate earlier
+serialized evidence. Resource program/evidence model 3 and expression model 1
+are checked together; the existing three count metrics retain their meanings.

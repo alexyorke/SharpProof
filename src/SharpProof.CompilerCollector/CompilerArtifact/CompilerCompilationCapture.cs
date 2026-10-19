@@ -172,6 +172,7 @@ internal static class CompilerCompilationCapture
             AssemblyName = compilation.AssemblyName ?? throw new InvalidOperationException("The assembly name is unavailable."),
             AssemblyIdentity = compilation.Assembly.Identity.ToString(),
             TargetFramework = targetFramework,
+            ResourceTargetPlatform = compilation.Options.Platform.ToString(),
             CompilerVersion = CompilerCaptureIdentity.CaptureVersion(
                 typeof(Compilation)),
             CompilerMvid = CompilerCaptureIdentity.CaptureMvid(

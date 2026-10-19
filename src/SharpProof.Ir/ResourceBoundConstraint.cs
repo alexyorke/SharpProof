@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-internal enum ResourceCostMetric { LoopBodyEntries = 1, ArrayAllocations = 2, AllocatedElements = 3 }
+internal enum ResourceCostMetric { LoopBodyEntries = 1, ArrayAllocations = 2, AllocatedElements = 3, AllocatedBytes = 4 }
 
 internal sealed class ResourceBoundConstraint
 {

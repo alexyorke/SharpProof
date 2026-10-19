@@ -23,6 +23,7 @@ internal sealed class CompilerCompilationSnapshot
     [JsonIgnore]
     public string AssemblyIdentity { get; set; } = string.Empty;
     public string TargetFramework { get; set; } = string.Empty;
+    public string ResourceTargetPlatform { get; set; } = string.Empty;
     [JsonIgnore]
     public string CompilerVersion { get; set; } = string.Empty;
     [JsonIgnore]

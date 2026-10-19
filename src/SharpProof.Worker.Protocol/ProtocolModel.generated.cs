@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "18";
+    public const string Current = "19";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 20;
+    public const int Current = 21;
 }
 
 public static class WorkerManifestVersions
@@ -162,14 +162,17 @@ public enum WorkerResourceMetric
     Unspecified = 0,
     LoopBodyEntries = 1,
     ArrayAllocations = 2,
-    AllocatedElements = 3
+    AllocatedElements = 3,
+    AllocatedBytes = 4
 }
 
 public static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 2;
+    public const int Program = 3;
+    public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
+    public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
     public const int MaximumExpressionBytes = 1024 * 1024;
 }
 
@@ -614,7 +617,7 @@ internal static class WorkerProtocolMetadata
         WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
         WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
         WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
-        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements,
+        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements, WorkerResourceMetric.AllocatedBytes,
         WorkerRunStatus.Unspecified, WorkerRunStatus.Complete, WorkerRunStatus.TimedOut, WorkerRunStatus.Canceled, WorkerRunStatus.Failed,
         WorkerCallableCoverage.Unspecified, WorkerCallableCoverage.Complete, WorkerCallableCoverage.Incomplete,
         WorkerClaimOutcome.Unspecified, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown,
@@ -828,7 +831,7 @@ internal static class WorkerProtocolMetadata
         if (kind != WorkerEffectContractKind.ResourceUpperBound)
         { return constraint is null; }
         return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
-            constraint.CostModel == WorkerResourceModels.CostModel && constraint.ExpressionModel == WorkerResourceModels.Expression &&
+            constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
             constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
     }
     internal static readonly WorkerProtocolRule<WorkerClaimManifestEntry>[] ManifestClaimRules = [
