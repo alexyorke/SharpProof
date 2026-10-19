@@ -196,3 +196,48 @@ heading's blank-line spacing, the pinned markdown engine checked both changed
 documents with zero findings. Package compatibility and negative gate fixtures
 passed. The published predecessor `bf966074c` still had four CI checks pending
 at the latest inspection (25 successful, four skipped, no failures).
+
+## Closed resource programs and native derivation (in progress)
+
+The compiler now emits a resource program alongside its presentation bounds.
+Nodes describe zero cost, array allocation, sequence, branch alternatives and
+repeated regions. Repeats carry initialization, strict guard, positive update,
+counter width and overflow mode rather than a producer-asserted trip count.
+Source-call expansion and input substitution apply to this program too. Guarded
+tail recurrence uses a separate repeat kind so it does not invent loop entries.
+
+This is an upper-envelope lowering: early exits can shorten a source execution,
+and dependent sizes can be replaced by conservative enclosing-counter envelopes.
+The compiler lowering remains in the trusted boundary for preserving allocations,
+closed operation admission and counter stability. A large modeled upper cost
+alone cannot refute a source contract; refutation still requires owned replay
+of an actual violating execution.
+
+An independent worker module checks rank domains, monotone progress and overflow,
+then derives all three cumulative metrics from the nodes. Its strict program
+codec binds program/expression/cost-model versions and rejects malformed fields,
+arity, payloads and raw tree budgets before simplification. Native input binding
+uses the concrete owned callable's parameter types and domains. Conditional
+metadata leaves an explicit boundary with native Unknown until its provenance is
+bound, preserving the analyzer's existing conditional results.
+
+The first 38 focused native tests passed, including independent small executions,
+checked-prefix versus unchecked-wrap controls, source-to-worker agreement and
+malformed transport controls. The expanded run passed all 41 cases, adding
+source-call, metadata-boundary and construction-budget controls. The full
+analyzer regression suite passed all 1267 tests with zero build warnings/errors.
+Evaluated layout passed with 2626 source files, 59 projects and 151 pinned common
+files; documentation drift and lifecycle checks passed. All 497 IR tests and
+10 architecture tests passed. Both source-level metadata-boundary assertions
+passed after they were added. Nine quality categories passed initially; one
+prose spelling finding was corrected, then the pinned spelling checker passed
+all 71 configured files and markdown checked the changed roadmap with no findings.
+The published predecessor `9f7a9769e` still had CI running at the latest
+inspection, with no failures. The native resource-program consumer workflow
+remains pending as described below.
+
+Collector attachment, resource contracts, protocol/cache/SARIF integration,
+native metadata assumptions and replayed numeric violations remain open. This
+module verifies a supplied closed program; it is not yet a published native
+resource-claim workflow. Broader ranking synthesis and all required phases C-F
+remain incomplete.

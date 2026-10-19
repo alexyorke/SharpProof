@@ -36,6 +36,7 @@ internal sealed partial class ResourceBoundsAnalysis
         if (size is null)
         { return Unknown("UnprovedRecursiveProgress"); }
         Bound? activations = null;
+        ResourceLoopRank? rankProof = null;
         foreach (var argument in tail.Arguments)
         {
             if (argument.Parameter is not { } parameter)
@@ -62,8 +63,12 @@ internal sealed partial class ResourceBoundsAnalysis
                 BinaryOperatorKind.Divide when amount > 1 => GeometricCount(size, amount, descending: true),
                 _ => null
             };
+            rankProof = new ResourceLoopRank(progress.OperatorKind == BinaryOperatorKind.Subtract
+                ? ResourceLoopKind.DecreasingSubtract : ResourceLoopKind.DecreasingDivide,
+                size.Expression, ResourceExpression.Zero, amount,
+                rank.Parameter.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, progress.IsChecked);
         }
-        if (activations is null)
+        if (activations is null || rankProof is null)
         { return Unknown("UnprovedRecursiveProgress"); }
         // On n>0, subtracting a representable positive constant cannot
         // underflow; dividing by k>1 also decreases the nonnegative rank. All
@@ -72,6 +77,6 @@ internal sealed partial class ResourceBoundsAnalysis
         if (--_remaining < 0 || depth > 128)
         { return Unknown("AnalysisBudgetExceeded"); }
         var prefix = Sequence(block.Operations.Skip(1).Take(block.Operations.Length - 2), depth + 1);
-        return prefix.Scale(activations);
+        return prefix.Scale(activations, rankProof, ResourceRepeatKind.TailRecurrence);
     }
 }

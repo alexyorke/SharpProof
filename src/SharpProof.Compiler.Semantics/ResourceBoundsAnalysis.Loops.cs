@@ -53,7 +53,12 @@ internal sealed partial class ResourceBoundsAnalysis
         var body = Sequence(operations.Take(operations.Length - 1), depth + 1);
         _counters.Remove(counter.Local);
         _localProgress.Remove(counter.Local);
-        return new Cost(Bound.One, Bound.Zero, Bound.Zero).Add(body).Scale(count);
+        var checkedStep = step.Operation is IIncrementOrDecrementOperation update ? update.IsChecked :
+            ((ICompoundAssignmentOperation)step.Operation).IsChecked;
+        var rank = new ResourceLoopRank(geometric ? ResourceLoopKind.DecreasingDivide : ResourceLoopKind.DecreasingSubtract,
+            initial.Expression, ResourceExpression.Zero, amount,
+            counter.Local.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep);
+        return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
 
     private static BigInteger? IntegerConstant(IOperation? operation)
@@ -175,6 +180,15 @@ internal sealed partial class ResourceBoundsAnalysis
         _counters.Add(declaration.Symbol, envelope);
         var body = Visit(loop.Body, depth + 1);
         _counters.Remove(declaration.Symbol);
-        return new Cost(Bound.One, Bound.Zero, Bound.Zero).Add(body).Scale(count);
+        var rankKind = kind switch
+        {
+            BinaryOperatorKind.Add => ResourceLoopKind.IncreasingAdd,
+            BinaryOperatorKind.Multiply => ResourceLoopKind.IncreasingMultiply,
+            BinaryOperatorKind.Subtract => ResourceLoopKind.DecreasingSubtract,
+            _ => ResourceLoopKind.DecreasingDivide
+        };
+        var rank = new ResourceLoopRank(rankKind, initial.Expression, comparison.Expression, amount,
+            declaration.Symbol.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep);
+        return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
 }

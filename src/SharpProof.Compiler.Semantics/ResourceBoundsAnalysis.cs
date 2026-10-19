@@ -54,30 +54,34 @@ internal sealed partial class ResourceBoundsAnalysis
         internal Bound LoopIterations { get; }
         internal Bound Arrays { get; }
         internal Bound Elements { get; }
-        internal Cost(Bound loopIterations, Bound arrays, Bound elements)
+        internal ResourceProgram Program { get; }
+        internal Cost(Bound loopIterations, Bound arrays, Bound elements, ResourceProgram program)
         {
             LoopIterations = ArgumentNullGuard.NotNull(loopIterations, nameof(loopIterations));
             Arrays = ArgumentNullGuard.NotNull(arrays, nameof(arrays));
             Elements = ArgumentNullGuard.NotNull(elements, nameof(elements));
+            Program = ArgumentNullGuard.NotNull(program, nameof(program));
         }
-        internal static readonly Cost Zero = new(Bound.Zero, Bound.Zero, Bound.Zero);
+        internal static readonly Cost Zero = new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Zero);
         internal Cost Add(Cost other)
         {
             other = ArgumentNullGuard.NotNull(other, nameof(other));
             return new(Bound.Add(LoopIterations, other.LoopIterations),
-                Bound.Add(Arrays, other.Arrays), Bound.Add(Elements, other.Elements));
+                Bound.Add(Arrays, other.Arrays), Bound.Add(Elements, other.Elements), ResourceProgram.Sequence(Program, other.Program));
         }
         internal Cost Max(Cost other)
         {
             other = ArgumentNullGuard.NotNull(other, nameof(other));
             return new(Bound.Max(LoopIterations, other.LoopIterations),
-                Bound.Max(Arrays, other.Arrays), Bound.Max(Elements, other.Elements));
+                Bound.Max(Arrays, other.Arrays), Bound.Max(Elements, other.Elements), ResourceProgram.Choice(Program, other.Program));
         }
-        internal Cost Scale(Bound count)
+        internal Cost Scale(Bound count, ResourceLoopRank rank, ResourceRepeatKind kind)
         {
             count = ArgumentNullGuard.NotNull(count, nameof(count));
-            return new(Bound.Multiply(count, LoopIterations),
-                Bound.Multiply(count, Arrays), Bound.Multiply(count, Elements));
+            rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
+            var entries = kind == ResourceRepeatKind.Loop ? Bound.Add(Bound.One, LoopIterations) : LoopIterations;
+            return new(Bound.Multiply(count, entries),
+                Bound.Multiply(count, Arrays), Bound.Multiply(count, Elements), ResourceProgram.Repeat(rank, kind, Program));
         }
     }
 
@@ -221,7 +225,7 @@ internal sealed partial class ResourceBoundsAnalysis
             case IArrayCreationOperation array when array.Type is IArrayTypeSymbol type &&
                 SupportedType(type) && array.DimensionSizes.Length == 1 && array.Initializer is null:
                 var size = Size(array.DimensionSizes[0]);
-                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size);
+                result = size is null ? Unknown("UnsupportedAllocationSize") : new(Bound.Zero, Bound.One, size, ResourceProgram.Array(size.Expression));
                 break;
             case ISimpleAssignmentOperation assignment when !assignment.IsRef:
                 result = Writable(assignment.Target)

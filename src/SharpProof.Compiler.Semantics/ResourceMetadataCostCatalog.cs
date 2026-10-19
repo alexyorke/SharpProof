@@ -49,6 +49,6 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         _assumptions.Add("resource-metadata-net8.0.32:" + ResourceMetadataCostCatalog.ContentSha256 + ":" +
             spec.Template.Target.WitnessIdentifier + ":" + ResourceMetadataCostCatalog.EvidenceSource);
-        return arguments;
+        return arguments.Add(new Cost(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.MetadataBoundary));
     }
 }
