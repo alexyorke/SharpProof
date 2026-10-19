@@ -1150,3 +1150,42 @@ not yet expand public metric support. All 612 IR tests passed, including 19 new
 lifetime cases and replacement traces for 100 sizes.
 All quality and compatibility checks passed. Layout evaluated 2715 source files,
 59 projects and 151 pinned common files. The phase C checklist remains incomplete.
+
+## Compiler-owned finite lifetime extraction
+
+The lifetime evaluator now accepts an internally extracted trace from a typed IR
+program, rather than caller-provided allocation numbers. The initial admitted
+family is a single finite chain of primitive-array allocations, scalar/reference
+copies, and normal returns. Array storage widths and lengths come from typed IR
+and the separately validated runtime layout. Reference aliases preserve object
+identity; last-use root drops distinguish dead temporaries from live aliases.
+Literal copies through compiler temporaries retain their values until overwritten;
+unknown writes invalidate them. Constant comparison guards select only their proven
+edge. Local-write effect markers do not invent heap edges. Unreachable blocks do
+not contribute execution costs. Cycles, unproved branches, calls,
+unknown scalar effects, unproved symbolic or negative lengths, borrowed references and
+unsupported allocation shapes remain Unknown without partial metrics.
+
+The extractor bounds block/instruction/term scanning and emitted event counts.
+This is a normal-completion logical model. Exceptional-path composition, field
+stores/loads, object graphs, source-call lifetime summaries and symbolic repeated
+regions remain required. Native contract transport/reporting and public peak and
+retained metrics are still pending. All 635 IR tests passed, including 23 new
+extractor cases. Four validated-artifact source workflows passed: direct array
+return, returned alias, a dead temporary before the returned allocation, and
+borrowed-output rejection. The first three also execute emitted C# and verify the
+returned array lengths. Tests check the actual compiler-generated constant-copy
+and exception-guard representation rather than assuming source literals remain
+literal IR terms. Layout evaluated 2718 source files, 59 projects and 151 pinned
+common files. All quality and compatibility categories passed. Documentation
+generation and 723 local links passed.
+
+Exact published closure head fcbf7a467 passed all four coverage shards. The
+aggregate enforced the unchanged 100% floor and failed at 2665/2785 changed
+trusted lines (95.69%, 120 uncovered lines). This measurement predates the
+lifetime evaluator/extractor; it does not qualify the newer work. Coverage gap
+closure and fresh final exact-head CI remain required.
+
+Published closure head fcbf7a467 also passed every canonical container PR gate,
+package/consumer/release workflow, documentation and toolchain security checks.
+Its coverage threshold is the remaining failing workflow.
