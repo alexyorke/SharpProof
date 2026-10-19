@@ -339,6 +339,12 @@ public sealed partial class TotalLoweringContext
         return Factory.CreateOperation(IrStaticDelegateAllocationSite.Description, Span(operation.Syntax));
     }
 
+    internal OperationId InstanceDelegateAllocationSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation(IrDelegateCaptureSite.Description, Span(operation.Syntax));
+    }
+
     // A static field read is a read of ambient state.
     internal OperationId StaticReadSite(IOperation operation)
     {

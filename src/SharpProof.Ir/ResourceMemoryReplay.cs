@@ -92,6 +92,7 @@ internal sealed class ResourceMemoryReplay
         var actualValues = new Dictionary<IrVarId, IrValue>();
         var objects = new HashSet<int>();
         var fieldSlots = new Dictionary<IrMemberId, int>();
+        var pendingCaptures = new Dictionary<int, IrMemberId>();
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         events.Add(new(ResourceMemoryEventKind.Allocate, ResourceMemoryProgram.EmptyStringIdentity, ResourceMemoryProgram.EmptyStringIdentity, 0));
@@ -128,8 +129,17 @@ internal sealed class ResourceMemoryReplay
                         objectAllocation.AllocatedType != value.Type || Find(value, identities) != 0 || !objectAllocation.InitialValues.IsEmpty)
                     { return Unknown("MemoryReplayAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
+                    IrMemberId? capturedField = null;
                     if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
                     { objectShape = ResourceAllocationShape.Delegate(); }
+                    else if (IrDelegateCaptureSite.Matches(factory, objectAllocation))
+                    {
+                        if (!IrDelegateCaptureSite.TryGetCapture(factory, objectAllocation,
+                            index + 1 < _observed.Count ? _observed[index + 1].Instruction : null, out var capture))
+                        { return Unknown("MemoryReplayDelegateCaptureIncomplete"); }
+                        objectShape = ResourceAllocationShape.Delegate();
+                        capturedField = capture;
+                    }
                     else if (objectAllocation.AllocatedType == factory.ObjectType)
                     { objectShape = ResourceAllocationShape.Object([]); }
                     else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
@@ -142,6 +152,8 @@ internal sealed class ResourceMemoryReplay
                     identities.Add(value);
                     actualValues[objectTarget] = value;
                     objects.Add(identities.Count);
+                    if (capturedField is { } requiredCapture)
+                    { pendingCaptures.Add(identities.Count, requiredCapture); }
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(objectTarget, slots), 0, objectLower, objectUpper));
                     liveRoots.Add(objectTarget);
                     break;
@@ -196,6 +208,12 @@ internal sealed class ResourceMemoryReplay
                         var child = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
                         if (value.Kind != IrValueKind.Null && child == 0)
                         { return Unknown("MemoryReplayBorrowedReference"); }
+                        if (IrDelegateCaptureSite.IsTargetField(factory, field))
+                        {
+                            if (child == 0 || child == receiver || !pendingCaptures.TryGetValue(receiver, out var required) || required != field)
+                            { return Unknown("MemoryReplayDelegateCaptureUnsupported"); }
+                            pendingCaptures.Remove(receiver);
+                        }
                         if (!fieldSlots.TryGetValue(field, out var fieldSlot))
                         { fieldSlot = fieldSlots.Count; fieldSlots.Add(field, fieldSlot); }
                         events.Add(new(ResourceMemoryEventKind.StoreReference, receiver, fieldSlot, child));

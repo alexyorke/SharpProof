@@ -126,7 +126,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
-            StaticDelegateBinding = _calls == null ? null : _calls.CanBindStaticDelegate,
+            DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,
             ExceptionTarget = _frame == null ? null : (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (_frame.Search(kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target)))
         };
         var closure = RootParameterClosurePlan.TryCreate(_context.Target, _context.Compilation, _cancellationToken);

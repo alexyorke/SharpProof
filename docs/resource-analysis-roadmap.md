@@ -1622,3 +1622,52 @@ Missing, borrowed or unproved capture edges must prevent numerical lifetime
 claims. Preserve field-graph sharing/cycles and independently observe these edges
 during completed replay before admitting broader capture families. Stack bounds,
 remaining C/E/F requirements and unchanged coverage qualification stay open.
+
+## Owned instance delegate target graphs
+
+Explicit admitted instance bindings now emit a delegate allocation followed by a
+scoped synthetic target-field store. The target is evaluated and checked before
+allocation; the target body does not execute. The store uses the existing fresh
+write classification because it initializes the newly allocated delegate.
+
+Finite extraction and completed replay require the exact instance-allocation
+marker, nominal delegate type and immediately following target store. The field
+must have its reserved role, type and allocated receiver. Its value must be an
+already owned, non-null reference distinct from the new delegate; the edge can
+be initialized only once. Missing, unrelated, null, overwritten or self-capture
+evidence returns Unknown without partial bounds. Existing object-graph traversal
+then includes the target's children and cycles in retained output and excludes
+the returned graph from auxiliary storage.
+
+Initial verification passed seven IR capture mutation cases and 11 native
+controls covering target retention, child arrays, target cycles, generic methods,
+dead auxiliary storage, borrowed targets and unsupported conversions. Broader
+checks, self-capture rejection, runtime graph controls and packaged evidence are
+in progress. Ambiguous non-direct bindings remain Unknown under the existing
+compiler erasure model. Closure frame/capture links, broader lifetimes, stack
+bounds and remaining E/F work stay required.
+
+Final verification passed all 697 IR tests, including eight malformed-capture
+controls and independent runtime checks of the 120-byte delegate/target/child
+bundle and its actual target link. All 847 affected worker tests passed across
+resource, purity/effect, ownership, artifact/protocol, golden and cache families.
+Six final native cases passed, including binding through an owned field read
+while releasing the parent root. Six actual packaged proof/refutation controls
+passed, bringing cumulative validated lifetime package controls to 54.
+
+The frontend run passed 2120 cases and identified the two comparisons of the
+instance-delegate lowering snapshot. Its reviewed update adds the capture store
+and subsequent instruction numbering; both original and reformatted comparisons
+then passed. Quality/compatibility, scoped C# formatting, spelling/Markdown,
+documentation generation and 724 local links passed. Layout passed for 2726
+source files, 59 projects and all 151 pinned common files.
+
+Published static-delegate checkpoint 19b28e12c passed all four coverage shards,
+but aggregate validation stopped before percentage enforcement because the new
+static helper was missing from the explicit trusted-source inventory. Both
+delegate helpers are now classified in the acceptance contract. The authoritative
+evaluated production inventory validates all 516 trusted paths with both helpers
+included. No coverage exclusion or floor reduction was introduced. The latest
+numerical aggregate remains constructor checkpoint f98b6d080: 3395/3577 changed
+trusted lines (94.91%, 182 gaps). Fresh exact-head CI and coverage qualification
+remain required for this extension.

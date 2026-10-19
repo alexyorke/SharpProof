@@ -114,7 +114,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
-            StaticDelegateBinding = _calls == null ? null : _calls.CanBindStaticDelegate,
+            DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,
             ExceptionTarget = (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                 ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site)))
         };

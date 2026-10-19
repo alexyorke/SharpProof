@@ -534,7 +534,22 @@ Their 64-byte storage under the declared layout participates in aliasing,
 reference guards, auxiliary memory and retained output. Scalar boxes use fresh
 24-byte object storage for the admitted Boolean/integer payloads.
 
-Instance delegates, closure captures, cached conversions, metadata method targets
+Closure captures, cached conversions, metadata method targets
 and unsupported initialization remain Unknown without partial lifetime metrics.
 Delegate invocation costs and effects require their own admission and are not
 implied by allocation or lifetime evidence.
+
+### Owned instance delegate targets
+
+An admitted explicit instance binding that returns directly records an immutable
+target edge immediately after allocation. The target and its owned child graph
+therefore participate in retained output, sharing, cycles and auxiliary memory.
+For example, a 64-byte delegate retaining a 24-byte target and a 32-byte child
+array retains 120 newly owned bytes under the declared layout.
+
+Both extraction and completed replay require the compiler marker, delegate type,
+scoped target field and ordered initialization. Missing, mismatched, null,
+overwritten or borrowed edges produce Unknown, as does a target equal to the
+newly allocated delegate. Bindings whose
+construction may be erased, closure links and unsupported target bindings remain
+Unknown. Capture storage does not imply any bound on invoking the target method.

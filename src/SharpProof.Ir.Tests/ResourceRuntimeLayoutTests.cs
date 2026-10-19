@@ -187,6 +187,7 @@ public sealed class ResourceRuntimeLayoutTests
             static () => new MixedFields(SharedReference, 42, 1));
         CheckMeasured(ResourceAllocationShape.Delegate(), CreateDelegate);
         Assert.That(Measure(CreateInstanceDelegate), Is.EqualTo(88));
+        Assert.That(Measure(CreateInstanceDelegateWithChild), Is.EqualTo(120));
         Assert.That(Measure(CreateDiscardedDelegate), Is.Zero);
         CheckMeasured(ResourceAllocationShape.Closure([ResourceStorageKind.Word32]), CreateClosure);
         Assert.That(Measure(static () => RootParameterClosure(42)), Is.EqualTo(88));
@@ -231,6 +232,25 @@ public sealed class ResourceRuntimeLayoutTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static object CreateInstanceDelegate()
     { return new Func<int>(new DelegateReceiver().Read); }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object CreateInstanceDelegateWithChild()
+    { return new Func<int>(new DelegateGraphReceiver().Read); }
+
+    [Test]
+    public void RuntimeDelegateRetainsItsTargetAndChildGraph()
+    {
+        var callback = (Func<int>)CreateInstanceDelegateWithChild();
+        Assert.That(callback.Target, Is.TypeOf<DelegateGraphReceiver>());
+        Assert.That(callback(), Is.EqualTo(1));
+        GC.KeepAlive(callback);
+    }
+
+    private sealed class DelegateGraphReceiver
+    {
+        private readonly int[] _values = new int[1];
+        internal int Read() { return _values.Length; }
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static object CreateDiscardedDelegate()

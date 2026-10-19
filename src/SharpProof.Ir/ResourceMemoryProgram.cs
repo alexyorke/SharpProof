@@ -86,6 +86,7 @@ internal static class ResourceMemoryProgram
         var nextObject = 0;
         var objects = new HashSet<int>();
         var fieldSlots = new Dictionary<IrMemberId, int>();
+        var pendingCaptures = new Dictionary<int, IrMemberId>();
         for (var index = 0; index < instructions.Count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -117,8 +118,17 @@ internal static class ResourceMemoryProgram
                     if (objectAllocation.Target is not { } objectTarget || !objectAllocation.InitialValues.IsEmpty)
                     { return Unknown("MemoryAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
+                    IrMemberId? capturedField = null;
                     if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
                     { objectShape = ResourceAllocationShape.Delegate(); }
+                    else if (IrDelegateCaptureSite.Matches(factory, objectAllocation))
+                    {
+                        if (!IrDelegateCaptureSite.TryGetCapture(factory, objectAllocation,
+                            index + 1 < instructions.Count ? instructions[index + 1] : null, out var capture))
+                        { return Unknown("MemoryDelegateCaptureIncomplete"); }
+                        objectShape = ResourceAllocationShape.Delegate();
+                        capturedField = capture;
+                    }
                     else if (objectAllocation.AllocatedType == factory.ObjectType)
                     { objectShape = ResourceAllocationShape.Object([]); }
                     else if (factory.TryGetObjectStorageType(objectAllocation.AllocatedType, out var fields))
@@ -132,6 +142,8 @@ internal static class ResourceMemoryProgram
                     { objectSlot = slots.Count; slots.Add(objectTarget, objectSlot); }
                     values[objectTarget] = ++nextObject;
                     objects.Add(nextObject);
+                    if (capturedField is { } requiredCapture)
+                    { pendingCaptures.Add(nextObject, requiredCapture); }
                     trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, objectSlot, 0, objectLower, objectUpper));
                     break;
                 case IrAllocationInstruction allocation:
@@ -182,6 +194,12 @@ internal static class ResourceMemoryProgram
                     {
                         if (!TryReference(stored.Value, factory, values, out var child, fields: referenceFields))
                         { return Unknown("MemoryFieldStoreUnsupported"); }
+                        if (IrDelegateCaptureSite.IsTargetField(factory, field))
+                        {
+                            if (child == 0 || child == receiver || !pendingCaptures.TryGetValue(receiver, out var required) || required != field)
+                            { return Unknown("MemoryDelegateCaptureUnsupported"); }
+                            pendingCaptures.Remove(receiver);
+                        }
                         if (!fieldSlots.TryGetValue(field, out var fieldSlot))
                         { fieldSlot = fieldSlots.Count; fieldSlots.Add(field, fieldSlot); }
                         referenceFields[(receiver, field)] = child;

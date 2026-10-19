@@ -33,7 +33,7 @@ public sealed partial class NativeResourceContractTests
         }
     }
 
-    [TestCase("var receiver=new Callback(); return new System.Action(receiver.Work);")]
+    [TestCase("var receiver=new Callback(); var saved=new System.Action(receiver.Work); return saved;")]
     [TestCase("return Work;")]
     [TestCase("return () => value;")]
     [TestCase("return new System.Action(System.GC.Collect);")]
@@ -43,6 +43,48 @@ public sealed partial class NativeResourceContractTests
         ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public class Callback { public void Work() {} } public static class Initialized { static Initialized() {} public static void Work() {} } public static class C { public static void Work() {} " +
             $"[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static System.Delegate Target(int value) {{ {body} }} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+    }
+
+    [TestCase("", "var root=new Callback(); return new System.Action(root.Work);", 0, 88)]
+    [TestCase("public int[] Child;", "var root=new Callback(); root.Child=new int[1]; return new System.Action(root.Work);", 0, 120)]
+    [TestCase("public Callback Next;", "var root=new Callback(); root.Next=root; return new System.Action(root.Work);", 0, 88)]
+    [TestCase("public Callback Next;", "var parent=new Callback(); var root=new Callback(); parent.Next=root; return new System.Action(parent.Next.Work);", 24, 88)]
+    [TestCase("", "var dead=new int[1]; var root=new Callback(); return new System.Action(root.Work);", 32, 88)]
+    [TestCase("", "var root=new Callback(); return new System.Func<int>(root.Read);", 0, 88)]
+    public async Task InstanceDelegateLifetimesRetainTheirOwnedTargetGraph(string fields, string body, int auxiliary, int retained)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        ArgumentNullException.ThrowIfNull(body);
+        foreach (var metric in new[] { 5, 6 })
+        {
+            var upper = metric == 5 ? auxiliary : retained;
+            foreach (var violates in new[] { false, true })
+            {
+                if (violates && upper == 0)
+                { continue; }
+                var source = "using SharpProof.Attributes; public class Callback { " + fields +
+                    " public void Work() {} public int Read() { throw new System.InvalidOperationException(); } } public static class C { " +
+                    $"[ResourceUpperBound((ResourceMetric){metric},{(violates ? upper - 1 : upper)})] public static object Target() {{ {body} }} }}";
+                var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+                var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+                Assert.That(result.Outcome, Is.EqualTo(violates ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+                Assert.That(violates ? result.ResourceBound!.ObservedLowerBound : result.ResourceBound!.InferredUpperBound,
+                    Is.EqualTo(upper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
+    [Test]
+    public async Task BorrowedDelegateTargetsHaveNoPartialLifetimeMetrics()
+    {
+        const string source = "using SharpProof.Attributes; public class Callback { public void Work() {} } public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static System.Action Target(Callback input) { return new System.Action(input.Work); } }";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));

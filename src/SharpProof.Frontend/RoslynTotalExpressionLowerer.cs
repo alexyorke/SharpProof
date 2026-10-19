@@ -36,7 +36,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // or calls opaque code; otherwise a read is a pure function of the array.
     internal bool ApproximateElementReads { get; set; }
     internal bool PinElementReads { get; set; }
-    internal Func<IMethodSymbol, bool>? StaticDelegateBinding { get; set; }
+    internal Func<IMethodSymbol, bool>? DelegateBinding { get; set; }
 
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; set; }
@@ -338,6 +338,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     mayCheckNull = _factory.Variable(choice);
                 }
                 block = ApplyRule(operation, CSharpOperationSemantics.DelegateReceiver(_factory, receiver.Value, mayCheckNull), receiver.Continuation).Continuation;
+                if (DelegateBinding?.Invoke(((IMethodReferenceOperation)delegateCreation.Target).Method) == true)
+                {
+                    var type = _context.Type(operation.Type);
+                    var target = _context.Temporary(type);
+                    _builder!.Allocate(block, _context.InstanceDelegateAllocationSite(operation), type, target);
+                    var field = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType,
+                        IrDelegateCaptureSite.TargetFieldName, _factory.ObjectType, false);
+                    _builder.FieldStore(block, _context.FreshWriteSite(operation), IrWriteRegion.Field,
+                        AsObject(_factory.Variable(target)), field, AsObject(receiver.Value));
+                    return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+                }
             }
             return erased
                 ? new(_factory.Null(_context.Type(operation.Type)), block, FrontendSubsetClassification.Exact)
@@ -681,7 +692,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         {
             Target: IMethodReferenceOperation { Instance: null, Method.IsStatic: true }
         } creation && CSharpOperationSemantics.IsExplicitDelegateCreation(creation) &&
-            StaticDelegateBinding?.Invoke(((IMethodReferenceOperation)creation.Target).Method) == true
+            DelegateBinding?.Invoke(((IMethodReferenceOperation)creation.Target).Method) == true
             ? _context.StaticDelegateAllocationSite(operation) : _context.Site(operation);
         _builder!.Allocate(block, site, type, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
