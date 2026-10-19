@@ -3151,3 +3151,9 @@ previously published views remain stable across later Bind calls. Keep map looku
 Add, exact variable naming, callback order and partial-failure accumulation unchanged.
 Validate the full Contracts suite and generic/flow-capture materialization controls.
 Status: open before edits.
+
+IMM-M096 verified: all 145 affected Worker tests across eleven files pass, zero failures/
+skips/warnings/errors. Nineteen fixed vectors preserve values, duplicate rows, expected
+byte/nullable enum types and process/compiler input order. The plan's twelve-owner
+count was corrected to eleven files after exact-node selection. Mutable SUT buffers
+and reflection arrays remain unchanged.

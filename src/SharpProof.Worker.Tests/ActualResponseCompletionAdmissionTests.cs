@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -17,7 +18,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
         var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, TestContext.CurrentContext.CancellationToken);
         var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, otherActual })
+        foreach (var response in ImmutableArray.Create(actual, otherActual))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
@@ -93,7 +94,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
         var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, TestContext.CurrentContext.CancellationToken);
         var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, TestContext.CurrentContext.CancellationToken);
-        foreach (var response in new[] { actual, otherActual })
+        foreach (var response in ImmutableArray.Create(actual, otherActual))
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));

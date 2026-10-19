@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -202,8 +203,7 @@ public sealed class CompilerCallableLowererTests
         var mainPath = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "RelativeSummarySubject.cs");
-        var trees = new[]
-        {
+        var trees = ImmutableArray.Create(
             CSharpSyntaxTree.ParseText(
                 """
                 #undef SHARPPROOF_CONTRACTS
@@ -227,7 +227,7 @@ public sealed class CompilerCallableLowererTests
                 """,
                 parse,
                 "generated/helper.g.cs")
-        };
+        );
         var compilation = CSharpCompilation.Create(
             "RelativeSourceSummaryTreePath",
             trees,

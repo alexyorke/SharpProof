@@ -98,13 +98,12 @@ public sealed class ActualOwnedSessionEntryReservationTests
                     methodAdmissionDenied = true;
                     break;
                 }
-                var constraints = new[]
-                {
+                var constraints = ImmutableArray.Create<IrTerm>(
                     factory.Binary(IrBinaryOperator.Equal,
                         factory.Binary(IrBinaryOperator.Multiply, x, y), factory.Integer(x.Type, product)),
                     factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, p)),
                     factory.Binary(IrBinaryOperator.NotEqual, x, factory.Integer(x.Type, q))
-                };
+                );
                 // Manually constructed IR/Smt API lemmas use compiler-decoded
                 // bindings. They are not compiler-produced contract clauses.
                 var assumptions = domain.AddRange(constraints.Select(predicate =>

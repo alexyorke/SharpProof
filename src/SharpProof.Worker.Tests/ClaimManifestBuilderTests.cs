@@ -990,7 +990,7 @@ public sealed class ClaimManifestBuilderTests
                 """;
         }
         var identities = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var codeUnit in new[] { 0xD800, 0xD801, 0xDC00, 0xDFFF })
+        foreach (var codeUnit in ImmutableArray.Create(0xD800, 0xD801, 0xDC00, 0xDFFF))
         {
             var first = Build(("First.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
             var repeated = Build(("Renamed.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
@@ -1375,10 +1375,10 @@ public sealed class ClaimManifestBuilderTests
         Assert.That(target.Claims, Has.Length.EqualTo(2));
         Assert.That(
             target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Placement)),
-            Is.EqualTo(new ContractClausePlacement?[] {
+            Is.EqualTo(ImmutableArray.Create<ContractClausePlacement?>(
                 ContractClausePlacement.ValidPrologue,
                 ContractClausePlacement.Conditional
-            }));
+            )));
         Assert.That(
             binding.Failure,
             Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
@@ -2189,7 +2189,7 @@ public sealed class ClaimManifestBuilderTests
                 wrongAllowed.Constraint.AllowedExceptionTypes,
                 Is.EqualTo([integerIdentity]));
             // The compiler only declares these claims; Z3 decides them.
-            Assert.That(new[] { wrongAllowed, exactAllowed, derivedAllowed, wrongCatch, exactCatch }
+            Assert.That(ImmutableArray.Create(wrongAllowed, exactAllowed, derivedAllowed, wrongCatch, exactCatch)
                 .Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
@@ -2357,15 +2357,14 @@ public sealed class ClaimManifestBuilderTests
             var startInfo = ProcessRunner.CreateStartInfo(
                 Environment.CurrentDirectory,
                 "dotnet",
-                new[]
-                {
+                ImmutableArray.Create(
                     "vstest",
                     typeof(ClaimManifestBuilderTests).Assembly.Location,
                     "/TestCaseFilter:FullyQualifiedName=" +
                     typeof(ClaimManifestBuilderTests).FullName + "." +
                     nameof(
                         DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery)
-            });
+                ));
             startInfo.Environment[childVariable] = "1";
             using var temporary = new TempDirectory("nested-callable-stack-");
             var marker = Path.Combine(temporary.FullName, "marker");

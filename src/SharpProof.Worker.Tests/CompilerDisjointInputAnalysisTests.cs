@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -70,7 +71,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         }
         finally { runtime.Unload(); }
         var pairs = CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken);
-        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(new[] { (0, 2), (1, 2) }));
+        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(ImmutableArray.Create((0, 2), (1, 2))));
         foreach (var pair in pairs)
         {
             Assert.That(compilation.ClassifyConversion(method.Parameters[pair.Left].Type, method.Parameters[pair.Right].Type).Exists, Is.False);

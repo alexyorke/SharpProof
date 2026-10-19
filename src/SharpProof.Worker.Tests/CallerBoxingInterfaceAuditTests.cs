@@ -190,7 +190,7 @@ public sealed class CallerBoxingInterfaceAuditTests
             var nullableMethod = type.GetMethod("TargetNullable")!;
             var doubleControlMethod = type.GetMethod("ControlDouble")!;
             var nullableControlMethod = type.GetMethod("ControlNullable")!;
-            var methods = new[] { doubleMethod, nullableMethod, doubleControlMethod, nullableControlMethod, boundaryMethod };
+            var methods = ImmutableArray.Create(doubleMethod, nullableMethod, doubleControlMethod, nullableControlMethod, boundaryMethod);
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
                 JsonSerializer.Serialize(methods.Select(DescribeIl).ToImmutableArray(), WorkerProtocolJson.SharedOptions));
             foreach (var method in methods)

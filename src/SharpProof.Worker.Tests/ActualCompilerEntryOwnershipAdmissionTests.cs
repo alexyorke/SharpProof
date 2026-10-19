@@ -40,7 +40,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
             Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         }
         // Wrong actual owner at the raw validator only: no preparation constructed, rebound or enrolled.
-        foreach (var (target, other) in new[] { (targets[0], targets[1]), (targets[1], targets[0]) })
+        foreach (var (target, other) in ImmutableArray.Create((targets[0], targets[1]), (targets[1], targets[0])))
         {
             var exception = Assert.Throws<ArgumentException>(new Action(() =>
                 TotalCallableVerifier.ValidateEntryOwner(target, other.TotalEntry!)));

@@ -299,10 +299,10 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Assert.That(attribute.ConstructorArguments.Single().Kind, Is.EqualTo(TypedConstantKind.Primitive));
         }
         Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
-            Is.EqualTo(settings.Official ? Array.Empty<string>() : new[] { settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT" }));
+            Is.EqualTo(settings.Official ? ImmutableArray<string>.Empty : ImmutableArray.Create(settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT")));
         Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsOfficial)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
-            Is.EqualTo(settings.Official || settings.Mixed ? new[] { settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT" }
-                : Array.Empty<string>()));
+            Is.EqualTo(settings.Official || settings.Mixed ? ImmutableArray.Create(settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT")
+                : ImmutableArray<string>.Empty));
         Assert.That(target.IsStatic && target.Parameters.Single().RefKind == RefKind.None, Is.True);
         Assert.That(target.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(target.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));

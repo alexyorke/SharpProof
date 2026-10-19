@@ -39,7 +39,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(1));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row, row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row, row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -57,7 +57,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(2));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, one,
-            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -98,11 +98,11 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetString(type.Namespace), Is.EqualTo("SharpProof.Attributes"));
         Assert.That(reader.GetString(type.Name), Is.EqualTo("PositiveAttribute"));
         Assert.That(reader.GetString(constructor.Name), Is.EqualTo(".ctor"));
-        Assert.That(reader.GetBlobBytes(constructor.Signature), Is.EqualTo(new byte[] { 0x20, 0, 1 }));
+        Assert.That(reader.GetBlobBytes(constructor.Signature), Is.EqualTo(ImmutableArray.Create<byte>(0x20, 0, 1)));
         Assert.That(MetadataTokens.GetToken(attribute.Constructor), Is.Not.EqualTo(expectedConstructor.MetadataToken));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
+            ImmutableArray.Create(row), TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
