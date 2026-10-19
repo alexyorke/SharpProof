@@ -3056,3 +3056,13 @@ Arguments untouched. Nested corpus groups become immutable vectors, with initial
 vector guards replacing now-inapplicable null checks. Validate complete Fuzz tests and
 relevant Gates tests plus required corpus controls; keep embedded source bytes intact.
 Status: open before edits.
+
+IMM-M092: ContractApiIdentityResolver's unreadable-payload reason is assigned only
+while its private constructor checks trusted contract metadata. Make the property
+get-only; return the payload policy's reason through an out parameter and assign it
+once after the existing short-circuited shape check. Initialize the local to null so
+absent/source/untrusted candidates still leave no unreadable reason. Preserve metadata
+resolution, guard order, exact diagnostic text and cache publication. Atomic concurrent
+ImmutableInterlocked caches remain immutable roots. Validate resolver/rebuild/malformed,
+owned metadata lifetime and authentic implicit-reference policy tests.
+Status: open before edits.
