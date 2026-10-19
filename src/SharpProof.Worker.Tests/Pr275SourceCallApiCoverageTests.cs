@@ -12,6 +12,52 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275SourceCallApiCoverageTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ConstructorFramesAdmitScalarFieldBodies(bool conditional)
+    {
+        var body = conditional ? "if(Count==0) Count=2;" : "Count=2;";
+        var compilation = TestCompilation.Create("ConstructorFrameControl", ("Subject.cs",
+            "public class Node { public int Count; public Node() { " + body + " } } public static class Subject { public static Node Caller() => new Node(); }"));
+        var caller = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Caller").OfType<IMethodSymbol>().Single();
+        var constructor = compilation.GetTypeByMetadataName("Node")!.InstanceConstructors.Single();
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
+        ContractBindingFailure? failure = null;
+        bool Prepare(TotalLoweringContext frame)
+        {
+            ArgumentNullException.ThrowIfNull(frame);
+            var binding = new ContractBinder(compilation, frame.Factory).BindTotalRequires(frame, TestContext.CurrentContext.CancellationToken);
+            failure = binding.Failure;
+            return binding.IsSuccess;
+        }
+        var session = new TotalSourceCallSession(compilation, Prepare, null, TestContext.CurrentContext.CancellationToken);
+        var prepared = session.TryPrepare(context, constructor, null, [], out var frame, out var graph, constructorInitializers: true);
+        Assert.That(prepared, Is.True, "Constructor preparation failed: " + failure);
+        Assert.That(frame, Is.Not.Null);
+        Assert.That(graph, Is.Not.Null);
+        var lowered = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph!, frame!, Prepare, TestContext.CurrentContext.CancellationToken);
+        Assert.That(lowered.IsExact, Is.True, lowered.Classification.ToString());
+        var approximate = false;
+        foreach (var block in lowered.Program.Blocks)
+        {
+            foreach (var instruction in block.Instructions)
+            { approximate |= instruction is IrHavocInstruction { Origin: IrHavocOrigin.Approximation }; }
+        }
+        Assert.That(approximate, Is.False);
+        var syntax = caller.DeclaringSyntaxReferences.Single().GetSyntax(TestContext.CurrentContext.CancellationToken);
+        var callerGraph = SharpProof.Compiler.Semantics.TotalBodyLowering.CreateGraph(syntax, caller,
+            compilation.GetSemanticModel(syntax.SyntaxTree), TestContext.CurrentContext.CancellationToken);
+        var callerContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
+        var callerLowered = SharpProof.Compiler.Semantics.TotalBodyLowering.Lower(compilation, callerGraph!, callerContext,
+            TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
+        Assert.That(callerLowered.IsExact, Is.True, callerLowered.Classification.ToString());
+        foreach (var block in callerLowered.Program.Blocks)
+        {
+            foreach (var instruction in block.Instructions)
+            { Assert.That(instruction is IrHavocInstruction { Origin: IrHavocOrigin.Approximation }, Is.False); }
+        }
+    }
+
     private static readonly CSharpCompilation Compilation = TestCompilation.Create(
         "Pr275SourceCallApi", ("Subject.cs", """
             internal static class Subject {

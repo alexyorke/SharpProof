@@ -1503,8 +1503,8 @@ Truncating conversions without already-folded typed facts remain unsupported.
 Initial native controls passed default reference reads, default/updated scalar
 extents, Boolean guards, source field initializers, backing fields, aliases and
 separate instances. A constructor-body control exposed approximation at new Node()
-before allocation; it is an explicit Unknown boundary, not a source of invented
-default facts. Broader constructor/call lifetime admission remains required.
+before allocation; the constructor-receiver follow-up below resolves that
+boundary. Broader constructor/call lifetime admission remains required.
 The scalar overwrite control prevents an unknown input from reusing default zero.
 
 All 682 IR tests, 2122 frontend tests and 1416 analyzer tests passed, along with
@@ -1527,3 +1527,50 @@ Published replay-head 5567c1bb0 passed all four coverage shards, then reported
 3338/3518 changed trusted lines (94.88%), with 180 gaps against the unchanged
 100% floor. That improves on the preceding 202 gaps but predates field-default
 analysis and cannot qualify this checkpoint. Fresh exact-head CI remains required.
+
+## Fresh constructor receivers and initialization effects
+
+Direct constructor frames already lowered scalar stores and conditional bodies
+exactly. Caller lowering nevertheless emitted an approximation for the receiver
+before evaluating arguments, then replaced that receiver with the allocation.
+Construction now binds only the fresh allocated receiver, after arguments and
+before the constructor body. Ordinary instance calls retain their evaluated
+receiver and null/freshness rules.
+
+Native lifetime controls cover constructor scalar stores, guards over CLR
+defaults, field initializers followed by constructor updates, and constant
+constructor arguments. They check both exact bounds and independently replayed
+violations. An unconstrained constructor argument must still produce Unknown
+without partial numbers or used metadata assumptions.
+
+The first receiver-fix verification passed 302 native/source-call cases, all
+2122 frontend cases, and four actual packaged constructor lifetime proof and
+refutation cases. The package controls exercise retained output and auxiliary
+memory with strict/advisory diagnostics and result evidence.
+
+Published field-default checkpoint 36c649ad9 did not reach aggregate coverage:
+the semantic-worker shard failed six existing purity/synchronization controls.
+CLR zero stores had ordinary observable write sites. Zero initialization now
+uses the existing compiler-owned fresh-write marker, before any source
+initializer or constructor can publish the object. Source initializer and body
+writes retain their previous classification. All 40 affected purity, ownership,
+constructor, synchronization and independent runtime controls passed after this
+correction, including escape/rebind controls. The canonical-main failure at the
+published checkpoint contains the same six regressions. Its package/release run
+passed. No coverage qualification or full-roadmap completion is claimed.
+
+This correction uses existing receiver assignments, field stores and compiler
+fresh-write sites. Wire versions remain unchanged; worker identities include the
+frontend and other SharpProof companion assemblies, invalidating prior cached
+lowering results. Final canonical formatting, repository quality/compatibility,
+documentation generation and all 724 local links passed. The final frontend
+regression run again passed all 2122 tests.
+
+The final packaged rerun passed all four constructor cases after the fresh-write
+correction, bringing the cumulative validated lifetime package controls to 42.
+Final checkpoint Markdown and spelling checks passed as well.
+
+The full final worker suite passed all 6595 cases with no failures. This includes
+the native lifetime, purity, synchronization, replay, artifact, protocol and
+consumer-result regressions. Fresh exact-head CI remains required after publishing
+this checkpoint; the unchanged coverage floor and remaining C/E/F work stay open.

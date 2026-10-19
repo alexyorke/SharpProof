@@ -516,6 +516,10 @@ the value within the target range; unsupported conversions remain Unknown.
 
 A fresh default reference read can therefore prove retained bytes of zero while
 the containing object's auxiliary storage is still charged. Reads without a known
-compiler store, opaque constructions and unproved control remain Unknown. Some
-explicit constructor bodies still lower to approximation before allocation; this
-phase does not fabricate defaults or numerical evidence for those constructions.
+compiler store, opaque constructions and unproved control remain Unknown.
+Admitted direct constructors bind their fresh receiver after evaluating arguments
+and allocating storage. Finite scalar stores and guards in their bodies can
+determine subsequent extents; unconstrained constructor inputs remain Unknown.
+CLR zero stores carry the compiler's fresh-write marker because they precede any
+source operation that can publish the object. This preserves ordinary purity
+analysis while retaining the stores for memory analysis and replay.

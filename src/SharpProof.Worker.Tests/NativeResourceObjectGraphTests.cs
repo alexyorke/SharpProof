@@ -7,6 +7,10 @@ namespace SharpProof.Worker.Test;
 public sealed partial class NativeResourceContractTests
 {
     [TestCase("public class Node { public int Count; }", "var root=new Node(); return new int[root.Count];", 24, 24)]
+    [TestCase("public class Node { public int Count; public Node() { Count=2; } }", "var root=new Node(); return new int[root.Count];", 24, 32)]
+    [TestCase("public class Node { public int Count; public Node() { if(Count==0) Count=2; } }", "var root=new Node(); return new int[root.Count];", 24, 32)]
+    [TestCase("public class Node { public int Count=1; public Node() { if(Count==1) Count=3; } }", "var root=new Node(); return new int[root.Count];", 24, 40)]
+    [TestCase("public class Node { public int Count; public Node(int count) { Count=count; } }", "var root=new Node(3); return new int[root.Count];", 24, 40)]
     [TestCase("public class Node { public int Count; }", "var root=new Node(); root.Count=3; return new int[root.Count];", 24, 40)]
     [TestCase("public class Node { public int Count=2; }", "var root=new Node(); return new int[root.Count];", 24, 32)]
     [TestCase("public class Node { public int Count; }", "var root=new Node(); var alias=root; alias.Count=3; return new int[root.Count];", 24, 40)]
@@ -73,18 +77,16 @@ public sealed partial class NativeResourceContractTests
     }
 
     [Test]
-    public async Task OpaqueConstructorCannotInventDefaultFieldEvidence()
+    public async Task InputConstructorCannotInventDefaultFieldEvidence()
     {
-        var source = "using SharpProof.Attributes; public class Node { public int Count; public Node() { if(Count==0) Count=2; } } public static class C { " +
-            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static int[] Target() { var root=new Node(); return new int[root.Count]; } }";
+        var source = "using SharpProof.Attributes; public class Node { public int Count; public Node(int count) { Count=count; } } public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,1000)] public static int[] Target(int n) { var root=new Node(n); return new int[root.Count]; } }";
         var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
-        Assert.That(target.Total!.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .Any(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction is IrHavocInstruction { Origin: IrHavocOrigin.Approximation }), Is.True);
     }
 
     [TestCase("return new string('x', 0);", 0, 0)]

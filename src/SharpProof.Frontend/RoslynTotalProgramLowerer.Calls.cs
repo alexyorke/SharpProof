@@ -141,7 +141,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     { continue; }
                     SpendRegion();
                     var value = CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Type(field.Type));
-                    if (!_expressions.StoreInitializer(field, created, creation, value, current))
+                    if (!_expressions.StoreInitializer(field, created, creation, value, current, zeroInitialization: true))
                     { throw new RegionIncompleteException(); }
                 }
             }
@@ -288,7 +288,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         // The callee's `this` is the receiver as evaluated before the
         // arguments; an unmodeled caller `this` is unknown.
-        if (callee.Receiver is { } self)
+        // Construction binds its fresh receiver after argument evaluation and
+        // allocation below; it has no caller receiver to approximate here.
+        if (constructedReceiver == null && callee.Receiver is { } self)
         {
             if ((receiver ?? _context.ReceiverValue()) is { } value)
             { _builder.Assign(block, site, self.Entry, Bridge(value, _context.Factory.GetVariableInfo(self.Entry).Type)); }
