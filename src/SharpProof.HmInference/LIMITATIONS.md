@@ -15,7 +15,7 @@ The README describes today's supported subset; it is not the completion spec.
 | Complete project loading | Open: CLI compiles loose files with runtime references |
 | Instance and generic root methods | Implemented: declaration regression checks |
 | Attributes, optional/ref/out/in/params root parameters | Implemented: declaration regression checks |
-| Nullable types, null/default/coalescing/conditional access | Verified: reference/value wrappers, class/struct constraints and conservative nullable operations; imported unconstrained nullable T? schemes remain open |
+| Nullable types, null/default/coalescing/conditional access | Verified: reference/value wrappers, class/struct constraints, conservative nullable operations and retained annotations on existing type parameters; imported unconstrained nullable T? schemes remain open |
 | Generic constraints and name allocation | Existing constraints retained and names reserved; class/class?/struct/unmanaged/notnull/new(), interface, base and dependent constraints imported from calls and constructed signature types; constraint simplification and unsupported type shapes remain open; new compiler warnings reject candidates |
 | Task/ValueTask async roots and await | Verified: generic/non-generic roots, nullable results and preserved awaiter bindings; IDE-fix runtime checks cover suspension, cancellation and faults |
 | Void and async void roots; async/anonymous lambdas | Implemented: delegate Invoke signatures, per-lambda async contexts and explicit return types; runtime code-fix checks cover captures, callbacks, suspension, faults and cancellation |
@@ -28,7 +28,7 @@ The README describes today's supported subset; it is not the completion spec.
 | Explicit, constant and uninitialized locals | Verified: declared types and initializer/assignment conversions retained; runtime checks cover widening and boxing identity |
 | Boolean condition conversions | Verified: primitive Boolean inference and retained user-defined conversion/true-operator types, including loops, conditional expressions, guards and filters |
 | Declaration/type/property/list patterns | Open |
-| Custom Deconstruct methods | Open: tuple deconstruction is implemented; nominal and extension Deconstruct remain open |
+| Custom Deconstruct methods | Verified: instance, generic extension, base/interface projections, nested/mixed targets, assignment results and sync/async foreach; member/indexer stores and conversions retained. Implicit bindings/conversions are rechecked across supplied files; IDE-fix runtime checks compare evaluation/setter order |
 | Field/property/indexer stores and object/collection initializers | Verified: conservative receiver/value types, overload/conversion tests and runtime probe; anonymous objects and record with expressions remain open |
 | Void/custom delegates and method groups | Implemented: Action and generic/non-generic delegates, static/instance method groups, conservative variance/extension conversions and cross-file binding checks; ref delegates, attributed/modified lambdas and expression trees remain open |
 | User operators/conversions and non-array params collections | Open |

@@ -241,6 +241,46 @@ public static partial class Inference
             return BuildConstraints(variables);
         }
 
+        private string CompilerWarningKey(Diagnostic warning, Compilation compilation)
+        {
+            if (warning is null)
+            { throw new ArgumentNullException(nameof(warning)); }
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            var treeOrdinal = 0;
+            foreach (var candidate in compilation.SyntaxTrees)
+            {
+                if (ReferenceEquals(candidate, warning.Location.SourceTree))
+                { break; }
+                treeOrdinal++;
+            }
+            var prefix = warning.Id + ":" + treeOrdinal + ":" + warning.Location.SourceTree?.FilePath + ":";
+            if (warning.Location.IsInSource && warning.Location.SourceTree is SyntaxTree tree)
+            {
+                var root = tree.GetRoot(cancellationToken);
+                var span = warning.Location.SourceSpan;
+                var node = root.FindNode(span, getInnermostNodeForTie: true);
+                foreach (var owner in node.AncestorsAndSelf())
+                {
+                    if (owner is not MethodDeclarationSyntax method)
+                    { continue; }
+                    SyntaxNode? body = method.Body is not null ? method.Body : method.ExpressionBody?.Expression;
+                    if (body is not null && body.FullSpan.Contains(span))
+                    {
+                        var ordinal = 0;
+                        foreach (var declaration in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+                        {
+                            if (declaration.SpanStart == method.SpanStart)
+                            { return prefix + "body:" + ordinal + ":" + (span.Start - body.FullSpan.Start) + ":" + span.Length; }
+                            ordinal++;
+                        }
+                    }
+                    break;
+                }
+            }
+            return prefix + warning.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private bool IntroducesCompilerWarnings(Compilation changed)
         {
             if (changed is null)
@@ -250,7 +290,7 @@ public static partial class Inference
             {
                 if (warning.Severity == DiagnosticSeverity.Warning)
                 {
-                    var key = warning.Id + ":" + warning.Location.SourceTree?.FilePath + ":" + warning.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
+                    var key = CompilerWarningKey(warning, model.Compilation);
                     existing.TryGetValue(key, out var count);
                     existing[key] = count + 1;
                 }
@@ -259,7 +299,7 @@ public static partial class Inference
             {
                 if (warning.Severity == DiagnosticSeverity.Warning)
                 {
-                    var key = warning.Id + ":" + warning.Location.SourceTree?.FilePath + ":" + warning.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
+                    var key = CompilerWarningKey(warning, changed);
                     if (!existing.TryGetValue(key, out var count) || count == 0)
                     { return true; }
                     existing[key] = count - 1;

@@ -102,7 +102,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Break/continue and traditional switch | Track each exit separately; consume it at the correct loop/switch |
 | Tuple array foreach deconstruction | Bind nested tuple elements, discards and explicit types |
 | Checked/unchecked blocks and throws | Preserve overflow contexts and treat throws as nonreturning exits |
-| Tuple deconstruction declarations | Infer nested tuple bindings and discards; retain explicit element types |
+| Tuple/custom deconstruction | Infer nested declarations, mixed assignments and discards; retain conversions and assignment-expression tuple results |
 | Explicit/target-typed construction and initializers | Preserve constructor/indexer/Add selection; pin initializer source types and support nested members |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
 | Conditionals, return branches and guard returns | Unify results |
@@ -157,9 +157,14 @@ infer mutually recursive C# method groups or fully simplify arbitrary combinatio
 of generic constraints. Imported unconstrained nullable `T?`
 schemes are still unsupported. See [the completion ledger](LIMITATIONS.md).
 
-Tuple deconstruction supports declarations, reassignment and mixed targets for
-local/parameter identifiers and discards. Custom Deconstruct methods (including
-nested ones) remain unsupported. Ref constructors, anonymous objects, record with
+Tuple and custom deconstruction support declarations, reassignment, mixed targets,
+discards, member/indexer stores and nested instance/extension Deconstruct methods.
+Generic receivers retain base/interface substitutions. Assignment expressions
+return their converted target tuples. Selected implicit methods and conversions are
+rechecked across supplied files, including sync/async foreach deconstruction.
+Existing body warnings are matched by ID and body-relative source location;
+warnings at new sites reject a candidate even if that warning ID already exists.
+Ref constructors, anonymous objects, record with
 expressions, FormattableString and custom interpolation handlers
 are also unsupported. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.

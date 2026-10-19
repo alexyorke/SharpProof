@@ -1,0 +1,31 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public sealed class DeconstructionBox<T>
+{
+    public T Value;
+    public DeconstructionBox(T value) { Value=value; }
+}
+public static class DeconstructionSamples
+{
+    public static int First(KeyValuePair<int,bool> pair) { var(value,flag)=pair;return value; }
+    public static string Nested(KeyValuePair<int,KeyValuePair<string,bool>> pair) { var(first,(value,flag))=pair;return value; }
+    public static (int,bool) Assign(KeyValuePair<int,bool> pair,int value,bool flag) => (value,flag)=pair;
+    public static int Last(IEnumerable<KeyValuePair<int,bool>> pairs,int seed)
+    {
+        foreach(var(value,flag) in pairs) seed=value;
+        return seed;
+    }
+    public static async Task<int> LastAsync(IAsyncEnumerable<KeyValuePair<int,bool>> pairs,int seed)
+    {
+        await foreach(var(value,flag) in pairs) seed=value;
+        return seed;
+    }
+    public static int Extension(DeconstructionBox<int> box) { var(value,flag)=box;return value; }
+    public static void Deconstruct<T>(this DeconstructionBox<T> box,out T value,out bool flag)
+    {
+        value=box.Value;
+        flag=true;
+    }
+}

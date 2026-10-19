@@ -325,6 +325,8 @@ public static partial class Inference
                         != (after.ReducedFrom ?? after).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
                     { return new(symbol.Name, "Rejected", "Generalization changes a selected method group overload."); }
                 }
+                if (!PreservesDeconstructionBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes a deconstruction binding or conversion."); }
                 var originalCreations = beforeRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
                 var changedCreations = afterRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
                 for (var i = 0; i < originalCreations.Length; i++)
@@ -732,14 +734,9 @@ public static partial class Inference
                         if (assignment.Left is TupleExpressionSyntax or DeclarationExpressionSyntax)
                         {
                             var original = model.GetTypeInfo(assignment.Right, cancellationToken).Type;
-                            if (original is not INamedTypeSymbol { IsTupleType: true })
-                            {
-                                throw new InferenceException("Only tuple-based deconstruction is supported.");
-                            }
-
-                            var assignedTuple = Expression(assignment.Right);
-                            BindDeconstruction(assignment.Left, assignedTuple, original);
-                            return assignedTuple;
+                            if (original is null)
+                            { throw new InferenceException("Unresolved deconstruction source."); }
+                            return BindDeconstruction(assignment.Left, Expression(assignment.Right), original, AssignmentDeconstructionBinding(model, assignment));
                         }
 
                         return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
@@ -1109,8 +1106,12 @@ public static partial class Inference
             return CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type!);
         }
 
-        private void BindDeconstruction(ExpressionSyntax target, HmType value, ITypeSymbol original)
+        private HmType BindDeconstruction(ExpressionSyntax target, HmType value, ITypeSymbol original, DeconstructionInfo /* SPINT001: all values valid - Default metadata supports tuple binding; unresolved custom bindings are reported explicitly. */ info = default)
         {
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
             if (value is null)
             {
                 throw new global::System.ArgumentNullException(nameof(value));
@@ -1133,37 +1134,28 @@ public static partial class Inference
                         { HmType.Unify(value, CSharpTypes.Rigid(declaredType)); }
                     }
 
-                    BindDesignation(declaration.Designation, value, original);
-                    break;
+                    return BindDesignation(declaration.Designation, value, original, info);
                 case TupleExpressionSyntax tuple:
-                    var source = original as INamedTypeSymbol;
-                    if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Arguments.Count)
-                    {
-                        throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
-                    }
-
-                    var elements = tuple.Arguments.Select(_ => HmType.Variable()).ToArray();
-                    HmType.Unify(value, new("Tuple", elements));
-                    for (var i = 0; i < elements.Length; i++)
-                    {
-                        BindDeconstruction(tuple.Arguments[i].Expression, elements[i], source.TupleElements[i].Type);
-                    }
-
-                    break;
-                case IdentifierNameSyntax identifier:
-                    if (model.GetOperation(identifier, cancellationToken) is not IDiscardOperation)
-                    {
-                        AssignValue(identifier, value, original);
-                    }
-
-                    break;
+                    var parts = DeconstructionParts(value, original, info, tuple.Arguments.Count);
+                    var assigned = new HmType[parts.Values.Length];
+                    for (var i = 0; i < assigned.Length; i++)
+                    { assigned[i] = BindDeconstruction(tuple.Arguments[i].Expression, parts.Values[i], parts.Types[i], parts.Steps[i]); }
+                    return new("Tuple", assigned);
+                case IdentifierNameSyntax identifier when model.GetOperation(identifier, cancellationToken) is IDiscardOperation:
+                    return value;
+                case IdentifierNameSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax:
+                    return AssignValue(target, value, original);
                 default:
                     throw new InferenceException("Mixed declarations and assignments in deconstruction are unsupported.");
             }
         }
 
-        private void BindDesignation(VariableDesignationSyntax designation, HmType value, ITypeSymbol original)
+        private HmType BindDesignation(VariableDesignationSyntax designation, HmType value, ITypeSymbol original, DeconstructionInfo /* SPINT001: all values valid - Default metadata supports tuple binding; unresolved custom bindings are reported explicitly. */ info = default)
         {
+            if (designation is null)
+            { throw new ArgumentNullException(nameof(designation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
             if (value is null)
             {
                 throw new global::System.ArgumentNullException(nameof(value));
@@ -1174,24 +1166,15 @@ public static partial class Inference
             {
                 case SingleVariableDesignationSyntax variable:
                     environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, value);
-                    break;
+                    return value;
                 case DiscardDesignationSyntax:
-                    break;
+                    return value;
                 case ParenthesizedVariableDesignationSyntax tuple:
-                    var source = original as INamedTypeSymbol;
-                    if (source is not { IsTupleType: true } || source.TupleElements.Length != tuple.Variables.Count)
-                    {
-                        throw new InferenceException("Custom nested Deconstruct calls are unsupported.");
-                    }
-
-                    var elements = tuple.Variables.Select(_ => HmType.Variable()).ToArray();
-                    HmType.Unify(value, new("Tuple", elements));
-                    for (var i = 0; i < elements.Length; i++)
-                    {
-                        BindDesignation(tuple.Variables[i], elements[i], source.TupleElements[i].Type);
-                    }
-
-                    break;
+                    var parts = DeconstructionParts(value, original, info, tuple.Variables.Count);
+                    var assigned = new HmType[parts.Values.Length];
+                    for (var i = 0; i < assigned.Length; i++)
+                    { assigned[i] = BindDesignation(tuple.Variables[i], parts.Values[i], parts.Types[i], parts.Steps[i]); }
+                    return new("Tuple", assigned);
                 default:
                     throw new InferenceException("Unsupported deconstruction designation.");
             }

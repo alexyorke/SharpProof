@@ -333,6 +333,8 @@ internal static class Program
         passed += await EnumerationRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ControlFlowChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await ControlFlowRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await DeconstructionChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await DeconstructionRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += BindingChecks.Run(cancellationToken);
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

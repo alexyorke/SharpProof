@@ -154,9 +154,8 @@ public static partial class Inference
                 }
                 else if (loop is ForEachVariableStatementSyntax deconstructed)
                 {
-                    if (info.ElementType is not INamedTypeSymbol { IsTupleType: true })
-                    { throw new InferenceException("Custom foreach Deconstruct methods are unsupported."); }
-                    BindDeconstruction(deconstructed.Variable, element, info.ElementType);
+                    BindDeconstruction(deconstructed.Variable, element, info.ElementType!, model.GetDeconstructionInfo(deconstructed));
+
                 }
                 return LoopFlow(Branch(loop.Statement));
             });

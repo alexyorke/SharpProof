@@ -12,6 +12,7 @@
     <Compile Include="../SharpProof.HmInference/NullableAsync.cs" Link="NullableAsync.cs" />
     <Compile Include="../SharpProof.HmInference/DelegateInference.cs" Link="DelegateInference.cs" />
     <Compile Include="../SharpProof.HmInference/Enumeration.cs" Link="Enumeration.cs" />
+    <Compile Include="../SharpProof.HmInference/Deconstruction.cs" Link="Deconstruction.cs" />
     <Compile Include="../SharpProof.HmInference/StructuredFlow.cs" Link="StructuredFlow.cs" />
     <Compile Include="../SharpProof.HmInference/ConstraintRules.cs" Link="ConstraintRules.cs" />
     <Compile Include="../SharpProof.HmInference/CSharpTypes.cs" Link="CSharpTypes.cs" />

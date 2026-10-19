@@ -48,7 +48,7 @@ internal static class CSharpTypes
             {
                 throw new InferenceException("Imported unconstrained nullable type parameters are unsupported.");
             }
-            return new(Display(type));
+            return new(Display(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)));
         }
         if (type is ITypeParameterSymbol parameter && variables is not null && variables.TryGetValue(parameter, out var variable))
         {
@@ -146,6 +146,9 @@ internal static class CSharpTypes
         }
 
         inferred = inferred.Root;
+        if (declared is ITypeParameterSymbol { NullableAnnotation: NullableAnnotation.Annotated }
+            && inferred.Name == Display(declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated)))
+        { return Display(declared); }
         if (inferred.Name == NullableReference)
         {
             return Render(inferred.Arguments[0], declared.WithNullableAnnotation(NullableAnnotation.NotAnnotated), variables) + "?";

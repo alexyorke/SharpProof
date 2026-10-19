@@ -28,7 +28,7 @@ internal static class ExitChecks
             ("ForeachDeconstruct", "static int M((int,bool)[] xs,int seed) { foreach(var (value,flag) in xs) seed=value; return seed; }", "Suggestion", "T1 M<T1, T2>((T1, T2)[] xs, T1 seed)"),
             ("ForeachDeconstructNested", "static string M((int,(bool,string))[] xs,string seed) { foreach(var (_,(_,text)) in xs) seed=text; return seed; }", "Suggestion", "T3 M<T1, T2, T3>((T1, (T2, T3))[] xs, T3 seed)"),
             ("ForeachDeconstructTyped", "static int M((int,bool)[] xs,int seed) { foreach((int value,bool flag) in xs) seed=value; return seed; }", "Concrete", null),
-            ("ForeachCustomDeconstruct", "static int M(System.Collections.Generic.KeyValuePair<int,bool>[] xs,int seed) { foreach(var (value,flag) in xs) seed=value; return seed; }", "Skipped", null),
+            ("ForeachCustomDeconstruct", "static int M(System.Collections.Generic.KeyValuePair<int,bool>[] xs,int seed) { foreach(var (value,flag) in xs) seed=value; return seed; }", "Suggestion", "T1 M<T1, T2>(global::System.Collections.Generic.KeyValuePair<T1, T2>[] xs, T1 seed)"),
             ("CheckedStatement", "static int M(int x,bool ignored) { checked { x++; } return x; }", "Suggestion", "int M<T1>(int x, T1 ignored)"),
             ("UncheckedStatement", "static int M(int x,bool ignored) { unchecked { x++; } return x; }", "Suggestion", "int M<T1>(int x, T1 ignored)"),
             ("ThrowGuard", "static int M(bool fail,int x) { if(fail) throw new System.InvalidOperationException(); return x; }", "Suggestion", "T1 M<T1>(bool fail, T1 x)"),
