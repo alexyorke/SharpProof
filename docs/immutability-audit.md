@@ -2481,3 +2481,13 @@ no general extension-method dispatch: replace Dictionary.TryAdd with explicit Co
 then Add on the builder, retaining the original error before publication. Validate real
 third-party regression controls and package-discovery class/case/minimum controls.
 Status: open before edits.
+
+IMM-M063: Coordinator inspected the host-only Invoke-SharpProof.ps1 wrapper. Its
+incremental Docker argument vector currently rebinds arrays with +=; use a scoped
+ImmutableArray<string> builder, append the existing worktree volumes, optional token
+name, service and task arguments in the same order, then materialize the native string[]
+once for Docker splatting. Keep input CLI arguments, Git path discovery, temporary Git
+pointer ownership and cleanup, lint build selection and exit-code propagation unchanged.
+This wrapper must remain host orchestration; all repository validation still runs in the
+canonical Linux amd64 container. Validate through the real worktree-aware layout call.
+Status: open before edits.
