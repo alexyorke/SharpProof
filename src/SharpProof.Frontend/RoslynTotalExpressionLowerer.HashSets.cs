@@ -68,16 +68,18 @@ internal sealed partial class RoslynTotalExpressionLowerer
             block = receiver.Value.Continuation;
         }
         var arguments = creation?.Arguments ?? invocation?.Arguments ?? property!.Arguments;
-        var values = new IrTerm[arguments.Length];
+        var valuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
+        valuesBuilder.Count = arguments.Length;
         foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
         {
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)
             { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
             value = Pin(operation, value);
-            values[argument.Parameter!.Ordinal] = value.Value;
+            valuesBuilder[argument.Parameter!.Ordinal] = value.Value;
             block = value.Continuation;
         }
+        var values = valuesBuilder.ToImmutable();
         var site = _context.Site(operation);
         if (creation != null)
         {
