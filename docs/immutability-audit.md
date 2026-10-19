@@ -3305,4 +3305,11 @@ snapshots. Retain symbol/default comparers, strict AddUnique, overwrite/idempote
 semantics and local order. Preserve add/remove before cache clear, cache clear before
 graph/compilation reassignment, and assumption clear before entry-assumption clear.
 Validate full Frontend and specification reuse/capture/concatenation ownership controls.
+Status: open before edits.IMM-M111: SourceCallFrame.Entry is assigned once at the CFG entry creation point.
+Make it a validated get-only constructor input and pass a frame factory through
+LowerSharedFrame into LowerCore. Invoke it only after the existing entry block creation,
+after cancellation/preflight/model capture and construction limits, retaining _calls.Enter
+and finally Leave, callback bodies, caller budget/continued block order and top-level
+SetEntry behavior. No frame-dependent code runs before that point. Validate composed
+source exception/filter, session reentry, construction-budget and cancellation paths.
 Status: open before edits.
