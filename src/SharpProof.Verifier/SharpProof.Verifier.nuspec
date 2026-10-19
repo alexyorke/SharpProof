@@ -66,7 +66,6 @@
     <file src="$nativeroot$/z3/4.12.2/linux-x64/Microsoft.Z3.dll" target="tools/net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.*.pdb" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.CompilerArtifact.dll" target="tools\net10" />
-    <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Dataflow.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Ir.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Logging.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Host.dll" target="tools\net10" />
