@@ -29,7 +29,7 @@ internal static class CallChecks
             ("ExtensionNamed", "static int M(int x,int y) => x.First(other:y); } static class Extensions { public static T First<T>(this T value,T other) => value;", "Suggestion", "T1 M<T1>(T1 x, T1 y)"),
             ("ExtensionConstraint", "static object M(object x) => x.Identity(); } static class Extensions { public static T Identity<T>(this T value) where T:class => value;", "Suggestion", "T1 M<T1>(T1 x) where T1 : class"),
             ("RefExtension", "static int M(int x) => x.Identity(); } static class Extensions { public static int Identity(this ref int value) => value;", "Concrete", null),
-            ("ParamsCollection", "static int M(int x) => Sum(x); static int Sum(params System.Collections.Generic.List<int> values) => values.Count;", "Skipped", null)
+            ("ParamsCollection", "static int M(int x) => Sum(x); static int Sum(params System.Collections.Generic.List<int> values) => values.Count;", "Concrete", null)
         ];
         var failures = new List<string>();
         var passed = 0;

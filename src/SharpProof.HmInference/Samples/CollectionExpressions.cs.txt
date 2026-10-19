@@ -1,0 +1,14 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+public static class CollectionExpressionSamples
+{
+    private static T First<T>(params List<T> values) => values[0];
+    private static T SpanFirst<T>(params ReadOnlySpan<T> values) => values[0];
+    public static int ParamsList(int value) => First(value, value);
+    public static int ParamsSpan(int value) => SpanFirst(value, value);
+    public static int[] ArrayElements(int value) => [value];
+    public static List<int> ListElements(int value) => [value, value];
+    public static List<int> SpreadElements(int[] values, int last) => [.. values, last];
+    public static IEnumerable<int> InterfaceElements(int value) => [value];
+}

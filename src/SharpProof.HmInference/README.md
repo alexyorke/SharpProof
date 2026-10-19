@@ -87,6 +87,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Feature | Behavior |
 | --- | --- |
 | Local function captures | Infer supported bodies after the enclosing local declarations; retain declared local schemes and propagate capture constraints, async and iterator results |
+| Collection expressions and non-array params | Infer elements through construction, spread enumeration and collection builders; preserve Add/protocol selection and conversions |
 | Anonymous objects and with expressions | Infer internal anonymous property graphs and clone initializer constraints; preserve nominal record/struct types, conversions and selected clone members |
 | Reference calls and delegates | Infer invariant ref/out/in slots, out variables/discards, ref aliases/returns and ref delegate invocation; retain lambda modifiers/attributes and compiler escape checks |
 | Primary-constructor captures | Preserve declared instance storage types while generalizing unrelated method inputs |
@@ -165,8 +166,9 @@ compare original/fixed traces through suspension, empty/full iteration, early
 breaks, body/move/disposal failures and cancellation.
 Generic instance calls preserve receiver substitutions and explicit type arguments.
 
-The adapter skips custom operators, expanded non-array params
-collections, unsupported patterns and other unimplemented syntax. It does not
+The adapter skips custom operators, unsupported patterns and other unimplemented
+syntax. Collection expressions and expanded non-array params are inferred through
+their element and construction protocols. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
 of generic constraints. See [the completion ledger](LIMITATIONS.md).
 

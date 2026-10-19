@@ -293,6 +293,8 @@ public static partial class Inference
                 var afterRoot = afterTree.GetRoot(cancellationToken);
                 if (!PreservesForEachBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes the selected enumeration protocol or implicit await."); }
+                if (!PreservesCollectionBindings(beforeRoot, afterRoot, beforeModel, afterModel))
+                { return new(symbol.Name, "Rejected", "Generalization changes collection construction, Add or spread protocol selection."); }
                 var beforeAwaits = beforeRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
                 var afterAwaits = afterRoot.DescendantNodes().OfType<AwaitExpressionSyntax>().ToArray();
                 for (var i = 0; i < beforeAwaits.Length; i++)
@@ -893,6 +895,8 @@ public static partial class Inference
                     }
 
                     return CSharpTypes.Rigid(createdArray);
+                case CollectionExpressionSyntax collectionSyntax:
+                    return CollectionExpression(model.GetOperation(collectionSyntax, cancellationToken) as ICollectionExpressionOperation ?? throw new InferenceException("Unresolved collection expression."));
                 case AnonymousObjectCreationExpressionSyntax anonymous:
                     var anonymousType = model.GetTypeInfo(anonymous, cancellationToken).Type as INamedTypeSymbol
                         ?? throw new InferenceException("Unresolved anonymous object.");
@@ -1459,10 +1463,8 @@ public static partial class Inference
                 if (BindReferenceArgument(argument, expected))
                 { continue; }
 
-                if (parameter.IsParams && argument.ArgumentKind is not ArgumentKind.Explicit and not ArgumentKind.ParamArray)
-                {
-                    throw new InferenceException("Expanded non-array params collections are unsupported.");
-                }
+                if (argument.Value is ICollectionExpressionOperation collection)
+                { CollectionExpression(collection, expected); continue; }
 
                 if (argument.ArgumentKind == ArgumentKind.ParamArray)
                 {
