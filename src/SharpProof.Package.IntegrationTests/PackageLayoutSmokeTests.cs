@@ -288,9 +288,9 @@ public sealed class PackageLayoutSmokeTests
             }
         }
 
-        var failures = new List<string>();
-        var analyzers = new List<DiagnosticAnalyzer>();
-        var generators = new List<ISourceGenerator>();
+        var failuresBuilder = ImmutableArray.CreateBuilder<string>();
+        var analyzersBuilder = ImmutableArray.CreateBuilder<DiagnosticAnalyzer>();
+        var generatorsBuilder = ImmutableArray.CreateBuilder<ISourceGenerator>();
         foreach (var path in ImmutableArray.Create(Path.Combine(
                          analyzerDirectory,
                          "SharpProof.Analyzer.dll"), Path.Combine(
@@ -307,14 +307,17 @@ public sealed class PackageLayoutSmokeTests
             reference.AnalyzerLoadFailed += (_, args) =>
             {
                 System.ArgumentNullException.ThrowIfNull(args);
-                failures.Add(args.ErrorCode + ": " + args.Message);
+                failuresBuilder.Add(args.ErrorCode + ": " + args.Message);
             };
-            analyzers.AddRange(reference.GetAnalyzers(
+            analyzersBuilder.AddRange(reference.GetAnalyzers(
                 LanguageNames.CSharp));
-            generators.AddRange(reference.GetGenerators(
+            generatorsBuilder.AddRange(reference.GetGenerators(
                 LanguageNames.CSharp));
         }
 
+        var failures = failuresBuilder.ToImmutable();
+        var analyzers = analyzersBuilder.ToImmutable();
+        var generators = generatorsBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(failures, Is.Empty);
@@ -334,10 +337,10 @@ public sealed class PackageLayoutSmokeTests
                 Is.EqualTo(1));
             Assert.That(
                 analyzers,
-                Has.Count.EqualTo(2));
+                Has.Length.EqualTo(2));
             Assert.That(
                 generators,
-                Has.Count.EqualTo(1));
+                Has.Length.EqualTo(1));
         }
     }
 
@@ -1545,20 +1548,20 @@ public sealed class PackageLayoutSmokeTests
             workspace.ConsumerDirectory,
             feed.Source,
             offlineFrameworkSource);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "restore",
             workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
             "--configfile",
             nugetConfig,
-            "-p:NuGetAudit=false"
-        };
+            "-p:NuGetAudit=false"));
         arguments.Add("--packages");
         arguments.Add(workspace.PackageCache);
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
     private static Task<ProcessResult> BuildAnalyzerConsumerAsync(
@@ -1566,42 +1569,42 @@ public sealed class PackageLayoutSmokeTests
         bool runAnalyzers = true)
     {
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "build",
             workspace.ConsumerProject,
             "-c",
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"
-        };
+            "/nodeReuse:false"));
         if (!runAnalyzers)
         {
             arguments.Add("-p:RunAnalyzersDuringBuild=false");
         }
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
-    private static async Task<PackagedAnalyzerItem[]>
+    private static async Task<ImmutableArray<PackagedAnalyzerItem>>
         EvaluatePackagedAnalyzerItemsAsync(
             PackageWorkspace workspace,
             params (string Name, string Value)[] properties)
     {
         System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "--nologo"
-        };
+            "--nologo"));
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
         var evaluation = await RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
         Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
         return GetPackagedAnalyzerItems(evaluation.Output);
     }
@@ -1656,7 +1659,8 @@ public sealed class PackageLayoutSmokeTests
     {
         System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
         System.ArgumentNullException.ThrowIfNull(workspace);
-        var arguments = new List<string> {
+        var arguments = ImmutableArray.CreateBuilder<string>();
+        arguments.AddRange(ImmutableArray.Create<string>(
             "build",
             workspace.ConsumerProject,
             "-t:Rebuild",
@@ -1664,13 +1668,12 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false"
-        };
+            "/nodeReuse:false"));
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
-            [.. arguments]);
+            arguments.ToImmutable());
     }
 
     private static Task<ProcessResult> RebuildProbeAsync(
@@ -2487,13 +2490,33 @@ public sealed class PackageLayoutSmokeTests
     {
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
+        return RunDotNetAsync(workingDirectory, (IEnumerable<string>)arguments);
+    }
+
+    private static Task<ProcessResult> RunDotNetAsync(
+        string workingDirectory,
+        IEnumerable<string> arguments)
+    {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return RunProcessAsync(workingDirectory, "dotnet", arguments);
+    }
+
+    private static Task<ProcessResult> RunProcessAsync(
+        string workingDirectory,
+        string fileName,
+        params string[] arguments)
+    {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(fileName);
+        System.ArgumentNullException.ThrowIfNull(workingDirectory);
+        return RunProcessAsync(workingDirectory, fileName, (IEnumerable<string>)arguments);
     }
 
     private static async Task<ProcessResult> RunProcessAsync(
         string workingDirectory,
         string fileName,
-        params string[] arguments)
+        IEnumerable<string> arguments)
     {
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         System.ArgumentNullException.ThrowIfNull(fileName);
@@ -2525,12 +2548,12 @@ public sealed class PackageLayoutSmokeTests
                 Guid.NewGuid().ToString("N"));
     }
 
-    private static PackagedAnalyzerItem[]
+    private static ImmutableArray<PackagedAnalyzerItem>
         GetPackagedAnalyzerItems(string output)
     {
         System.ArgumentNullException.ThrowIfNull(output);
         using var document = JsonDocument.Parse(output);
-        var result = new List<PackagedAnalyzerItem>();
+        var result = ImmutableArray.CreateBuilder<PackagedAnalyzerItem>();
         foreach (var item in document.RootElement
             .GetProperty("Items")
             .GetProperty("Analyzer")
@@ -2553,7 +2576,7 @@ public sealed class PackageLayoutSmokeTests
                 Path.GetFileName(identity),
                 role));
         }
-        return [.. result];
+        return result.ToImmutable();
     }
 
     private static SourceConsumerAnalyzerItems
@@ -2616,12 +2639,13 @@ public sealed class PackageLayoutSmokeTests
     }
 
     private static void AssertPackagedAnalyzerItems(
-        PackagedAnalyzerItem[] items,
+        ImmutableArray<PackagedAnalyzerItem> items,
         bool includePortable,
         bool includeCollector,
         bool includeCodeFix = false)
     {
-        System.ArgumentNullException.ThrowIfNull(items, nameof(items));
+        if (items.IsDefault)
+        { throw new ArgumentNullException(nameof(items)); }
         Assert.That(
             items.Where(static item => item.Role == "CodeFix").Select(static item => item.FileName),
             includeCodeFix ? Is.EquivalentTo(ExpectedCodeFixEntryFileNames) : Is.Empty);
@@ -3369,13 +3393,15 @@ public sealed class PackageLayoutSmokeTests
         IAnalyzerAssemblyLoader,
         IDisposable
     {
-        private readonly Dictionary<string, string> _dependencies =
-            new(StringComparer.OrdinalIgnoreCase);
+        private ImmutableDictionary<string, string> _dependencies =
+            ImmutableDictionary.Create<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly PackageAnalyzerLoadContext _context;
 
         internal PackageAnalyzerAssemblyLoader()
         {
-            _context = new PackageAnalyzerLoadContext(_dependencies);
+            _context = new PackageAnalyzerLoadContext(name => name is null
+                ? throw new ArgumentNullException(nameof(name))
+                : System.Threading.Volatile.Read(ref _dependencies).TryGetValue(name, out var path) ? path : null);
         }
 
         public void AddDependencyLocation(string fullPath)
@@ -3384,7 +3410,13 @@ public sealed class PackageLayoutSmokeTests
             var name = AssemblyName.GetAssemblyName(fullPath).Name;
             if (!string.IsNullOrWhiteSpace(name))
             {
-                _dependencies[name] = Path.GetFullPath(fullPath);
+                ImmutableInterlocked.Update(ref _dependencies,
+                    static (map, entry) =>
+                    {
+                        System.ArgumentNullException.ThrowIfNull(map);
+                        return map.SetItem(entry.Name, entry.Path);
+                    },
+                    (Name: name, Path: Path.GetFullPath(fullPath)));
             }
         }
 
@@ -3400,10 +3432,10 @@ public sealed class PackageLayoutSmokeTests
         }
 
         private sealed class PackageAnalyzerLoadContext(
-            IReadOnlyDictionary<string, string> dependencies) :
+            Func<string, string?> dependencies) :
             AssemblyLoadContext(isCollectible: true)
         {
-            private readonly IReadOnlyDictionary<string, string> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
+            private readonly Func<string, string?> _guarded_dependencies = dependencies ?? throw new System.ArgumentNullException(nameof(dependencies));
             internal Assembly LoadPackageAssembly(string path)
             {
                 System.ArgumentNullException.ThrowIfNull(path);
@@ -3426,10 +3458,8 @@ public sealed class PackageLayoutSmokeTests
                 {
                     return compilerAssembly;
                 }
-                return identity.Name != null &&
-                    _guarded_dependencies.TryGetValue(identity.Name, out var path)
-                    ? LoadWithoutLock(path)
-                    : null;
+                var path = identity.Name != null ? _guarded_dependencies(identity.Name) : null;
+                return path != null ? LoadWithoutLock(path) : null;
             }
 
             private Assembly LoadWithoutLock(string path)

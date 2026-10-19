@@ -44,14 +44,18 @@ public sealed class FinalCompilationProbeTests
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         var artifactPaths = workspace.GetArtifactPaths();
         Assert.That(artifactPaths, Has.Length.EqualTo(2));
-        var artifacts = new Dictionary<string, ProbeArtifact>(
-            StringComparer.Ordinal);
+        var artifactsBuilder = ImmutableDictionary.CreateBuilder<string, ProbeArtifact>(StringComparer.Ordinal);
         foreach (var artifactPath in artifactPaths)
         {
             var artifact = await ProbeArtifact.ReadAsync(artifactPath);
-            artifacts.Add(artifact.TargetFramework, artifact);
+            if (artifactsBuilder.ContainsKey(artifact.TargetFramework))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + artifact.TargetFramework);
+            }
+            artifactsBuilder.Add(artifact.TargetFramework, artifact);
         }
 
+        var artifacts = artifactsBuilder.ToImmutable();
         Assert.That(
             artifacts.Keys,
             Is.EquivalentTo(ImmutableArray.Create(NetStandardTargetFramework, NetTargetFramework)));
@@ -739,7 +743,8 @@ public sealed class FinalCompilationProbeTests
         internal Task<ProcessResult> RebuildAsync(
             bool forceUnsupportedWorkerHost = false)
         {
-            var arguments = new List<string> {
+            var arguments = ImmutableArray.CreateBuilder<string>();
+            arguments.AddRange(ImmutableArray.Create<string>(
                 "build",
                 ProjectPath,
                 "-t:Rebuild",
@@ -748,14 +753,13 @@ public sealed class FinalCompilationProbeTests
                 "--no-restore",
                 "--nologo",
                 "/m:1",
-                "/nodeReuse:false"
-            };
+                "/nodeReuse:false"));
             if (forceUnsupportedWorkerHost)
             {
                 arguments.Add("-p:_SharpProofVerifierHostSupported=false");
             }
 
-            return RunDotNetAsync([.. arguments]);
+            return RunDotNetAsync(arguments.ToImmutable());
         }
 
         internal Task<ProcessResult> VerifyPackedArtifactAsync()
@@ -816,7 +820,7 @@ public sealed class FinalCompilationProbeTests
         }
 
         private async Task<ProcessResult> RunDotNetAsync(
-            string[] arguments)
+            IEnumerable<string> arguments)
         {
             System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
             var startInfo = ProcessRunner.CreateStartInfo(

@@ -194,12 +194,13 @@ public sealed class VerifierPackageDefaultsTests
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(arguments);
-        var effectiveArguments = arguments.ToList();
+        var effectiveArguments = ImmutableArray.CreateBuilder<string>();
+        effectiveArguments.AddRange(arguments);
         if (arguments.FirstOrDefault() == "build")
         {
             effectiveArguments.Add("-p:ReportAnalyzer=true");
         }
-        var startInfo = ProcessRunner.CreateStartInfo(root, "dotnet", effectiveArguments);
+        var startInfo = ProcessRunner.CreateStartInfo(root, "dotnet", effectiveArguments.ToImmutable());
         startInfo.Environment["SharedCompilationId"] = s_sharedCompilationServerId;
         return ProcessRunner.RunCapturedAsync(startInfo, TestContext.CurrentContext.CancellationToken);
     }
