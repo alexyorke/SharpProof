@@ -470,3 +470,16 @@ zero findings. A broad worker run caught the general-reference transport
 regression; the producer now emits only the resource-used reference subset,
 leaving general references excluded. The corrected full worker gate is running.
 All other unchecked roadmap items and final 100% coverage remain required.
+
+Published metadata checkpoint: `2e9ecfb61fc005a4808729e19e86e50fc51567ad`.
+Its exact-head documentation maintenance and toolchain image security workflows
+passed; container coverage, canonical PR gates, and package/consumer workflows
+were still running at inspection. The draft MR description now records the
+metadata behavior, strict/advisory policy, transport correction and coverage gap.
+
+Coverage follow-up added four adversarial arithmetic controls: left-hand
+constant multiplication is checked against independently evaluated costs, and
+three reversed maximum trees must stop at the shared comparison budget. All 12
+arithmetic-order tests passed with zero build warnings/errors. This exercises
+two previously uncovered rule families; complete coverage must still be measured
+and qualified, and no coverage percentage is inferred from these test results.

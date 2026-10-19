@@ -112,6 +112,55 @@ public sealed class ResourceBoundOrderTests
     }
 
     [Test]
+    public void LeftHandConstantFactorsHaveTheSameSoundOrderAsRightHandFactors()
+    {
+        var input = Input();
+        var expression = ResourceExpression.Multiply(ResourceExpression.Literal(2), input);
+        var limit = Linear(input, 3, 0);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(ResourceBoundOrder.Proves(expression, limit, cancellation), Is.True);
+        Assert.That(ResourceBoundOrder.Proves(expression, input, cancellation), Is.False);
+        for (int value = 0; value <= 100; value++)
+        {
+            var observed = expression.Evaluate(_ => value, cancellation);
+            Assert.That(observed, Is.EqualTo(new BigInteger(2 * value)));
+            Assert.That(observed, Is.LessThanOrEqualTo(limit.Evaluate(_ => value, cancellation)));
+        }
+    }
+
+    [TestCase(128)]
+    [TestCase(129)]
+    [TestCase(130)]
+    public void ReorderedMaximumAlternativesStopAtTheComparisonBudget(int count)
+    {
+        var inputs = Enumerable.Range(0, count).Select(Input).ToArray();
+        var upper = BalancedMaximum(inputs);
+        var limit = BalancedMaximum(inputs.Reverse().ToArray());
+        Assert.That(upper.NodeCount, Is.LessThanOrEqualTo(ResourceExpression.MaximumNodes));
+        Assert.That(limit.NodeCount, Is.LessThanOrEqualTo(ResourceExpression.MaximumNodes));
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(upper.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal % 7, cancellation),
+            Is.EqualTo(limit.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal % 7, cancellation)));
+        Action compare = () => ResourceBoundOrder.Proves(upper, limit, cancellation);
+        Assert.Throws<ResourceExpressionLimitException>(compare);
+    }
+
+    private static ResourceExpression BalancedMaximum(ResourceExpression[] expressions)
+    {
+        ArgumentNullException.ThrowIfNull(expressions);
+        while (expressions.Length > 1)
+        {
+            var next = new List<ResourceExpression>();
+            for (int index = 0; index < expressions.Length; index += 2)
+            {
+                next.Add(index + 1 < expressions.Length
+                    ? ResourceExpression.Max(expressions[index], expressions[index + 1]) : expressions[index]);
+            }
+            expressions = next.ToArray();
+        }
+        return expressions.Single();
+    }
+    [Test]
     public void UndefinedMetricsCannotDeclareAnArithmeticContract()
     {
         Action construct = () => _ = new ResourceBoundConstraint((ResourceCostMetric)999, ResourceExpression.Zero);
