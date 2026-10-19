@@ -24,6 +24,7 @@ internal static class IrInstructionFacts
             IrAssignInstruction assign => [assign.Value],
             IrAllocationInstruction allocation => allocation.Length == null ? allocation.InitialValues : allocation.InitialValues.Insert(0, allocation.Length),
             IrLockInstruction synchronization => [synchronization.Receiver],
+            IrWriteInstruction { Target: { } target, Index: { } index, Value: { } value, Length: { } length } => [target, index, value, length],
             IrWriteInstruction { Target: { } target, Index: { } index, Value: { } value } => [target, index, value],
             IrWriteInstruction { Target: { } target, Value: { } value } => [target, value],
             IrCallInstruction call => call.Receiver == null ? call.Arguments : call.Arguments.Insert(0, call.Receiver),

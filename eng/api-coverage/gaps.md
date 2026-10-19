@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,607 declarations have no catalog/audited-intrinsic evidence, and 66 have partial
+55,605 declarations have no catalog/audited-intrinsic evidence, and 68 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,607 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,605 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -75,7 +75,7 @@ access kind and value domains satisfy the production guard.
 | C: Comparers and comparable values | 26 Comparer.Compare calls and nine IComparable.CompareTo calls; standalone generic/custom implementations remain open | Resolve concrete type and implementation, preserve initialization and callback effects, and validate signed/unsigned limits, nulls and argument order. Tracked Default integer aliases are supported and proven null/default source parameters; generic array-element specialization is separately tested. Arbitrary generic receivers do not gain those assumptions. |
 | L: Lists and collection contents | Fresh List construction and concrete List Count, Add, Insert, GetRange and scalar/reference/opaque get/set share state; arbitrary interface receivers, unsupported operations on values and other List operations remain open | Model shared storage, capacity/growth and allocation, Count changes, bounds/argument faults, setter mutation and alias invalidation. List.GetItem's exception set alone does not supply content semantics. |
 | S: HashSet / Queue / Stack | Queue default/capacity construction, Enqueue, Dequeue and Count share FIFO state; Stack default/capacity construction, Push, Pop and Count share LIFO state | Both slices support concrete incoming and aliased receivers with scalar/reference/opaque values. Retain null/negative capacity/empty removal, growth, allocation and unknown-writer effects. Other Queue/Stack operations and exact resource/fault behavior, plus HashSet membership and comparer callbacks, remain open. |
-| R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
+| R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Typed SZ-array Clear now models valid scalar ranges and reference null stores, with valid-call effects for opaque values. Remaining: general Array/multidimensional/nonzero-lower-bound Clear, opaque default atoms and reference-content proofs, Copy/Resize, allocation/ref replacement and precise failure/callback semantics. Safe direct covariant Clear upcasts are covered; general covariant array assignments and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
 | N: Numeric / conversion | Convert.ToInt64 body arithmetic is partial; initialization/clauses, other conversions, floating operations and formatting remain open | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
 | E: Exceptions | Selected constructors are partial; other constructors and exact native opaque-call exception sets remain open | Preserve constructor arguments, allocation/cache effects, null/bounds behavior and exact exception identity. Portable named exception evidence must be carried into native IR before claiming AllowedExceptions proofs. |
@@ -563,6 +563,45 @@ within the proven domain; it does not close those corpus sites or work item D.
 Precise initialization/growth/faults, missing/duplicate/null keys, views, removal,
 other constructors and arbitrary incoming/custom comparer behavior remain open.
 
+## Verified typed SZ-array clearing
+
+`Array.Clear(Array, int, int)` now clears every scalar cell in its validated
+half-open range, preserving other cells and array identity. The whole-array overload
+uses the same range storage. This models arbitrary valid lengths without bounded
+unrolling; native proofs cover symbolic starts, lengths and observed indexes, Old
+state and aliases for Boolean and all nine integer/character domains. The three
+ranked corpus sites use typed scalar SZ arrays and gain partial evidence.
+
+Arguments are captured in C# source order, including named arguments and receiver
+rebinding by later arguments. Checked casts are preserved or conservatively rejected. Valid calls do
+not allocate or throw; nonempty incoming arrays are observable writes and empty
+ranges have no write. Proven unpublished arrays retain unobservable writes.
+Immutable scalar-array source helpers retain their concrete
+generic element representation through nested calls.
+
+Reference arrays store null without a covariance compatibility fault. Opaque
+struct/enum/unbound-value arrays retain a conservative effect-only content approximation;
+no CLR null is substituted for a struct default. Their valid-call no-allocation and
+no-throw facts are independently testable, while interpreting their cleared default
+values remains open. Native reference-array element proofs also remain open under
+the existing sequence-value boundary. Safe covariant upcasts directly inside Clear
+are tested; general covariant array assignments remain outside that boundary.
+
+The range-write IR carries an optional Int32 length. Portable single-cell writes
+retain their one-value encoding; range writes carry value and length, reject wrong
+arity/types, and preserve the length through source inlining and loop cloning. The
+native verifier requires complete nonnegative in-bounds range validity even for
+imported IR, and replay checks the whole range before storing any cell. Runtime/IR
+oracles and wrong-result probes cover aliases, unchanged cells, overlaps, argument
+order and the whole-array overload.
+
+General `System.Array`, multidimensional and non-zero-lower-bound storage are not
+assumed to be SZ arrays. Jagged arrays remain outside the existing callable value
+domain. Invalid/null calls retain opaque exception/resource/callback effects and
+cannot enter the successful clearing path; exact standard exception identity and
+callback provenance on those paths remain backlog. Clear does not close Copy,
+Resize, arbitrary shapes, reference-content proofs or opaque default interpretation.
+
 ## Verified concrete Queue FIFO state
 
 Framework `Queue<T>` default and capacity constructors, Enqueue, Dequeue and Count
@@ -798,7 +837,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Math.Max(System.Int32,System.Int32) | call | 4 | partially-modeled | N |
 | M:System.ArgumentNullException.#ctor | call | 3 | unmodeled | E |
 | M:System.ArgumentNullException.#ctor(System.String) | call | 3 | unmodeled | T |
-| M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | unmodeled | R |
+| M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | partially-modeled | R |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | unmodeled | S |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | partially-modeled | S |
 | M:System.Convert.ToInt64(System.Int16) | call | 3 | partially-modeled | N |
@@ -875,10 +914,12 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 62 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 68 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
+| M:System.Array.Clear(System.Array) | intrinsic=typed-sz-array-clear-state |
+| M:System.Array.Clear(System.Array,System.Int32,System.Int32) | intrinsic=typed-sz-array-clear-state |
 | M:System.Array.Empty``1 | catalog=bcl.array.empty;effects=Unknown;allocation=Unknown;throws=DoesNotThrow;exceptions=;nullness=NonNull;cardinality=Empty;termination=Unknown;postconditions=0 |
 | M:System.Byte.CompareTo(System.Byte) | intrinsic=integer-comparison |
 | M:System.Char.CompareTo(System.Char) | intrinsic=integer-comparison |

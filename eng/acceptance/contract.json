@@ -201,6 +201,7 @@
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Comparisons.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Convert.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.InterfaceArrays.cs",
+          "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.ArrayClear.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Dictionaries.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Lists.cs",
           "src/SharpProof.Frontend/RoslynTotalExpressionLowerer.Stacks.cs",
