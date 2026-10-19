@@ -1341,7 +1341,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         foreach (var edge in edges)
         {
             var call = edge();
-            var bindings = new Dictionary<(SpecVariableRole, int), object?>();
+            var bindingsBuilder = ImmutableDictionary.CreateBuilder<(SpecVariableRole, int), object?>();
             foreach (var variable in template.Variables)
             {
                 var value = variable.Role switch
@@ -1351,8 +1351,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     SpecVariableRole.Result => call.Result,
                     _ => throw new AssertionException("Unknown spec variable role.")
                 };
-                bindings.Add((variable.Role, variable.Ordinal), value);
+                bindingsBuilder.AddUnique((variable.Role, variable.Ordinal), value);
             }
+            var bindings = bindingsBuilder.ToImmutable();
             if (Evaluate(condition, bindings) is not true)
             {
                 return false;

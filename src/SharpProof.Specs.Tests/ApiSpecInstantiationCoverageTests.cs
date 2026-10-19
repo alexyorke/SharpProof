@@ -328,20 +328,21 @@ public sealed class ApiSpecInstantiationCoverageTests
         SpecInstantiationResult Instantiate(bool includeOuter, bool includeInner,
             bool includePeer)
         {
-            var substitutions = new Dictionary<SpecVarId, IrTerm>();
+            var substitutionsBuilder = ImmutableDictionary.CreateBuilder<SpecVarId, IrTerm>();
             if (includeOuter)
             {
-                substitutions[template.Parameters[0]] = outerValue;
+                substitutionsBuilder[template.Parameters[0]] = outerValue;
             }
             if (includeInner)
             {
-                substitutions[template.Parameters[1]] = innerValue;
+                substitutionsBuilder[template.Parameters[1]] = innerValue;
             }
             if (includePeer)
             {
-                substitutions[template.Parameters[2]] = reference;
+                substitutionsBuilder[template.Parameters[2]] = reference;
             }
 
+            var substitutions = substitutionsBuilder.ToImmutable();
             return ApiSpecInstantiator.InstantiatePostconditions(
                 template, factory, substitutions);
         }

@@ -54,7 +54,7 @@ public sealed class ApiSpecTests
         {
             Assert.Throws<ArgumentNullException>(() => ApiSpecTable.Create(null!));
             Assert.Throws<ArgumentException>(() =>
-                ApiSpecTable.Create(Array.Empty<ApiSpecDeclaration>()));
+                ApiSpecTable.Create(ImmutableArray<ApiSpecDeclaration>.Empty));
             Assert.Throws<ArgumentException>(() =>
                 ApiSpecTable.Create([declaration, null!]));
             var duplicateError = Assert.Throws<ArgumentException>(() =>
@@ -1588,7 +1588,7 @@ public sealed class ApiSpecTests
                 emit.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
-        return MetadataReference.CreateFromImage(stream.ToArray());
+        return MetadataReference.CreateFromImage(ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));
     }
 
     private static MetadataReference CoreReference
