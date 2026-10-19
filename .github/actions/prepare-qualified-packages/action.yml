@@ -34,13 +34,55 @@ runs:
         artifact-ids: ${{ inputs.artifact-id }}
         merge-multiple: true
         path: nupkgs
-    # The default docker driver writes the image straight into the daemon.
-    # A buildx layer cache needs the docker-container driver, whose extra
-    # tarball export and load cost more than the base-image pulls it saves.
-    - name: Build the pinned Linux amd64 toolchain
+    # The windows-native stage compiles Z3 from source for win-x64 and
+    # win-arm64: about 14 of an uncached build's 15 minutes. Its DLLs are
+    # pinned byte-for-byte in toolchain.json and the toolchain stage
+    # re-verifies them, so a cached payload is exactly what a fresh compile
+    # must produce. The key covers the stage text, its base image, the build
+    # recipe, and the catalog. Default-branch entries are readable by every
+    # pull request; pull-request entries stay scoped to their own branch.
+    # Scheduled runs and release tags always compile from source, so the
+    # recipe keeps proving it reproduces the pins and releases never ship a
+    # cached payload.
+    - name: Key the pinned Windows Z3 cross-build
+      id: windows-native
       shell: bash
       run: |
         set -euo pipefail
+        recipe="$(
+          {
+            grep '^ARG DOTNET_SDK_IMAGE=' eng/container/Dockerfile
+            awk '/^FROM / { stage = ($0 == "FROM ${DOTNET_SDK_IMAGE} AS windows-native") } stage' \
+              eng/container/Dockerfile
+            git ls-files --stage eng/container/windows-native eng/container/toolchain.json
+          } | sha256sum | cut -c1-64
+        )"
+        echo "key=sharpproof-windows-native-${recipe}" >> "$GITHUB_OUTPUT"
+        echo "path=${RUNNER_TEMP}/sharpproof-windows-native" >> "$GITHUB_OUTPUT"
+    - name: Restore the pinned Windows Z3 cross-build
+      id: windows-native-cache
+      if: github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/')
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.windows-native.outputs.path }}
+        key: ${{ steps.windows-native.outputs.key }}
+    # The default docker driver writes the image straight into the daemon.
+    # On a cache hit, --build-context replaces the windows-native stage with
+    # its cached /payload output; on a miss the stage builds as before and
+    # its verified output is copied out of the image for the cache.
+    - name: Build the pinned Linux amd64 toolchain
+      shell: bash
+      env:
+        WINDOWS_NATIVE_CACHE_HIT: ${{ steps.windows-native-cache.outputs.cache-hit }}
+        WINDOWS_NATIVE_PATH: ${{ steps.windows-native.outputs.path }}
+      run: |
+        set -euo pipefail
+        native_context=()
+        if [[ "${WINDOWS_NATIVE_CACHE_HIT}" == true ]]; then
+          test -f "${WINDOWS_NATIVE_PATH}/payload/win-x64/libz3.dll"
+          test -f "${WINDOWS_NATIVE_PATH}/payload/win-arm64/libz3.dll"
+          native_context=(--build-context "windows-native=${WINDOWS_NATIVE_PATH}")
+        fi
         docker buildx build \
           --platform linux/amd64 \
           --file eng/container/Dockerfile \
@@ -49,5 +91,22 @@ runs:
           --tag "${COMPOSE_PROJECT_NAME}-tooling:local" \
           --build-arg USER_UID=1000 \
           --build-arg USER_GID=1000 \
+          "${native_context[@]}" \
           --progress plain \
           .
+        if [[ "${WINDOWS_NATIVE_CACHE_HIT}" != true ]]; then
+          rm -rf "${WINDOWS_NATIVE_PATH}"
+          mkdir -p "${WINDOWS_NATIVE_PATH}"
+          container="$(docker create "${COMPOSE_PROJECT_NAME}-tooling:local")"
+          docker cp "${container}:/opt/sharpproof/windows-native" "${WINDOWS_NATIVE_PATH}/payload"
+          docker rm "${container}" > /dev/null
+        fi
+    # Concurrent jobs may race to save the same key; the first one wins and a
+    # failed save never fails the job.
+    - name: Save the pinned Windows Z3 cross-build
+      if: steps.windows-native-cache.outputs.cache-hit != 'true' && !startsWith(github.ref, 'refs/tags/')
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.windows-native.outputs.path }}
+        key: ${{ steps.windows-native.outputs.key }}
