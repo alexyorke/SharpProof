@@ -2565,3 +2565,13 @@ phase boundaries. Replace the operation child vector with an immutable snapshot.
 writers remain resource/stateful sinks. Validate manifest, query/structural identity,
 reference ownership/budgets and original syntax-path sentinel controls.
 Status: open before edits.
+
+IMM-M067: Coordinator rechecked all remaining Worker production collection candidates.
+Twenty-eight rows are existing owned builders, seven are required concurrent lane/slot,
+compiler byte, mutable Dictionary probe, per-read status, native char or text-writer
+boundaries. Seven SARIF arrays/maps remain confirmed violations, not mandatory mutable
+serializer contracts. Convert result/notification accumulation to scoped array builders,
+fixed nested vectors to ImmutableArray, and special-name JSON maps/document to private
+readonly record shapes with explicit property names/order. Preserve exact SARIF key
+order, outcome/policy projection and byte serialization; validate launcher/SARIF cases.
+Status: open before edits.
