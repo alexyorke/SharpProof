@@ -2854,3 +2854,12 @@ preserves 2,980 raw/interpolated tokens across 671 changed files against master 
 M079 additional verification: 20 source-document checks and script formatting pass
 (87 PowerShell, 19 shell, zero changes). Canonical reflection confirms PEReader's
 ReadDebugDirectory returns ImmutableArray<DebugDirectoryEntry>; root reuse is immutable.
+
+IMM-M080: Worker.Tests H-P read-only audit identifies 42 ToArray materializations
+in local assertions, syntax/diagnostic projections and indexed construction scratch.
+Convert these selected exact Roslyn invocation tokens to ToImmutableArray, retaining
+order and referenced objects. Review coupled array-specific helper signatures, null/default
+fallbacks and post-construction indexing before tests. Native PE/reflection/params and
+intentionally mutable runtime aliases are excluded from this batch. Main validates all
+reported sites, formats changed files and runs the ordinary Worker project tests.
+Status: open before edits.
