@@ -388,6 +388,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IInvocationOperation comparison &&
             IntegerComparisonBody(comparison, block, depth) is { } compared)
         { return compared; }
+        if (depth < 256 && operation is IInvocationOperation conversionCall &&
+            IntegralConvertBody(conversionCall, block, depth) is { } convertedCall)
+        { return convertedCall; }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }

@@ -16,9 +16,9 @@ The complete declaration universe is the 59,639 rows of
 [net10.0.tsv](net10.0.tsv), pinned to Microsoft.NETCore.App.Ref 10.0.13 / net10.0
 and SDK 10.0.402; [the manifest](net10.0.manifest.json) records assembly checksums.
 Of these, 3,966 type containers are explicitly excluded from behavioral support,
-55,628 declarations have no catalog/audited-intrinsic evidence, and 45 have partial
+55,618 declarations have no catalog/audited-intrinsic evidence, and 55 have partial
 evidence. No declaration is labeled fully modeled. The TSV is the exhaustive list
-of declaration gaps; duplicating its 55,628 unmodeled rows here would create a
+of declaration gaps; duplicating its 55,618 unmodeled rows here would create a
 second authority. Fields, events, constructors, overloads and generic arity remain
 separate entries. Absence of catalog evidence does not establish that contextual
 language lowering is missing.
@@ -52,7 +52,7 @@ access kind and value domains satisfy the production guard.
 | S: HashSet / Queue / Stack | Contains/Add/Remove, enqueue/dequeue/push/pop and constructors remain open; concrete Counts only nonnegative | Add membership or sequence state, comparer callback behavior, empty/duplicate cases, allocation and mutation effects. Count nonnegativity does not prove contents or strict positivity. |
 | R: Arrays | SZ-array Length already has contextual support; general System.Array, multidimensional and array helper methods need distinct models | Keep contextual guards in ranking. Model Clear/Copy/Resize state, overlapping ranges, allocation/ref replacement and precise faults. Reference covariance and arbitrary interface implementations remain open. |
 | T: Strings | Length/index/equality/basic predicates partially modeled; construction, split/replace/format/join/substring and others remain open | Preserve UTF-16/ordinal domains, nulls, bounds, overload/culture distinctions, allocations and effects. Check native proof support separately from catalog facets. |
-| N: Numeric / conversion | A few numeric helpers are partial; conversions, floating operations and formatting need separate work | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
+| N: Numeric / conversion | Convert.ToInt64 body arithmetic is partial; initialization/clauses, other conversions, floating operations and formatting remain open | Specify checked/unchecked overflow, NaN/infinity/rounding and culture/formatting as applicable; compare IR with runtime across boundary values and refute wrong claims. |
 | E: Exceptions | Selected constructors are partial; other constructors and exact native opaque-call exception sets remain open | Preserve constructor arguments, allocation/cache effects, null/bounds behavior and exact exception identity. Portable named exception evidence must be carried into native IR before claiming AllowedExceptions proofs. |
 | F: Delegates / enumeration / LINQ / parallelism | Invoke, iterator members, LINQ and Parallel.For remain open | Model callback effects, captured mutable state, deferred execution, iteration faults, allocation and parallel behavior; preserve conservative fallback until covered. |
 | O: Ambient state and other APIs | Date/time, randomness, IO, volatile reads, diagnostics, reflection and object behavior need individual contracts | Define nondeterminism, ambient capabilities, observable reads/writes, exceptions and allocation per overload. Do not force deterministic scalar semantics. |
@@ -420,6 +420,41 @@ Boxing controls retain allocation uncertainty for opaque and nullable elements.
 Existing alias invalidation, dispatch and growth/fault uncertainty remain. Normal
 CLR/IR growth choices consume approximation and grant no native replay authority.
 
+## Verified integral conversion to Int64
+
+Framework `Convert.ToInt64` now lowers the eight signed/unsigned integer overloads,
+`Char` and `Boolean` in executable bodies. Integer values retain their complete
+domains and the result is a signed 64-bit value. Boolean maps to zero or one;
+Char maps its UTF-16 code unit, including unpaired surrogates. UInt64 conversion
+checks against Int64.MaxValue and throws OverflowException above that limit even
+in an unchecked source context.
+
+Pinned runtime 10.0.13 has a beforefieldinit Convert initializer that reads
+DBNull.Value and stores Convert.DBNull; DBNull initialization allocates its
+singleton. The body model retains optional allocation, static writes, other
+initialization effects and failure. Neither a scalar argument nor an UInt64 range
+precondition proves unconditional DoesNotThrow, ZeroAllocations or EnforcePure.
+Convert calls in logical clauses remain Unknown until initialization evidence can
+be carried there; an arithmetic relation on normal body return does not establish
+clause purity or initializer safety.
+
+The pre-change dispatch reproduced eight Unknown value-preservation claims.
+Native proof/refutation pairs exercise the numeric relation while keeping those
+initialization effects open. CLR/IR differential tests check signed/unsigned
+limits, the UInt64 overflow boundary and UTF-16 code units. Concrete normal replay
+requires actual Convert class initialization and observations of the matching
+fixed primitive overload. Failed, mismatching, malformed or unapproved readiness
+observations never certify a normal path. Source lookalikes and floating, decimal,
+string, object and provider overloads do not gain this model. Unknown argument
+callbacks retain their effects.
+
+This adds arithmetic evidence for the two ranked ToInt64 overloads (Int16 and
+Int32, three static sites each). It does not prove every enclosing corpus method
+or close all behavioral facets of these partial declarations. Other numeric
+conversions, floating and decimal rounding, formatting, nullable boxing, string
+parsing, provider/culture semantics, initialization and logical-clause support
+remain open.
+
 ## Cross-cutting gaps previously identified
 
 - Array-backed IList bounds failure can invoke user CultureInfo callbacks during
@@ -580,8 +615,8 @@ review of unsupported facets/contexts; it is not a fully covered API.
 | M:System.Array.Clear(System.Array,System.Int32,System.Int32) | call | 3 | unmodeled | R |
 | M:System.Collections.Generic.HashSet`1.Remove(`0) | call | 3 | unmodeled | S |
 | M:System.Collections.Generic.Queue`1.#ctor(System.Int32) | call | 3 | unmodeled | S |
-| M:System.Convert.ToInt64(System.Int16) | call | 3 | unmodeled | N |
-| M:System.Convert.ToInt64(System.Int32) | call | 3 | unmodeled | N |
+| M:System.Convert.ToInt64(System.Int16) | call | 3 | partially-modeled | N |
+| M:System.Convert.ToInt64(System.Int32) | call | 3 | partially-modeled | N |
 | M:System.Guid.NewGuid | call | 3 | unmodeled | O |
 | M:System.Linq.Enumerable.Max(System.Collections.Generic.IEnumerable{System.Int32}) | call | 3 | unmodeled | N |
 | M:System.Linq.Enumerable.Min(System.Collections.Generic.IEnumerable{System.Int32}) | call | 3 | unmodeled | N |
@@ -654,7 +689,7 @@ review of unsupported facets/contexts; it is not a fully covered API.
 
 ## Every declaration with partial evidence
 
-These 45 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
+These 55 rows record the supplied facets; Unknown facets, zero postconditions and guarded contexts are still gaps. The complete TSV remains authoritative.
 
 | Declaration | Current evidence |
 | --- | --- |
@@ -668,6 +703,16 @@ These 45 rows record the supplied facets; Unknown facets, zero postconditions an
 | M:System.Collections.Generic.ICollection`1.Add(`0) | intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage |
 | M:System.Collections.Generic.List`1.#ctor | intrinsic=fresh-list-state |
 | M:System.Collections.Generic.List`1.Add(`0) | catalog=bcl.list.add;effects=WritesReceiverState;allocation=MayAllocate;throws=Unknown;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Unknown;postconditions=0;intrinsic=fresh-list-state;intrinsic=opaque-list-value-storage;intrinsic=concrete-list-state |
+| M:System.Convert.ToInt64(System.Boolean) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.Byte) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.Char) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.Int16) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.Int32) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.Int64) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.SByte) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.UInt16) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.UInt32) | intrinsic=checked-integral-to-int64 |
+| M:System.Convert.ToInt64(System.UInt64) | intrinsic=checked-integral-to-int64 |
 | M:System.Exception.#ctor | catalog=bcl.exception.ctor;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Exception.#ctor(System.String) | catalog=bcl.exception.ctor.string;effects=WritesReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0 |
 | M:System.Int16.CompareTo(System.Int16) | intrinsic=integer-comparison |
