@@ -2627,3 +2627,16 @@ remain native SUT invocation buffers. The replay test's observation count map be
 an Ordinal builder; retain all source snippets and UTF-16 model displays unchanged.
 Validate the full exact replay fixture, including its real analyzer/worker/CLR case.
 Status: open before edits.
+
+IMM-M070: Coordinator traced AnalyzerPipelineLongFuzzTests' internal metadata and
+instrumentation state. Replace analyzer configuration map construction with an
+OrdinalIgnoreCase immutable builder and freeze before the provider; its private option
+adapters can retain the immutable map directly. Replace six read-only syntax/literal
+query snapshots with immutable arrays. Construct TextChange and alias vectors through
+scoped builders, freezing before phase traversal and WithChanges. Narrow private source
+integer/string-length/array-length domains to ImmutableArray<int>, retaining first-seen
+Distinct/sort semantics and initialization guards. Membership of existing runtime array
+lengths becomes an immutable hash set. Keep concurrent analyzer exception collection,
+assembly resources, generated-source text, reflection object[] and actual int[] CLR
+inputs/copies intact. Validate exact replay plus ref-state/runtime coverage controls.
+Status: open before edits.
