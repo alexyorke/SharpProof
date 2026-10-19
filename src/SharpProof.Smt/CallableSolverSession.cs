@@ -57,8 +57,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         try
         {
             _encoder.ValidateQuery(query, meter, cancellationToken);
-            var active = ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
-            var selectors = ImmutableList<Expr>.Empty;
+            var active = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+            var selectors = ImmutableArray.CreateBuilder<Expr>();
             for (var index = 0; index < query.Assumptions.Length; index++)
             {
                 meter.Consume();
@@ -73,8 +73,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 var name = selector.ToString();
                 if (!active.ContainsKey(name))
                 {
-                    active = active.AddUnique(name, index);
-                    selectors = selectors.Add(selector);
+                    active.AddUnique(name, index);
+                    selectors.Add(selector);
                 }
             }
             if (!_goals.TryGetValue(query, out var goalSelector))
@@ -86,24 +86,24 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     _owner.Own(_runner.Context.MkNot(goal)))));
                 _goals = _goals.AddUnique(query, goalSelector);
             }
-            selectors = selectors.Add(goalSelector);
+            selectors.Add(goalSelector);
             while (_assertedReferenceFacts < _encoder.ReferenceFacts.Count)
             {
                 meter.Consume();
                 _solver.Assert(_encoder.ReferenceFacts[_assertedReferenceFacts++]);
             }
-            var status = Check(selectors, meter);
+            var status = Check(selectors.ToImmutable(), meter);
             if (status == Status.SATISFIABLE && SmallReferenceWitnesses(query, meter) is { } smallReferences)
             {
                 // Prefer replayable string/array witnesses after the original
                 // query is SAT. A failed preference retries the unbounded
                 // query, so this bound can never prove a claim.
-                selectors = selectors.Add(smallReferences);
-                status = Check(selectors, meter);
+                selectors.Add(smallReferences);
+                status = Check(selectors.ToImmutable(), meter);
                 if (status != Status.SATISFIABLE)
                 {
-                    selectors = selectors.RemoveAt(selectors.Count - 1);
-                    status = Check(selectors, meter);
+                    selectors.RemoveAt(selectors.Count - 1);
+                    status = Check(selectors.ToImmutable(), meter);
                 }
             }
             if (status == Status.SATISFIABLE)
@@ -117,8 +117,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     // failure of that preference never becomes a proof.
                     if (NominalReferenceWitnesses(query, meter) is { } nominal)
                     {
-                        selectors = selectors.Add(nominal);
-                        var retry = Check(selectors, meter);
+                        selectors.Add(nominal);
+                        var retry = Check(selectors.ToImmutable(), meter);
                         if (retry == Status.SATISFIABLE)
                         { return CreateModel(query, meter); }
                         if (retry == Status.UNKNOWN)
@@ -129,7 +129,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             }
             return status switch
             {
-                Status.UNSATISFIABLE => DecodeCore(_solver.UnsatCore, active, goalSelector.ToString(), meter),
+                Status.UNSATISFIABLE => DecodeCore(_solver.UnsatCore, active.ToImmutable(), goalSelector.ToString(), meter),
                 _ => BackendCheckResult.Unknown(SmtNativeUtilities.ClassifyUnknown(_solver.ReasonUnknown))
             };
         }
@@ -140,10 +140,11 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         }
     }
 
-    private Status Check(ImmutableList<Expr> selectors, SmtQueryResourceMeter meter)
+    private Status Check(ImmutableArray<Expr> selectors, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        selectors = RepositoryParameterGuard.NotNull(selectors, nameof(selectors));
+        if (selectors.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(selectors)); }
         using var parameters = _runner.Context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
         // The host owns SIGINT and forwards cancellation through Context.Interrupt().

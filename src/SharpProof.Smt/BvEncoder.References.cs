@@ -56,13 +56,14 @@ internal sealed partial class BvEncoder
     {
         query = RepositoryParameterGuard.NotNull(query, nameof(query));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        var bounds = new List<BoolExpr>();
+        var bounds = ImmutableArray.CreateBuilder<BoolExpr>();
         // This preference follows a rejected SAT model. A
         // bounded set of nominal types covers every requested view, rather
         // than sampling SSA values whose later aliases can evade the sample.
         // Compatible types may share tags; uncertain required aliases can
         // still abstain. These are never proof premises.
-        var groups = new Dictionary<IrTypeId, int>();
+        var groups = ImmutableDictionary.CreateBuilder<IrTypeId, int>();
+        var groupOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrTypeId, int>>();
         foreach (var field in _fieldOrder)
         {
             meter.Consume();
@@ -73,6 +74,7 @@ internal sealed partial class BvEncoder
             meter.Consume();
             AddType(factory.GetVariableInfo(variable).Type);
         }
+        var orderedGroups = groupOrder.ToImmutable();
         if (groups.Count != 0)
         {
             if (_nominalWitnessTags == null)
@@ -80,11 +82,12 @@ internal sealed partial class BvEncoder
                 using var result = context.MkBitVecSort(MaximumNominalWitnessTypes);
                 _nominalWitnessTags = context.MkFreshFuncDecl("nominal_witness_tags", [ReferenceSort], result);
             }
-            var masks = new ulong[groups.Count];
-            foreach (var first in groups)
+            var masks = ImmutableArray.CreateBuilder<ulong>(groups.Count);
+            masks.Count = groups.Count;
+            foreach (var first in orderedGroups)
             {
                 var mask = 1UL << first.Value;
-                foreach (var second in groups)
+                foreach (var second in orderedGroups)
                 {
                     meter.Consume();
                     if (!KnownNominalCompatibility(first.Key, second.Key, meter))
@@ -92,6 +95,7 @@ internal sealed partial class BvEncoder
                 }
                 masks[first.Value] = mask;
             }
+            var maskSnapshot = masks.MoveToImmutable();
             foreach (var field in _fieldOrder)
             {
                 meter.Consume();
@@ -114,16 +118,16 @@ internal sealed partial class BvEncoder
 
             void AddMembership(int group, Expr value)
             {
-                RepositoryParameterGuard.ThrowIfInvalid(group < 0 || group >= masks.Length, nameof(group));
+                RepositoryParameterGuard.ThrowIfInvalid(group < 0 || group >= maskSnapshot.Length, nameof(group));
                 value = RepositoryParameterGuard.NotNull(value, nameof(value));
                 meter.Consume();
                 var tags = (BitVecExpr)owner.Own(context.MkApp(_nominalWitnessTags, value));
-                var masked = owner.Own(context.MkBVAND(tags, owner.Own(context.MkBV(masks[group], MaximumNominalWitnessTypes))));
+                var masked = owner.Own(context.MkBVAND(tags, owner.Own(context.MkBV(maskSnapshot[group], MaximumNominalWitnessTypes))));
                 bounds.Add(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
                     owner.Own(context.MkEq(masked, owner.Own(context.MkBV(1UL << group, MaximumNominalWitnessTypes)))))));
             }
         }
-        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds));
+        return bounds.Count == 0 ? null : owner.Own(context.MkAnd(bounds.ToImmutable()));
 
         void AddType(IrTypeId type)
         {
@@ -131,7 +135,11 @@ internal sealed partial class BvEncoder
             meter.Consume();
             if (groups.Count < MaximumNominalWitnessTypes && type != factory.ObjectType &&
                 factory.GetTypeInfo(type).Kind == IrTypeKind.Reference && !groups.ContainsKey(type))
-            { groups.Add(type, groups.Count); }
+            {
+                var group = groups.Count;
+                groups.AddUnique(type, group);
+                groupOrder.Add(new(type, group));
+            }
         }
     }
     private bool KnownNominalCompatibility(IrTypeId first, IrTypeId second, SmtQueryResourceMeter meter)

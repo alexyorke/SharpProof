@@ -88,16 +88,17 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
         if (!CompilerIdentityBridge.IsClosedReferenceType(type, cancellation.Token))
         { return; }
-        var chain = new List<INamedTypeSymbol>();
+        var chainBuilder = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (var current = (INamedTypeSymbol)type; current.SpecialType != SpecialType.System_Object; current = current.BaseType!)
         {
             cancellation.Token.ThrowIfCancellationRequested();
-            if (chain.Count == 64 || current.BaseType == null || current.SpecialType != SpecialType.None)
+            if (chainBuilder.Count == 64 || current.BaseType == null || current.SpecialType != SpecialType.None)
             { return; }
-            chain.Add(current);
+            chainBuilder.Add(current);
         }
+        var chain = chainBuilder.ToImmutable();
         IrTypeId? parent = null;
-        for (var index = chain.Count - 1; index >= 0; index--)
+        for (var index = chain.Length - 1; index >= 0; index--)
         {
             var symbol = chain[index];
             var id = _factory.GetOrCreateReferenceType(CompilerIdentityBridge.InternType(_factory, symbol), CompilerIdentityBridge.CreateTypeDisplay(symbol));

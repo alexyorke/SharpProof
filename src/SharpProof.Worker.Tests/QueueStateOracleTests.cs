@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -71,10 +72,9 @@ public sealed class QueueStateOracleTests
             state.WithKeyedField(Field("value"), factory.CreateIntegerValue(head == int.MaxValue ? 0 : head + 1), factory.CreateIntegerValue(23));
         }
         var parameter = context.Parameters.Single().Entry;
-        var inputs = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-        {
-            [parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type, state)
-        };
+        var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
+        inputBuilder[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type, state);
+        var inputs = inputBuilder.ToImmutable();
         var options = new IrProgramReplayOptions(request =>
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -152,7 +152,7 @@ public sealed class QueueStateOracleTests
                 ArgumentNullException.ThrowIfNull(request);
                 return factory.GetVariableInfo(request.Variable).Type == factory.BooleanType ? factory.CreateBooleanValue(false) : null;
             });
-            var result = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<ScopedIrId<IrVariableTag>, IrValue>(), 5000, options);
+            var result = new IrProgramInterpreter(factory).Execute(lowered.Program, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty, 5000, options);
             Assert.That(result.ConsumedApproximation, Is.True);
             if (fault != null)
             {
