@@ -100,7 +100,7 @@ public static partial class Inference
             { ImportConstraints(parameter, mapping[parameter], mapping, add.TypeArguments[parameter.Ordinal]); }
         }
 
-        private HmType CollectionExpression(ICollectionExpressionOperation operation, HmType? expected = null)
+        private HmType CollectionExpression(ICollectionExpressionOperation operation, HmType? expected = null, Func<IOperation, (ITypeSymbol Type, HmType Shape, ExpressionSyntax Syntax)>? elementSource = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
@@ -138,10 +138,19 @@ public static partial class Inference
                 }
                 else
                 {
-                    BindNullableArgument(item, element.Shape);
-                    var source = model.GetTypeInfo(item.Syntax, cancellationToken).Type ?? item.Type ?? element.Type;
-                    var value = BoundExpression(item);
-                    BindCollectionAdd(operation, source, value, (ExpressionSyntax)item.Syntax, shape);
+                    if (elementSource is not null)
+                    {
+                        var resolved = elementSource(item);
+                        BindConvertedArgument(resolved.Type, element.Type, resolved.Shape, element.Shape);
+                        BindCollectionAdd(operation, resolved.Type, resolved.Shape, resolved.Syntax, shape);
+                    }
+                    else
+                    {
+                        BindNullableArgument(item, element.Shape);
+                        var source = model.GetTypeInfo(item.Syntax, cancellationToken).Type ?? item.Type ?? element.Type;
+                        var value = BoundExpression(item);
+                        BindCollectionAdd(operation, source, value, (ExpressionSyntax)item.Syntax, shape);
+                    }
                 }
             }
             return shape;
@@ -153,17 +162,48 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(root)); }
             if (semantic is null)
             { throw new ArgumentNullException(nameof(semantic)); }
+            var seen = new HashSet<ICollectionExpressionOperation>();
             foreach (var expression in root.DescendantNodes().OfType<ExpressionSyntax>())
             {
                 var operation = semantic.GetOperation(expression);
                 if (operation is ICollectionExpressionOperation collection)
-                { yield return collection; }
+                { if (seen.Add(collection)) { yield return collection; } }
+                if (InterpolationHandler(operation)?.HandlerCreation is IObjectCreationOperation handlerConstruction)
+                {
+                    foreach (var argument in handlerConstruction.Arguments)
+                    {
+                        if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation pack && seen.Add(pack))
+                        { yield return pack; }
+                    }
+                }
                 var arguments = operation switch { IInvocationOperation call => call.Arguments, IObjectCreationOperation creation => creation.Arguments, IPropertyReferenceOperation property => property.Arguments, _ => default };
                 if (arguments.IsDefault)
                 { continue; }
                 foreach (var argument in arguments)
-                { if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation expanded) { yield return expanded; } }
+                { if (argument.ArgumentKind == ArgumentKind.ParamCollection && argument.Value is ICollectionExpressionOperation expanded && seen.Add(expanded)) { yield return expanded; } }
             }
+        }
+
+        private static ExpressionSyntax CollectionValueSyntax(ICollectionExpressionOperation collection, IOperation value)
+        {
+            if (collection is null)
+            { throw new ArgumentNullException(nameof(collection)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            for (var current = (IOperation)collection; current.Parent is not null; current = current.Parent)
+            {
+                if (current.Parent is IInterpolatedStringHandlerCreationOperation handler)
+                {
+                    if (ReferenceEquals(current, handler.HandlerCreation))
+                    {
+                        value = ForwardedHandlerArgument(handler, value) ?? throw new InferenceException("Unresolved collection constructor placeholder.");
+                        if (value is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance })
+                        { return SyntaxFactory.ThisExpression(); }
+                    }
+                    break;
+                }
+            }
+            return value.Syntax as ExpressionSyntax ?? throw new InferenceException("Unresolved collection element syntax.");
         }
 
         private string CollectionFacts(ICollectionExpressionOperation operation)
@@ -193,7 +233,7 @@ public static partial class Inference
                         ? ProtocolMember(CollectionAdd(operation, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(type, spread.Syntax.SpanStart) + ")!"))) : null);
                 }
                 else
-                { facts.Add(ProtocolMember(CollectionAdd(operation, (ExpressionSyntax)item.Syntax))); }
+                { facts.Add(ProtocolMember(CollectionAdd(operation, CollectionValueSyntax(operation, item)))); }
             }
             return string.Join("|", facts);
         }

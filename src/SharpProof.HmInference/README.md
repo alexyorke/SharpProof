@@ -184,7 +184,10 @@ expressions retain nominal receivers and inferred initializer constraints.
 FormattableString/IFormattable targets infer their boxed holes, retaining format
 and alignment syntax. Custom interpolation handlers infer generic AppendFormatted
 arguments, containing-type substitutions and method constraints, including forwarded
-arguments/receivers and conditional append protocols. Constructor and append selections
+arguments/receivers and conditional append protocols. Expanded constructor packs
+support arrays, spans, lists and custom collection builders; forwarded elements
+share the normal conversion and Add constraints. Construction and Add selections
+inside these implicit packs are checked too. Constructor and append selections
 are checked across supplied files. Ordinary string holes retain their original types
 to preserve formatting overloads hidden by compiler lowering. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.

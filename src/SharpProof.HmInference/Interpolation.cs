@@ -87,13 +87,30 @@ public static partial class Inference
                 { BindHandlerConstructorValue(handler, item, arrayTarget.ElementType, element); }
                 return;
             }
+            if (value is ICollectionExpressionOperation collection)
+            {
+                CollectionExpression(collection, expected, item =>
+                { if (item is null) { throw new ArgumentNullException(nameof(item)); } return HandlerConstructorSource(handler, item); });
+                return;
+            }
+            var source = HandlerConstructorSource(handler, value);
+            BindConvertedArgument(source.Type, target, source.Shape, expected);
+        }
+
+        private (ITypeSymbol Type, HmType Shape, ExpressionSyntax Syntax) HandlerConstructorSource(IInterpolatedStringHandlerCreationOperation handler, IOperation value)
+        {
+            if (handler is null)
+            { throw new ArgumentNullException(nameof(handler)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
             var forwarded = ForwardedHandlerArgument(handler, value);
-            if (forwarded is null || ReferenceEquals(forwarded, value) && value.IsImplicit && value.Syntax == handler.Syntax)
+            if (forwarded is null || ReferenceEquals(forwarded, value) && value.IsImplicit && value.Syntax.SyntaxTree == handler.Syntax.SyntaxTree && value.Syntax.Span == handler.Syntax.Span)
             { throw new InferenceException("Unsupported synthetic interpolation constructor argument."); }
             var containingInstance = forwarded is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance };
             var source = (containingInstance ? forwarded.Type : model.GetTypeInfo(forwarded.Syntax, cancellationToken).Type ?? forwarded.Type)
                 ?? throw new InferenceException("Unresolved forwarded interpolation type.");
-            BindConvertedArgument(source, target, containingInstance ? CSharpTypes.Rigid(source) : BoundExpression(forwarded), expected);
+            var syntax = containingInstance ? SyntaxFactory.ThisExpression() : forwarded.Syntax as ExpressionSyntax ?? throw new InferenceException("Unresolved forwarded interpolation syntax.");
+            return (source, containingInstance ? CSharpTypes.Rigid(source) : BoundExpression(forwarded), syntax);
         }
 
         private void BindInterpolationCall(IInvocationOperation call, HmType handlerShape, ITypeSymbol handlerType)

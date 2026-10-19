@@ -11,7 +11,7 @@ internal static class InterpolationChecks
 {
     private const string Support = """
         #nullable enable
-        using System;using System.Globalization;using System.Runtime.CompilerServices;using System.Threading.Tasks;
+        using System;using System.Collections.Generic;using System.Globalization;using System.Runtime.CompilerServices;using System.Threading.Tasks;
         public static class InterpolationTrace {public static string Log="";public static bool Continue=true;public static object? LastContext;public static T Touch<T>(T value){Log+="hole;";return value;}}
         [InterpolatedStringHandler]public struct ProbeHandler {
             public ProbeHandler(int literalLength,int formattedCount){}
@@ -50,6 +50,46 @@ internal static class InterpolationChecks
             public void AppendLiteral(string text){}
             public void AppendFormatted<T>(T value){}
         }
+        [InterpolatedStringHandler]public struct ProbeSpanPackedHandler {
+            public ProbeSpanPackedHandler(int literalLength,int formattedCount,params ReadOnlySpan<object?> contexts){InterpolationTrace.Log+="span-ctor;";InterpolationTrace.LastContext=contexts[0];}
+            public void AppendLiteral(string text){}
+            public void AppendFormatted<T>(T value){}
+        }
+        [InterpolatedStringHandler]public struct ProbeListPackedHandler {
+            public ProbeListPackedHandler(int literalLength,int formattedCount,params List<object?> contexts){InterpolationTrace.Log+="list-ctor;";InterpolationTrace.LastContext=contexts[0];}
+            public void AppendLiteral(string text){}
+            public void AppendFormatted<T>(T value){}
+        }
+        [CollectionBuilder(typeof(ProbeContextPackBuilder),nameof(ProbeContextPackBuilder.Create))]
+        public readonly struct ProbeContextPack<T>:IEnumerable<T> {
+            private readonly T[] values;
+            public ProbeContextPack(T[] values){this.values=values;}
+            public T First=>values[0];
+            public IEnumerator<T> GetEnumerator()=>((IEnumerable<T>)values).GetEnumerator();
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
+        }
+        public static class ProbeContextPackBuilder {
+            public static ProbeContextPack<T> Create<T>(ReadOnlySpan<T> values){InterpolationTrace.Log+="pack-builder;";return new(values.ToArray());}
+        }
+        [InterpolatedStringHandler]public struct ProbeBuilderPackedHandler<T> {
+            public ProbeBuilderPackedHandler(int literalLength,int formattedCount,params ProbeContextPack<T> contexts){InterpolationTrace.Log+="pack-ctor;";InterpolationTrace.LastContext=contexts.First;}
+            public void AppendLiteral(string text){}
+            public void AppendFormatted<TValue>(TValue value){}
+        }
+        public sealed class ProbeOverloadedContexts:IEnumerable<object?> {
+            private readonly List<object?> values=[];
+            public ProbeOverloadedContexts(){InterpolationTrace.Log+="collection;";}
+            public object? First=>values[0];
+            public void Add(int value){InterpolationTrace.Log+="add-int;";values.Add(value);}
+            public void Add(object? value){InterpolationTrace.Log+="add-object;";values.Add(value);}
+            public IEnumerator<object?> GetEnumerator()=>values.GetEnumerator();
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
+        }
+        [InterpolatedStringHandler]public struct ProbeOverloadedPackedHandler {
+            public ProbeOverloadedPackedHandler(int literalLength,int formattedCount,params ProbeOverloadedContexts contexts){InterpolationTrace.Log+="overload-ctor;";InterpolationTrace.LastContext=contexts.First;}
+            public void AppendLiteral(string text){}
+            public void AppendFormatted<T>(T value){}
+        }
         [InterpolatedStringHandler]public struct ProbeThisHandler {
             public ProbeThisHandler(int literalLength,int formattedCount,object owner){}
             public void AppendLiteral(string text){}
@@ -72,6 +112,11 @@ internal static class InterpolationChecks
             public static void Generic<T>(ProbeOwner<T> owner,[InterpolatedStringHandlerArgument("owner")]ProbeGenericHandler<T> handler){}
             public static void Context<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeContextHandler handler){}
             public static void Packed<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbePackedHandler handler){}
+            public static void SpanPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeSpanPackedHandler handler){}
+            public static void ListPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeListPackedHandler handler){}
+            public static void BuilderPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeBuilderPackedHandler<T> handler){}
+            public static void OverloadedPacked<T>(T context,[InterpolatedStringHandlerArgument("context")]ProbeOverloadedPackedHandler handler){}
+            public static void NamedOverloadedPacked<T>(bool flag,T context,[InterpolatedStringHandlerArgument("context")]ProbeOverloadedPackedHandler handler){}
             public static FormattableString Capture(FormattableString value)=>value;
         }
         """;
@@ -105,6 +150,11 @@ internal static class InterpolationChecks
             ("HandlerImplicitReceiver", "void M(int value)=>Write($\"{value}\");void Write([InterpolatedStringHandlerArgument(\"\")]ProbeThisHandler handler){}", "void M<T1>(T1 value)"),
             ("HandlerForwardedBoxing", "static void M(int context,int value)=>InterpolationApi.Context(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value) where T1 : notnull"),
             ("HandlerConstructorParams", "static void M(int context,int value)=>InterpolationApi.Packed(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value)"),
+            ("HandlerConstructorSpanParams", "static void M(int context,int value)=>InterpolationApi.SpanPacked(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value)"),
+            ("HandlerConstructorListParams", "static void M(int context,int value)=>InterpolationApi.ListPacked(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value)"),
+            ("HandlerConstructorBuilderParams", "static void M(int context,int value)=>InterpolationApi.BuilderPacked(context,$\"{value}\");", "void M<T1, T2>(T1 context, T2 value)"),
+            ("HandlerConstructorOverloadedAdd", "static void M(int context,int value)=>InterpolationApi.OverloadedPacked(context,$\"{value}\");", "void M<T1>(int context, T1 value)"),
+            ("HandlerConstructorNamedArguments", "static void M(bool flag,int context,int value)=>InterpolationApi.NamedOverloadedPacked(context:context,flag:flag,handler:$\"{value}\");", "void M<T1>(bool flag, int context, T1 value)"),
             ("HandlerConcatenation", "static void M(int left,int right)=>InterpolationApi.Take($\"a{left}\"+$\"b{right}\");", "void M<T1, T2>(T1 left, T2 right)"),
             ("HandlerNested", "static void M(int value)=>InterpolationApi.Take($\"outer{InterpolationApi.Forward(true,$\"inner{value}\")}\");", "void M<T1>(T1 value)")
         ];
@@ -139,6 +189,11 @@ internal static class InterpolationChecks
                 public static FormattableString CaptureNullable(string? value)=>$"value={value}";
                 public static async Task<FormattableString> CaptureAsync(Task<int> pending)=>$"awaited={await pending}";
                 public static void Packed(int context,int value)=>InterpolationApi.Packed(context,$"{value}");
+                public static void SpanPacked(int context,int value)=>InterpolationApi.SpanPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
+                public static void ListPacked(int context,int value)=>InterpolationApi.ListPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
+                public static void BuilderPacked(int context,int value)=>InterpolationApi.BuilderPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
+                public static void OverloadedPacked(int context,int value)=>InterpolationApi.OverloadedPacked(InterpolationTrace.Touch(context),$"{InterpolationTrace.Touch(value)}");
+                public static void NamedOverloadedPacked(bool flag,int context,int value)=>InterpolationApi.NamedOverloadedPacked(context:InterpolationTrace.Touch(context),flag:flag,handler:$"{InterpolationTrace.Touch(value)}");
                 public static string Render(int value,bool enabled)=>InterpolationApi.Forward(enabled,$"before{InterpolationTrace.Touch(value),4:D2}after");
             }
             public static class OriginalInterpolationRunner {
@@ -151,7 +206,14 @@ internal static class InterpolationChecks
                     InterpolationTrace.Continue=false;InterpolationTrace.Log="";var stopped=InterpolationProbe.Render(7,true);
                     if(full!="ctor:True;literal:before;hole;value:07:4;literal:after;call;"||disabled!="ctor:False;call;"||stopped!="ctor:True;literal:before;call;")return "bad";
                     InterpolationProbe.Packed(17,7);if(!Equals(InterpolationTrace.LastContext,17))return "bad";
-                    return full+disabled+stopped;
+                    InterpolationTrace.Log="";InterpolationProbe.SpanPacked(19,7);if(!Equals(InterpolationTrace.LastContext,19)||InterpolationTrace.Log!="hole;span-ctor;hole;")return "bad";
+                    InterpolationTrace.Log="";InterpolationProbe.ListPacked(23,7);if(!Equals(InterpolationTrace.LastContext,23)||InterpolationTrace.Log!="hole;list-ctor;hole;")return "bad";
+                    InterpolationTrace.Log="";InterpolationProbe.BuilderPacked(29,7);if(!Equals(InterpolationTrace.LastContext,29)||InterpolationTrace.Log!="hole;pack-builder;pack-ctor;hole;")return "bad";
+                    var built=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.OverloadedPacked(31,7);
+                    if(!Equals(InterpolationTrace.LastContext,31)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return "bad";
+                    var overloaded=InterpolationTrace.Log;InterpolationTrace.Log="";InterpolationProbe.NamedOverloadedPacked(false,37,7);
+                    if(!Equals(InterpolationTrace.LastContext,37)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return "bad";
+                    return full+disabled+stopped+built+overloaded+InterpolationTrace.Log;
                 }
             }
             """;
@@ -164,7 +226,7 @@ internal static class InterpolationChecks
         if (Equals(originalTrace, "bad"))
         { throw new InvalidOperationException("Original interpolation behavior failed."); }
         var provider = new HmSignatureCodeFixProvider();
-        for (var round = 0; round < 5; round++)
+        for (var round = 0; round < 10; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -194,7 +256,17 @@ internal static class InterpolationChecks
                     var rendered=InterpolationProbe.Render(value,true);
                     if(rendered!="ctor:True;literal:before;hole;value:"+value+":4;literal:after;call;")return false;
                     InterpolationTrace.LastContext=null;InterpolationProbe.Packed(value,value);
-                    return ReferenceEquals(InterpolationTrace.LastContext,value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value))return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.SpanPacked(value,value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="hole;span-ctor;hole;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.ListPacked(value,value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="hole;list-ctor;hole;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.BuilderPacked(value,value);
+                    if(!ReferenceEquals(InterpolationTrace.LastContext,value)||InterpolationTrace.Log!="hole;pack-builder;pack-ctor;hole;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.OverloadedPacked(31,value);
+                    if(!Equals(InterpolationTrace.LastContext,31)||InterpolationTrace.Log!="hole;collection;add-int;overload-ctor;hole;")return false;
+                    InterpolationTrace.LastContext=null;InterpolationTrace.Log="";InterpolationProbe.NamedOverloadedPacked(false,37,value);
+                    return Equals(InterpolationTrace.LastContext,37)&&InterpolationTrace.Log=="hole;collection;add-int;overload-ctor;hole;";
                 }
             }
             """);

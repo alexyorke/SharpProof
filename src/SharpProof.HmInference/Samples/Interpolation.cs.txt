@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 [InterpolatedStringHandler]
@@ -10,10 +11,47 @@ public struct SampleFormattingHandler
     public bool AppendLiteral(string text) => true;
     public bool AppendFormatted<T>(T value, int alignment = 0, string? format = null) => true;
 }
+[InterpolatedStringHandler]
+public struct SampleSpanContextHandler
+{
+    public SampleSpanContextHandler(int literalLength, int formattedCount, params ReadOnlySpan<object?> contexts) { }
+    public void AppendLiteral(string text) { }
+    public void AppendFormatted<T>(T value) { }
+}
+[InterpolatedStringHandler]
+public struct SampleListContextHandler
+{
+    public SampleListContextHandler(int literalLength, int formattedCount, params List<object?> contexts) { }
+    public void AppendLiteral(string text) { }
+    public void AppendFormatted<T>(T value) { }
+}
+[CollectionBuilder(typeof(SampleContextPackBuilder), nameof(SampleContextPackBuilder.Create))]
+public readonly struct SampleContextPack<T>(T[] values) : IEnumerable<T>
+{
+    public IEnumerator<T> GetEnumerator() => ((IEnumerable<T>)values).GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public static class SampleContextPackBuilder
+{
+    public static SampleContextPack<T> Create<T>(ReadOnlySpan<T> values) => new(values.ToArray());
+}
+[InterpolatedStringHandler]
+public struct SampleBuilderContextHandler<T>
+{
+    public SampleBuilderContextHandler(int literalLength, int formattedCount, params SampleContextPack<T> contexts) { }
+    public void AppendLiteral(string text) { }
+    public void AppendFormatted<TValue>(TValue value) { }
+}
 public static class InterpolationSamples
 {
     private static void Consume(SampleFormattingHandler handler) { }
     private static void Forward(bool enabled, [InterpolatedStringHandlerArgument("enabled")] SampleFormattingHandler handler) { }
+    private static void SpanContexts<T>(T context, [InterpolatedStringHandlerArgument("context")] SampleSpanContextHandler handler) { }
+    private static void ListContexts<T>(T context, [InterpolatedStringHandlerArgument("context")] SampleListContextHandler handler) { }
+    private static void BuilderContexts<T>(T context, [InterpolatedStringHandlerArgument("context")] SampleBuilderContextHandler<T> handler) { }
+    public static void SpanPackedFormat(int context, int value) => SpanContexts(context, $"{value}");
+    public static void ListPackedFormat(int context, int value) => ListContexts(context, $"{value}");
+    public static void BuilderPackedFormat(int context, int value) => BuilderContexts(context, $"{value}");
     public static FormattableString CaptureFormat(int value) => $"value={value,6:D4}";
     public static FormattableString CaptureNullableFormat(string? value) => $"value={value}";
     public static async Task<FormattableString> CaptureAwaitedFormat(Task<int> pending) => $"value={await pending}";
