@@ -1365,7 +1365,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object? Evaluate(
         SpecTermDeclaration term,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         return term switch
@@ -1388,7 +1388,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object EvaluateUnary(
         SpecUnaryDeclaration unary,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         return unary.Operator switch
@@ -1401,7 +1401,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static object EvaluateBinary(
         SpecBinaryDeclaration binary,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         System.ArgumentNullException.ThrowIfNull(bindings);
         var left = Evaluate(binary.Left, bindings);
@@ -1429,7 +1429,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static long EvaluateLength(
         SpecLengthDeclaration length,
-        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
+        ImmutableDictionary<(SpecVariableRole, int), object?> bindings)
     {
         return Evaluate(length.Value, bindings) switch
         {

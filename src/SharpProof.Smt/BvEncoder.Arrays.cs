@@ -2,10 +2,10 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder
 {
-    private ImmutableDictionary<IrTypeId, FuncDecl> _elements = ImmutableDictionary<IrTypeId, FuncDecl>.Empty;
-    private ImmutableList<FuncDecl> _elementOrder = ImmutableList<FuncDecl>.Empty;
-    private ImmutableHashSet<IrSequenceAccessTerm> _arrayAccesses = ImmutableHashSet<IrSequenceAccessTerm>.Empty;
-    private ImmutableList<IrSequenceAccessTerm> _arrayAccessOrder = ImmutableList<IrSequenceAccessTerm>.Empty;
+    private readonly ImmutableDictionary<IrTypeId, FuncDecl>.Builder _elements = ImmutableDictionary.CreateBuilder<IrTypeId, FuncDecl>();
+    private readonly ImmutableList<FuncDecl>.Builder _elementOrder = ImmutableList.CreateBuilder<FuncDecl>();
+    private readonly ImmutableHashSet<IrSequenceAccessTerm>.Builder _arrayAccesses = ImmutableHashSet.CreateBuilder<IrSequenceAccessTerm>();
+    private readonly ImmutableList<IrSequenceAccessTerm>.Builder _arrayAccessOrder = ImmutableList.CreateBuilder<IrSequenceAccessTerm>();
 
     private Expr EncodeArrayAccess(IrSequenceAccessTerm access, SmtQueryResourceMeter meter)
     {
@@ -22,17 +22,16 @@ internal sealed partial class BvEncoder
             using var indexSort = context.MkBitVecSort(32);
             using Sort valueSort = info.Kind == IrTypeKind.Boolean ? context.MkBoolSort() : context.MkBitVecSort((uint)info.Width);
             element = context.MkFuncDecl("element" + _elements.Count.ToString(CultureInfo.InvariantCulture), [ReferenceSort, indexSort], valueSort);
-            _elements = _elements.AddUnique(storageType, element);
-            _elementOrder = _elementOrder.Add(element);
+            _elements.AddUnique(storageType, element);
+            _elementOrder.Add(element);
         }
         var length = (BitVecExpr)EncodeLength(array, meter);
         var valid = owner.Own(context.MkAnd(owner.Own(context.MkNot(owner.Own(context.MkEq(array, NullReference)))),
             owner.Own(context.MkBVSGE(index, owner.Own(context.MkBV(0, 32)))), owner.Own(context.MkBVSLT(index, length))));
         Expr empty = info.Kind == IrTypeKind.Boolean ? owner.Own(context.MkFalse()) : owner.Own(context.MkBV(0, (uint)info.Width));
-        if (!_arrayAccesses.Contains(access))
+        if (_arrayAccesses.Add(access))
         {
-            _arrayAccesses = _arrayAccesses.Add(access);
-            _arrayAccessOrder = _arrayAccessOrder.Add(access);
+            _arrayAccessOrder.Add(access);
         }
         return owner.Own(context.MkITE(valid, owner.Own(context.MkApp(element, array, index)), empty));
     }
@@ -41,8 +40,8 @@ internal sealed partial class BvEncoder
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        var observations = ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>>.Empty;
-        foreach (var access in _arrayAccessOrder)
+        var observations = ImmutableDictionary.CreateBuilder<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>.Builder>();
+        foreach (var access in _arrayAccessOrder.ToImmutable())
         {
             meter.Consume();
             using var array = model.Evaluate(Encode(access.Sequence, meter), true);
@@ -55,10 +54,13 @@ internal sealed partial class BvEncoder
             var decoded = CreateValue(factory, access.Type, value) ?? throw new UnsupportedIrEncodingException();
             var key = (ArrayStorageType(access.Type), array.ToString());
             if (!observations.TryGetValue(key, out var elements))
-            { elements = ImmutableDictionary<int, IrValue>.Empty; }
-            observations = observations.SetItem(key, elements.SetItem((int)number.UInt64, decoded));
+            {
+                elements = ImmutableDictionary.CreateBuilder<int, IrValue>();
+                observations[key] = elements;
+            }
+            elements[(int)number.UInt64] = decoded;
         }
-        return observations;
+        return observations.ToImmutableDictionary(static entry => entry.Key, static entry => entry.Value.ToImmutable());
     }
 
     // Signedness changes the numeric interpretation, not the array's bits.

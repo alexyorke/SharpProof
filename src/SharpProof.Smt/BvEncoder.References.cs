@@ -6,16 +6,17 @@ internal sealed partial class BvEncoder
     private FuncDecl? _length;
     private FuncDecl? _nominalWitnessTags;
     private Expr? _nullReference;
-    private ImmutableDictionary<IrTypeId, Expr> _emptyArrays = ImmutableDictionary<IrTypeId, Expr>.Empty;
-    private ImmutableList<KeyValuePair<IrTypeId, Expr>> _emptyArrayOrder = ImmutableList<KeyValuePair<IrTypeId, Expr>>.Empty;
-    private ImmutableDictionary<IrStringId, Expr> _stringLiterals = ImmutableDictionary<IrStringId, Expr>.Empty;
-    private ImmutableList<KeyValuePair<IrStringId, Expr>> _stringLiteralOrder = ImmutableList<KeyValuePair<IrStringId, Expr>>.Empty;
-    internal ImmutableList<BoolExpr> ReferenceFacts { get; private set; } = ImmutableList<BoolExpr>.Empty;
+    private readonly ImmutableDictionary<IrTypeId, Expr>.Builder _emptyArrays = ImmutableDictionary.CreateBuilder<IrTypeId, Expr>();
+    private readonly ImmutableList<KeyValuePair<IrTypeId, Expr>>.Builder _emptyArrayOrder = ImmutableList.CreateBuilder<KeyValuePair<IrTypeId, Expr>>();
+    private readonly ImmutableDictionary<IrStringId, Expr>.Builder _stringLiterals = ImmutableDictionary.CreateBuilder<IrStringId, Expr>();
+    private readonly ImmutableList<KeyValuePair<IrStringId, Expr>>.Builder _stringLiteralOrder = ImmutableList.CreateBuilder<KeyValuePair<IrStringId, Expr>>();
+    private readonly ImmutableList<BoolExpr>.Builder _referenceFacts = ImmutableList.CreateBuilder<BoolExpr>();
+    internal ImmutableList<BoolExpr> ReferenceFacts => _referenceFacts.ToImmutable();
 
     private void AddReferenceFact(BoolExpr fact)
     {
         fact = RepositoryParameterGuard.NotNull(fact, nameof(fact));
-        ReferenceFacts = ReferenceFacts.Add(fact);
+        _referenceFacts.Add(fact);
     }
 
     // Witness sizes are charged when decoded. Prefer small string/array/collection
@@ -34,13 +35,13 @@ internal sealed partial class BvEncoder
                     owner.Own(context.MkBV(MaximumSmallReference, 32)))));
             }
         }
-        foreach (var field in _fieldOrder)
+        foreach (var field in _fieldOrder.ToImmutable())
         {
             meter.Consume();
             var member = factory.GetMemberInfo(field.Key);
             if (member.ParameterTypes.IsEmpty && member.ReturnType == factory.IntegerType && factory.GetString(member.Name) is IrFieldSites.Prefix + "list:count" or IrFieldSites.Prefix + "queue:count" or IrFieldSites.Prefix + "stack:count")
             {
-                foreach (var observed in _fieldReads[field.Key])
+                foreach (var observed in _fieldReads[field.Key].ToImmutable())
                 {
                     meter.Consume();
                     var count = owner.Own(context.MkApp(field.Value, observed.Owner));
@@ -64,7 +65,7 @@ internal sealed partial class BvEncoder
         // still abstain. These are never proof premises.
         var groups = ImmutableDictionary.CreateBuilder<IrTypeId, int>();
         var groupOrder = ImmutableArray.CreateBuilder<KeyValuePair<IrTypeId, int>>();
-        foreach (var field in _fieldOrder)
+        foreach (var field in _fieldOrder.ToImmutable())
         {
             meter.Consume();
             AddType(factory.GetMemberInfo(field.Key).ReturnType);
@@ -96,12 +97,12 @@ internal sealed partial class BvEncoder
                 masks[first.Value] = mask;
             }
             var maskSnapshot = masks.MoveToImmutable();
-            foreach (var field in _fieldOrder)
+            foreach (var field in _fieldOrder.ToImmutable())
             {
                 meter.Consume();
                 if (!groups.TryGetValue(factory.GetMemberInfo(field.Key).ReturnType, out var group))
                 { continue; }
-                foreach (var observed in _fieldReads[field.Key])
+                foreach (var observed in _fieldReads[field.Key].ToImmutable())
                 {
                     meter.Consume();
                     var application = observed.Key == null ? context.MkApp(field.Value, observed.Owner)
@@ -178,13 +179,13 @@ internal sealed partial class BvEncoder
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter),
             owner.Own(context.MkBV(factory.GetString(term.Value).Length, 32)))));
-        foreach (var literal in _stringLiteralOrder.Select(static literal => literal.Value).Concat(_emptyArrayOrder.Select(static empty => empty.Value)))
+        foreach (var literal in _stringLiteralOrder.ToImmutable().Select(static literal => literal.Value).Concat(_emptyArrayOrder.ToImmutable().Select(static empty => empty.Value)))
         {
             meter.Consume();
             AddDistinctReferenceFact(value, literal);
         }
-        _stringLiterals = _stringLiterals.AddUnique(term.Value, value);
-        _stringLiteralOrder = _stringLiteralOrder.Add(new(term.Value, value));
+        _stringLiterals.AddUnique(term.Value, value);
+        _stringLiteralOrder.Add(new(term.Value, value));
         if (_text != null)
         { AddLiteralText(value, factory.GetString(term.Value), meter); }
         return value;
@@ -219,19 +220,19 @@ internal sealed partial class BvEncoder
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
-        foreach (var previous in _emptyArrayOrder)
+        foreach (var previous in _emptyArrayOrder.ToImmutable())
         {
             meter.Consume();
             if (HaveDistinctScalarElements(term.Type, previous.Key))
             { AddDistinctReferenceFact(value, previous.Value); }
         }
-        foreach (var literal in _stringLiteralOrder.Select(static literal => literal.Value))
+        foreach (var literal in _stringLiteralOrder.ToImmutable().Select(static literal => literal.Value))
         {
             meter.Consume();
             AddDistinctReferenceFact(value, literal);
         }
-        _emptyArrays = _emptyArrays.AddUnique(term.Type, value);
-        _emptyArrayOrder = _emptyArrayOrder.Add(new(term.Type, value));
+        _emptyArrays.AddUnique(term.Type, value);
+        _emptyArrayOrder.Add(new(term.Type, value));
         return value;
     }
 
@@ -289,7 +290,7 @@ internal sealed partial class BvEncoder
         var certifiedTypes = ImmutableDictionary.CreateBuilder<string, IrTypeId>(StringComparer.Ordinal);
         var shared = ImmutableDictionary.CreateBuilder<string, object>(StringComparer.Ordinal);
         var classTypes = ImmutableDictionary.CreateBuilder<string, ImmutableArray<IrTypeId>.Builder>(StringComparer.Ordinal);
-        foreach (var empty in _emptyArrayOrder)
+        foreach (var empty in _emptyArrayOrder.ToImmutable())
         {
             meter.Consume();
             using var evaluated = model.Evaluate(empty.Value, true);
@@ -302,7 +303,7 @@ internal sealed partial class BvEncoder
         }
         var identities = ImmutableDictionary.CreateBuilder<string, object>(StringComparer.Ordinal);
         string? emptyStringToken = null;
-        foreach (var literal in _stringLiteralOrder)
+        foreach (var literal in _stringLiteralOrder.ToImmutable())
         {
             meter.Consume();
             using var evaluated = model.Evaluate(literal.Value, true);
@@ -475,7 +476,7 @@ internal sealed partial class BvEncoder
 
     internal void DisposeReferences()
     {
-        foreach (var element in _elementOrder)
+        foreach (var element in _elementOrder.ToImmutable())
         { element.Dispose(); }
         _length?.Dispose();
         _nominalWitnessTags?.Dispose();

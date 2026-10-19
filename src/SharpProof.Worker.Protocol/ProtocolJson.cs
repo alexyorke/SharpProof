@@ -906,17 +906,16 @@ public static partial class WorkerProtocolJson
             return [];
         }
 
-        var ownedIds = ImmutableHashSet.Create<string?>(s_ordinal);
-        var owned = ImmutableList<WorkerClaimResult>.Empty;
+        var ownedIds = ImmutableHashSet.CreateBuilder<string?>(s_ordinal);
+        var owned = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         foreach (var claimId in callable.ClaimIds)
         {
-            if (!ownedIds.Contains(claimId))
+            if (ownedIds.Add(claimId))
             {
-                ownedIds = ownedIds.Add(claimId);
-                owned = owned.AddRange(claimsById[claimId]);
+                owned.AddRange(claimsById[claimId]);
             }
         }
-        return [.. owned];
+        return owned.ToImmutable();
     }
 
     private static void ValidateSummary(WorkerVerificationSummary? summary,
@@ -1004,14 +1003,14 @@ public static partial class WorkerProtocolJson
             return false;
         }
 
-        var seen = ImmutableHashSet<T>.Empty;
+        var seen = ImmutableHashSet.CreateBuilder<T>();
         foreach (var value in values)
         {
             if (!IsDefined(value, unspecified) || seen.Contains(value))
             {
                 return false;
             }
-            seen = seen.Add(value);
+            seen.Add(value);
         }
 
         return true;
@@ -1042,7 +1041,7 @@ public static partial class WorkerProtocolJson
     {
         RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
-        var identities = ImmutableDictionary.Create<string, (string? CallableId, WorkerAssumptionKind Kind)>(s_ordinal);
+        var identities = ImmutableDictionary.CreateBuilder<string, (string? CallableId, WorkerAssumptionKind Kind)>(s_ordinal);
         var valid = true;
         foreach (var callable in callables)
         {
@@ -1064,7 +1063,7 @@ public static partial class WorkerProtocolJson
                 }
                 else
                 {
-                    identities = identities.Add(assumption.Id, identity);
+                    identities.Add(assumption.Id, identity);
                 }
             }
         }
@@ -1087,7 +1086,7 @@ public static partial class WorkerProtocolJson
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
         values = RepositoryParameterGuard.NotNull(values, nameof(values));
         var items = values.ToImmutableArray();
-        var seen = ImmutableHashSet.Create<string?>(s_ordinal);
+        var seen = ImmutableHashSet.CreateBuilder<string?>(s_ordinal);
         var valid = true;
         foreach (var value in items)
         {
@@ -1097,7 +1096,7 @@ public static partial class WorkerProtocolJson
             }
             else
             {
-                seen = seen.Add(value);
+                seen.Add(value);
             }
         }
         errors.Check(valid, code);
@@ -1118,7 +1117,7 @@ public static partial class WorkerProtocolJson
             return false;
         }
 
-        var seen = ImmutableHashSet.Create<string?>(s_ordinal);
+        var seen = ImmutableHashSet.CreateBuilder<string?>(s_ordinal);
         foreach (var value in values)
         {
             if (value == null || !complete(value))
@@ -1128,7 +1127,7 @@ public static partial class WorkerProtocolJson
             var identity = key(value);
             if (seen.Contains(identity))
             { return false; }
-            seen = seen.Add(identity);
+            seen.Add(identity);
         }
 
         return true;
@@ -1219,24 +1218,24 @@ public static partial class WorkerProtocolJson
             CreateCallableAssumptions(ImmutableArray<WorkerCallableManifestEntry> callables)
         {
             RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
-            var result = ImmutableDictionary.Create<string, ImmutableArray<(string Id, WorkerAssumptionKind Kind)>>(s_ordinal);
+            var result = ImmutableDictionary.CreateBuilder<string, ImmutableArray<(string Id, WorkerAssumptionKind Kind)>>(s_ordinal);
             foreach (var callable in callables)
             {
                 if (callable.CallableId != null && !result.ContainsKey(callable.CallableId))
                 {
-                    result = result.Add(
+                    result.Add(
                         callable.CallableId,
                         NormalizeAssumptionDeclarations(callable.Assumptions));
                 }
             }
-            return result;
+            return result.ToImmutable();
         }
     }
 
     private sealed class OrdinalIdentityIndex<T>
         where T : class
     {
-        private readonly ImmutableDictionary<string, T> _byId = ImmutableDictionary.Create<string, T>(s_ordinal);
+        private readonly ImmutableDictionary<string, T> _byId;
         private readonly bool _hasNull;
         private readonly T? _nullValue;
 
@@ -1246,6 +1245,7 @@ public static partial class WorkerProtocolJson
         {
             identity = RepositoryParameterGuard.NotNull(identity, nameof(identity));
             values = RepositoryParameterGuard.NotNull(values, nameof(values));
+            var byId = ImmutableDictionary.CreateBuilder<string, T>(s_ordinal);
             foreach (var value in values)
             {
                 var id = identity(value);
@@ -1257,11 +1257,12 @@ public static partial class WorkerProtocolJson
                         _hasNull = true;
                     }
                 }
-                else if (!_byId.ContainsKey(id))
+                else if (!byId.ContainsKey(id))
                 {
-                    _byId = _byId.Add(id, value);
+                    byId.Add(id, value);
                 }
             }
+            _byId = byId.ToImmutable();
         }
 
         internal T? Find(string? id)

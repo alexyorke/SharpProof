@@ -144,19 +144,20 @@ internal static class WorkerResultAssembler
                     : "The worker was canceled before selected callable evidence was published."
             }];
         }
-        var assumptionsByCallable = ImmutableDictionary.Create<string, ImmutableArray<WorkerAssumptionEvidence>>(StringComparer.Ordinal);
+        var assumptionsByCallableBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<WorkerAssumptionEvidence>>(StringComparer.Ordinal);
         foreach (var callable in callables)
         {
             if (!string.IsNullOrWhiteSpace(callable.CallableId))
             {
-                if (!assumptionsByCallable.ContainsKey(callable.CallableId))
+                if (!assumptionsByCallableBuilder.ContainsKey(callable.CallableId))
                 {
-                    assumptionsByCallable = assumptionsByCallable.Add(
+                    assumptionsByCallableBuilder.Add(
                         callable.CallableId,
                         WorkerProtocolJson.EmptyIfDefault(callable.Assumptions));
                 }
             }
         }
+        var assumptionsByCallable = assumptionsByCallableBuilder.ToImmutable();
         return Create(inputHash, manifest, status, failureReason,
             callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
             {
@@ -191,7 +192,7 @@ internal static class WorkerResultAssembler
     {
         RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
-        var kinds = ImmutableDictionary.Create<string, WorkerAssumptionKind>(StringComparer.Ordinal);
+        var kinds = ImmutableDictionary.CreateBuilder<string, WorkerAssumptionKind>(StringComparer.Ordinal);
         foreach (var assumption in callables.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))
             .Concat(claims.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))))
         {
@@ -203,7 +204,7 @@ internal static class WorkerResultAssembler
             {
                 return true;
             }
-            kinds = kinds.SetItem(assumption.Id, assumption.Kind);
+            kinds[assumption.Id] = assumption.Kind;
         }
         return false;
     }

@@ -242,10 +242,10 @@ public sealed class ResultTypeCodeFixTests
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(diagnostic);
-        var fixes = ImmutableList<CodeAction>.Empty;
+        var fixes = ImmutableArray.CreateBuilder<CodeAction>();
         await new ResultTypeCodeFixProvider().RegisterCodeFixesAsync(new CodeFixContext(
-            document, diagnostic, (action, _) => fixes = fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
+            document, diagnostic, (action, _) => fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
             TestContext.CurrentContext.CancellationToken));
-        return fixes.ToImmutableArray();
+        return fixes.ToImmutable();
     }
 }

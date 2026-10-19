@@ -4,19 +4,19 @@ public sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private ImmutableDictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = ImmutableDictionary.Create<ExternalIdentityBucketKey, ExternalIdentityBucket>(ExternalIdentityBucketKeyComparer.Instance);
-    private ImmutableDictionary<string, IrStringId> _stringIds = ImmutableDictionary.Create<string, IrStringId>(StringComparer.Ordinal);
-    private ImmutableList<string> _strings = [];
-    private ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>.Empty;
-    private ImmutableList<IrTypeInfo> _types = [];
-    private ImmutableHashSet<IrTypeId> _closedSealedReferenceTypes = [];
-    private ImmutableList<IrVariableInfo> _variables = [];
-    private ImmutableDictionary<StructuralKey, IrMemberId> _memberIds = ImmutableDictionary.Create<StructuralKey, IrMemberId>(StructuralKeyComparer.Instance);
-    private ImmutableList<IrMemberInfo> _members = [];
-    private ImmutableList<IrOperationInfo> _operations = [];
-    private ImmutableDictionary<StructuralKey, IrTerm> _termIds = ImmutableDictionary.Create<StructuralKey, IrTerm>(StructuralKeyComparer.Instance);
-    private ImmutableList<IrTerm> _terms = [];
-    private ImmutableDictionary<IrTypeId, IrValue> _emptyArrays = ImmutableDictionary<IrTypeId, IrValue>.Empty;
+    private readonly ImmutableDictionary<ExternalIdentityBucketKey, ExternalIdentityBucket>.Builder _externalIdentityBuckets = ImmutableDictionary.CreateBuilder<ExternalIdentityBucketKey, ExternalIdentityBucket>(ExternalIdentityBucketKeyComparer.Instance);
+    private readonly ImmutableDictionary<string, IrStringId>.Builder _stringIds = ImmutableDictionary.CreateBuilder<string, IrStringId>(StringComparer.Ordinal);
+    private readonly ImmutableList<string>.Builder _strings = ImmutableList.CreateBuilder<string>();
+    private readonly ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>.Builder _typeIds = ImmutableDictionary.CreateBuilder<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>();
+    private readonly ImmutableList<IrTypeInfo>.Builder _types = ImmutableList.CreateBuilder<IrTypeInfo>();
+    private readonly ImmutableHashSet<IrTypeId>.Builder _closedSealedReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
+    private readonly ImmutableList<IrVariableInfo>.Builder _variables = ImmutableList.CreateBuilder<IrVariableInfo>();
+    private readonly ImmutableDictionary<StructuralKey, IrMemberId>.Builder _memberIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrMemberId>(StructuralKeyComparer.Instance);
+    private readonly ImmutableList<IrMemberInfo>.Builder _members = ImmutableList.CreateBuilder<IrMemberInfo>();
+    private readonly ImmutableList<IrOperationInfo>.Builder _operations = ImmutableList.CreateBuilder<IrOperationInfo>();
+    private readonly ImmutableDictionary<StructuralKey, IrTerm>.Builder _termIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrTerm>(StructuralKeyComparer.Instance);
+    private readonly ImmutableList<IrTerm>.Builder _terms = ImmutableList.CreateBuilder<IrTerm>();
+    private readonly ImmutableDictionary<IrTypeId, IrValue>.Builder _emptyArrays = ImmutableDictionary.CreateBuilder<IrTypeId, IrValue>();
     private readonly ImmutableDictionary<IrTypeId, IrTypeId?>.Builder _closedClassReferenceBases = ImmutableDictionary.CreateBuilder<IrTypeId, IrTypeId?>();
     private readonly ImmutableHashSet<IrTypeId>.Builder _interfaceReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
     private readonly ImmutableDictionary<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>.Builder _implementedReferenceInterfaces = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>();
@@ -121,7 +121,7 @@ public sealed class IrFactory
             else
             {
                 bucket = new ExternalIdentityBucket<T>([]);
-                _externalIdentityBuckets = _externalIdentityBuckets.Add(bucketKey, bucket);
+                _externalIdentityBuckets.Add(bucketKey, bucket);
             }
         }
 
@@ -153,8 +153,8 @@ public sealed class IrFactory
                 }
 
                 var id = CreateIdentityCore();
-                _externalIdentityBuckets = _externalIdentityBuckets.SetItem(bucketKey,
-                    new ExternalIdentityBucket<T>(bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id))));
+                _externalIdentityBuckets[bucketKey] =
+                    new ExternalIdentityBucket<T>(bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id)));
                 return id;
             }
         }
@@ -196,7 +196,7 @@ public sealed class IrFactory
             if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference)
             { throw new ArgumentException("A certificate requires a Total nominal reference type.", nameof(type)); }
-            _closedSealedReferenceTypes = _closedSealedReferenceTypes.Add(type);
+            _closedSealedReferenceTypes.Add(type);
         }
     }
 
@@ -326,7 +326,7 @@ public sealed class IrFactory
         {
             GetTypeInfoCore(type, nameof(type));
             var id = new IrVarId(_scope, _variables.Count);
-            _variables = _variables.Add(new IrVariableInfo(id, InternStringCore(name), type));
+            _variables.Add(new IrVariableInfo(id, InternStringCore(name), type));
             return id;
         }
     }
@@ -383,8 +383,8 @@ public sealed class IrFactory
 
             var nameId = InternStringCore(name);
             var id = new IrMemberId(_scope, _members.Count);
-            _memberIds = _memberIds.Add(key, id);
-            _members = _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
+            _memberIds.Add(key, id);
+            _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
             return id;
         }
     }
@@ -404,7 +404,7 @@ public sealed class IrFactory
         {
             var id = new OperationId(_scope, _operations.Count);
             var descriptionId = string.IsNullOrWhiteSpace(description) ? (IrStringId?)null : InternStringCore(description!);
-            _operations = _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
+            _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
             return id;
         }
     }
@@ -622,7 +622,7 @@ public sealed class IrFactory
         {
             EmptyArray(type);
             if (!_emptyArrays.TryGetValue(type, out var value))
-            { _emptyArrays = _emptyArrays.Add(type, value = CreateSequenceValue(type, ImmutableArray<IrValue>.Empty)); }
+            { _emptyArrays.Add(type, value = CreateSequenceValue(type, ImmutableArray<IrValue>.Empty)); }
             return value;
         }
     }
@@ -1018,8 +1018,8 @@ public sealed class IrFactory
         }
 
         var id = new IrStringId(_scope, _strings.Count);
-        _stringIds = _stringIds.Add(value, id);
-        _strings = _strings.Add(value);
+        _stringIds.Add(value, id);
+        _strings.Add(value);
         return id;
     }
 
@@ -1066,8 +1066,8 @@ public sealed class IrFactory
         shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
-        _typeIds = _typeIds.Add(key, id);
-        _types = _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
+        _typeIds.Add(key, id);
+        _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
         return id;
     }
 
@@ -1153,12 +1153,12 @@ public sealed class IrFactory
 
         var id = new IrId(_scope, _terms.Count);
         var term = create(id, state);
-        _termIds = _termIds.Add(key, term);
-        _terms = _terms.Add(term);
+        _termIds.Add(key, term);
+        _terms.Add(term);
         return term;
     }
 
-    private T GetScoped<T>(long scope, int value, IReadOnlyList<T> items, string parameterName)
+    private T GetScoped<T>(long scope, int value, ImmutableList<T>.Builder items, string parameterName)
     {
         EnsureScope(scope, parameterName);
         return items[ArgumentNullGuard.RequireIndex(

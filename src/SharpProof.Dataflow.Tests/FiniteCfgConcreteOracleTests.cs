@@ -196,9 +196,9 @@ public sealed class FiniteCfgConcreteOracleTests
 
         System.ArgumentNullException.ThrowIfNull(edges);
         System.ArgumentNullException.ThrowIfNull(transfers);
-        var inputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray();
-        var outputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray();
-        inputs = inputs.SetItem(entryBlockId, initial);
+        var inputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray().ToBuilder();
+        var outputs = Enumerable.Repeat(FiniteSet.Bottom, blockCount).ToImmutableArray().ToBuilder();
+        inputs[entryBlockId] = initial;
 
         for (var iteration = 0; iteration < 32; iteration++)
         {
@@ -212,7 +212,7 @@ public sealed class FiniteCfgConcreteOracleTests
                     continue;
                 }
 
-                outputs = outputs.SetItem(blockId, joined);
+                outputs[blockId] = joined;
                 changed = true;
             }
 
@@ -235,13 +235,13 @@ public sealed class FiniteCfgConcreteOracleTests
                     continue;
                 }
 
-                inputs = inputs.SetItem(blockId, joined);
+                inputs[blockId] = joined;
                 changed = true;
             }
 
             if (!changed)
             {
-                return new FinitePowersetFixpoint(inputs, outputs);
+                return new FinitePowersetFixpoint(inputs.ToImmutable(), outputs.ToImmutable());
             }
         }
 
@@ -325,9 +325,9 @@ public sealed class FiniteCfgConcreteOracleTests
     {
         System.ArgumentNullException.ThrowIfNull(graph);
         System.ArgumentNullException.ThrowIfNull(transfers);
-        var inputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray();
-        var outputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray();
-        inputs = inputs.SetItem(graph.EntryBlockId, ConcreteNullness.MaybeNull);
+        var inputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray().ToBuilder();
+        var outputs = Enumerable.Repeat(ConcreteNullness.Bottom, graph.Blocks.Length).ToImmutableArray().ToBuilder();
+        inputs[graph.EntryBlockId] = ConcreteNullness.MaybeNull;
         var changed = true;
         var iterations = 0;
         while (changed)
@@ -345,15 +345,15 @@ public sealed class FiniteCfgConcreteOracleTests
                     continue;
                 }
 
-                outputs = outputs.SetItem(blockId, output);
+                outputs[blockId] = output;
                 changed = true;
                 foreach (var successor in graph.GetSuccessors(blockId))
                 {
-                    inputs = inputs.SetItem(successor, inputs[successor] | output);
+                    inputs[successor] = inputs[successor] | output;
                 }
             }
         }
-        return new ConcreteFixpoint(inputs, outputs);
+        return new ConcreteFixpoint(inputs.ToImmutable(), outputs.ToImmutable());
     }
 
     private static NullnessValue ApplyAbstract(

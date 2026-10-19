@@ -12,9 +12,9 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213", Justification = "The native runner drains checks and invokes DisposeOwned before releasing its context.")]
     private readonly Z3ExpressionOwner _owner = new();
     private readonly BvEncoder _encoder;
-    private ImmutableDictionary<Assumption, BoolExpr> _assumptions = ImmutableDictionary<Assumption, BoolExpr>.Empty;
-    private ImmutableDictionary<VerificationQuery, BoolExpr> _goals = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
-    private ImmutableDictionary<VerificationQuery, BoolExpr> _smallReferences = ImmutableDictionary<VerificationQuery, BoolExpr>.Empty;
+    private readonly ImmutableDictionary<Assumption, BoolExpr>.Builder _assumptions = ImmutableDictionary.CreateBuilder<Assumption, BoolExpr>();
+    private readonly ImmutableDictionary<VerificationQuery, BoolExpr>.Builder _goals = ImmutableDictionary.CreateBuilder<VerificationQuery, BoolExpr>();
+    private readonly ImmutableDictionary<VerificationQuery, BoolExpr>.Builder _smallReferences = ImmutableDictionary.CreateBuilder<VerificationQuery, BoolExpr>();
     private readonly ImmutableDictionary<VerificationQuery, BoolExpr>.Builder _nominalReferences = ImmutableDictionary.CreateBuilder<VerificationQuery, BoolExpr>();
     private long _consumedResourceCount;
     private int _assertedReferenceFacts;
@@ -68,7 +68,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                     var predicate = _encoder.EncodeBoolean(assumption.Predicate, meter);
                     selector = _owner.Own(_runner.Context.MkBoolConst("a" + _assumptions.Count.ToString(CultureInfo.InvariantCulture)));
                     _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, predicate)));
-                    _assumptions = _assumptions.AddUnique(assumption, selector);
+                    _assumptions.AddUnique(assumption, selector);
                 }
                 var name = selector.ToString();
                 if (!active.ContainsKey(name))
@@ -84,7 +84,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 goalSelector = _owner.Own(_runner.Context.MkBoolConst("g" + _goals.Count.ToString(CultureInfo.InvariantCulture)));
                 _solver.Assert(_owner.Own(_runner.Context.MkImplies(goalSelector,
                     _owner.Own(_runner.Context.MkNot(goal)))));
-                _goals = _goals.AddUnique(query, goalSelector);
+                _goals.AddUnique(query, goalSelector);
             }
             selectors.Add(goalSelector);
             while (_assertedReferenceFacts < _encoder.ReferenceFacts.Count)
@@ -165,7 +165,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         { return null; }
         var selector = _owner.Own(_runner.Context.MkBoolConst("s" + _smallReferences.Count.ToString(CultureInfo.InvariantCulture)));
         _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, bound)));
-        _smallReferences = _smallReferences.AddUnique(query, selector);
+        _smallReferences.AddUnique(query, selector);
         return selector;
     }
 
@@ -183,7 +183,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         _nominalReferences.AddUnique(query, selector);
         return selector;
     }
-    internal static BackendCheckResult DecodeCore<T>(IReadOnlyList<T> core, IReadOnlyDictionary<string, int> active,
+    internal static BackendCheckResult DecodeCore<T>(IReadOnlyList<T> core, ImmutableDictionary<string, int> active,
         string goal, SmtQueryResourceMeter meter) where T : IDisposable
     {
         active = RepositoryParameterGuard.NotNull(active, nameof(active));

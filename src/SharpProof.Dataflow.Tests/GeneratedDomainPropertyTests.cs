@@ -253,13 +253,14 @@ internal static class GeneratedDomainSamples
     {
         var domain = IntervalDomain.Instance;
         var random = new Random(seed);
-        ImmutableList<IntervalValue> values = [
+        ImmutableArray<IntervalValue> initialValues = [
             domain.Bottom,
             domain.Top,
             domain.Constant(long.MinValue),
             domain.Constant(long.MaxValue),
             domain.Range(long.MinValue, long.MaxValue)
         ];
+        var values = initialValues.ToBuilder();
 
         for (var index = 0; index < count; index++)
         {
@@ -267,7 +268,7 @@ internal static class GeneratedDomainSamples
             var second = NextSignedValue(random);
             var lower = Math.Min(first, second);
             var upper = Math.Max(first, second);
-            values = values.Add(random.Next(6) switch
+            values.Add(random.Next(6) switch
             {
                 0 => domain.Constant(first),
                 1 => domain.Range(lower, upper),
@@ -284,20 +285,21 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values.ToImmutableArray();
+        return values.ToImmutable();
     }
 
     public static ImmutableArray<SequenceCardinalityValue> Sequences(int seed, int count)
     {
         var domain = SequenceCardinalityDomain.Instance;
         var random = new Random(seed);
-        ImmutableList<SequenceCardinalityValue> values = [
+        ImmutableArray<SequenceCardinalityValue> initialValues = [
             domain.Bottom,
             domain.Empty,
             domain.NonEmpty,
             domain.Top,
             domain.KnownLength(long.MaxValue)
         ];
+        var values = initialValues.ToBuilder();
 
         for (var index = 0; index < count; index++)
         {
@@ -316,7 +318,7 @@ internal static class GeneratedDomainSamples
                     NextModulus(random),
                     random.NextInt64(0, 17))
             };
-            values = values.Add(random.Next(5) switch
+            values.Add(random.Next(5) switch
             {
                 0 => domain.KnownLength(first),
                 1 => domain.Create(SequenceCardinalityKind.Empty, length),
@@ -328,7 +330,7 @@ internal static class GeneratedDomainSamples
             });
         }
 
-        return values.ToImmutableArray();
+        return values.ToImmutable();
     }
 
     private static long NextSignedValue(Random random)

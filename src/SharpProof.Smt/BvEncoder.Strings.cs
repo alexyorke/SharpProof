@@ -8,8 +8,8 @@ internal sealed partial class BvEncoder
     private Sort? _codeUnitSort;
     private SeqSort? _textSort;
     private FuncDecl? _text;
-    private ImmutableHashSet<uint> _textLinked = ImmutableHashSet<uint>.Empty;
-    private ImmutableList<(Expr Value, Expr Left, Expr Right)> _concatenations = ImmutableList<(Expr Value, Expr Left, Expr Right)>.Empty;
+    private readonly ImmutableHashSet<uint>.Builder _textLinked = ImmutableHashSet.CreateBuilder<uint>();
+    private readonly ImmutableList<(Expr Value, Expr Left, Expr Right)>.Builder _concatenations = ImmutableList.CreateBuilder<(Expr Value, Expr Left, Expr Right)>();
 
     private Expr EncodeStringEquals(Expr left, Expr right, SmtQueryResourceMeter meter)
     {
@@ -32,7 +32,7 @@ internal sealed partial class BvEncoder
         var text = (SeqExpr)owner.Own(context.MkApp(_text!, value));
         if (!_textLinked.Contains(value.Id))
         {
-            _textLinked = _textLinked.Add(value.Id);
+            _textLinked.Add(value.Id);
             var length = owner.Own(context.MkBV2Int((BitVecExpr)EncodeLength(value, meter), false));
             AddReferenceFact(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
                 owner.Own(context.MkEq(length, owner.Own(context.MkLength(text)))))));
@@ -48,9 +48,9 @@ internal sealed partial class BvEncoder
         _codeUnitSort = context.MkBitVecSort(16);
         _textSort = context.MkSeqSort(_codeUnitSort);
         _text = context.MkFuncDecl("text", ReferenceSort, _textSort);
-        foreach (var literal in _stringLiteralOrder)
+        foreach (var literal in _stringLiteralOrder.ToImmutable())
         { AddLiteralText(literal.Value, factory.GetString(literal.Key), meter); }
-        foreach (var concatenation in _concatenations)
+        foreach (var concatenation in _concatenations.ToImmutable())
         { AddConcatenationText(concatenation, meter); }
     }
 
@@ -70,7 +70,7 @@ internal sealed partial class BvEncoder
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var concatenation = (value, left, right);
-        _concatenations = _concatenations.Add(concatenation);
+        _concatenations.Add(concatenation);
         if (_text != null)
         { AddConcatenationText(concatenation, meter); }
     }

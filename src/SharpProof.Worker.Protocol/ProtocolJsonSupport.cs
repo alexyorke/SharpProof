@@ -25,15 +25,15 @@ public static partial class WorkerProtocolJson
 
     private sealed class Validator
     {
-        private ImmutableList<WorkerProtocolError> _errors = ImmutableList<WorkerProtocolError>.Empty;
+        private readonly ImmutableArray<WorkerProtocolError>.Builder _errors = ImmutableArray.CreateBuilder<WorkerProtocolError>();
 
         internal int Count => _errors.Count;
-        internal WorkerProtocolValidationResult Result => new(_errors);
+        internal WorkerProtocolValidationResult Result => new(_errors.ToImmutable());
 
         internal void Add(string code)
         {
             code = RepositoryParameterGuard.NotNull(code, nameof(code));
-            _errors = _errors.Add(new WorkerProtocolError
+            _errors.Add(new WorkerProtocolError
             {
                 Code = code,
                 Message = $"Protocol invariant '{code}' was not satisfied."

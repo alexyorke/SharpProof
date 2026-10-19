@@ -2,17 +2,17 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false)
 {
-    private ImmutableDictionary<IrId, Expr> _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : ImmutableDictionary<IrId, Expr>.Empty)));
-    private ImmutableDictionary<IrVarId, Expr> _variables = ImmutableDictionary<IrVarId, Expr>.Empty;
+    private readonly ImmutableDictionary<IrId, Expr>.Builder _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : ImmutableDictionary.CreateBuilder<IrId, Expr>())));
+    private readonly ImmutableDictionary<IrVarId, Expr>.Builder _variables = ImmutableDictionary.CreateBuilder<IrVarId, Expr>();
 
     internal void ValidateQuery(VerificationQuery query, SmtQueryResourceMeter meter, CancellationToken cancellationToken)
     {
-        var depths = ImmutableDictionary<IrId, int>.Empty;
+        var depths = ImmutableDictionary.CreateBuilder<IrId, int>();
         foreach (var assumption in query.Assumptions)
         {
-            depths = SmtEncodingDepth.Validate(assumption.Predicate, depths, meter, cancellationToken);
+            SmtEncodingDepth.Validate(assumption.Predicate, depths, meter, cancellationToken);
         }
-        depths = SmtEncodingDepth.Validate(query.Goal.Predicate, depths, meter, cancellationToken);
+        SmtEncodingDepth.Validate(query.Goal.Predicate, depths, meter, cancellationToken);
         foreach (var variable in query.ModelVariables)
         {
             GetVariable(variable, meter);
@@ -35,7 +35,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             : throw new UnsupportedIrEncodingException();
         // A zero-length string input need not be the interned "" literal:
         // the CLR can allocate distinct empty strings (e.g. string.Copy("")).
-        _variables = _variables.AddUnique(variable, expression);
+        _variables.AddUnique(variable, expression);
         return expression;
     }
 
@@ -73,28 +73,30 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 EncodeRelation(relation, meter),
             _ => throw new UnsupportedIrEncodingException()
         };
-        _encoded = _encoded.AddUnique(term.Id, expression);
+        _encoded.AddUnique(term.Id, expression);
         return expression;
     }
 
     // Only a Horn search encodes unknown invariants, as uninterpreted relations.
-    internal ImmutableDictionary<IrMemberId, FuncDecl>? Relations { get; private set; } =
-        enableInvariantRelations ? ImmutableDictionary<IrMemberId, FuncDecl>.Empty : null;
-    internal ImmutableList<KeyValuePair<IrMemberId, FuncDecl>> RelationDeclarations { get; private set; } =
-        ImmutableList<KeyValuePair<IrMemberId, FuncDecl>>.Empty;
+    private readonly ImmutableDictionary<IrMemberId, FuncDecl>.Builder? _relations =
+        enableInvariantRelations ? ImmutableDictionary.CreateBuilder<IrMemberId, FuncDecl>() : null;
+    private readonly ImmutableList<KeyValuePair<IrMemberId, FuncDecl>>.Builder _relationDeclarations =
+        ImmutableList.CreateBuilder<KeyValuePair<IrMemberId, FuncDecl>>();
+    internal ImmutableDictionary<IrMemberId, FuncDecl>? Relations => _relations?.ToImmutable();
+    internal ImmutableList<KeyValuePair<IrMemberId, FuncDecl>> RelationDeclarations => _relationDeclarations.ToImmutable();
 
     private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         relation = RepositoryParameterGuard.NotNull(relation, nameof(relation));
         var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToArray();
-        var relations = Relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
+        var relations = _relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         if (!relations.TryGetValue(relation.Member, out var declaration))
         {
             declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
                 [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
-            Relations = relations.Add(relation.Member, declaration);
-            RelationDeclarations = RelationDeclarations.Add(new(relation.Member, declaration));
+            relations.Add(relation.Member, declaration);
+            _relationDeclarations.Add(new(relation.Member, declaration));
         }
         return owner.Own(context.MkApp(declaration, arguments));
     }
@@ -241,13 +243,13 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
 internal static class SmtEncodingDepth
 {
-    internal static ImmutableDictionary<IrId, int> Validate(IrTerm root, ImmutableDictionary<IrId, int> maximumDepths,
+    internal static void Validate(IrTerm root, ImmutableDictionary<IrId, int>.Builder maximumDepths,
         SmtQueryResourceMeter meter, CancellationToken cancellationToken)
     {
         maximumDepths = RepositoryParameterGuard.NotNull(maximumDepths, nameof(maximumDepths));
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        var depths = maximumDepths.ToBuilder();
+        var depths = maximumDepths;
         var pending = ImmutableStack<(IrTerm Term, int Depth)>.Empty;
         var children = ImmutableStack<IrTerm>.Empty;
         pending = pending.Push((root, 1));
@@ -274,6 +276,5 @@ internal static class SmtEncodingDepth
                 children = children.Pop();
             }
         }
-        return depths.ToImmutable();
     }
 }
