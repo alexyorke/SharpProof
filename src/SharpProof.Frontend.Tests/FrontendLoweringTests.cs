@@ -1537,7 +1537,7 @@ public sealed class FrontendLoweringTests
             Is.True,
             string.Join(Environment.NewLine, emit.Diagnostics));
         return MetadataReference.CreateFromImage(
-            stream.ToArray().ToImmutableArray(),
+            ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
             new MetadataReferenceProperties(
                 MetadataImageKind.Assembly,
                 aliases: [alias]));

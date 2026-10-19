@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Xml.Linq;
@@ -16,14 +17,17 @@ internal sealed class PublicApiDocumentationTests
     [Test]
     public void IntelliSenseFileExactlyDocumentsTheSupportedPublicApi()
     {
-        var documented = XDocument.Load(GetDocumentationPath())
-            .Descendants("member")
-            .ToDictionary(
-                static element =>
-                    (string?)element.Attribute("name") ??
-                    throw new InvalidOperationException(
-                        "A documentation member has no name."),
-                StringComparer.Ordinal);
+        var documentedBuilder = ImmutableDictionary.CreateBuilder<string, XElement>(StringComparer.Ordinal);
+        foreach (var element in XDocument.Load(GetDocumentationPath()).Descendants("member"))
+        {
+            var name = (string?)element.Attribute("name") ??
+                throw new InvalidOperationException("A documentation member has no name.");
+            if (!documentedBuilder.TryAdd(name, element))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + name);
+            }
+        }
+        var documented = documentedBuilder.ToImmutable();
         var expected = GetPublicApiMembers();
 
         Assert.That(
@@ -68,19 +72,27 @@ internal sealed class PublicApiDocumentationTests
         }
     }
 
-    private static SortedDictionary<string, MemberInfo> GetPublicApiMembers()
+    private static ImmutableSortedDictionary<string, MemberInfo> GetPublicApiMembers()
     {
-        var result = new SortedDictionary<string, MemberInfo>(
-            StringComparer.Ordinal);
+        var result = ImmutableSortedDictionary.CreateBuilder<string, MemberInfo>(StringComparer.Ordinal);
+        void AddMember(string key, MemberInfo member)
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            ArgumentNullException.ThrowIfNull(member);
+            if (!result.TryAdd(key, member))
+            {
+                throw new ArgumentException("An item with the same key has already been added. Key: " + key);
+            }
+        }
         foreach (var type in typeof(Contract).Assembly.GetExportedTypes())
         {
-            result.Add("T:" + GetTypeName(type), type);
+            AddMember("T:" + GetTypeName(type), type);
             foreach (var constructor in type.GetConstructors(
                          BindingFlags.Public |
                          BindingFlags.Instance |
                          BindingFlags.DeclaredOnly))
             {
-                result.Add(GetMethodId(constructor), constructor);
+                AddMember(GetMethodId(constructor), constructor);
             }
             foreach (var method in type.GetMethods(
                          BindingFlags.Public |
@@ -90,7 +102,7 @@ internal sealed class PublicApiDocumentationTests
             {
                 if (!method.IsSpecialName)
                 {
-                    result.Add(GetMethodId(method), method);
+                    AddMember(GetMethodId(method), method);
                 }
             }
             foreach (var property in type.GetProperties(
@@ -99,7 +111,7 @@ internal sealed class PublicApiDocumentationTests
                          BindingFlags.Instance |
                          BindingFlags.DeclaredOnly))
             {
-                result.Add(
+                AddMember(
                     "P:" + GetTypeName(type) + "." + property.Name,
                     property);
             }
@@ -108,12 +120,12 @@ internal sealed class PublicApiDocumentationTests
                          BindingFlags.Static |
                          BindingFlags.DeclaredOnly))
             {
-                result.Add(
+                AddMember(
                     "F:" + GetTypeName(type) + "." + field.Name,
                     field);
             }
         }
-        return result;
+        return result.ToImmutable();
     }
 
     private static string GetMethodId(MethodBase method)
@@ -154,10 +166,10 @@ internal sealed class PublicApiDocumentationTests
                 : GetTypeName(type);
     }
 
-    private static ParameterInfo[] GetParameters(MemberInfo member)
+    private static ImmutableArray<ParameterInfo> GetParameters(MemberInfo member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
-        return member is MethodBase method ? method.GetParameters() : [];
+        return member is MethodBase method ? method.GetParameters().ToImmutableArray() : [];
     }
 
     private static void AssertNamedElement(
