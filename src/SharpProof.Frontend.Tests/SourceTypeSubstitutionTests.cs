@@ -46,6 +46,23 @@ public sealed class SourceTypeSubstitutionTests
     }
 
     [Test]
+    public void NestedSourceFramesKeepArraySymbolsWithoutAdmittingTheirCompilation()
+    {
+        var tree = CSharpSyntaxTree.ParseText("public class Box { public static void Target<T>(T[] values) { } }");
+        var compilation = CSharpCompilation.Create("LazySubstitutionCompilation", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+        var caller = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var first = caller.CreateFrame(target);
+        var nested = first.CreateFrame(target);
+        Assert.That(first.Compilation, Is.Null);
+        Assert.That(nested.Compilation, Is.Null);
+        nested.SpecializeTypeParameter(target.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));
+        var expected = compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Int32));
+        Assert.That(CompilerIdentityBridge.SameRuntimeType(nested.SpecializeSourceType(target.Parameters[0].Type)!, expected), Is.True);
+        Assert.That(nested.Compilation, Is.Null);
+    }
+    [Test]
     public void CyclicSubstitutionAbstainsWithinItsConstructionBound()
     {
         var tree = CSharpSyntaxTree.ParseText("public class Box<T> { public void Target() { } }");
