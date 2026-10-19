@@ -333,6 +333,8 @@ public static partial class Inference
                         != (after.ReducedFrom ?? after).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
                     { return new(symbol.Name, "Rejected", "Generalization changes a selected method group overload."); }
                 }
+                if (!PreservesPatternBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes an implicit pattern member."); }
                 if (!PreservesDeconstructionBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
                 { return new(symbol.Name, "Rejected", "Generalization changes a deconstruction binding or conversion."); }
                 var originalCreations = beforeRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
@@ -617,7 +619,7 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(statement));
             }
 
-            Anchor(statement.Expression);
+            Expression(statement.Expression);
             return Scoped(() =>
             {
                 HmType? returns = null;
@@ -634,8 +636,10 @@ public static partial class Inference
                                 hasDefault = true;
                                 break;
                             case CaseSwitchLabelSyntax:
+                                Anchor(statement.Expression);
                                 break;
-                            case CasePatternSwitchLabelSyntax { Pattern: ConstantPatternSyntax or DiscardPatternSyntax } pattern:
+                            case CasePatternSwitchLabelSyntax pattern:
+                                Pattern(pattern.Pattern, Expression(statement.Expression));
                                 if (pattern.WhenClause is not null)
                                 {
                                     BooleanCondition(pattern.WhenClause.Condition);
@@ -723,9 +727,8 @@ public static partial class Inference
             {
                 case AwaitExpressionSyntax awaited:
                     return Awaited(awaited);
-                case IsPatternExpressionSyntax pattern when pattern.Pattern is ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression }
-                    or UnaryPatternSyntax { Pattern: ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression } }:
-                    Anchor(pattern.Expression);
+                case IsPatternExpressionSyntax pattern:
+                    Pattern(pattern.Pattern, Expression(pattern.Expression));
                     return new("bool");
                 case ConditionalAccessExpressionSyntax conditionalAccess:
                     return ConditionalAccess(conditionalAccess);
@@ -942,14 +945,11 @@ public static partial class Inference
                 case CheckedExpressionSyntax checkedExpression:
                     return Expression(checkedExpression.Expression);
                 case SwitchExpressionSyntax switched:
-                    Anchor(switched.GoverningExpression);
+                    Expression(switched.GoverningExpression);
                     var switchedResult = HmType.Variable();
                     foreach (var arm in switched.Arms)
                     {
-                        if (arm.Pattern is not ConstantPatternSyntax and not DiscardPatternSyntax)
-                        {
-                            throw new InferenceException("Only constant/discard switch patterns are supported.");
-                        }
+                        Pattern(arm.Pattern, Expression(switched.GoverningExpression));
 
                         if (arm.WhenClause is not null)
                         {

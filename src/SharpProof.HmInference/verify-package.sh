@@ -33,6 +33,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 delegate void PackageSink<T>(T value);
 sealed class PackageBox<T> { public T Get()=>default!; }
+sealed class PackagePatternBox<T> { public T Value=>default!; }
 sealed class PackageAwaitBox<T> { public System.Runtime.CompilerServices.TaskAwaiter<T> GetAwaiter()=>Task.FromResult(default(T)!).GetAwaiter(); }
 [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(PackageBuilder<>))]
 readonly struct PackageTask<T> {
@@ -78,6 +79,10 @@ static class Sample {
     public static async Task<object?> BoxAwaitedArgument(Task<int?> value)=>BoxOptional(await value);
     public static async Task<long?> WidenAwaitedArgument(Task<int?> value,bool ignored)=>WidenOptional(await value);
     public static int ArrayArgument(int[] values)=>FirstValue(values);
+    public static int PatternList(int[] values,int fallback)=>values is [var first,..]?first:fallback;
+    public static int PatternProperty(PackagePatternBox<int> value,int fallback)=>value is {Value:var item}?item:fallback;
+    public static int PatternNullable(int? value,int fallback)=>value is {} captured?captured:fallback;
+    public static int PatternSwitch(object value)=>value switch {string text=>text.Length,int number=>number,_=>-1};
     public static int Identity(int value) => value;
     public static int? NullableIdentity(int? value) => value;
     public static string? NullableReferenceIdentity(string? value) => value;
@@ -95,10 +100,10 @@ EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 if grep -Eq 'CS8032|AD0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
-for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'global::PackageTask<T1> CustomBuilderIdentity<T1>' 'T1? ImportedNullable<T1>' 'T1 ImportedNullableLegacy<T1>' 'ImportedNullableAsync<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class' 'BoxArgument<T1>' 'BoxAwaitedArgument<T1>' 'WidenAwaitedArgument<T1>' 'ArrayArgument<T1>' 'where T1 : notnull'; do
+for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'ConditionalElement<T1>' 'CoalesceAssign<T1>' 'CustomAwait<T1>' 'global::PackageTask<T1> CustomBuilderIdentity<T1>' 'T1? ImportedNullable<T1>' 'T1 ImportedNullableLegacy<T1>' 'ImportedNullableAsync<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'Yield<T1>' 'AsyncYield<T1>' 'Last<T1>' 'Flow<T1>' 'Loop<T1>' 'Pair<T1, T2>' 'AssignPair<T1, T2>' 'where T1 : struct' 'where T1 : class' 'BoxArgument<T1>' 'BoxAwaitedArgument<T1>' 'WidenAwaitedArgument<T1>' 'ArrayArgument<T1>' 'where T1 : notnull' 'PatternList<T1>' 'PatternProperty<T1>' 'PatternNullable<T1>' 'PatternSwitch<T1>'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' 'PASS NuGetEnumerationDiagnostics' 'PASS NuGetControlFlowDiagnostics' 'PASS NuGetDeconstructionDiagnostics' 'PASS NuGetCustomAwaitAndNullableOperations' 'PASS NuGetUnconstrainedNullableSchemes' 'PASS NuGetCustomAsyncBuilders' 'PASS NuGetArgumentConversions' 'PASS NuGetPatternInference' | tee "$evidence/package-checks.txt"

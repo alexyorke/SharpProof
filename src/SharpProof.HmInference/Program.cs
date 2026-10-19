@@ -321,6 +321,7 @@ internal static class Program
 
         passed++;
         Program.Log.Info("PASS PolymorphicRuntime");
+        passed += await PatternChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CallChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (SyntaxChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += await (FlowChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

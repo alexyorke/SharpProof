@@ -106,7 +106,8 @@ method/local-function declarations supply schemes instantiated per call.
 | Explicit/target-typed construction and initializers | Preserve constructor/indexer/Add selection; pin initializer source types and support nested members |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
 | Conditionals, return branches and guard returns | Unify results |
-| Constant/discard switch expressions | Preserve governing type; unify result arms |
+| Declaration, recursive, positional and list patterns | Bind pattern variables; infer structural member/element types and retain implicit protocol selections |
+| Pattern switches and switch expressions | Bind section/arm variables and guards; unify results and preserve constant conversion domains |
 | Self-recursive methods | Solve monomorphic recursive references |
 | Resolved method and generic calls | Import signatures; instantiate generic parameters per call |
 | Named/reordered arguments and omitted optional defaults | Bind by Roslyn parameter identity rather than source position |
@@ -177,8 +178,8 @@ the source type of user-defined conversions and true operators.
 Ref foreach, generalized extension enumeration and type-parameter enumerator
 patterns remain unsupported. Ref delegates,
 attributed/modified lambdas and expression trees remain unsupported.
-Switch statements support constant labels and guards,
-not declaration/type patterns. Try/catch/finally supports exception locals, filters,
+Switch statements support pattern variables and guards.
+Try/catch/finally supports exception locals, filters,
 rethrow and pending loop/return exits. Using statements/declarations, await using
 and lock retain concrete resource/receiver types to preserve disposal conversions,
 pattern/interface selection and Monitor versus System.Threading.Lock lowering.
@@ -212,6 +213,18 @@ Null-coalescing assignments share their input/result types for identity and
 nullable-lifting conversions; widening and boxing endpoints stay concrete.
 Candidates introducing new compiler warnings (including nullable warnings) are
 rejected; existing warnings do not become evidence of correctness.
+
+Pattern variables participate in inference through `is` expressions, switch labels,
+guards and switch-expression arms. Var captures share the input monotype; property
+and positional patterns propagate generic container/tuple arguments, including
+inherited members and extension deconstructors. Nullable empty-property patterns
+preserve the underlying value type. List and slice patterns support arrays, strings
+and custom indexers/slices. Declaration/type tests keep their explicit tested type,
+while relational and constant tests retain their original conversion domain.
+Runtime `ITuple` positional patterns retain the static input domain required by
+C# fallback binding. Selected implicit property, length, indexer, slice and deconstructor members are
+rechecked across supplied files. Runtime IDE-fix tests compare values and getter,
+indexer, slice and deconstruction traces, including failed matches and empty lists.
 
 Resource-local receiver checks tolerate differences between declared nullable
 annotations and the non-null flow state at a member access, retaining the

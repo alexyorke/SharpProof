@@ -1,0 +1,21 @@
+#nullable enable
+
+class PatternSampleBox<T>
+{
+    public T Item = default!;
+    public T Value => Item;
+    public void Deconstruct(out T item, out bool flag) { item = Item; flag = true; }
+}
+
+static class PatternSamples
+{
+    public static int Capture(int value) => value is var copy ? copy : value;
+    public static int NullableCapture(int? value, int fallback) => value is { } copy ? copy : fallback;
+    public static int Property(PatternSampleBox<int> value, int fallback) => value is { Value: var item } ? item : fallback;
+    public static int Position(PatternSampleBox<int> value, int fallback) => value is (var item, var flag) ? item : fallback;
+    public static int Head(int[] values, int fallback) => values is [var first, ..] ? first : fallback;
+    public static int[] Tail(int[] values, int[] fallback) => values is [_, .. var rest] ? rest : fallback;
+    public static int TypeSwitch(object value) => value switch { string text => text.Length, int number => number, _ => -1 };
+    public static int ListSwitch(int[] values, int fallback) => values switch { [var first, ..] => first, _ => fallback };
+    public static bool Range(int value, bool ignored) => value is > 0 and < 10;
+}
