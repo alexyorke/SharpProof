@@ -3385,3 +3385,12 @@ symbol comparers. Add's boolean gates the entry-comparer order append. Preserve 
 updates before TypeSpecializer/Result/Parameters rebuilding; no collection root escapes.
 Validate full Frontend generic/array/comparer/capture controls after the dictionary gate.
 Status: open before edits.
+
+IMM-M115: Main verified 18 Fuzz test fixed-vector/set/singleton-map candidates across
+13 files. Freeze ordered outer vectors for semantic cases, campaign/replay sources,
+JSON mutation delegates and structural parents. Preserve nested runtime/reflection
+arguments and mutation callbacks. CompileActual consumes IReadOnlyList and Count.
+Freeze known-failure/child-source sets with ordinal comparer and three singleton
+interpreter maps. Eight strict ToDictionary candidates remain separate pending explicit
+construction; no blanket ToImmutableDictionary replacement. Validate all ordinary Fuzz.
+Status: open before edits.
