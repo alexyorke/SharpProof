@@ -373,8 +373,10 @@
           "src/SharpProof.Ir/IrModel.generated.cs",
           "src/SharpProof.Ir/IrProgram.cs",
           "src/SharpProof.Ir/ResourceExpression.cs",
+          "src/SharpProof.Ir/ResourceAllocationShape.cs",
           "src/SharpProof.Ir/ResourceBoundOrder.cs",
           "src/SharpProof.Ir/ResourceBoundConstraint.cs",
+          "src/SharpProof.Ir/ResourceRuntimeLayout.cs",
           "src/SharpProof.Ir/ResourceProgram.cs",
           "src/SharpProof.Ir/ResourceMetadataReference.cs"
         ]
@@ -385,6 +387,7 @@
           "src/SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "src/SharpProof.CompilerArtifact/ResourceExpressionCodec.cs",
           "src/SharpProof.CompilerArtifact/ResourceExpressionOwnership.cs",
+          "src/SharpProof.CompilerArtifact/ResourceAllocationShapeCodec.cs",
           "src/SharpProof.CompilerArtifact/ResourceProgramCodec.cs",
           "src/SharpProof.CompilerArtifact/CompilerLoweredArtifact.Resources.cs",
           "src/SharpProof.CompilerArtifact/ResourceProgramOwnership.cs",

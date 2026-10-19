@@ -247,3 +247,25 @@ strictly larger. Unknown evidence contains its reason and no partial numeric bou
 Metric or declared-bound mismatches are rejected, including cached responses.
 The compiler carries declarations and programs; it cannot supply a resource
 proof verdict or substitute a qualitative trusted effect summary.
+
+## Quantitative memory implementation status
+
+An internal layout kernel now models fresh source-owned instance storage under
+`coreclr-8.0.32-x64-source-storage-v1`, conditional on CoreCLR 8.0.32, x64 and
+8-byte pointers. Typed shapes describe arrays, object fields, UTF-16 strings,
+primitive boxing, delegates, and one fresh closure frame plus delegate. The
+reviewed layout constants are pinned to the runtime source linked in the
+[roadmap](resource-analysis-roadmap.md#quantitative-memory-implementation-plan).
+
+Array/string storage uses aligned header-plus-payload arithmetic. Ordinary
+non-overlapping fields use a packed lower bound and a conservative slot upper
+bound; a loose interval supplies no exact cost. Referenced objects and constructor
+effects are separate. A factory that returns a cached string or delegate does
+not establish a fresh allocation merely because its instance shape has a size.
+Unknown shapes and incompatible contexts return no partial interval.
+
+These shapes and their closed codec are implementation infrastructure. They do
+not yet expose byte contracts, prove target compatibility, or measure peak/retained
+heap or stack memory. Compiler extraction, callable input ownership, native layout
+assumptions and result projection are the next integration steps. The existing
+three public metrics retain their documented meanings.

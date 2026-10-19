@@ -621,3 +621,35 @@ Primary layout evidence:
 [object and array layout](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.h),
 [string sizing](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.cpp), and
 [delegate implementation](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Delegate.CoreCLR.cs).
+
+The first memory layer is implemented: typed allocation shapes cover arrays,
+ordinary non-overlapping object fields, strings, primitive boxes, delegates and
+fresh closure bundles. Model `coreclr-8.0.32-x64-source-storage-v1` computes byte
+intervals, rejects incompatible contexts, propagates cancellation and returns
+Unknown on unsupported shapes or arithmetic budgets. Its digest is derived from
+the actual model constants, storage widths, supported context and pinned source.
+Closed shape transport rejects duplicate/missing/unrelated fields, undefined
+storage, noncanonical arithmetic encoding, supplied byte verdicts and runtime
+assertions. Shape transport alone establishes neither input ownership nor a
+runtime/layout assumption; those remain worker integration requirements.
+
+All 25 initial layout tests and 20 transport tests passed, including 13 independent
+allocation controls in the canonical CoreCLR 8.0.32 x64 process. A final digest
+regression increased the passing focused layout suite to 26 tests. Loose object
+packing remains an interval, and an empty-string factory's cached result is not
+mistaken for a fresh allocation. The full IR suite passed 554 tests before that
+additional identity test; the full analyzer suite passed 1375. All quality and
+compatibility categories passed with zero build warnings/errors. Layout passed
+for 2656 source files, 59 projects and 151 pinned common files.
+
+Cumulative byte contracts, compiler shape extraction, native binding/projection,
+liveness/escape, retained output and stack models are still unimplemented. Phase
+C stays unchecked. The next step is typed shape transport within the owned
+resource representation, followed by bound target/platform/reference assumptions
+and native byte contracts; continue through every allocation category before
+completing the cumulative allocation item.
+
+For published composed-rank checkpoint `45f6419c7`, all non-coverage workflows and
+all four coverage shards passed. Qualification failed at 2510/2572 changed trusted
+lines (97.59%), leaving 62 gaps against the unchanged 100% baseline. The memory
+layer is not included in that measurement and requires its own exact-head CI.
