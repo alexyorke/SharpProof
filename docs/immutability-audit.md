@@ -2431,3 +2431,14 @@ snapshot conversion. Preserve it along with the previous 17 exclusions. The chec
 syntax-token selection is therefore 141 replacements, with 18 native/alias buffers kept.
 The scratch syntax tool's initial missing CompilationUnitSyntax cast was corrected before
 any source write; the dry-run parsed all selected tokens and preserved raw source text.
+
+IMM-M059: Coordinator read the four remaining Frontend.Tests ToDictionary interpreter
+input maps (TypedProgramLoweringTests and three Visual Basic shift fixtures), the local
+CFG stack, and GoldenSourceAnchors. Use strict ImmutableDictionaryCapture.Create for
+inputs, preserving evaluation/duplicate/null order and the original IrValue instances.
+Use immutable DFS Push/Pop in NestedLocalCfgFilteredExceptionBoundaryTests. Build token
+start/end maps locally and freeze before constructor publication; the unexposed anchor
+memo can use a readonly builder with existing immutable Add equality semantics. Build
+spelling vectors with an exact-capacity array builder before Join. Preserve golden text,
+span boundaries, occurrence counting, source-token order and native reflection arrays.
+Status: open before edits.
