@@ -3376,3 +3376,12 @@ pass after formatting. New dictionary Worker workflow controls are still running
 Inventory now covers 1,878 C# files/2,600 candidates (1,791 Open) and 84 PS scripts/
 1,090 candidates (809 Open), zero PS parse failures. Newly checked builder rows still
 await explicit classification. New master test collections remain in the open inventory.
+
+IMM-M114: Main checked all eight private receiver/comparer roots and partial-file
+callers. Use readonly symbol/default builders for entry/nullable/default comparers,
+array receiver/capture representations and receiver-element substitutions. Retain both
+first-seen order sidecars, SetItem overwrite semantics, nullable recursion guards and
+symbol comparers. Add's boolean gates the entry-comparer order append. Preserve map
+updates before TypeSpecializer/Result/Parameters rebuilding; no collection root escapes.
+Validate full Frontend generic/array/comparer/capture controls after the dictionary gate.
+Status: open before edits.
