@@ -3515,3 +3515,9 @@ once into ImmutableArray at Roslyn CreateFromImage publication, preserving strea
 and avoiding a writable published image. Retain seven traced native reflection/Assembly
 Load/Construct adapters and one actual mutable int[] SUT identity. Validate full Contracts.
 Status: open before edits.
+IMM-M125 verified on pinned Linux amd64 SDK 10.0.402: two actual baseline/current
+production MSBuild queries pass and their complete diagnostic JSON responses are
+byte-identical, including forwarded arguments and runtime metadata. The M124 symbol
+validator compiles through its actual Add-Type boundary. Its behavioral regression
+controls and the remaining shared/M120-M124/M126-M127 project gates are still pending.
+M118/M119/M122 Release Worker build passes zero warnings/errors; full ordinary tests run.
