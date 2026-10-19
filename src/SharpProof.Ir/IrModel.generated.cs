@@ -995,9 +995,9 @@ public sealed partial class IrWriteInstruction : IrInstruction
         : base(id, IrInstructionKind.Write, operation)
     { Region = region; }
 
-    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrTerm target, IrTerm index, IrTerm value)
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrTerm target, IrTerm index, IrTerm value, IrTerm? length = null)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = IrWriteRegion.Element; Target = target; Index = index; Value = value; }
+    { Region = IrWriteRegion.Element; Target = target; Index = index; Value = value; Length = length; }
 
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
         IrTerm target, IrMemberId field, IrTerm value, IrTerm? key = null)
@@ -1009,6 +1009,8 @@ public sealed partial class IrWriteInstruction : IrInstruction
     // stored value; other writes are effect sites only.
     public IrTerm? Target { get; }
     public IrTerm? Index { get; }
+    // A half-open range [Index, Index + Length); absent for a single cell.
+    public IrTerm? Length { get; }
     public IrMemberId? Field { get; }
     public IrTerm? Value { get; }
     public bool IsElementStore => Index != null && Field == null;

@@ -2,6 +2,26 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsArrayClear(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return method.IsStatic && method.ReturnsVoid && method.ContainingType.SpecialType == SpecialType.System_Array &&
+            IsFrameworkCollectionMember(method) && method.GetDocumentationCommentId() is
+                "M:System.Array.Clear(System.Array)" or "M:System.Array.Clear(System.Array,System.Int32,System.Int32)";
+    }
+
+    internal static IOperation? TypedArrayClearReceiver(IInvocationOperation invocation)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        if (!IsArrayClear(invocation.TargetMethod))
+        { return null; }
+        var receiver = invocation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
+        while (receiver is IConversionOperation { OperatorMethod: null } conversion &&
+            (conversion.Conversion.IsIdentity || conversion.Conversion is { IsReference: true, IsImplicit: true }))
+        { receiver = conversion.Operand; }
+        return receiver.Type is IArrayTypeSymbol { IsSZArray: true } array && IsValueDomain(array.ElementType) ? receiver : null;
+    }
+
     // An element access on a single-dimensional array faults on a null array,
     // then on an index outside it. A multidimensional array's bounds are not
     // modeled; `outside` is then an approximated flag.
@@ -175,6 +195,11 @@ internal static partial class CSharpOperationSemantics
                 IArrayElementReferenceOperation element => element.ArrayReference == use,
                 IFieldReferenceOperation field => field.Instance == use,
                 IPropertyReferenceOperation { Property.Name: "Length" } length => length.Instance == use,
+                IConversionOperation
+                {
+                    OperatorMethod: null, Conversion: { IsReference: true, IsImplicit: true },
+                    Parent: IArgumentOperation { Parameter.Ordinal: 0, Parent: IInvocationOperation clear }
+                } => IsArrayClear(clear.TargetMethod),
                 ISimpleAssignmentOperation assignment => assignment.Target == use && IsFreshCreation(assignment.Value, model),
                 _ => false
             };

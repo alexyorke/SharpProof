@@ -382,6 +382,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
+        if (depth < 256 && operation is IInvocationOperation clearing &&
+            ArrayClearBody(clearing, block, depth) is { } cleared)
+        { return cleared; }
         if (depth < 256 && operation is IInvocationOperation identity &&
             ReferenceEqualsBody(identity, block, depth) is { } referenceEquality)
         { return referenceEquality; }

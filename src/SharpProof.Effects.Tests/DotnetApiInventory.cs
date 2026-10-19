@@ -131,6 +131,9 @@ internal static class DotnetApiInventory
 
         if (symbol is IMethodSymbol method)
         {
+            if (CSharpOperationSemantics.IsArrayClear(method))
+            { evidence.Add("intrinsic=typed-sz-array-clear-state"); }
+
             if (CSharpOperationSemantics.IsObjectReferenceEquals(method))
             { evidence.Add("intrinsic=object-reference-identity"); }
 

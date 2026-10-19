@@ -16,6 +16,13 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(inventory);
         var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=typed-sz-array-clear-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "all valid ranges of a four-cell incoming array, aliases and unchanged cells; whole-array overload; CLR/IR equality and wrong-result control; native symbolic-range and effect controls in ArrayClear tests",
+                    () => CheckArrayClearIntrinsic(compilation, row.Id, false), () => CheckArrayClearIntrinsic(compilation, row.Id, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=object-reference-identity", StringComparison.Ordinal))
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
