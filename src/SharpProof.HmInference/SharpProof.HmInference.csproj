@@ -11,7 +11,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
     <ProjectReference Include="../SharpProof.HmInference.Analyzer/SharpProof.HmInference.Analyzer.csproj" />
     <ProjectReference Include="../SharpProof.HmInference.CodeFixes/SharpProof.HmInference.CodeFixes.csproj" />
-    <Compile Remove="CollectionExpressions.cs;NominalTypes.cs;NamedTypeShapes.cs;MemberBindings.cs;EnumerationProtocols.cs;Patterns.cs;ArgumentConversions.cs;AsyncBuilders.cs;Deconstruction.cs;Enumeration.cs;DelegateInference.cs;ConstraintRules.cs;StructuredFlow.cs;NullableAsync.cs;Inference.cs;CSharpTypes.cs;Types.cs;HmInferenceAnalyzer.cs;HmCore.cs" />
+    <Compile Remove="UserOperators.cs;CollectionExpressions.cs;NominalTypes.cs;NamedTypeShapes.cs;MemberBindings.cs;EnumerationProtocols.cs;Patterns.cs;ArgumentConversions.cs;AsyncBuilders.cs;Deconstruction.cs;Enumeration.cs;DelegateInference.cs;ConstraintRules.cs;StructuredFlow.cs;NullableAsync.cs;Inference.cs;CSharpTypes.cs;Types.cs;HmInferenceAnalyzer.cs;HmCore.cs" />
     <None Update="Samples/*.cs.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

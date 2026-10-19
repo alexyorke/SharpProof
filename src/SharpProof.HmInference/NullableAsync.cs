@@ -124,6 +124,13 @@ public static partial class Inference
             {
                 return new(CSharpTypes.NullableValue, Expression(expression));
             }
+            var returnConversion = model.ClassifyConversion(expression, converted);
+            if (returnConversion.IsUserDefined)
+            {
+                var targetShape = CSharpTypes.Erase(converted);
+                if (TryUserConversion(info.Type, converted, Expression(expression), targetShape, returnConversion.MethodSymbol))
+                { return targetShape; }
+            }
             // Preserve widening, boxing and reference conversions at the return
             // boundary instead of narrowing the API to the expression's type.
             Anchor(expression);

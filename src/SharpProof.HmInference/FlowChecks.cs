@@ -28,7 +28,7 @@ internal static class FlowChecks
             ("ForScope", "static int M(int x,int y) { for(var i=0;i<1;i++) { x=y; } for(var i=0;i<1;i++) { x=y; } return x; }", "Suggestion", "T1 M<T1>(T1 x, T1 y)"),
             ("AssignmentWidening", "static long M(long x,int y,bool ignored) { x=y; return x; }", "Suggestion", "long M<T1>(long x, int y, T1 ignored)"),
             ("StringCompound", "static string M(string x,string y) { x+=y; return x; }", "Concrete", null),
-            ("CustomIncrement", "static Counter M(Counter x) => ++x; struct Counter { public static Counter operator ++(Counter x) => x; }", "Skipped", null),
+            ("CustomIncrement", "static Counter M(Counter x) => ++x; struct Counter { public static Counter operator ++(Counter x) => x; }", "Concrete", null),
             ("ForeachArray", "static int M(int[] xs,int seed) { var result=seed; foreach(var x in xs) result=x; return result; }", "Suggestion", "T1 M<T1>(T1[] xs, T1 seed)"),
             ("ForeachMatrix", "static int M(int[,] xs,int seed) { var result=seed; foreach(var x in xs) result=x; return result; }", "Suggestion", "T1 M<T1>(T1[,] xs, T1 seed)"),
             ("ForeachExplicitConversion", "static long M(int[] xs,bool ignored) { var result=0L; foreach(long x in xs) result=x; return result; }", "Suggestion", "long M<T1>(int[] xs, T1 ignored)"),

@@ -103,7 +103,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Synchronous lambdas | Infer inputs/results; retain explicit annotations |
 | Locals and nested blocks | Share types by symbol; retain explicit/constant local types, uninitialized declarations and conversions |
 | Mutable locals/parameters, tuple/field/property/array/indexer stores | Keep monotypes; preserve member selection and assignment conversions |
-| Compound assignments and increments | Retain original built-in operand types; skip custom operators |
+| Compound assignments and increments | Retain built-in promotions; infer generic user operators and nullable lifting |
 | Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
 | Break/continue and traditional switch | Track each exit separately; consume it at the correct loop/switch |
 | Tuple array foreach deconstruction | Bind nested tuple elements, discards and explicit types |
@@ -166,7 +166,7 @@ compare original/fixed traces through suspension, empty/full iteration, early
 breaks, body/move/disposal failures and cancellation.
 Generic instance calls preserve receiver substitutions and explicit type arguments.
 
-The adapter skips custom operators, unsupported patterns and other unimplemented
+The adapter skips unsupported patterns and other unimplemented
 syntax. Collection expressions and expanded non-array params are inferred through
 their element and construction protocols. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
@@ -191,6 +191,14 @@ goto and goto case/default are supported, including pending finally/disposal.
 Unreachable syntax still contributes typing constraints. Boolean conditions retain
 the source type of user-defined conversions and true operators.
 General type-parameter enumerator patterns remain unsupported.
+Generic user-defined binary/unary operators, increments, compound assignments,
+and conversions share containing-type substitutions with their operands/results.
+Nullable lifting and checked operator selection are retained; explicit casts and
+fixed call targets preserve their declared conversion endpoints. Awaited return
+conversions infer through Task/ValueTask results, including nullable struct
+constraints. Selected operators and conversions are rechecked across supplied
+files. Applied IDE-fix tests verify effects, reference identity, new payload domains,
+null short-circuiting and suspension before a lifted async conversion.
 Ref delegates and attributed/modified lambdas retain their syntax and contracts.
 Quoted lambdas infer through Expression<TDelegate>, including custom delegates,
 nested quotes, nullable captures and compilation/invocation. Natural delegate/tree
@@ -272,8 +280,8 @@ interface conversions carry inferred type arguments through generic bases,
 implemented interfaces and arrays. Representable subtype relationships become
 C# constraints. Covariant array/interface/delegate conversions retain reference
 constraints, and boxing into non-nullable `object` requires `notnull`. Nullable
-boxing preserves `T?` with a value constraint. Numeric, lifted numeric and
-user-defined conversions keep their original endpoints. Tuple element and
+boxing preserves `T?` with a value constraint. Numeric and lifted numeric conversions keep their original endpoints;
+user-defined conversions infer owner substitutions while preserving fixed targets. Tuple element and
 expanded array-params arguments follow the same rules, including awaited nullable
 values. IDE-fix runtime checks compare results, evaluation order, operator effects,
 boxing and reference identity with the original code.

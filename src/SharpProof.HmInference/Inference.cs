@@ -377,6 +377,8 @@ public static partial class Inference
                         return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
                     }
                 }
+                if (!PreservesUserOperations(beforeRoot, afterRoot, beforeModel, afterModel))
+                { return new(symbol.Name, "Rejected", "Generalization changes a selected user operator or conversion."); }
             }
 
             var originalIndexers = method.DescendantNodes().OfType<ElementAccessExpressionSyntax>().ToArray();
@@ -805,6 +807,12 @@ public static partial class Inference
                     {
                         return CoalesceAssigned(assignment);
                     }
+                    if (model.GetOperation(assignment, cancellationToken) is ICompoundAssignmentOperation { OperatorMethod: not null } userCompound)
+                    {
+                        var calculatedType = userCompound.IsLifted ? userCompound.Type! : userCompound.OperatorMethod.ReturnType;
+                        var calculated = UserOperator(userCompound.OperatorMethod, [userCompound.Target, userCompound.Value], calculatedType, userCompound.IsLifted);
+                        return AssignValue(assignment.Left, calculated, calculatedType);
+                    }
                     if (model.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation { OperatorMethod: null })
                     {
                         throw new InferenceException("User-defined and coalescing assignments are unsupported.");
@@ -955,10 +963,8 @@ public static partial class Inference
                 case BinaryExpressionSyntax binary:
                     return Binary(binary);
                 case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
-                    if (model.GetSymbolInfo(unary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
-                    {
-                        throw new InferenceException("User-defined operators are unsupported.");
-                    }
+                    if (model.GetOperation(unary, cancellationToken) is IUnaryOperation { OperatorMethod: not null } userUnary)
+                    { return UserOperator(userUnary.OperatorMethod, [userUnary.Operand], userUnary.Type!, userUnary.IsLifted); }
 
                     Anchor(unary.Operand);
                     return CSharpTypes.Rigid(model.GetTypeInfo(unary, cancellationToken).Type!);
@@ -993,6 +999,13 @@ public static partial class Inference
                 case MemberAccessExpressionSyntax member:
                     return Member(member);
                 case CastExpressionSyntax cast:
+                    if (model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: not null } userCast)
+                    {
+                        var targetType = model.GetTypeInfo(cast.Type, cancellationToken).Type!;
+                        var fixedTarget = CSharpTypes.Rigid(targetType);
+                        if (TryUserConversion(model.GetTypeInfo(cast.Expression, cancellationToken).Type!, targetType, Expression(cast.Expression), fixedTarget, userCast.OperatorMethod))
+                        { return fixedTarget; }
+                    }
                     Anchor(cast.Expression);
                     return CSharpTypes.Rigid(model.GetTypeInfo(cast.Type, cancellationToken).Type!);
                 case DefaultExpressionSyntax @default:
@@ -1165,6 +1178,12 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(operand));
             }
 
+            if (model.GetOperation(expression, cancellationToken) is IIncrementOrDecrementOperation { OperatorMethod: not null } userIncrement)
+            {
+                var result = UserOperator(userIncrement.OperatorMethod, [userIncrement.Target], userIncrement.Type!, userIncrement.IsLifted);
+                HmType.Unify(AssignmentTarget(operand), result);
+                return result;
+            }
             if (model.GetOperation(expression, cancellationToken) is not IIncrementOrDecrementOperation { OperatorMethod: null })
             {
                 throw new InferenceException("User-defined increments are unsupported.");
@@ -1304,7 +1323,9 @@ public static partial class Inference
             {
                 return Coalesced(binary);
             }
-            if (binary.Kind() is SyntaxKind.AsExpression or SyntaxKind.IsExpression || model.GetSymbolInfo(binary, cancellationToken).Symbol is IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator })
+            if (model.GetOperation(binary, cancellationToken) is IBinaryOperation { OperatorMethod: not null } userBinary)
+            { return UserOperator(userBinary.OperatorMethod, [userBinary.LeftOperand, userBinary.RightOperand], userBinary.Type!, userBinary.IsLifted); }
+            if (binary.Kind() is SyntaxKind.AsExpression or SyntaxKind.IsExpression)
             {
                 throw new InferenceException("User-defined, null-coalescing and type-test operators are unsupported.");
             }

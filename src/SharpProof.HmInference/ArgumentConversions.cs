@@ -39,7 +39,7 @@ public static partial class Inference
             return shape;
         }
 
-        private void BindConvertedArgument(ITypeSymbol source, ITypeSymbol target, HmType inferred, HmType expected)
+        private void BindConvertedArgument(ITypeSymbol source, ITypeSymbol target, HmType inferred, HmType expected, bool allowUserDefined = true)
         {
             if (source is null)
             { throw new ArgumentNullException(nameof(source)); }
@@ -69,6 +69,8 @@ public static partial class Inference
                 && SymbolEqualityComparer.Default.Equals(source, nullable.TypeArguments[0]) && destination.Name == CSharpTypes.NullableValue)
             { HmType.Unify(inferred, destination.Arguments[0]); return; }
             var classified = ((CSharpCompilation)model.Compilation).ClassifyConversion(source, target);
+            if (allowUserDefined && classified.IsUserDefined && TryUserConversion(source, target, inferred, expected, classified.MethodSymbol))
+            { return; }
             if (!classified.IsUserDefined && classified.IsImplicit && (classified.IsReference || classified.IsBoxing))
             { BindSubtype(source, target, inferred, expected, false); return; }
             // Numeric, lifted numeric and user-defined conversions are not equality.

@@ -1,0 +1,18 @@
+#nullable enable
+using System.Threading.Tasks;
+public readonly record struct SampleOperatorBox<T>(T Value)
+{
+    public static SampleOperatorBox<T> operator +(SampleOperatorBox<T> left, SampleOperatorBox<T> right) => left;
+    public static implicit operator T(SampleOperatorBox<T> value) => value.Value;
+    public static implicit operator SampleOperatorBox<T>(T value) => new(value);
+}
+public static class UserOperatorSamples
+{
+    public static SampleOperatorBox<int> AddBoxes(SampleOperatorBox<int> left, SampleOperatorBox<int> right) => left + right;
+    public static SampleOperatorBox<int>? AddNullableBoxes(SampleOperatorBox<int>? left, SampleOperatorBox<int>? right) => left + right;
+    public static int? UnwrapNullableBox(SampleOperatorBox<int>? value) => value;
+    public static string? UnwrapNullableReferenceBox(SampleOperatorBox<string?> value) => value;
+    public static async Task<string?> UnwrapAwaitedNullableReferenceBox(Task<SampleOperatorBox<string?>> pending) => await pending;
+    public static async Task<int> UnwrapAwaitedBox(Task<SampleOperatorBox<int>> pending) => await pending;
+    public static async ValueTask<int?> UnwrapAwaitedNullableBox(Task<SampleOperatorBox<int>?> pending) => await pending;
+}
