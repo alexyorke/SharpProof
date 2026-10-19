@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Frontend;
@@ -36,13 +37,11 @@ public sealed class FuzzDomainBehaviorTests
     {
         var complete = new FrontendSemanticEdgeCase("long", "long value", "value",
             [7L], FrontendSubsetDecision.Exact, FrontendAbstention.None);
-        var incompleteCases = new[]
-        {
+        var incompleteCases = ImmutableArray.Create(
             complete with { ReturnType = " " },
             complete with { Parameters = null! },
             complete with { Expression = " " },
-            complete with { Arguments = null! }
-        };
+            complete with { Arguments = null! });
 
         foreach (var incomplete in incompleteCases)
         {

@@ -64,8 +64,7 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
         yield return Case("NestedCast", GeneratedCSharpExpression.CastToString(reference));
         yield return Case("NestedIntegerConditional", GeneratedCSharpExpression.Conditional(boolean, integer, other));
         yield return Case("NestedStringConditional", GeneratedCSharpExpression.Conditional(boolean, text, otherText));
-        foreach (var kind in new[]
-        {
+        foreach (var kind in ImmutableArray.Create(
             GeneratedExpressionKind.Add,
             GeneratedExpressionKind.Subtract,
             GeneratedExpressionKind.Multiply,
@@ -76,8 +75,7 @@ public sealed class Pr275NestedCSharpStructuralCandidateTests
             GeneratedExpressionKind.LessThan,
             GeneratedExpressionKind.LessThanOrEqual,
             GeneratedExpressionKind.GreaterThan,
-            GeneratedExpressionKind.GreaterThanOrEqual
-        })
+            GeneratedExpressionKind.GreaterThanOrEqual))
         {
             yield return Case("Nested" + kind, GeneratedCSharpExpression.Binary(kind, integer, other));
         }

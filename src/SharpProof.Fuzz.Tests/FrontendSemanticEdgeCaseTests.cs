@@ -17,7 +17,7 @@ public sealed class FrontendSemanticEdgeCaseTests
     [Test]
     public void FixedSemanticEdgesMatchRuntimeOrAbstainExactly()
     {
-        var cases = new[] {
+        var cases = ImmutableArray.Create(
             Exact("sbyte", "", "-3"),
             Exact("byte", "", "3"),
             Exact("short", "", "-3"),
@@ -102,8 +102,7 @@ public sealed class FrontendSemanticEdgeCaseTests
                 "long? value",
                 "-value",
                 FrontendAbstention.LiftedOperator,
-                (long?)1L)
-        };
+                (long?)1L));
 
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 

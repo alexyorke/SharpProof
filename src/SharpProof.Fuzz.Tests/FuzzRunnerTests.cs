@@ -28,12 +28,10 @@ public sealed class FuzzRunnerTests
                 Is.EqualTo(FuzzRunner.MaximumRetainedFailures));
             Assert.That(
                 keys.Take(3),
-                Is.EqualTo(new[]
-                {
+                Is.EqualTo(ImmutableArray.Create(
                     new FuzzFailureKey(0, "finite-domain-smt"),
                     new FuzzFailureKey(0, "frontend"),
-                    new FuzzFailureKey(0, "partial-term-smt")
-                }));
+                    new FuzzFailureKey(0, "partial-term-smt"))));
             Assert.That(
                 keys[^1],
                 Is.EqualTo(new FuzzFailureKey(
@@ -50,9 +48,9 @@ public sealed class FuzzRunnerTests
             FuzzOracleStatus.Agreement,
             FuzzOracleStatus.Abstained);
         var keys = FuzzRunner.SelectFailureKeys(
-            new[] { FuzzOracleStatus.Agreement },
-            new[] { FuzzOracleStatus.Agreement },
-            new[] { FuzzOracleStatus.Abstained });
+            ImmutableArray.Create(FuzzOracleStatus.Agreement),
+            ImmutableArray.Create(FuzzOracleStatus.Agreement),
+            ImmutableArray.Create(FuzzOracleStatus.Abstained));
 
         using (Assert.EnterMultipleScope())
         {
@@ -60,7 +58,7 @@ public sealed class FuzzRunnerTests
             Assert.That(classification.HasAbstention, Is.True);
             Assert.That(
                 keys,
-                Is.EqualTo(new[] { new FuzzFailureKey(0, "partial-term-smt") }));
+                Is.EqualTo(ImmutableArray.Create(new FuzzFailureKey(0, "partial-term-smt"))));
         }
     }
 
@@ -108,14 +106,15 @@ public sealed class FuzzRunnerTests
     [Test]
     public void GeneratorCorpusCoversEverySupportedOperatorFamily()
     {
-        var observed = new HashSet<GeneratedExpressionKind>();
+        var observedBuilder = ImmutableHashSet.CreateBuilder<GeneratedExpressionKind>();
         for (var seed = 0; seed < 256; seed++)
         {
             var expression = new SmallCSharpCaseGenerator(seed).Next(
                 maximumDepth: 5).Expression;
-            Collect(expression, observed);
+            Collect(expression, observedBuilder);
         }
 
+        var observed = observedBuilder.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(observed, Does.Contain(GeneratedExpressionKind.Add));
@@ -332,13 +331,14 @@ public sealed class FuzzRunnerTests
     [Test]
     public void ExpandedFrontendShapesMatchRuntime()
     {
-        var cases = new[] {
+        var cases = ImmutableArray.Create(
             new GeneratedCSharpCase(
                 GeneratedCSharpExpression.Length(
                     GeneratedCSharpExpression.Text()),
                 Left: 0,
                 Right: 0,
-                Condition: false) {
+                Condition: false)
+            {
                 Text = null
             },
             new GeneratedCSharpCase(
@@ -347,7 +347,8 @@ public sealed class FuzzRunnerTests
                     GeneratedCSharpExpression.Left()),
                 Left: 1,
                 Right: 0,
-                Condition: false) {
+                Condition: false)
+            {
                 Values = [7]
             },
             new GeneratedCSharpCase(
@@ -355,8 +356,7 @@ public sealed class FuzzRunnerTests
                     GeneratedCSharpExpression.NullReference()),
                 Left: 0,
                 Right: 0,
-                Condition: false)
-        };
+                Condition: false));
 
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
