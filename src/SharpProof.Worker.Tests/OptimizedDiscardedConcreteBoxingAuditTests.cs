@@ -147,7 +147,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             { AssertNoInliningOnly(method); }
             Assert.That(boundaryMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
             Assert.That(sourceMethod.GetMethodBody()!.GetILAsByteArray(), Is.EqualTo(IdentityBody));
-            var il = new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod }.Select(DescribeIl).ToArray();
+            var il = new[] { targetMethod, controlMethod, sourceMethod, boundaryMethod }.Select(DescribeIl).ToImmutableArray();
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
                 JsonSerializer.Serialize(il, WorkerProtocolJson.SharedOptions));
             var target = targetMethod.CreateDelegate<Func<decimal, object, int>>();

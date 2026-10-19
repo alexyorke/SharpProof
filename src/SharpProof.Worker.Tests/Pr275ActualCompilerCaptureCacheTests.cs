@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -22,7 +23,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
-        var trees = compilation.SyntaxTrees.ToArray();
+        var trees = compilation.SyntaxTrees;
         for (var ordinal = 0; ordinal < treeCount; ordinal++)
         {
             Assert.That(CompilerCompilationCapture.TryGetCapturedTreeTextLength(compilation, ordinal, out var length), Is.False);
@@ -86,7 +87,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "generated.cs");
         var compilation = CSharpCompilation.Create("Pr275ActualRejectedZeroOffset", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS8938"));
         Assert.That(errors[0].Location.SourceTree, Is.SameAs(tree));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -78,7 +79,7 @@ public sealed class PassiveLoopCutterTests
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Has.Length.EqualTo(1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.False);
         var cell = instructions.OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (factory.GetOperationInfo(write.Operation).Description is { } id &&
@@ -319,7 +320,7 @@ public sealed class PassiveLoopCutterTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("large-loop");
-        var blocks = Enumerable.Range(0, 1000).Select(_ => builder.CreateBlock()).ToArray();
+        var blocks = Enumerable.Range(0, 1000).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var ordinal = 0; ordinal < blocks.Length; ordinal++)
         { builder.Goto(blocks[ordinal], site, blocks[(ordinal + 1) % blocks.Length]); }
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);

@@ -234,8 +234,8 @@ public sealed class NativeTotalCandidateCoreTests
             "Contract.Ensures(Contract.Result<int>() == x / divisor); Contract.Ensures(Contract.Result<int>() >= 0); return x / divisor; } }");
         var total = preparation.Total!;
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var requires = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToArray();
-        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToArray();
+        var requires = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
+        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
         Assert.That(requires, Has.Length.EqualTo(3));
         Assert.That(ensures, Has.Length.EqualTo(2));
         Assert.That(candidate.Requires, Has.Length.EqualTo(requires.Length));

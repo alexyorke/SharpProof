@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -57,9 +58,9 @@ public sealed class NativeConstructionWorkAdmissionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("dominance-work-admission");
-        var dispatch = Enumerable.Range(0, count + 1).Select(_ => builder.CreateBlock()).ToArray();
-        var headers = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToArray();
-        var latches = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToArray();
+        var dispatch = Enumerable.Range(0, count + 1).Select(_ => builder.CreateBlock()).ToImmutableArray();
+        var headers = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToImmutableArray();
+        var latches = Enumerable.Range(0, count).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var index = 0; index < count; index++)
         {
             builder.Branch(dispatch[index], site, factory.Boolean(false), headers[index], dispatch[index + 1]);

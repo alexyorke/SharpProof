@@ -870,7 +870,7 @@ public sealed class PassiveCallableVcTests
         var site = factory.CreateOperation();
         var result = factory.CreateVariable("result", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
-        var blocks = Enumerable.Range(0, blockCount).Select(_ => builder.CreateBlock()).ToArray();
+        var blocks = Enumerable.Range(0, blockCount).Select(_ => builder.CreateBlock()).ToImmutableArray();
         for (var index = 0; index < blocks.Length - 1; index++)
         { builder.Goto(blocks[index], site, blocks[index + 1]); }
         builder.Return(blocks[^1], site, factory.Integer(0));

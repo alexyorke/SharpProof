@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -16,7 +17,7 @@ public sealed class LinkedProductionCoverageTests
     {
         using var result = await RunAsync("ordinary");
         Assert.That(result.RootElement.GetProperty("error").ValueKind, Is.EqualTo(JsonValueKind.Null));
-        var rows = result.RootElement.GetProperty("projects").EnumerateArray().ToArray();
+        var rows = result.RootElement.GetProperty("projects").EnumerateArray().ToImmutableArray();
         Assert.That(rows, Has.Length.EqualTo(2));
         foreach (var row in rows)
         {

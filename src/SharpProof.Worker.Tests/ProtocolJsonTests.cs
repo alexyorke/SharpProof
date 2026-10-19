@@ -1750,7 +1750,7 @@ public sealed class ProtocolJsonTests
         Assert.DoesNotThrow(
             (Action)(() => WorkerProtocolJson.Canonicalize(response)));
         var codes = WorkerProtocolJson.Validate(response).Errors
-            .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToArray();
+            .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(codes, Does.Contain("response.claim_results"));
@@ -1921,7 +1921,7 @@ public sealed class ProtocolJsonTests
         var elapsedErrors = validation.Errors
             .Where(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code is
                 "response.elapsed_unrepresentable" or "summary.elapsed"))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(elapsedErrors.Length == 0, Is.EqualTo(expectedValid));
     }
@@ -2342,7 +2342,7 @@ public sealed class ProtocolJsonTests
         System.ArgumentNullException.ThrowIfNull(validation);
         var actual = validation.Errors
             .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(actual, Is.EquivalentTo(expected));
     }
 
@@ -2354,7 +2354,7 @@ public sealed class ProtocolJsonTests
         System.ArgumentNullException.ThrowIfNull(validation);
         var actual = validation.Errors
             .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             foreach (var code in expected)

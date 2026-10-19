@@ -16,7 +16,7 @@ internal static partial class PortableIrGraphCodec
     private static readonly ImmutableArray<IrHavocKind> HavocKinds =
         PortableIrWireCatalog.HavocKinds;
     internal static bool HasCompleteWireEnumCatalogs =>
-        new[] {
+        ImmutableArray.Create(
             IsComplete(OpaquePurities),
             IsComplete(UnaryOperators),
             IsComplete(BinaryOperators),
@@ -24,7 +24,7 @@ internal static partial class PortableIrGraphCodec
             IsComplete(PortableIrWireCatalog.HavocOrigins),
             IsComplete(PortableIrWireCatalog.ExecutionSemantics),
             IsComplete(PortableIrWireCatalog.ExceptionKinds)
-        }.All(static complete => complete);
+        ).All(static complete => complete);
 
     internal static bool HasCompleteSlotCatalogs =>
         IsCompleteSlots(PortableIrSlotCatalog.Terms, typeof(IrTermKind)) &&

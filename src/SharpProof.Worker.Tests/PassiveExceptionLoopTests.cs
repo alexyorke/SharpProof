@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -39,7 +40,7 @@ public sealed class PassiveExceptionLoopTests
     {
         var candidate = ChangingPendingExceptionCandidate(explicitThrows: true);
         var sites = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>()
-            .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToArray();
+            .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToImmutableArray();
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, maximumSteps: 128);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
@@ -58,7 +59,7 @@ public sealed class PassiveExceptionLoopTests
     public void PendingSummariesUseOnlyOriginalThrowsAndNeverWitnessSearch()
     {
         var candidate = ChangingPendingExceptionCandidate();
-        var originalThrows = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>().ToArray();
+        var originalThrows = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>().ToImmutableArray();
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken),
             Is.True, reason.ToString());
         Assert.That(proof!.PendingThrows, Is.Not.Empty);
@@ -175,7 +176,7 @@ public sealed class PassiveExceptionLoopTests
             Is.True, reason.ToString());
         Assert.That(candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(originalInstructions));
         Assert.That(search!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>(), Is.Empty);
-        var havocs = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>().ToArray();
+        var havocs = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>().ToImmutableArray();
         Assert.That(havocs, Has.Length.EqualTo(insideEntry ? 1 : 2));
         Assert.That(havocs.Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin)), Is.All.EqualTo(IrHavocOrigin.Approximation));
         Assert.That(havocs.SelectMany(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Variables)).Intersect(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Old })))), Is.Empty);
@@ -281,7 +282,7 @@ public sealed class PassiveExceptionLoopTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("router-bound");
-        var entries = Enumerable.Range(0, 1100).Select(_ => builder.CreateBlock()).ToArray();
+        var entries = Enumerable.Range(0, 1100).Select(_ => builder.CreateBlock()).ToImmutableArray();
         var first = builder.CreateBlock();
         var second = builder.CreateBlock();
         var end = builder.CreateBlock();

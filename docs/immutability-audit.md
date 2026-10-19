@@ -2931,3 +2931,12 @@ buffers. Preserve these explicit mutable APIs and stream/text resource owners. N
 BuildTasks source change is needed; all current production syntax rows are classified.
 Agent's additional source scan found cancellation/process ownership state and params
 adapters only. This classification does not close unreviewed scopes elsewhere.
+
+IMM-M080-M081 verified: all 5,627 ordinary Worker tests pass, zero failures/skips,
+with zero build warnings/errors. First build correctly rejected two redundant immutable
+copies (CA2009); main replaced those with direct initialized immutable root reuse and
+reran the full project. The remaining 40 selected projections retain order and references.
+Compiler evidence uses a scoped builder, scalar-domain output is frozen, and all seven
+wire-enum checks still execute eagerly left-to-right before All. Main verified test
+helper consumers and publication shapes; read-only review agrees. M083/M084 remain
+pending their own validation on later source snapshots.

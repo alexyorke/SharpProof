@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -107,7 +108,7 @@ public sealed class NativeMetadataNominalOwnerTests
             JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(preparation)))!,
             TestContext.CurrentContext.CancellationToken, references);
         var factory = decoded.Body.Program.Factory;
-        var entries = decoded.Body.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var entries = decoded.Body.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
         var token = Activator.CreateInstance(subject.RootMethod.DeclaringType!.Assembly.GetType("Token")!)!;
         foreach (var aliases in new[] { false, true })
         {

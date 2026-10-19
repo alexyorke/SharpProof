@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -38,7 +39,7 @@ public sealed class Pr275AnalyzerApiCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(expectedToken);
         var tree = Compilation.SyntaxTrees.Single();
-        var nodes = tree.GetRoot().DescendantNodes().ToArray();
+        var nodes = tree.GetRoot().DescendantNodes().ToImmutableArray();
         SyntaxNode declaration = declarationKind switch
         {
             "method" => nodes.OfType<MethodDeclarationSyntax>().Single(),

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -126,7 +127,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         var targets = discovery.Targets.Values
             .Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind is
                 MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet))
-            .ToArray();
+            .ToImmutableArray();
         var artifact = CreateArtifact(compilation, discovery);
         var callables = artifact.Callables.ToDictionary(
             item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
@@ -142,10 +143,10 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         {
             var manifestClaims = target.EffectClaims
                 .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))
-                .ToArray();
+                .ToImmutableArray();
             var artifactClaims = callables[target.Entry.CallableId].EffectClaims
                 .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId))
-                .ToArray();
+                .ToImmutableArray();
 
             Assert.That(manifestClaims, Has.Length.EqualTo(1), target.Method.MethodKind.ToString());
             Assert.That(artifactClaims, Is.EqualTo(manifestClaims), target.Method.MethodKind.ToString());

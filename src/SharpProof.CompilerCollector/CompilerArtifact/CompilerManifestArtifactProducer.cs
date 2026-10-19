@@ -100,13 +100,13 @@ internal static class CompilerManifestArtifactProducer
         artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var claims = target.EffectClaims;
-        var evidence = new CompilerEffectClaimArtifact[claims.Length];
+        var evidence = ImmutableArray.CreateBuilder<CompilerEffectClaimArtifact>(claims.Length);
         for (var index = 0; index < claims.Length; index++)
         {
             var claim = claims[index];
-            evidence[index] = claim.Evidence;
+            evidence.Add(claim.Evidence);
         }
-        return artifact with { EffectClaims = evidence.ToImmutableArray() };
+        return artifact with { EffectClaims = evidence.ToImmutable() };
     }
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(

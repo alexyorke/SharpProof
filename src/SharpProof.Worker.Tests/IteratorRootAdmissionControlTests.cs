@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -102,7 +103,7 @@ public sealed class IteratorRootAdmissionControlTests
                 PeSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)),
                 Compiler = typeof(CSharpCompilation).Assembly.FullName,
                 CompilerMvid = typeof(CSharpCompilation).Module.ModuleVersionId,
-                Symbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToArray(),
+                Symbols = ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.ToImmutableArray(),
                 CallableId = callableId,
                 CanonicalAttribute = canonicalAttribute,
                 AttributePath = attributeSyntax.SyntaxTree.FilePath,
@@ -113,11 +114,11 @@ public sealed class IteratorRootAdmissionControlTests
                 EntryClaimIds = preparation.Entry.ClaimIds,
                 PreparedEffectClaimId = effectClaim.ClaimId,
                 PreparedEffectContractKind = effectClaim.ContractKind.ToString(),
-                ValidEffectClaimIds = preparation.Total?.ValidEffectClaimIds.ToArray(),
+                ValidEffectClaimIds = preparation.Total?.ValidEffectClaimIds,
                 EntryAssumptions = preparation.Entry.Assumptions,
-                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToArray(),
+                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToImmutableArray(),
                 CallPreconditionCount = preparation.Total?.CallPreconditions.Length,
-                NativeBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())).ToArray(),
+                NativeBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())).ToImmutableArray(),
                 EmptyStatements,
                 WarmupIterations,
                 MeasuredIterations,

@@ -172,7 +172,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
             var controlMethod = type.GetMethod("Control")!;
             var methods = new[] { targetMethod, controlMethod, echoMethod };
             await File.WriteAllTextAsync(Path.Combine(evidence, "decoded-il.json"),
-                JsonSerializer.Serialize(methods.Select(DescribeIl).ToArray(), WorkerProtocolJson.SharedOptions));
+                JsonSerializer.Serialize(methods.Select(DescribeIl).ToImmutableArray(), WorkerProtocolJson.SharedOptions));
             foreach (var method in methods)
             {
                 var flags = method.GetMethodImplementationFlags();

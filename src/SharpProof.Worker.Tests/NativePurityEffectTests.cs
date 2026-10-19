@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -318,7 +319,7 @@ public sealed class NativePurityEffectTests
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         var total = preparation.Total!;
         var factory = total.Program.Factory;
-        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
         var writes = new List<IrWriteRegion>();
         var execution = new IrProgramInterpreter(factory).Execute(total.Program,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entries[0], initiallyNull ? factory.CreateNullValue(factory.GetVariableInfo(entries[0]).Type) :
@@ -528,7 +529,7 @@ public sealed class NativePurityEffectTests
         Assert.That(preparation.Total, Is.Not.Null);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToArray();
+        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         Assert.That(result.WriteWitness, Is.EqualTo(writes[0].Operation));
@@ -631,7 +632,7 @@ public sealed class NativePurityEffectTests
         Assert.That(write.Region, Is.EqualTo(region));
         Assert.That(result.WriteWitness, faults ? Is.Null : Is.EqualTo(write.Operation));
         var factory = total.Program.Factory;
-        var entries = total.Parameters.Select(parameter => parameter.Entry).ToArray();
+        var entries = total.Parameters.Select(parameter => parameter.Entry).ToImmutableArray();
         var observed = 0;
         // The objects enter with the field values the runtime run used.
         var field = write.Field!.Value;

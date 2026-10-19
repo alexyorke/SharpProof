@@ -256,7 +256,7 @@ public sealed class PortableIrGraphCodecTests
             .Select(@operator => factory.Unary(
                 @operator,
                 @operator == IrUnaryOperator.Not ? boolTerm : integerTerm))
-            .ToArray();
+            .ToImmutableArray();
         var binaryTerms = Enum.GetValues<IrBinaryOperator>()
             .Select(@operator =>
             {
@@ -268,7 +268,7 @@ public sealed class PortableIrGraphCodecTests
                         : (integerTerm, integerTerm);
                 return factory.Binary(@operator, operands.Item1, operands.Item2);
             })
-            .ToArray();
+            .ToImmutableArray();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         foreach (var havocKind in Enum.GetValues<IrHavocKind>())
@@ -283,7 +283,7 @@ public sealed class PortableIrGraphCodecTests
         }
 
         builder.Return(entry, factory.CreateOperation("return"), integerTerm);
-        var roots = unaryTerms.Concat(binaryTerms).ToArray();
+        var roots = unaryTerms.Concat(binaryTerms).ToImmutableArray();
         var encoded = PortableIrGraphCodec.Encode(
             factory,
             builder.Build(),
@@ -329,7 +329,7 @@ public sealed class PortableIrGraphCodecTests
         var instructions = fixture.Program.Blocks
             .OrderBy(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))
             .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
