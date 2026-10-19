@@ -3118,3 +3118,10 @@ catalog workflow coverage pass, zero failures/skips/warnings/errors. Main and re
 review checked partial-entry cleanup, frozen rollback state, marker publication, ordinal
 path preflight, IL target ordering and diagnostic projection. The first build required
 explicit configured-factory callback guards (M094); those are now present.
+
+IMM-M095 verified: 60 baseline/current argv, export/package sequencing and native
+failure controls pass for project, main/other solution, default target and solution
+build paths. Null/empty/additional argv cases preserve binding errors as well as values;
+the native adapter copies the frozen builder snapshot without null normalization.
+Formatting checks all 87 PowerShell and 19 shell scripts, zero changes remaining.
+Main verified native shapes and read-only review found no concrete defect.

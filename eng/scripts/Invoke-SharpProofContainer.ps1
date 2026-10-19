@@ -143,22 +143,24 @@ function Invoke-PipelineCommand(
 function Invoke-TestProject([string]$ProjectPath) {
     if (-not $NoBuild) {
         Invoke-SharpProofRequiredDotnet @('restore', $ProjectPath, '--locked-mode')
-        $buildArguments = @(
-            'build', $ProjectPath, '--configuration', $Configuration,
-            '--no-restore')
-        $buildArguments += $fastBuildArguments
-        Invoke-SharpProofRequiredDotnet $buildArguments
+        $buildArgumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArgumentBuilder.AddRange([string[]]@(
+                'build', $ProjectPath, '--configuration', $Configuration,
+                '--no-restore'))
+        $buildArgumentBuilder.AddRange([string[]]@($fastBuildArguments))
+        Invoke-SharpProofRequiredDotnet ([string[]]@($buildArgumentBuilder.ToImmutable()))
         & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
 
     $assembly = Get-SharpProofTestAssemblyPath `
         -ProjectPath $ProjectPath `
         -Configuration $Configuration
-    $arguments = @('vstest', $assembly)
+    $argumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $argumentBuilder.AddRange([string[]]@('vstest', $assembly))
     if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-        $arguments += '/TestCaseFilter:' + $TestFilter
+        $argumentBuilder.Add('/TestCaseFilter:' + $TestFilter)
     }
-    Invoke-SharpProofRequiredDotnet $arguments
+    Invoke-SharpProofRequiredDotnet ([string[]]@($argumentBuilder.ToImmutable()))
 }
 
 function Invoke-PackageTests {
@@ -173,7 +175,10 @@ function Invoke-PackageTests {
 function Invoke-SolutionTests([string]$SolutionPath) {
     if (-not $NoBuild) {
         Invoke-SharpProofRequiredDotnet @('restore', $SolutionPath, '--locked-mode')
-        Invoke-SharpProofRequiredDotnet (@('build', $SolutionPath, '--configuration', $Configuration, '--no-restore') + $fastBuildArguments)
+        $buildArgumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArgumentBuilder.AddRange([string[]]@('build', $SolutionPath, '--configuration', $Configuration, '--no-restore'))
+        $buildArgumentBuilder.AddRange([string[]]@($fastBuildArguments))
+        Invoke-SharpProofRequiredDotnet ([string[]]@($buildArgumentBuilder.ToImmutable()))
         & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
     }
     $isMainSolution = [IO.Path]::GetFileName($SolutionPath) -ceq
@@ -182,20 +187,21 @@ function Invoke-SolutionTests([string]$SolutionPath) {
     [string]::IsNullOrWhiteSpace($TestFilter)
     $testProjectParallelism = Get-SharpProofTestProjectParallelism `
         -RepositoryRoot $repositoryRoot
-    $arguments = @(
-        'test', $SolutionPath, '--configuration', $Configuration,
-        '--no-restore')
-    $arguments += $fastBuildArguments
-    $arguments += '--no-build'
-    $arguments += "/m:$testProjectParallelism"
+    $argumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $argumentBuilder.AddRange([string[]]@(
+            'test', $SolutionPath, '--configuration', $Configuration,
+            '--no-restore'))
+    $argumentBuilder.AddRange([string[]]@($fastBuildArguments))
+    $argumentBuilder.Add('--no-build')
+    $argumentBuilder.Add("/m:$testProjectParallelism")
     if ($runPackageTestsSeparately) {
-        $arguments += @(
-            '--filter', 'FullyQualifiedName!~SharpProof.Package.Test')
+        $argumentBuilder.AddRange([string[]]@(
+                '--filter', 'FullyQualifiedName!~SharpProof.Package.Test'))
     }
     elseif (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-        $arguments += @('--filter', $TestFilter)
+        $argumentBuilder.AddRange([string[]]@('--filter', $TestFilter))
     }
-    Invoke-SharpProofRequiredDotnet $arguments
+    Invoke-SharpProofRequiredDotnet ([string[]]@($argumentBuilder.ToImmutable()))
 
     if ($runPackageTestsSeparately) {
         $packageArguments = @{
@@ -220,11 +226,17 @@ function Invoke-SharpProofSolutionBuild(
     [string]$BuildConfiguration,
     [string[]]$AdditionalBuildArguments = @()) {
     Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
-    $buildArguments = @(
-        'build', 'SharpProof.slnx', '--configuration', $BuildConfiguration,
-        '--no-restore')
-    $buildArguments += $AdditionalBuildArguments
-    Invoke-SharpProofRequiredDotnet $buildArguments
+    $buildArgumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $buildArgumentBuilder.AddRange([string[]]@(
+            'build', 'SharpProof.slnx', '--configuration', $BuildConfiguration,
+            '--no-restore'))
+    if ($null -ne $AdditionalBuildArguments) {
+        $buildArgumentBuilder.AddRange($AdditionalBuildArguments)
+    }
+    $buildArgumentSnapshot = $buildArgumentBuilder.ToImmutable()
+    $nativeBuildArguments = [string[]]::new($buildArgumentSnapshot.Length + [int]($null -eq $AdditionalBuildArguments))
+    $buildArgumentSnapshot.CopyTo($nativeBuildArguments)
+    Invoke-SharpProofRequiredDotnet $nativeBuildArguments
     & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $BuildConfiguration
 }
 
@@ -487,16 +499,17 @@ switch ($Command) {
         if (-not $NoBuild) {
             Invoke-SharpProofRequiredDotnet @('restore', $Target, '--locked-mode')
         }
-        $arguments = @(
-            'test', $Target, '--configuration', $Configuration, '--no-restore')
-        $arguments += $fastBuildArguments
+        $argumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $argumentBuilder.AddRange([string[]]@(
+                'test', $Target, '--configuration', $Configuration, '--no-restore'))
+        $argumentBuilder.AddRange([string[]]@($fastBuildArguments))
         if ($NoBuild) {
-            $arguments += '--no-build'
+            $argumentBuilder.Add('--no-build')
         }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
+            $argumentBuilder.AddRange([string[]]@('--filter', $TestFilter))
         }
-        Invoke-SharpProofRequiredDotnet $arguments
+        Invoke-SharpProofRequiredDotnet ([string[]]@($argumentBuilder.ToImmutable()))
     }
     'test-changed' {
         $changedArguments = New-TestInvocationArguments
