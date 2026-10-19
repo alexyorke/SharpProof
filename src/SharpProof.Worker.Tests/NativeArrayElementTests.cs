@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -125,10 +126,11 @@ public sealed class NativeArrayElementTests
     private static async Task<WorkerClaimOutcome> PostconditionAsync(CompilerCallablePreparation preparation)
     {
         System.ArgumentNullException.ThrowIfNull(preparation);
-        var results = new List<WorkerClaimResult>();
+        var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
-        return results.Count == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
+            check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
+        var results = resultBuilder.ToImmutable();
+        return results.Length == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
     }
 
     private static CompilerCallablePreparation Prepare(string method, bool effects = true)

@@ -40,12 +40,13 @@ public sealed class NativeMetadataReferenceOwnerTests
         var entryType = factory.GetVariableInfo(entry).Type;
         var input = runtime == null ? factory.CreateNullValue(entryType) : type == "string" ?
             factory.CreateStringValue((string)runtime) : factory.CreateReferenceValue(entryType, runtime);
-        var observed = new List<bool>();
+        var observationBuilder = ImmutableArray.CreateBuilder<bool>();
         var marker = body.Body.CallPreconditions.Single().Instruction;
         var execution = new IrProgramInterpreter(factory).Execute(body.Body.Program,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, input), 10000,
             new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observed.Add(value.Boolean); } } });
+            { AssignmentObserver = (instruction, value, _) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); if (instruction.Id == marker) { observationBuilder.Add(value.Boolean); } } });
+        var observed = observationBuilder.ToImmutable();
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         if (guarded && isNull)
@@ -53,8 +54,8 @@ public sealed class NativeMetadataReferenceOwnerTests
         else
         { Assert.That(execution.ReturnValue, Is.SameAs(input)); }
         Assert.That(subject.RootMethod.Invoke(null, [runtime]), Is.SameAs(runtime));
-        Assert.That(observed.Count, Is.EqualTo(guarded && isNull ? 0 : 1));
-        if (observed.Count != 0)
+        Assert.That(observed.Length, Is.EqualTo(guarded && isNull ? 0 : 1));
+        if (observed.Length != 0)
         { Assert.That(observed.Single(), Is.EqualTo(!isNull)); }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(body);

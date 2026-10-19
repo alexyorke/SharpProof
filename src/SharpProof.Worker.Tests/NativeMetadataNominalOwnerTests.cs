@@ -56,12 +56,13 @@ public sealed class NativeMetadataNominalOwnerTests
             new Action(static () => { }) : Activator.CreateInstance(subject.RootMethod.DeclaringType!.Assembly.GetType("Token")!);
         var value = concrete == null ? factory.CreateNullValue(entryType) : kind == "string" ?
             factory.CreateStringValue((string)concrete) : factory.CreateReferenceValue(entryType, concrete);
-        var observations = new List<bool>();
+        var observationBuilder = ImmutableArray.CreateBuilder<bool>();
         var marker = decoded.Body.CallPreconditions.Single().Instruction;
         var replay = new IrProgramInterpreter(factory).Execute(decoded.Body.Program,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, value), 10000,
             new IrProgramReplayOptions(static _ => null)
-            { AssignmentObserver = (instruction, assigned, _) => { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observations.Add(assigned.Boolean); } } });
+            { AssignmentObserver = (instruction, assigned, _) => { System.ArgumentNullException.ThrowIfNull(assigned, nameof(assigned)); System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (instruction.Id == marker) { observationBuilder.Add(assigned.Boolean); } } });
+        var observations = observationBuilder.ToImmutable();
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.Type, Is.EqualTo(nominalReturn ? entryType : factory.ObjectType));
