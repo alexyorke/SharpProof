@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
@@ -58,7 +59,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(targetOwner.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(ContractApi).Assembly.GetName().Name));
         }
         var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
-            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToArray();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToImmutableArray();
         Assert.That(variables, Has.Length.EqualTo(2));
         var expectedDiagnostics = new List<string>();
         var bindings = new List<string>();
@@ -70,7 +71,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(initializer, Is.Not.Null);
             Assert.That(initializer!.InitializedFields, Has.Length.EqualTo(1));
             Assert.That(SymbolEqualityComparer.Default.Equals(initializer.InitializedFields.Single(), field), Is.True);
-            var operations = initializer.Value.DescendantsAndSelf().ToArray();
+            var operations = initializer.Value.DescendantsAndSelf().ToImmutableArray();
             var methodReference = operations.OfType<IMethodReferenceOperation>().Single();
             var creation = operations.OfType<IDelegateCreationOperation>().Single();
             var method = methodReference.Method;

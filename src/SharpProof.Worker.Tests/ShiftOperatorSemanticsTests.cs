@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -114,7 +115,7 @@ public sealed class ShiftOperatorSemanticsTests
 
     private static IEnumerable<object[]> Inputs()
     {
-        long[] edges = [0, 1, -1, 2, 7, 8, 31, 32, 33, 63, 64, 65, 127, 128, 200, 255, -31, -32, -33, -64,
+        ImmutableArray<long> edges = [0, 1, -1, 2, 7, 8, 31, 32, 33, 63, 64, 65, 127, 128, 200, 255, -31, -32, -33, -64,
             int.MaxValue, int.MinValue, uint.MaxValue, long.MaxValue, long.MinValue, 0x40000000];
         var random = new Random(20261010);
         long Pick()

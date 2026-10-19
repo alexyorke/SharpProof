@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
@@ -10,7 +11,7 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
 {
     private static IEnumerable<TestCaseData> WitnessCases()
     {
-        foreach (var boundary in new[] { "validation", "launcher" })
+        foreach (var boundary in ImmutableArray.Create("validation", "launcher"))
         {
             yield return new TestCaseData(WorkerEffectContractKind.DoesNotThrow, WorkerEffectSet.Throws, true, boundary);
             yield return new TestCaseData(WorkerEffectContractKind.DoesNotThrow, WorkerEffectSet.Allocates, false, boundary);

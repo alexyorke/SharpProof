@@ -169,7 +169,7 @@ public sealed class TypedMetadataReferenceTests
         var factory = total!.Program.Factory;
         var entry = total.Parameters.Single().Entry;
         var entryType = factory.GetVariableInfo(entry).Type;
-        object?[] inputs = [null, type == "string" ? new string('x', 3) : new object()];
+        ImmutableArray<object?> inputs = [null, type == "string" ? new string('x', 3) : new object()];
         foreach (var input in inputs)
         {
             var compiled = subject.Invoke(input!);
@@ -257,7 +257,7 @@ public sealed class TypedMetadataReferenceTests
         var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proven.Outcome, Is.InstanceOf<ProvenOutcome>(), proven.Reason.ToString());
         Assert.That(refuted.Outcome, Is.InstanceOf<RefutedOutcome>(), refuted.Reason.ToString());
-        Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(new[] { parameter.Entry }));
+        Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(ImmutableArray.Create(parameter.Entry)));
     }
 
     [Test]
@@ -274,7 +274,7 @@ public sealed class TypedMetadataReferenceTests
         var firstParameter = total.Parameters[0];
         var secondParameter = total.Parameters[1];
         var first = new string('x', 3);
-        foreach (var alias in new[] { true, false })
+        foreach (var alias in ImmutableArray.Create(true, false))
         {
             var second = alias ? first : new string('x', 3);
             Assert.That(subject.Method.Invoke(null, [first, second]), Is.EqualTo(alias));

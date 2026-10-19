@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -33,7 +34,7 @@ public sealed class CompilerOrdinaryParameterAttributeSelectionTests
         Assert.That(SymbolEqualityComparer.Default.Equals(decoded!.Method, method), Is.True);
         Assert.That(decoded.ParameterAttributes, Is.Empty);
         Assert.That(decoded.Instructions.Last().Code, Is.EqualTo(nameof(System.Reflection.Metadata.ILOpCode.Ret)));
-        foreach (var value in new[] { -2, 0, 7 })
+        foreach (var value in ImmutableArray.Create(-2, 0, 7))
         {
             Assert.That(subject.Method.Invoke(null, [value]), Is.EqualTo(value));
             Assert.That(subject.RootMethod.Invoke(null, [value]), Is.EqualTo(value));

@@ -39,7 +39,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
                 public static int Target() => Guard.Need(1);
             }
             """, ["SP0027"]);
-        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
         Assert.That(errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
         using (var image = new MemoryStream())
         {
@@ -53,7 +53,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         var model = CompilationModelProvider.GetSemanticModel(compilation, tree);
         Assert.That(compilation.ContainsSyntaxTree(tree), Is.True);
         Assert.That(model.Compilation, Is.SameAs(compilation));
-        var declarations = (await tree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = (await tree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var calleeSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard"));
         var callerSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
         var callee = (IMethodSymbol)model.GetDeclaredSymbol(calleeSyntax)!;

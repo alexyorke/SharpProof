@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -123,9 +125,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
         var compilation = CreateCompilation("CSharp", CSharpMethods);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>()
-            .ToDictionary(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText),
-                syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!)));
+        var locals = ImmutableDictionaryCapture.Create(tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>(), syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText), syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!)));
         var source = locals["Leaf"];
         var parent = locals["Parent"];
         var definition = MethodOwner(compilation.GetTypeByMetadataName("HostContainer")!.GetMembers("Host")

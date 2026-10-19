@@ -254,7 +254,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var backend = new ScriptedBackend(BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure));
+        var backend = new ScriptedBackend([BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure)]);
         var results = await VerifyNativeClaimsAsync(project.Snapshot.Callables.Single(), backend, project.Request.Budgets);
         Assert.That(backend.CallCount, Is.EqualTo(1));
         Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -433,11 +433,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 ProofCore = [new string('x', WorkerProtocolJson.MaximumJsonBytes)]
             }]
         };
-        foreach (var maximumBytes in new[]
-        {
-            1L,
-            (long)WorkerProtocolJson.MaximumJsonBytes * 2
-        })
+        foreach (var maximumBytes in ImmutableArray.Create(1L, (long)WorkerProtocolJson.MaximumJsonBytes * 2))
         {
             using var temporaryDirectory = new TempDirectory(
                 "worker-cache-write-size-");
@@ -563,9 +559,9 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     private sealed class ScriptedBackend(
-        params BackendCheckResult[] results) : ISmtBackend
+        ImmutableArray<BackendCheckResult> results) : ISmtBackend
     {
-        private ImmutableQueue<BackendCheckResult> _results = ImmutableQueue.CreateRange(results ?? throw new System.ArgumentNullException(nameof(results)));
+        private ImmutableQueue<BackendCheckResult> _results = ImmutableQueue.CreateRange(results.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(results)) : results);
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);

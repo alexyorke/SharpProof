@@ -144,7 +144,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
         Assert.That(callable.Total, Is.Not.Null);
         var total = callable.Total!;
         Assert.That(total.IsBodyAbstraction, Is.False);
-        Assert.That(total.ValidEffectClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+        Assert.That(total.ValidEffectClaimIds, Is.EqualTo(ImmutableArray.Create(claim.ClaimId)));
         Assert.That(total.EffectsCompleteAtEntry, Is.EqualTo(expectedEntryEffects));
         Assert.That(total.ExceptionConstraints, Has.Length.EqualTo(expectedConstraints));
         if (expectedConstraints == 1)

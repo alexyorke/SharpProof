@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Testing;
@@ -69,7 +70,7 @@ public sealed class ContractIntrinsicValidationTests
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 2);
         var messages = diagnostics.Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(

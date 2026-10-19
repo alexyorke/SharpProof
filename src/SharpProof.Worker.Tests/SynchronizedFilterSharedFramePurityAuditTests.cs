@@ -124,7 +124,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 Assert.That(runtimeObservation.Filter.IsStatic, Is.True);
                 Assert.That(runtimeObservation.Target.ReturnType, Is.EqualTo(typeof(bool).FullName));
                 Assert.That(runtimeObservation.Filter.ReturnType, Is.EqualTo(typeof(bool).FullName));
-                Assert.That(runtimeObservation.Target.ParameterTypes, Is.EqualTo(new[] { typeof(int).FullName }));
+                Assert.That(runtimeObservation.Target.ParameterTypes, Is.EqualTo(ImmutableArray.Create(typeof(int).FullName)));
                 Assert.That(runtimeObservation.Filter.ParameterTypes, Is.Empty);
                 Assert.That(runtimeObservation.FieldCount, Is.Zero);
                 Assert.That(runtimeObservation.HasTypeInitializer, Is.False);

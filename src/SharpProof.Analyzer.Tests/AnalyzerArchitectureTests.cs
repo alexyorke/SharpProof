@@ -92,7 +92,7 @@ public sealed class AnalyzerArchitectureTests
                 source,
                 "effects",
                 ["SP0002", "SP0045"]))
-            .ToArray();
+            .ToImmutableArray();
         var results = await Task.WhenAll(tasks);
         var expected = Snapshot(results[0]);
 
@@ -111,7 +111,7 @@ public sealed class AnalyzerArchitectureTests
                                   name.StartsWith(
                                       "SharpProof.",
                                       StringComparison.Ordinal))
-            .ToArray();
+            .ToImmutableArray();
 
         Assert.That(
             references,
@@ -145,7 +145,7 @@ public sealed class AnalyzerArchitectureTests
         var names = Directory.EnumerateFiles(output, "*.dll")
             .Select(Path.GetFileNameWithoutExtension)
             .OfType<string>()
-            .ToArray();
+            .ToImmutableArray();
         var testAssembly =
             typeof(AnalyzerArchitectureTests).Assembly.GetName().Name;
         var sharpProofNames = names
@@ -158,7 +158,7 @@ public sealed class AnalyzerArchitectureTests
                         typeof(SharpProof.DefensiveCodingAnalyzer.ParameterGuardAnalyzer).Assembly.GetName().Name,
                         StringComparison.Ordinal);
             })
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -187,7 +187,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void OperationKindGateCatalogIsExhaustive()
     {
-        var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToArray();
+        var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToImmutableArray();
 
         Assert.That(
             OperationSubsetClassifier.GetKnownOperationKinds(),
@@ -309,7 +309,7 @@ public sealed class AnalyzerArchitectureTests
             var columns = line
                 .Split('|')
                 .Select(static column => column is null ? throw new System.ArgumentNullException(nameof(column)) : (column.Trim()))
-                .ToArray();
+                .ToImmutableArray();
             if (columns.Length < 4 ||
                 columns[0].Length != 6 ||
                 !columns[0].StartsWith("SP", StringComparison.Ordinal) ||

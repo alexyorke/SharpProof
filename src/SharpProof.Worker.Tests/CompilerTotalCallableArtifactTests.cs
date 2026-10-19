@@ -133,7 +133,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
-        Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(new CompilerDisjointInputPair[] { new(0, 1), new(0, 2), new(1, 2) }));
+        Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(ImmutableArray.Create(new CompilerDisjointInputPair(0, 1), new CompilerDisjointInputPair(0, 2), new CompilerDisjointInputPair(1, 2))));
         Assert.That(CompilerTotalCallableArtifactCodec.Encode(preparation.Total)!.DisjointInputs, Is.EqualTo(artifact.Callables.Single().Total!.DisjointInputs));
         Assert.That((await Check(preparation, 0)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
@@ -557,8 +557,8 @@ public sealed class CompilerTotalCallableArtifactTests
         };
         var encoded = CompilerTotalCallableArtifactCodec.Encode(modified)!;
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)) with { Total = encoded }) }; }
-        var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))
-            .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToImmutableArray();
+        var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old)))
+            .Concat(encoded.Result == -1 ? ImmutableArray<int>.Empty : ImmutableArray.Create(encoded.Result)).Distinct().OrderBy(index => index).ToImmutableArray();
         var operations = encoded.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Operation))
             .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToImmutableArray();
         Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations, TestContext.CurrentContext.CancellationToken)));

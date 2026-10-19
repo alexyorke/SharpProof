@@ -34,7 +34,7 @@ public sealed class WorkerBinaryIdentityTests
         var wrongExtension = Path.Combine(temporaryWorkspace.FullName, "worker.exe");
         File.WriteAllBytes(wrongExtension, [1, 2, 3]);
 
-        foreach (var path in new[] { missing, wrongExtension })
+        foreach (var path in ImmutableArray.Create(missing, wrongExtension))
         {
             var failure = Assert.Throws<FileNotFoundException>((Action)(() =>
                 WorkerBinaryIdentity.ComputeSha256(path)));

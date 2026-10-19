@@ -94,7 +94,7 @@ public sealed class CompilerReportingTests
                 { second = second with { Message = second.Message + " other" }; }
                 break;
         }
-        Assert.That(CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]), Is.EqualTo(new[] { first, second }));
+        Assert.That(CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]), Is.EqualTo(ImmutableArray.Create(first, second)));
     }
 
     [Test]
@@ -215,7 +215,7 @@ public sealed class CompilerReportingTests
         var canonical = CompilerDiagnosticArtifactOrdering.Canonicalize([second, first]);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(canonical, Is.EqualTo(new[] { first, second }));
+            Assert.That(canonical, Is.EqualTo(ImmutableArray.Create(first, second)));
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical(canonical), Is.True);
             Assert.That(CompilerDiagnosticArtifactOrdering.IsCanonical([second, first]), Is.False);
             Assert.That(CompilerDiagnosticArtifactOrdering.Compare(first, first), Is.Zero);

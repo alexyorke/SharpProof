@@ -17,9 +17,9 @@ public sealed class TypedPortableIntegerTests
         var factory = new IrFactory();
         var roots = System.Collections.Immutable.ImmutableList<IrTerm>.Empty;
         var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
-        foreach (var width in new[] { 8, 16, 32, 64 })
+        foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
-            foreach (var isSigned in new[] { false, true })
+            foreach (var isSigned in ImmutableArray.Create(false, true))
             {
                 var type = factory.GetOrCreateIntegerType(width, isSigned);
                 var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;

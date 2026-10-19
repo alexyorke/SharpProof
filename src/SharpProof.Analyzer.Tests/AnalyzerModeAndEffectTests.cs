@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -652,7 +653,7 @@ public sealed class AnalyzerModeAndEffectTests
             """;
         var factories = Enumerable.Range(0, 4)
             .Select(static _ => new RecordingSessionFactory())
-            .ToArray();
+            .ToImmutableArray();
 
         var runs = await Task.WhenAll(factories.Select(factory =>
             factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (AnalyzerTestHost.AnalyzeAsync(
@@ -889,7 +890,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047", "SP0047");
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -970,7 +971,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1220,7 +1221,7 @@ public sealed class AnalyzerModeAndEffectTests
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0047"))
             .Select(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             incomplete,
             Has.Length.EqualTo(4),

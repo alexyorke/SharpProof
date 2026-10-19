@@ -70,7 +70,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
             new CompilerReferenceSiblingLocation("Module.netmodule", null, sibling).Resolve()))!.Message,
             Is.EqualTo("A compiler reference directory is unavailable."));
-        foreach (var unsafeName in new[] { "", ".", "..", "../Module.netmodule", "a\0b" })
+        foreach (var unsafeName in ImmutableArray.Create("", ".", "..", "../Module.netmodule", "a\0b"))
         {
             Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
                 CompilerCompilationCapture.ResolveSiblingModule("\0", unsafeName)))!.Message,
@@ -150,19 +150,22 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         TestCompilation.AssertNoErrors(compilation);
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         var argumentIdentity = CompilerExceptionTypeIdentity.Encode(core.GetTypeByMetadataName("System.ArgumentException")!);
-        var claims = new[]
+        var claims = ImmutableArray.Create(new CompilerEffectClaimArtifact { ClaimId = "none", ContractKind = WorkerEffectContractKind.DoesNotThrow }, new CompilerEffectClaimArtifact
         {
-            new CompilerEffectClaimArtifact { ClaimId = "none", ContractKind = WorkerEffectContractKind.DoesNotThrow },
-            new CompilerEffectClaimArtifact { ClaimId = "argument", ContractKind = WorkerEffectContractKind.AllowedExceptions,
-                Constraint = new() { AllowedExceptionTypes = [argumentIdentity] } },
-            new CompilerEffectClaimArtifact { ClaimId = "effect", ContractKind = WorkerEffectContractKind.EffectContract,
-                Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] } }
-        };
+            ClaimId = "argument",
+            ContractKind = WorkerEffectContractKind.AllowedExceptions,
+            Constraint = new() { AllowedExceptionTypes = [argumentIdentity] }
+        }, new CompilerEffectClaimArtifact
+        {
+            ClaimId = "effect",
+            ContractKind = WorkerEffectContractKind.EffectContract,
+            Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] }
+        });
         var projected = CompilerExceptionConstraintEvidence.Project(core, claims);
         Assert.That(projected.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId)), Is.EqualTo(ExpectedClaimIds));
         Assert.That(projected[0].AllowedKinds, Is.Empty);
-        Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
-        Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange }));
+        Assert.That(projected[1].AllowedKinds, Is.EqualTo(ImmutableArray.Create(IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange)));
+        Assert.That(projected[2].AllowedKinds, Is.EqualTo(ImmutableArray.Create(IrExceptionKind.Argument, IrExceptionKind.ArgumentOutOfRange)));
         Assert.That(compilation.Assembly.GetTypeByMetadataName("System.DivideByZeroException"), Is.Null);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, claims), Is.Empty);
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, []), Is.Empty);

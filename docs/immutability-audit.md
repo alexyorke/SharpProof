@@ -3592,3 +3592,14 @@ retain native-array contracts. Freeze with ToImmutableArray while preserving eag
 order, symbol/reference identity and diagnostics. Other Analyzer vectors, collectors,
 private return shapes and actual mutable option-provider subjects remain open. Validate
 all ordinary Analyzer tests. Status: open before edits.
+IMM-M131 verified: all 711 affected ordinary Release Worker tests pass, zero
+failures/skips/build warnings/errors; 88 exact embedded PDB outputs. Main corrected
+an ImmutableArray.Create overload ambiguity by naming element constructors and added
+the missing immutable-collections import before this clean rerun. Independent review
+confirms target ordering, strict map/ordinal sets, private input coupling and preserved
+mutable backend queue/counters. Removed the redundant parenthesized immutable recapture.
+IMM-M133 verified: all 1,134 ordinary Release Analyzer tests pass, zero failures/skips/
+build warnings/errors; 64 exact embedded PDB outputs. Review confirms Task.WhenAll
+IEnumerable inputs, snapshot consumers, symbol identity and native/SUT preservation.
+Canonical whitespace check of pending C# files requires zero changes. M132 Package
+vectors/deep expected graph/atomic cache pass independent review; workflow remains pending.

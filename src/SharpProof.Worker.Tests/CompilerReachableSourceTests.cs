@@ -93,7 +93,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(shared.Graph, Is.Not.Null);
         Assert.That(PortableIrGraphCodec.Decode(shared.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Program, Is.Not.Null);
         Assert.That(graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId != shared.BodyId)).All(body =>
-            body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
+            body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(ImmutableArray.Create(shared.BodyId)) && body.Graph != null && body.IsCallSkeleton &&
             body.SourceCalls.Single().CalleeBodyId == shared.BodyId)), Is.True);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -168,7 +168,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
         Assert.That(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Local", StringComparison.Ordinal))).Callees,
-            Is.EqualTo(new[] { graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Helper", StringComparison.Ordinal))).BodyId }));
+            Is.EqualTo(ImmutableArray.Create(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Helper", StringComparison.Ordinal))).BodyId)));
     }
 
     [TestCase("public static int Root() => P; static int P => 1;")]
@@ -304,7 +304,7 @@ public sealed class CompilerReachableSourceTests
         {
             case "missing":
                 {
-                    graph = graph with { Bodies = (graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body != leaf)).ToArray()).ToImmutableArray() };
+                    graph = graph with { Bodies = graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body != leaf)).ToImmutableArray() };
                     artifact = artifact with { ReachableSource = graph };
                 }
                 break;

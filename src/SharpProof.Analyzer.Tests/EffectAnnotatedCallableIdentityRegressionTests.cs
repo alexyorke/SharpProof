@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Testing;
@@ -36,7 +37,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
         };
         var actualExceptionNames = claim.Evidence.Constraint.AllowedExceptionTypes
             .Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value[(value.LastIndexOf("::", StringComparison.Ordinal) + 2)..]))
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {

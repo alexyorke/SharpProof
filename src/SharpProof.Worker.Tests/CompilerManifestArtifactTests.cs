@@ -452,29 +452,35 @@ public sealed class CompilerManifestArtifactTests
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.Serialize(none, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
-        foreach (var location in new[]
-                 {
-                     new WorkerSourceLocation
-                     {
-                         Path = "same.cs", Start = 0, Length = 0,
-                         Line = 0, Column = 1
-                     },
-                     new WorkerSourceLocation
-                     {
-                         Path = "same.cs", Start = 0, Length = 0,
-                         Line = 1, Column = 0
-                     },
-                     new WorkerSourceLocation
-                     {
-                         Path = "", Start = 0, Length = 1,
-                         Line = 0, Column = 0
-                     },
-                     new WorkerSourceLocation
-                     {
-                         Path = "", Start = -1, Length = 0,
-                         Line = 0, Column = 0
-                     }
-                 })
+        foreach (var location in ImmutableArray.Create(new WorkerSourceLocation
+        {
+            Path = "same.cs",
+            Start = 0,
+            Length = 0,
+            Line = 0,
+            Column = 1
+        }, new WorkerSourceLocation
+        {
+            Path = "same.cs",
+            Start = 0,
+            Length = 0,
+            Line = 1,
+            Column = 0
+        }, new WorkerSourceLocation
+        {
+            Path = "",
+            Start = 0,
+            Length = 1,
+            Line = 0,
+            Column = 0
+        }, new WorkerSourceLocation
+        {
+            Path = "",
+            Start = -1,
+            Length = 0,
+            Line = 0,
+            Column = 0
+        }))
         {
             var malformed = CreateArtifact();
             {
@@ -766,11 +772,7 @@ public sealed class CompilerManifestArtifactTests
         Assert.That(CompilerLoweredArtifact.Decode(
             valid.Callables, valid.Manifest, valid.Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken).Length, Is.EqualTo(1));
 
-        foreach (var mutation in new[]
-        {
-            "missing-payload", "missing-compilation", "callable-count",
-            "foreign-id", "claim-id", "reason", "missing-effects"
-        })
+        foreach (var mutation in ImmutableArray.Create("missing-payload", "missing-compilation", "callable-count", "foreign-id", "claim-id", "reason", "missing-effects"))
         {
             var artifact = CloneArtifact(valid);
             switch (mutation)

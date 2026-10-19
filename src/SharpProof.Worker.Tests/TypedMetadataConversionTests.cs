@@ -47,7 +47,7 @@ public sealed class TypedMetadataConversionTests
         var entryType = factory.GetVariableInfo(entry).Type;
         var (minimum, maximum) = Range(source);
         var (targetMinimum, targetMaximum) = Range(target);
-        BigInteger[] boundaries = [minimum, maximum, -1, 0, 1, targetMinimum - 1, targetMinimum, targetMinimum + 1,
+        ImmutableArray<BigInteger> boundaries = [minimum, maximum, -1, 0, 1, targetMinimum - 1, targetMinimum, targetMinimum + 1,
             targetMaximum - 1, targetMaximum, targetMaximum + 1, int.MinValue, int.MaxValue, uint.MaxValue, long.MinValue, long.MaxValue];
         foreach (var boundary in boundaries.Distinct().Where(value => value >= minimum && value <= maximum))
         {

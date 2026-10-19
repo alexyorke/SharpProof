@@ -107,7 +107,7 @@ public sealed class ContractForCycleAnalyzerTests
 
         var cycleDiagnostics = diagnostics
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0010"))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(

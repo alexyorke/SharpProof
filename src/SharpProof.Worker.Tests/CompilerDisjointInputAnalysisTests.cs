@@ -41,7 +41,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         Assert.That(pairs.Length, Is.LessThanOrEqualTo(CompilerArtifactLimits.MaximumInstructions));
         var expected = (from left in Enumerable.Range(0, count)
                         from right in Enumerable.Range(left + 1, count - left - 1)
-                        select (left, right)).Take(expectedPairs).ToArray();
+                        select (left, right)).Take(expectedPairs).ToImmutableArray();
         Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(expected));
         foreach (var pair in pairs)
         {

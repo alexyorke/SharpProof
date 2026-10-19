@@ -120,7 +120,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
             sample.SourceSha256,
             CompilerErrorCount = 0,
             EmitSucceeded = true,
-            RuntimeInputs = new[] { 7, -3 },
+            RuntimeInputs = ImmutableArray.Create(7, -3),
             sample.RuntimeOutputs,
             LocalDeclaration = Site(declaration),
             ActualOwnerReferences = ownerReferences.Select(Site).ToImmutableArray(),
@@ -189,7 +189,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
             sample.SourceSha256,
             CompilerErrorCount = 0,
             EmitSucceeded = true,
-            RuntimeInputs = new[] { 7, -3 },
+            RuntimeInputs = ImmutableArray.Create(7, -3),
             sample.RuntimeOutputs,
             ActualOwnerReferences = actualOwnerReferences.Select(Site).ToImmutableArray(),
             AstContainerRole = language == "CSharp" ? "actual-method-declaration" : "VB-MethodBlock-AST-only",
@@ -300,7 +300,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject", throwOnError: true)!.GetMethod("Root")!;
-            outputs = new[] { 7, -3 }.Select(value => (int)method.Invoke(null, [value])!).ToImmutableArray();
+            outputs = ImmutableArray.Create(7, -3).Select(value => (int)method.Invoke(null, [value])!).ToImmutableArray();
             Assert.That(outputs, Is.EqualTo(expected));
         }
         finally

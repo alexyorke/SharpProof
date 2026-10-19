@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -1124,7 +1125,7 @@ public sealed class RequiresAndControlTests
         var messages = diagnostics
             .Select(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             messages.All(static message =>
                 message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
@@ -1170,7 +1171,7 @@ public sealed class RequiresAndControlTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
         Assert.That(messages[1], Does.Contain("Contract.Old").And.Contain("<placement>"));
         Assert.That(messages[2], Does.Contain("Contract.Old").And.Contain("<nesting>"));
@@ -1386,7 +1387,7 @@ public sealed class RequiresAndControlTests
             ["SP0047"]);
 
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToArray();
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(messages, Has.Length.EqualTo(2));
@@ -1451,7 +1452,7 @@ public sealed class RequiresAndControlTests
 
         var invalid = diagnostics
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024"))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(invalid, Has.Length.EqualTo(3));
         Assert.That(
             invalid.Select(static diagnostic =>

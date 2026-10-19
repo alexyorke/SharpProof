@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -53,7 +54,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = await tree.GetRootAsync();
         var declarations = syntax.DescendantNodes().OfType<EventFieldDeclarationSyntax>()
-            .SelectMany(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Declaration.Variables)).ToArray();
+            .SelectMany(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Declaration.Variables)).ToImmutableArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
         var model = compilation.GetSemanticModel(tree);
         foreach (var declaration in declarations)
@@ -124,7 +125,7 @@ public sealed class EventInitializerIntrinsicOwnershipAuditTests
         var model = compilation.GetSemanticModel(tree);
         var intrinsics = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol { Name: "Result" or "Old" }))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(intrinsics, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsics)
         {

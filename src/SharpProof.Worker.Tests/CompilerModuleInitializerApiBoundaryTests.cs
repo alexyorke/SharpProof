@@ -140,7 +140,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         var tree = CSharpSyntaxTree.ParseText(source, (CSharpParseOptions)valid.SyntaxTrees.Single().Options, "field-like-event.cs");
         var compilation = valid.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
         var eventSymbol = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Value").OfType<IEventSymbol>().Single();
-        foreach (var method in new[] { eventSymbol.AddMethod!, eventSymbol.RemoveMethod! })
+        foreach (var method in ImmutableArray.Create(eventSymbol.AddMethod!, eventSymbol.RemoveMethod!))
         {
             Assert.That(method.IsImplicitlyDeclared, Is.True);
             Assert.That(method.IsStatic, Is.True);

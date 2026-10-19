@@ -33,7 +33,7 @@ public sealed class CompilerRecursiveMayEffectUnionCoverageTests
         var graph = decoded.ReachableSource!;
         Assert.That(graph.CollectionComplete, Is.True);
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
-        var ids = graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId)).ToHashSet(StringComparer.Ordinal);
+        var ids = graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId)).ToImmutableHashSet(StringComparer.Ordinal);
         Assert.That(ids, Has.Count.EqualTo(3));
         Assert.That(graph.Bodies.All(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && body.CallsComplete &&
             body.EffectsCompleteAtEntry && body.IsCallSkeleton && body.SourceCalls.Length == 1 &&
