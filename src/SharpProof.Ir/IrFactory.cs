@@ -10,6 +10,9 @@ public sealed class IrFactory
     private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
     private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
+    private readonly Dictionary<IrTypeId, IrTypeId?> _closedClassReferenceBases = [];
+    private readonly HashSet<IrTypeId> _interfaceReferenceTypes = [];
+    private readonly Dictionary<IrTypeId, HashSet<IrTypeId>> _implementedReferenceInterfaces = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
     private readonly List<IrMemberInfo> _members = [];
@@ -207,6 +210,73 @@ public sealed class IrFactory
         {
             GetTypeInfoCore(type, nameof(type));
             return _closedSealedReferenceTypes.Contains(type);
+        }
+    }
+
+    internal void RegisterClosedClassReferenceType(IrTypeId type, IrTypeId? baseType)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _interfaceReferenceTypes.Contains(type) ||
+                baseType.HasValue && (baseType == type || baseType == ObjectType ||
+                    !_closedClassReferenceBases.ContainsKey(baseType.Value)))
+            { throw new ArgumentException("A class certificate requires a nominal type and a certified base.", nameof(type)); }
+            if (_closedClassReferenceBases.TryGetValue(type, out var previous) && previous != baseType)
+            { throw new ArgumentException("A class certificate cannot change its base.", nameof(baseType)); }
+            _closedClassReferenceBases[type] = baseType;
+        }
+    }
+
+    internal bool TryGetClosedClassReferenceBase(IrTypeId type, out IrTypeId? baseType)
+    {
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _closedClassReferenceBases.TryGetValue(type, out baseType);
+        }
+    }
+
+    internal void RegisterInterfaceReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closedClassReferenceBases.ContainsKey(type))
+            { throw new ArgumentException("An interface certificate requires a Total nominal interface.", nameof(type)); }
+            _interfaceReferenceTypes.Add(type);
+        }
+    }
+
+    internal bool IsInterfaceReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _interfaceReferenceTypes.Contains(type);
+        }
+    }
+
+    internal void RegisterImplementedReferenceInterface(IrTypeId type, IrTypeId interfaceType)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType || type == interfaceType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || !_interfaceReferenceTypes.Contains(interfaceType))
+            { throw new ArgumentException("An implemented interface requires certified nominal views.", nameof(interfaceType)); }
+            if (!_implementedReferenceInterfaces.TryGetValue(type, out var interfaces))
+            { _implementedReferenceInterfaces.Add(type, interfaces = []); }
+            interfaces.Add(interfaceType);
+        }
+    }
+
+    internal IrTypeId[] GetImplementedReferenceInterfaces(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _implementedReferenceInterfaces.TryGetValue(type, out var interfaces) ? [.. interfaces.OrderBy(id => id.IsDefault ? throw new ArgumentException("A type must be initialized.", nameof(id)) : id.Value)] : [];
         }
     }
 

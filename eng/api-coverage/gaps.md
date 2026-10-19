@@ -36,6 +36,24 @@ opt-in relational packs or all possible behavioral facets. Such areas are outsid
 this universe, rather than verified or absent. Runtime/IR differential evidence
 also does not imply that every caller can be proved by the SMT verifier.
 
+## Verified reference identity boundary
+
+Compiler-owned closed class types now establish impossible entry aliases when
+neither type belongs to the other's inheritance chain. Runtime identity erases
+nested tuple element names, dynamic/object spelling and nullable annotations;
+these spellings do not create disjoint CLR types. Exact constructed source-helper
+receiver and parameter types preserve the caller's nominal identity.
+
+Native counterexample replay checks compatible class ancestry and compiler-owned
+interface/implementation evidence before sharing an identity across distinct
+nominal views. Impossible closed class field aliases cannot authorize a refutation.
+Base/derived, supported interface aliases and both-null values retain their tested
+behavior. Missing legacy metadata and uncertified open generic views can still
+yield Unknown, including legitimate aliases when generic arguments coincide.
+This boundary does not add complete field disjointness proofs or arbitrary CLR
+subtype materialization. Portable metadata is part of the canonical artifact and
+its request-bound digest; malformed ancestry and interface metadata fail closed.
+
 ## Priorities and acceptance criteria
 
 Work from the largest source counts, but split a family into sound semantic slices.
