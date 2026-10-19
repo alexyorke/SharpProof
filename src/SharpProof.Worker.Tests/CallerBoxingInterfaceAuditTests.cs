@@ -94,7 +94,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var comparable = compilation.GetTypeByMetadataName("System.IComparable")!;
-        var bindings = new List<object>();
+        var bindingBuilder = ImmutableArray.CreateBuilder<object>();
         foreach (var methodName in TargetNames)
         {
             var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -144,7 +144,7 @@ public sealed class CallerBoxingInterfaceAuditTests
             Assert.That(effect.ConstructorArguments.Single().Value, Is.EqualTo(0L));
             Assert.That(effect.NamedArguments.Single(pair => pair.Key == "Complete").Value.Value, Is.EqualTo(true));
             Assert.That(effect.NamedArguments.Single(pair => pair.Key == "PreconditionFree").Value.Value, Is.EqualTo(true));
-            bindings.Add(new
+            bindingBuilder.Add(new
             {
                 Method = methodName,
                 Callee = invocation.TargetMethod.ToDisplayString(),
@@ -166,6 +166,7 @@ public sealed class CallerBoxingInterfaceAuditTests
                 SpanLength = argument.Value.Syntax.Span.Length
             });
         }
+        var bindings = bindingBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-binding.json"),
             JsonSerializer.Serialize(bindings, WorkerProtocolJson.SharedOptions));
 
@@ -177,9 +178,9 @@ public sealed class CallerBoxingInterfaceAuditTests
         var imageBytes = image.ToArray();
         await File.WriteAllBytesAsync(Path.Combine(evidence, "oracle.dll"), imageBytes);
         image.Position = 0;
-        var probes = new List<ProbeObservation>();
-        var observations = new List<RuntimeObservation>();
-        var identityControls = new List<IdentityObservation>();
+        var probeBuilder = ImmutableArray.CreateBuilder<ProbeObservation>();
+        var observationBuilder = ImmutableArray.CreateBuilder<RuntimeObservation>();
+        var identityControlBuilder = ImmutableArray.CreateBuilder<IdentityObservation>();
         var runtime = new AssemblyLoadContext("InterfaceBoxingOracle", isCollectible: true);
         try
         {
@@ -212,16 +213,19 @@ public sealed class CallerBoxingInterfaceAuditTests
             {
                 var present = MeasureIdentity(echo, sentinel);
                 var absent = MeasureIdentity(echo, null);
-                identityControls.Add(new("preboxed-double", round, present.Bytes, ReferenceEquals(present.Result, sentinel)));
-                identityControls.Add(new("null", round, absent.Bytes, absent.Result == null));
+                identityControlBuilder.Add(new("preboxed-double", round, present.Bytes, ReferenceEquals(present.Result, sentinel)));
+                identityControlBuilder.Add(new("null", round, absent.Bytes, absent.Result == null));
             }
-            MeasureCase("TargetDouble", "double-present", targetDouble, controlDouble, WitnessValue, sentinel, false, probes, observations);
-            MeasureCase("TargetNullable", "nullable-present", targetNullable, controlNullable, (double?)WitnessValue, sentinel, false, probes, observations);
-            MeasureCase("TargetNullable", "nullable-null", targetNullable, controlNullable, null, null, true, probes, observations);
+            MeasureCase("TargetDouble", "double-present", targetDouble, controlDouble, WitnessValue, sentinel, false, probeBuilder, observationBuilder);
+            MeasureCase("TargetNullable", "nullable-present", targetNullable, controlNullable, (double?)WitnessValue, sentinel, false, probeBuilder, observationBuilder);
+            MeasureCase("TargetNullable", "nullable-null", targetNullable, controlNullable, null, null, true, probeBuilder, observationBuilder);
             GC.KeepAlive(sentinel);
             GC.KeepAlive(_escaped);
         }
         finally { runtime.Unload(); }
+        var probes = probeBuilder.ToImmutable();
+        var observations = observationBuilder.ToImmutable();
+        var identityControls = identityControlBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "clr-probes.json"),
             JsonSerializer.Serialize(probes, WorkerProtocolJson.SharedOptions));
         await File.WriteAllTextAsync(Path.Combine(evidence, "clr-measurements.json"),
@@ -253,7 +257,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
-        var nativeObservations = new List<NativeObservation>();
+        var nativeObservationBuilder = ImmutableArray.CreateBuilder<NativeObservation>();
         foreach (var methodName in TargetNames)
         {
             var declaration = artifact.Manifest.Claims.Single(claim =>
@@ -265,16 +269,17 @@ public sealed class CallerBoxingInterfaceAuditTests
             Assert.That(group, Has.Length.EqualTo(methodName == "TargetDouble" ? MeasurementRounds : 2 * MeasurementRounds));
             var positive = group.Any(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes > 0));
             var zero = group.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0));
-            nativeObservations.Add(new(methodName, declaration.CallableId, claim.ClaimId,
+            nativeObservationBuilder.Add(new(methodName, declaration.CallableId, claim.ClaimId,
                 claim.Outcome, claim.Reason, claim.Vacuity, captured.Total != null, captured.Total?.IsBodyAbstraction,
                 preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>().Count(),
                 positive, zero, zero && claim.Outcome == WorkerClaimOutcome.Refuted));
         }
+        var nativeObservations = nativeObservationBuilder.ToImmutable();
         await File.WriteAllTextAsync(Path.Combine(evidence, "grouped-native-observations.json"),
             JsonSerializer.Serialize(nativeObservations, WorkerProtocolJson.SharedOptions));
         foreach (var native in nativeObservations)
         { TestContext.WriteLine($"{native.Method}; native={native.Outcome}; reason={native.Reason}; positive={native.AnyPositiveBytes}; allZero={native.AllSubjectZero}"); }
-        TestContext.WriteLine($"interface-boxing claims={nativeObservations.Count}; inputs=3; evidence={evidence}");
+        TestContext.WriteLine($"interface-boxing claims={nativeObservations.Length}; inputs=3; evidence={evidence}");
         Assert.Multiple((Action)(() =>
         {
             Assert.That(identityControls.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Bytes == 0 && row.SameReference)), Is.True,
@@ -302,7 +307,7 @@ public sealed class CallerBoxingInterfaceAuditTests
 
     private static void MeasureCase<T>(string method, string input, Func<T, IComparable?, IComparable?> target,
         Func<T, IComparable?, IComparable?> control, T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */, IComparable? sentinel, bool expectedNull,
-        List<ProbeObservation> probes, List<RuntimeObservation> observations)
+        ImmutableArray<ProbeObservation>.Builder probes, ImmutableArray<RuntimeObservation>.Builder observations)
     {
         System.ArgumentNullException.ThrowIfNull(control);
         System.ArgumentNullException.ThrowIfNull(input);

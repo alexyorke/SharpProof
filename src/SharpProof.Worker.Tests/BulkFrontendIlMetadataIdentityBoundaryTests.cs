@@ -198,8 +198,8 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             var entry = body.Parameters.Single().Entry;
             foreach (var input in Inputs)
             {
-                var observations = new List<bool>();
-                var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToHashSet();
+                var observationBuilder = ImmutableArray.CreateBuilder<bool>();
+                var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
                 var options = new IrProgramReplayOptions(static _ => null)
                 {
                     AssignmentObserver = (instruction, assigned, _) =>
@@ -207,14 +207,14 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                         System.ArgumentNullException.ThrowIfNull(assigned);
                         System.ArgumentNullException.ThrowIfNull(instruction);
                         if (markers.Contains(instruction.Id))
-                        { observations.Add(assigned.Boolean); }
+                        { observationBuilder.Add(assigned.Boolean); }
                     }
                 };
                 var replay = new IrProgramInterpreter(factory).Execute(body.Program,
                     global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(entry, factory.CreateBooleanValue(input)), 10000, options);
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ReturnValue!.Boolean, Is.EqualTo(input));
-                Assert.That(observations, Is.EqualTo(ExpectedPreconditions));
+                Assert.That(observationBuilder.ToImmutable(), Is.EqualTo(ExpectedPreconditions));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ApproximationVariables, Is.Empty);
             }

@@ -537,13 +537,14 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
     private static IEnumerable<IOperation> Walk(IOperation operation)
     {
         System.ArgumentNullException.ThrowIfNull(operation);
-        var pending = new Stack<IOperation>();
-        pending.Push(operation);
-        while (pending.TryPop(out var current))
+        var pending = ImmutableStack<IOperation>.Empty.Push(operation);
+        while (!pending.IsEmpty)
         {
+            var current = pending.Peek();
+            pending = pending.Pop();
             yield return current;
             foreach (var child in current.ChildOperations)
-            { pending.Push(child); }
+            { pending = pending.Push(child); }
         }
     }
 

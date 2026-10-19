@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -40,9 +41,10 @@ public sealed class CompilerBodyAbstractionTests
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
         var unknown = checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is not ProvenOutcome));
         Assert.That(unknown.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
@@ -151,9 +153,10 @@ public sealed class CompilerBodyAbstractionTests
             } }
             """);
         using var project = new ShadowTestProject(metadata.CreateArtifact());
-        var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
+        var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
+        var checks = checkBuilder.ToImmutable();
         Assert.That(checks, Has.Count.EqualTo(2));
         if (string.IsNullOrEmpty(initialization))
         {

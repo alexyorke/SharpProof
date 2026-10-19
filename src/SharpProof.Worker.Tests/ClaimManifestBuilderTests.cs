@@ -687,17 +687,13 @@ public sealed class ClaimManifestBuilderTests
                 Is.EqualTo(capability.ToString()));
         }
 
-        var effectCombinations =
-            new Dictionary<SharpProof.Effects.EffectContractKind, WorkerEffectSet>
-            {
-                [SharpProof.Effects.EffectContractKind.None] =
-                    WorkerEffectSet.None
-            };
+        var effectCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Effects.EffectContractKind, WorkerEffectSet>();
+        effectCombinations[SharpProof.Effects.EffectContractKind.None] = WorkerEffectSet.None;
         foreach (var effect in effects.Where(static effect =>
                      effect != SharpProof.Effects.EffectContractKind.None))
         {
             var mapped = ClaimManifestBuilder.ToWorkerEffects(effect);
-            foreach (var combination in effectCombinations.ToArray())
+            foreach (var combination in effectCombinations.ToImmutable())
             {
                 effectCombinations[combination.Key | effect] =
                     combination.Value | mapped;
@@ -711,21 +707,15 @@ public sealed class ClaimManifestBuilderTests
                 combination.Key.ToString());
         }
 
-        var capabilityCombinations =
-            new Dictionary<
-                SharpProof.Effects.EffectContractCapabilityKind,
-                WorkerEffectCapabilitySet>
-            {
-                [SharpProof.Effects.EffectContractCapabilityKind.None] =
-                    WorkerEffectCapabilitySet.None
-            };
+        var capabilityCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Effects.EffectContractCapabilityKind, WorkerEffectCapabilitySet>();
+        capabilityCombinations[SharpProof.Effects.EffectContractCapabilityKind.None] = WorkerEffectCapabilitySet.None;
         foreach (var capability in capabilities.Where(static capability =>
                      capability !=
                      SharpProof.Effects.EffectContractCapabilityKind.None))
         {
             var mapped =
                 ClaimManifestBuilder.ToWorkerCapabilities(capability);
-            foreach (var combination in capabilityCombinations.ToArray())
+            foreach (var combination in capabilityCombinations.ToImmutable())
             {
                 capabilityCombinations[combination.Key | capability] =
                     combination.Value | mapped;
@@ -989,7 +979,7 @@ public sealed class ClaimManifestBuilderTests
                 }
                 """;
         }
-        var identities = new HashSet<string>(StringComparer.Ordinal);
+        var identities = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var codeUnit in ImmutableArray.Create(0xD800, 0xD801, 0xDC00, 0xDFFF))
         {
             var first = Build(("First.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;

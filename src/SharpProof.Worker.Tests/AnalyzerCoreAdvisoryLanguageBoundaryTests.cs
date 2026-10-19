@@ -52,8 +52,9 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
             compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration), method), Is.True);
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.Compilation, Is.SameAs(compilation));
-        var diagnostics = new List<Diagnostic>();
-        var outcome = AdvisoryRequiresDiagnostics.Analyze(method, declaration, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+        var outcome = AdvisoryRequiresDiagnostics.Analyze(method, declaration, session, diagnosticBuilder.Add, TestContext.CurrentContext.CancellationToken);
+        var diagnostics = diagnosticBuilder.ToImmutable();
 
         if (visualBasic)
         {

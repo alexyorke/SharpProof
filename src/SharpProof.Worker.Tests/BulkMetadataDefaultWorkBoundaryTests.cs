@@ -234,13 +234,13 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         var artifact = CompilerTotalCallableArtifactCodec.Encode(prepared)!;
         var decoded = CompilerDecodedShadowBody.Decode(prepared.CallableId, artifact, TestContext.CurrentContext.CancellationToken, references).Body;
         var factory = decoded.Program.Factory;
-        var arguments = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty;
+        var arguments = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         for (var index = 0; index < inputs.Length; index++)
         {
             var entry = decoded.Parameters[index].Entry;
-            arguments = arguments.Add(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, inputs[index]));
+            arguments.Add(entry, factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, inputs[index]));
         }
-        var observed = new List<bool>();
+        var observed = ImmutableArray.CreateBuilder<bool>();
         var marker = decoded.CallPreconditions.Single().Instruction;
         var options = new IrProgramReplayOptions(static _ => null)
         {
@@ -252,10 +252,10 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
                 { observed.Add(value.Boolean); }
             }
         };
-        var execution = new IrProgramInterpreter(factory).Execute(decoded.Program, arguments, 10000, options);
+        var execution = new IrProgramInterpreter(factory).Execute(decoded.Program, arguments.ToImmutable(), 10000, options);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(execution.ConsumedApproximation, Is.False);
-        Assert.That(observed, Is.EqualTo(ExpectedPreconditions));
+        Assert.That(observed.ToImmutable(), Is.EqualTo(ExpectedPreconditions));
     }
 }

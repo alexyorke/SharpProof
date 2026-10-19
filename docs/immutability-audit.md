@@ -3201,3 +3201,9 @@ warnings/errors. Main and independent review checked recursive old() binding, fi
 ordering, stable published snapshots, constructor-only symbol maps, nullable comparers
 and partial generic callback timing. The new callback now has its explicit null guard,
 as required by the repository analyzer; construction builders do not escape.
+
+IMM-M100 verified: all 118 affected Worker tests pass, zero failures/skips/warnings/
+errors. Main verified callback serial execution, producer completion/freeze boundaries,
+pre-mutation map snapshots, measured allocation intervals, native compiler argv and
+LIFO traversal. The flag maps retain indexer semantics and observation arrays preserve
+order and duplicates. No mutable subject buffers were changed.
