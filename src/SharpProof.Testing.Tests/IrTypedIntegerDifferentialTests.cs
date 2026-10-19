@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -23,9 +24,9 @@ public sealed class IrTypedIntegerDifferentialTests
         var oracle = new IrCSharpDifferentialOracle(factory);
         var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         var highBit = 1UL << (width - 1);
-        (ulong Left, ulong Right)[] pairs = [(mask, 1), (highBit, mask), (0, 0),
+        ImmutableArray<(ulong Left, ulong Right)> pairs = [(mask, 1), (highBit, mask), (0, 0),
             (highBit, 1), (mask >> 1, 1), (mask, 2), (mask, mask)];
-        IrBinaryOperator[] operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
+        ImmutableArray<IrBinaryOperator> operations = [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
             IrBinaryOperator.Multiply, IrBinaryOperator.Divide, IrBinaryOperator.Remainder,
             IrBinaryOperator.LessThan, IrBinaryOperator.GreaterThanOrEqual, IrBinaryOperator.Equal];
         foreach (var operation in operations)
@@ -43,7 +44,7 @@ public sealed class IrTypedIntegerDifferentialTests
             }
         }
         var negation = factory.Unary(IrUnaryOperator.Negate, factory.Variable(left));
-        foreach (var bits in new[] { 0UL, highBit, mask })
+        foreach (var bits in ImmutableArray.Create(0UL, highBit, mask))
         {
             var result = oracle.Compare(negation,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValueFromBits(type, bits)));
@@ -56,15 +57,14 @@ public sealed class IrTypedIntegerDifferentialTests
     {
         var factory = new IrFactory();
         var oracle = new IrCSharpDifferentialOracle(factory);
-        foreach (var source in new[] { factory.GetOrCreateIntegerType(8, true),
-                     factory.GetOrCreateIntegerType(64, false) })
+        foreach (var source in ImmutableArray.Create(factory.GetOrCreateIntegerType(8, true), factory.GetOrCreateIntegerType(64, false)))
         {
             var variable = factory.CreateVariable("source", source);
             var bits = factory.GetTypeInfo(source).Width == 8 ? 0xffUL : ulong.MaxValue;
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValueFromBits(source, bits));
-            foreach (var width in new[] { 8, 16, 32, 64 })
+            foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
             {
-                foreach (var isSigned in new[] { false, true })
+                foreach (var isSigned in ImmutableArray.Create(false, true))
                 {
                     var target = factory.GetOrCreateIntegerType(width, isSigned);
                     var result = oracle.Compare(factory.Cast(target, factory.Variable(variable)), values);
@@ -83,14 +83,14 @@ public sealed class IrTypedIntegerDifferentialTests
         using var assertions = Assert.EnterMultipleScope();
         var factory = new IrFactory();
         var oracle = new IrCSharpDifferentialOracle(factory);
-        foreach (var width in new[] { 32, 64 })
+        foreach (var width in ImmutableArray.Create(32, 64))
         {
             var type = factory.GetOrCreateIntegerType(width, true);
             var left = factory.CreateVariable("left", type);
             var right = factory.CreateVariable("right", type);
             var mask = width == 64 ? ulong.MaxValue : uint.MaxValue;
             var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValueFromBits(type, 1UL << (width - 1))).SetItem(right, factory.CreateIntegerValueFromBits(type, mask));
-            foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder })
+            foreach (var operation in ImmutableArray.Create(IrBinaryOperator.Divide, IrBinaryOperator.Remainder))
             {
                 var result = oracle.Compare(factory.Binary(operation,
                     factory.Variable(left), factory.Variable(right)), values);

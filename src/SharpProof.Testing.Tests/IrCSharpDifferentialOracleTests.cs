@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -13,12 +14,12 @@ public sealed class IrCSharpDifferentialOracleTests
         var factory = new IrFactory();
         var generator = new WellSortedIrGenerator(factory, seed: 0x5A17);
         var oracle = new IrCSharpDifferentialOracle(factory);
-        var categories = new HashSet<GeneratedIrCategory>();
+        var categoryBuilder = ImmutableHashSet.CreateBuilder<GeneratedIrCategory>();
 
         for (var index = 0; index < 200; index++)
         {
             var generated = generator.Next(maximumDepth: 4);
-            categories.Add(generated.Category);
+            categoryBuilder.Add(generated.Category);
             var result = oracle.Compare(generated.Term, generated.Variables);
             Assert.That(
                 result.Status,
@@ -26,6 +27,7 @@ public sealed class IrCSharpDifferentialOracleTests
                 $"case {index}: {result.Detail}; term " +
                 new IrPrinter(factory).Print(generated.Term));
         }
+        var categories = categoryBuilder.ToImmutable();
         Assert.That(
             categories,
             Is.EquivalentTo(Enum.GetValues<GeneratedIrCategory>()));
@@ -252,13 +254,7 @@ public sealed class IrCSharpDifferentialOracleTests
                     [factory.CreateNullValue(factory.StringType)])));
 
         Assert.That(
-            new[]
-            {
-                empty.Status,
-                scalarElements.Status,
-                nestedElements.Status,
-                nullElement.Status
-            },
+            ImmutableArray.Create(empty.Status, scalarElements.Status, nestedElements.Status, nullElement.Status),
             Is.All.EqualTo(DifferentialStatus.Agreement));
     }
 
