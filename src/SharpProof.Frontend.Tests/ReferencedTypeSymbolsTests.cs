@@ -30,7 +30,7 @@ public sealed class ReferencedTypeSymbolsTests
     {
         var compilation = CreateCompilation(
             "Cancellation",
-            "namespace A.B.C.D { }");
+            "namespace A.B.C.D { }", []);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -55,7 +55,7 @@ public sealed class ReferencedTypeSymbolsTests
                 internal sealed class Marker { }
                 namespace B.C.D { }
             }
-            """);
+            """, []);
         using var cancellation = new CancellationTokenSource();
         using var types = ReferencedTypeSymbols.GetAll(
             compilation,
@@ -83,7 +83,7 @@ public sealed class ReferencedTypeSymbolsTests
                     "N" + index.ToString(CultureInfo.InvariantCulture)));
         var compilation = CreateCompilation(
             "DeepNamespaces",
-            "namespace " + namespaceName + " { }");
+            "namespace " + namespaceName + " { }", []);
 
         var types = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray();
 
@@ -118,7 +118,7 @@ public sealed class ReferencedTypeSymbolsTests
             {
                 internal sealed class Nested { }
             }
-            """);
+            """, []);
         var compilation = CreateCompilation(
             "ConsumerAssembly",
             """
@@ -145,7 +145,7 @@ public sealed class ReferencedTypeSymbolsTests
                 internal sealed class Nested { }
             }
             """,
-            referenced.ToMetadataReference());
+            [referenced.ToMetadataReference()]);
 
         var identities = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type =>
@@ -183,9 +183,10 @@ public sealed class ReferencedTypeSymbolsTests
     private static CSharpCompilation CreateCompilation(
         string assemblyName,
         string source,
-        params MetadataReference[] references)
+        ImmutableArray<MetadataReference> references)
     {
-        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        if (references.IsDefault)
+        { throw new ArgumentNullException(nameof(references)); }
         System.ArgumentNullException.ThrowIfNull(assemblyName);
         System.ArgumentNullException.ThrowIfNull(source);
         return CSharpCompilation.Create(
