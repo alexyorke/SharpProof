@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -134,11 +135,7 @@ public sealed partial class NativeSpecifiedCallTests
                     var input = values == null ? factory.CreateNullValue(arrayType) : factory.CreateSequenceValue(arrayType,
                         values.Cast<object>().Select(value => GenericReturnOracleValue(factory, elementType, value ?? throw new ArgumentNullException(nameof(value)))));
                     var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                        new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-                        {
-                            [context.Parameters[0].Entry] = input,
-                            [context.Parameters[1].Entry] = factory.CreateIntegerValue(index)
-                        }, 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
+                        ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(context.Parameters[0].Entry, input).SetItem(context.Parameters[1].Entry, factory.CreateIntegerValue(index)), 100000, new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false)));
                     Assert.That(replay.Status, Is.EqualTo(fault == null ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Exception));
                     if (fault == null)
                     {

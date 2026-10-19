@@ -188,7 +188,7 @@ public sealed class MetadataClauseOriginTests
         var context = new TotalLoweringContext(factory, method);
         var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken).Clauses.Single();
         var value = IrSubstitution.Substitute(factory, bound.Value,
-            new Dictionary<IrVarId, IrTerm> { [context.Parameters[0].Entry] = factory.Variable(entry) });
+            ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(context.Parameters[0].Entry, factory.Variable(entry)));
         string name;
         Assert.That(metadata ? CompilerTotalCallableArtifactCodec.TryCreateMetadataMarkerName("Library.Target", 0,
             factory.GetOperationInfo(site).SourceSpan, origin, out name) :

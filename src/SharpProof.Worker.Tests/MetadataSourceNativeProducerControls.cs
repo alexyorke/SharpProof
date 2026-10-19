@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -66,10 +67,7 @@ public sealed class MetadataSourceNativeProducerControls
             Assert.That(total.Result, Is.Not.Null);
             var parameter = total.Parameters.Single();
             var factory = total.Program.Factory;
-            var entries = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 7L)
-            };
+            var entries = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.SetItem(parameter.Entry, factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 7L));
             var executed = new IrProgramInterpreter(factory).Execute(total.Program, entries);
             var expected = family is "identity" or "static-read" ? 7L : 0L;
             Assert.That(actualSubject!.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(expected));
