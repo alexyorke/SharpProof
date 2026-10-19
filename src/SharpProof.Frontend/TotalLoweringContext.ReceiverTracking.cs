@@ -422,6 +422,21 @@ public sealed partial class TotalLoweringContext
         { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
     }
 
+    internal void SpecializeSourceReferenceType(ITypeSymbol declared, ITypeSymbol actual)
+    {
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        _receiverElements[declared] = actual;
+        _types.TypeSpecializer = SpecializeReceiverElement;
+        var type = Type(actual);
+        Parameters = [.. Parameters.Select(binding => binding is null ? throw new ArgumentNullException(nameof(binding)) :
+            SymbolEqualityComparer.Default.Equals(binding.Parameter.Type, declared) && Factory.GetVariableInfo(binding.Entry).Type != type
+                ? new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
+                    Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type)) : binding)];
+        if (SymbolEqualityComparer.Default.Equals(Target.ReturnType, declared) && Result is { } result && Factory.GetVariableInfo(result).Type != type)
+        { Result = Factory.CreateVariable("result", type); }
+    }
+
     internal void SpecializeScalarParameter(IParameterSymbol parameter, ITypeSymbol scalar)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));

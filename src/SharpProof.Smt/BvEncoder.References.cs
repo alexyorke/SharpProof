@@ -161,6 +161,7 @@ internal sealed partial class BvEncoder
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
         var certifiedTypes = new Dictionary<string, IrTypeId>(StringComparer.Ordinal);
+        var classTypes = new Dictionary<string, HashSet<IrTypeId>>(StringComparer.Ordinal);
         var shared = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var empty in _emptyArrays)
         {
@@ -214,6 +215,19 @@ internal sealed partial class BvEncoder
             certifiedTypes[token] = type;
         }
 
+        bool IsClassBase(IrTypeId ancestor, IrTypeId descendant)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(ancestor.IsDefault, nameof(ancestor));
+            RepositoryParameterGuard.ThrowIfInvalid(descendant.IsDefault, nameof(descendant));
+            for (IrTypeId? current = descendant; current.HasValue && factory.TryGetClosedClassReferenceBase(current.Value, out var parent); current = parent)
+            {
+                meter.Consume();
+                if (current == ancestor)
+                { return true; }
+            }
+            return false;
+        }
+
         // An object decodes once per model token; its fields, references
         // included, decode after it is registered, so cycles terminate.
         IrValue Decode(IrTypeId type, Expr evaluated)
@@ -236,6 +250,23 @@ internal sealed partial class BvEncoder
             {
                 meter.Consume();
                 CertifyType(token, type);
+            }
+            // Distinct nominal views need positive runtime compatibility. Missing
+            // certificates, including legacy and open generic views, cannot
+            // make an impossible alias into an authoritative counterexample.
+            if (info.Kind == IrTypeKind.Reference && type != factory.ObjectType)
+            {
+                if (!classTypes.TryGetValue(token, out var previousTypes))
+                { classTypes.Add(token, previousTypes = []); }
+                foreach (var previous in previousTypes)
+                {
+                    meter.Consume();
+                    if (type != previous && !IsClassBase(type, previous) && !IsClassBase(previous, type) &&
+                        !(factory.IsInterfaceReferenceType(type) && factory.IsInterfaceReferenceType(previous)) &&
+                        !factory.GetImplementedReferenceInterfaces(type).Contains(previous) && !factory.GetImplementedReferenceInterfaces(previous).Contains(type))
+                    { throw new UnsupportedIrEncodingException(); }
+                }
+                previousTypes.Add(type);
             }
             if (aliases.TryGetValue((type, token), out var value))
             { return value; }

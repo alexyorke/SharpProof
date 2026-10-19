@@ -300,6 +300,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
         {
+            frame.SpecializeSourceReferenceType(owner.OriginalDefinition, owner);
             if (!Spend(owner.TypeArguments.Length + 1))
             { frame = null; return false; }
             for (var ordinal = 0; ordinal < owner.TypeArguments.Length; ordinal++)
@@ -332,6 +333,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
+            if (parameter.Type.IsReferenceType && argument.Parameter.Type.IsReferenceType)
+            { frame.SpecializeSourceReferenceType(parameter.Type, argument.Parameter.Type); }
             if (caller.IsIntegerComparerType(argument.Parameter.Type) && caller.IsNullableDefaultIntegerComparer(argument.Value))
             { frame.SpecializeNullableDefaultComparerParameter(parameter); }
             if (parameter.Type is ITypeParameterSymbol && KnownSourceValue(argument.Parameter.Type) is { } scalar)

@@ -6,13 +6,13 @@ internal static class CompilerDisjointInputAnalysis
 {
     internal static ImmutableArray<CompilerDisjointInputPair> Collect(IMethodSymbol method, CancellationToken cancellationToken)
     {
-        // Only Roslyn's closed sealed class symbols certify impossible aliases.
+        // Closed class types share an instance only along one inheritance chain.
         var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
         if (method.Parameters.Length > 128)
         { return []; }
         // Each pair consumes work in both directions, keeping its count below this limit.
         var remainingWork = CompilerArtifactLimits.MaximumInstructions;
-        var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken))).ToArray();
+        var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedReferenceType(parameter.Type, cancellationToken))).ToArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
             left = RepositoryParameterGuard.NotNull(left, nameof(left));
@@ -21,7 +21,7 @@ internal static class CompilerDisjointInputAnalysis
                 cancellationToken.ThrowIfCancellationRequested();
                 if (--remainingWork < 0)
                 { return true; }
-                if (SymbolEqualityComparer.Default.Equals(current, right))
+                if (CompilerIdentityBridge.SameRuntimeType(current, right))
                 { return true; }
             }
             return false;
