@@ -2906,3 +2906,15 @@ buffer; select 109 rows. IndependentPath uses an immutable path plus LIFO immuta
 stack; compiled outputs retain their already immutable publication type. TestProject
 requires an immutable overload alongside its native params adapter. Reuse proof/core
 roots that are already immutable rather than copying them again.
+
+IMM-M084: CompilerTotalIlBodyProvider caches are immutable roots repeatedly rebound
+with Add. Use readonly ordinal ImmutableDictionary builders for its two private caches,
+retaining negative null-body caching and already-frozen PE images. Add behavior matches
+the former ImmutableDictionary.Add (including equal-value duplicate acceptance).
+Lifecycle trace: one provider per synchronous lowering, sequential lowering passes share
+that owner, PrepareIl calls synchronously, Read never recursively resolves and no cache
+escapes. Retain lazy captured references and native read buffers. Validate stream fills,
+metadata body admission, scalar IL decoding and source-image-mutation cache identity.
+A separate scan found 42 other production map/set rebindings needing ownership/fork
+review; immutable stack/queue traversal rebindings are separate legitimate operations.
+Status: open before edits.
