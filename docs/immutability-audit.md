@@ -3219,3 +3219,9 @@ index state. Queue traversal stays immutable FIFO. Nested purity builders retain
 recursive depth entries. Validate full Frontend and compiler continuation/purity/capture
 boundary tests; keep callbacks/region work accounting and explicit failure paths intact.
 Status: open before edits.
+
+Inventory checkpoint after IMM-M090-M100: 1,870 C# files yield 2,553 syntax candidates;
+44 newly tested C# builder rows are classified, 1,715 rows remain Open. All 84 tracked
+PowerShell scripts parse with zero errors and 1,093 candidates; 18 M095 argv-builder
+rows are classified. Pending M101/M102 implementation and semantic gaps remain open
+in this audit; syntax candidate removal alone does not close their validation.
