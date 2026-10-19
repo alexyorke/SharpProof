@@ -181,7 +181,12 @@ Existing body warnings are matched by ID and body-relative source location;
 warnings at new sites reject a candidate even if that warning ID already exists.
 Anonymous objects use internal structural property graphs; record/struct with
 expressions retain nominal receivers and inferred initializer constraints.
-FormattableString and custom interpolation handlers remain unsupported. A nameof member lookup may reject a candidate even though
+FormattableString/IFormattable targets infer their boxed holes, retaining format
+and alignment syntax. Custom interpolation handlers infer generic AppendFormatted
+arguments, containing-type substitutions and method constraints, including forwarded
+arguments/receivers and conditional append protocols. Constructor and append selections
+are checked across supplied files. Ordinary string holes retain their original types
+to preserve formatting overloads hidden by compiler lowering. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.
 
 Loop analysis accumulates constraints over monomorphic bindings; it does not

@@ -33,7 +33,7 @@ internal static class SyntaxChecks
             ("InterpolateUnused", "static string M(int x,bool ignored) => $\"value={x}\";", "Suggestion", "string M<T1>(int x, T1 ignored)"),
             ("InterpolateFormat", "static string M(int x,bool ignored) => $\"{x,8:D4}\";", "Suggestion", "string M<T1>(int x, T1 ignored)"),
             ("InterpolateRaw", "static string M(int x,bool ignored) => $\"\"\"value={x}\"\"\";", "Suggestion", "string M<T1>(int x, T1 ignored)"),
-            ("FormattableSkipped", "static System.FormattableString M(int x) => $\"{x}\";", "Skipped", null),
+            ("Formattable", "static System.FormattableString M(int x) => $\"{x}\";", "Suggestion", "global::System.FormattableString M<T1>(T1 x)"),
             ("NameofParameter", "static string M(int x) => nameof(x);", "Suggestion", "string M<T1>(T1 x)"),
             ("NameofMember", "static string M(string x) => nameof(x.Length);", "Rejected", null),
             ("EscapedIdentifier", "static int @M(int @class) => @class;", "Suggestion", "T1 @M<T1>(T1 @class)")

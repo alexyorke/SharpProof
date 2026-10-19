@@ -1,0 +1,22 @@
+#nullable enable
+using System;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+[InterpolatedStringHandler]
+public struct SampleFormattingHandler
+{
+    public SampleFormattingHandler(int literalLength, int formattedCount) { }
+    public SampleFormattingHandler(int literalLength, int formattedCount, bool enabled, out bool append) { append = enabled; }
+    public bool AppendLiteral(string text) => true;
+    public bool AppendFormatted<T>(T value, int alignment = 0, string? format = null) => true;
+}
+public static class InterpolationSamples
+{
+    private static void Consume(SampleFormattingHandler handler) { }
+    private static void Forward(bool enabled, [InterpolatedStringHandlerArgument("enabled")] SampleFormattingHandler handler) { }
+    public static FormattableString CaptureFormat(int value) => $"value={value,6:D4}";
+    public static FormattableString CaptureNullableFormat(string? value) => $"value={value}";
+    public static async Task<FormattableString> CaptureAwaitedFormat(Task<int> pending) => $"value={await pending}";
+    public static void GenericHandlerFormat(int value) => Consume($"value={value}");
+    public static void ForwardedHandlerFormat(bool enabled, int value) => Forward(enabled, $"value={value}");
+}

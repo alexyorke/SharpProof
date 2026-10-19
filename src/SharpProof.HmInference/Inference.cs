@@ -377,6 +377,8 @@ public static partial class Inference
                         return new(symbol.Name, "Rejected", "Generalization changes a selected constructor.");
                     }
                 }
+                if (!PreservesInterpolationBindings(beforeRoot, afterRoot, beforeModel, afterModel, changedMethod, changed))
+                { return new(symbol.Name, "Rejected", "Generalization changes interpolation handler construction or append selection."); }
                 if (!PreservesUserOperations(beforeRoot, afterRoot, beforeModel, afterModel))
                 { return new(symbol.Name, "Rejected", "Generalization changes a selected user operator or conversion."); }
             }
@@ -402,8 +404,13 @@ public static partial class Inference
                 }
             }
 
-            if ((needsBuilderEmission || IsUsedBuilderMember(symbol)) && ValidateBuilderEmission(method, changedMethod, changedModel) is string builderFailure)
+            var builderEmission = needsBuilderEmission || IsUsedBuilderMember(symbol);
+            if (builderEmission && ValidateBuilderEmission(method, changedMethod, changedModel) is string builderFailure)
             { return new(symbol.Name, "Rejected", builderFailure); }
+            if (!builderEmission && (requiresInterpolationEmission || method.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>().Any(interpolation =>
+                { if (interpolation is null) { throw new ArgumentNullException(nameof(interpolation)); } return InterpolationHandler(model.GetOperation(interpolation, cancellationToken)) is not null; }))
+                && ValidateInterpolationEmission(changedModel) is string interpolationFailure)
+            { return new(symbol.Name, "Rejected", interpolationFailure); }
 
             var typeParameterNames = (method.TypeParameterList?.Parameters.Select(p =>
             {
@@ -800,7 +807,8 @@ public static partial class Inference
 
                         if (model.GetOperation(assignment.Left, cancellationToken) is IDiscardOperation)
                         { return Expression(assignment.Right); }
-                        return AssignValue(assignment.Left, Expression(assignment.Right), model.GetTypeInfo(assignment.Right, cancellationToken).Type);
+                        return AssignValue(assignment.Left, Expression(assignment.Right), IsTargetedInterpolation(assignment.Right)
+                            ? model.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType : model.GetTypeInfo(assignment.Right, cancellationToken).Type);
                     }
 
                     if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
@@ -942,26 +950,9 @@ public static partial class Inference
                     }
                     return CSharpTypes.Rigid(constructed.Type!);
                 case InterpolatedStringExpressionSyntax interpolated:
-                    // Keep original hole types to preserve overloads and formatting;
-                    // custom interpolation-handler conversions remain unsupported.
-                    var converted = model.GetTypeInfo(interpolated, cancellationToken).ConvertedType;
-                    if (converted?.SpecialType != SpecialType.System_String)
-                    {
-                        throw new InferenceException("Only string-targeted interpolation is supported.");
-                    }
-
-                    foreach (var hole in interpolated.Contents.OfType<InterpolationSyntax>())
-                    {
-                        Anchor(hole.Expression);
-                        if (hole.AlignmentClause is not null)
-                        {
-                            HmType.Unify(Expression(hole.AlignmentClause.Value), new("int"));
-                        }
-                    }
-
-                    return new("string");
+                    return Interpolation(interpolated);
                 case BinaryExpressionSyntax binary:
-                    return Binary(binary);
+                    return InterpolationHandler(model.GetOperation(binary, cancellationToken)) is not null ? Interpolation(binary) : Binary(binary);
                 case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
                     if (model.GetOperation(unary, cancellationToken) is IUnaryOperation { OperatorMethod: not null } userUnary)
                     { return UserOperator(userUnary.OperatorMethod, [userUnary.Operand], userUnary.Type!, userUnary.IsLifted); }
@@ -1035,6 +1026,8 @@ public static partial class Inference
 
         private void Anchor(ExpressionSyntax expression)
         {
+            if (IsTargetedInterpolation(expression))
+            { UnifyDeconstructionReceiver(CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).ConvertedType!), Interpolation(expression)); return; }
             // Local declaration annotations and flow-state annotations can differ.
             // Retain the declared wrapper while fixing the same runtime receiver type.
             UnifyDeconstructionReceiver(CSharpTypes.Rigid(model.GetTypeInfo(expression, cancellationToken).Type ?? model.GetTypeInfo(expression, cancellationToken).ConvertedType ?? throw new InferenceException("Untyped expression.")), Expression(expression));

@@ -102,6 +102,13 @@ public static partial class Inference
             }
             if (info.Type is null || converted is null)
             { return Expression(expression); }
+            if (IsTargetedInterpolation(expression))
+            {
+                var inferred = Interpolation(expression).Root;
+                if (converted.IsReferenceType && converted.NullableAnnotation == NullableAnnotation.Annotated && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
+                { return new(CSharpTypes.NullableReference, inferred); }
+                return inferred;
+            }
             var sameTuple = info.Type is INamedTypeSymbol { IsTupleType: true } sourceTuple && converted is INamedTypeSymbol { IsTupleType: true } declaredTuple
                 && SymbolEqualityComparer.Default.Equals(sourceTuple.TupleUnderlyingType, declaredTuple.TupleUnderlyingType);
             if (SymbolEqualityComparer.Default.Equals(info.Type, converted) || sameTuple || model.ClassifyConversion(expression, converted).IsIdentity)
@@ -242,6 +249,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(value)); }
             if (expected is null)
             { throw new ArgumentNullException(nameof(expected)); }
+            if (value.Syntax is ExpressionSyntax interpolation && IsTargetedInterpolation(interpolation))
+            { Interpolation(interpolation, expected); return; }
             var inferred = BoundExpression(value).Root;
             expected = expected.Root;
             if (TryBindArgumentConversion(value, expected, inferred))
