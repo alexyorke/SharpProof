@@ -24,6 +24,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Public API](public-api.md) | Contract clauses, closed attributes, effect declarations, trust controls |
 | [Language reference](language-reference.md) | Construct-by-construct model, support boundaries, and regression evidence |
 | [Diagnostic examples](diagnostic-examples.md) | Portable analyzer diagnostics and worker reporting |
+| [Static resource bounds](resource-bounds.md) | Opt-in proven loop counts, cumulative array allocations, and explicit Unknown results |
 | [Coverage and limits](coverage-and-limits.md) | Modeled operations, conservative boundaries, regression coverage |
 | [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
 | [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |

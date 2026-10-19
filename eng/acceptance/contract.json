@@ -384,6 +384,8 @@
           "src/SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs",
           "src/SharpProof.Analyzer.Core/AnalyzerSession.cs",
           "src/SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
+          "src/SharpProof.Analyzer.Core/ResourceBoundsAnalysis.cs",
+          "src/SharpProof.Analyzer.Core/ResourceBoundsDiagnostics.cs",
           "src/SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
           "src/SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs",
           "src/SharpProof.Analyzer.Core/Advisory/AdvisoryScalarIntervalTransfer.cs",

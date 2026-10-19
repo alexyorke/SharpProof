@@ -398,6 +398,10 @@ namespace SharpProof.Analyzer;
 
 internal static class GeneratedDiagnosticDescriptors
 {
+    internal static readonly DiagnosticDescriptor ResourceBoundsRule = new(
+        "SP0060", "Static resource bounds", "Method '{0}': {1}", "Resources",
+        DiagnosticSeverity.Info, isEnabledByDefault: false,
+        description: "Reports proven upper bounds on total loop body entries, cumulative array allocations and elements, or an explicit Unknown reason.");
 
     internal static readonly DiagnosticDescriptor PurityNotVerifiedRule = new(
         id: "SP0002",
@@ -567,7 +571,8 @@ internal static class GeneratedDiagnosticDescriptors
         SelectedAnalysisIncompleteRule,
         CompilerManifestFailureRule,
         ContractApiUnverifiableRule,
-        EffectContractNotProvenRule
+        EffectContractNotProvenRule,
+        ResourceBoundsRule
     ];
 }
 ```

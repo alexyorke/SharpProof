@@ -16,3 +16,4 @@ SP0047 | Verification | Info | Reports selected methods outside the supported an
 SP0049 | Infrastructure | Error | Reports failure to emit the selected final compiler manifest.
 SP0050 | Infrastructure | Error | Reports a referenced contract API assembly that could not be read to verify its payload.
 SP0052 | Contracts | Warning | Reports a complete body summary that exceeds its declared `[EffectContract]`.
+SP0060 | Resources | Disabled | Opt-in proven loop/cumulative array bounds or explicit Unknown reasons.
