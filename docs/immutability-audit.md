@@ -2813,3 +2813,15 @@ Refreshed inventory: 1,870 C# files, 2,919 syntax candidates; eight new scoped b
 rows classified and the two argument-view input boundary rows retained. Literal check
 against cd3363c63 preserves 2,968 raw/interpolated tokens across 666 changed C# files.
 All remaining open rows and unchecked semantic shapes remain in scope.
+
+IMM-M078: Coordinator selected 25 fixed IR/Specs input-map/postcondition initializers
+from the verified 64f90998e source inventory (24 dictionaries and one fixed list).
+These only supply read-only interpreter/spec inputs; scoped mutable substitution and
+per-edge accumulation are separate remaining candidates. Convert fixed maps to immutable
+factory expressions, preserving Dictionary.Add strictness through AddUnique and indexer
+last-write semantics through SetItem. Fixed postconditions become ImmutableArray.
+Use exact Roslyn nodes against saved source, accounting for shifted imports and earlier
+array edits; reject changed nodes, unsupported constructors/comments and unexpected peers
+before writes. No persistent root is reassigned during fixed expression construction.
+Validate ordinary IR and Specs projects and preserve all invalid binding/value probes.
+Status: open before edits.
