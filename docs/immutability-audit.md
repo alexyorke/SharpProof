@@ -2957,3 +2957,16 @@ Validate ListStateOracle, MetadataClauseOrigin, MetadataSourceNativeProducerCont
 NativeSpecifiedCall and Pr275AssumptionIdRequiredInput tests. Preserve all mutable SUT
 arrays, reflection arguments and runtime aliases embedded in these test scenarios.
 Status: open before edits.
+
+IMM-M087: Production semantic scan found 42 additional immutable map/set/list roots
+reassigned during construction and private sequential state updates. Main first traced
+12 sites in final pack parsing, closed-parameter sequence admission, metadata-resolution
+caches/module capture/hash grouping, specification-pack memo and manifest feature/reason
+construction. Convert these six owners to scoped/read-only immutable builders and freeze
+at existing publication boundaries, preserving reference/symbol/ordinal comparers, cached
+nulls, Add/SetItem behavior, duplicate guards, reason order and final sort order.
+The earlier proposed blanket exclusions for memo/recursive state were rejected: no
+escaped root, rollback snapshot or concurrent caller was demonstrated. Remaining 30
+sites require their own source/ownership review. Validate collector, metadata/spec pack,
+claim-manifest and final-compilation tests plus the relevant broader gate.
+Status: open before edits.
