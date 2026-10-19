@@ -188,8 +188,12 @@ goto and goto case/default are supported, including pending finally/disposal.
 Unreachable syntax still contributes typing constraints. Boolean conditions retain
 the source type of user-defined conversions and true operators.
 General type-parameter enumerator patterns remain unsupported.
-Ref delegates,
-attributed/modified lambdas and expression trees remain unsupported.
+Ref delegates and attributed/modified lambdas retain their syntax and contracts.
+Quoted lambdas infer through Expression<TDelegate>, including custom delegates,
+nested quotes, nullable captures and compilation/invocation. Natural delegate/tree
+types are resolved for conversions to Delegate, Expression and LambdaExpression;
+declared conversion endpoints remain fixed. Compiler checks enforce tree-language
+restrictions and supplied call bindings.
 Switch statements support pattern variables and guards.
 Try/catch/finally supports exception locals, filters,
 rethrow and pending loop/return exits. Using statements/declarations, await using

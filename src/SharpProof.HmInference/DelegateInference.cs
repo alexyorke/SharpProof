@@ -188,9 +188,23 @@ public static partial class Inference
         {
             if (lambda is null)
             { throw new ArgumentNullException(nameof(lambda)); }
-            if (model.GetOperation(lambda, cancellationToken) is not IAnonymousFunctionOperation operation
-                || model.GetTypeInfo(lambda, cancellationToken).ConvertedType is not INamedTypeSymbol { TypeKind: TypeKind.Delegate } target)
-            { throw new InferenceException("Lambda requires a resolved delegate target."); }
+            if (model.GetOperation(lambda, cancellationToken) is not IAnonymousFunctionOperation operation)
+            { throw new InferenceException("Lambda requires a resolved operation."); }
+            var expressionDefinition = model.Compilation.GetTypeByMetadataName("System.Linq.Expressions.Expression`1");
+            INamedTypeSymbol? DelegateTarget(ITypeSymbol? candidate)
+            {
+                if (candidate is INamedTypeSymbol { TypeKind: TypeKind.Delegate } direct)
+                { return direct; }
+                return candidate is INamedTypeSymbol quoted && SymbolEqualityComparer.Default.Equals(quoted.OriginalDefinition, expressionDefinition)
+                    && quoted.TypeArguments[0] is INamedTypeSymbol { TypeKind: TypeKind.Delegate } nested ? nested : null;
+            }
+            var info = model.GetTypeInfo(lambda, cancellationToken);
+            var container = info.ConvertedType as INamedTypeSymbol;
+            var target = DelegateTarget(container);
+            if (target is null)
+            { container = info.Type as INamedTypeSymbol; target = DelegateTarget(container); }
+            if (target is null || container is null)
+            { throw new InferenceException("Lambda requires a resolved delegate or expression-tree target."); }
             var parameters = lambda switch
             {
                 SimpleLambdaExpressionSyntax simple => new[] { simple.Parameter },
@@ -198,8 +212,12 @@ public static partial class Inference
                 AnonymousMethodExpressionSyntax anonymous => anonymous.ParameterList?.Parameters.ToArray() ?? [],
                 _ => throw new InferenceException("Unsupported lambda.")
             };
-            var nominal = CSharpTypes.Erase(target);
-            var signature = DelegateSignature(target, nominal);
+            var nominal = CSharpTypes.Erase(container);
+            var shape = nominal.Root;
+            if (shape.Name == CSharpTypes.NullableReference)
+            { shape = shape.Arguments[0].Root; }
+            var signature = DelegateSignature(target, SymbolEqualityComparer.Default.Equals(container.OriginalDefinition, expressionDefinition)
+                ? CSharpTypes.OwnArguments(shape)[0] : nominal);
             var previousAsync = asyncReturn;
             var previousBuilder = asyncBuilder;
             var previousBuilderResult = asyncBuilderResult;
@@ -233,7 +251,7 @@ public static partial class Inference
                     HmType.Unify(signature.Output, WrapAsyncResult(result));
                     return new(null, true);
                 });
-                ImportConstructedConstraints(target, nominal);
+                ImportConstructedConstraints(container, nominal);
                 return nominal;
             }
             finally { asyncReturn = previousAsync; asyncBuilder = previousBuilder; asyncBuilderResult = previousBuilderResult; builderUsesResult = previousBuilderUsesResult; }

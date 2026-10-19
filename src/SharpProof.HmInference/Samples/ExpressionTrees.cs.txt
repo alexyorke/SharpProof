@@ -1,0 +1,14 @@
+#nullable enable
+using System;
+using System.Linq.Expressions;
+
+public class SampleTreeBox<T> { public T Value = default!; }
+public static class ExpressionTreeSamples
+{
+    public static Expression<Func<int>> QuotedCapture(int value) => () => value;
+    public static Expression<Func<int>> QuotedMember(SampleTreeBox<int> box) => () => box.Value;
+    public static int QuotedApply(Expression<Func<int, int>> expression, int value) => expression.Compile()(value);
+    public static Expression<Func<Expression<Func<int>>>> NestedQuote(int value) => () => () => value;
+    public static Expression<Func<string?>> NullableQuote(string? value) => () => value;
+    public static LambdaExpression BaseQuote(int value, bool ignored) => (int item) => value;
+}
