@@ -3560,6 +3560,36 @@ public sealed class PackageLayoutSmokeTests
     {
         public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageProvesLogicalSourceStackContracts(bool recursive)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var attributes = recursive
+            ? "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,1,nameof(n),1)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,24,nameof(n),24)]"
+            : "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,2)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,48)]";
+        var body = recursive ? "if(n<=0) return; Target(n-1);" : "Leaf(n);";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "using SharpProof.Attributes; public static class Subject { " + attributes +
+            " public static void Target(int n) { " + body + " } private static void Leaf(int value) {} }", "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(2));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            var bound = claim.GetProperty("resourceBound");
+            JsonAssert.Equal(bound, "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.StackCostModel);
+            Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+            Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
+        }
+    }
     [Test]
     public async Task MainPackageProvesNativeResourceBoundsAndPublishesMetricEvidence()
     {

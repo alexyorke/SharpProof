@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "32";
+    public const string Current = "33";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 34;
+    public const int Current = 35;
 }
 
 public static class WorkerManifestVersions
@@ -165,14 +165,17 @@ public enum WorkerResourceMetric
     AllocatedElements = 3,
     AllocatedBytes = 4,
     PeakAuxiliaryBytes = 5,
-    RetainedBytes = 6
+    RetainedBytes = 6,
+    SourceActivationDepth = 7,
+    SourceStackBytes = 8
 }
 
 public static class WorkerResourceModels
 {
     public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
     public const int Expression = 1;
-    public const int Program = 4;
+    public const int Program = 5;
+    public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
     public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
     public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
     public const string LifetimeCostModel = AllocationLayout + ":finite-owned-strong-reachability-v1:normal-completion";
@@ -620,7 +623,7 @@ internal static class WorkerProtocolMetadata
         WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
         WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
         WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
-        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements, WorkerResourceMetric.AllocatedBytes, WorkerResourceMetric.PeakAuxiliaryBytes, WorkerResourceMetric.RetainedBytes,
+        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements, WorkerResourceMetric.AllocatedBytes, WorkerResourceMetric.PeakAuxiliaryBytes, WorkerResourceMetric.RetainedBytes, WorkerResourceMetric.SourceActivationDepth, WorkerResourceMetric.SourceStackBytes,
         WorkerRunStatus.Unspecified, WorkerRunStatus.Complete, WorkerRunStatus.TimedOut, WorkerRunStatus.Canceled, WorkerRunStatus.Failed,
         WorkerCallableCoverage.Unspecified, WorkerCallableCoverage.Complete, WorkerCallableCoverage.Incomplete,
         WorkerClaimOutcome.Unspecified, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown,
@@ -834,7 +837,7 @@ internal static class WorkerProtocolMetadata
         if (kind != WorkerEffectContractKind.ResourceUpperBound)
         { return constraint is null; }
         return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
-            constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
+            constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : constraint.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
             constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
     }
     internal static readonly WorkerProtocolRule<WorkerClaimManifestEntry>[] ManifestClaimRules = [

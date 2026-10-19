@@ -11,7 +11,8 @@ internal static class NativeResourceContractVerifier
         claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
         budgets = ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         var result = Verify(target, claim, cancellation);
-        if (result.ResourceBound?.UnknownReason != "ResourceBoundComparisonUnproved")
+        if (claim.Constraint.ResourceUpperBound?.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ||
+            result.ResourceBound?.UnknownReason != "ResourceBoundComparisonUnproved")
         { return result; }
         try
         {
@@ -97,6 +98,14 @@ internal static class NativeResourceContractVerifier
             var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram, target.Entry.CallableId, owner, metadata.Bind, cancellation);
             if (!check.Verified)
             { return Unknown(check.UnknownReason ?? "ResourceProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+            ResourceExpression? stackUpper = null;
+            if (constraint.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes)
+            {
+                var stack = NativeResourceStackVerifier.Derive(target.ResourceProgram, cancellation);
+                if (stack.Bounds is not { } stackBounds)
+                { return Unknown(stack.UnknownReason ?? "ResourceStackProofUnavailable", WorkerClaimReason.UnsupportedBody); }
+                stackUpper = constraint.Metric == WorkerResourceMetric.SourceActivationDepth ? stackBounds.Depth : stackBounds.StorageBytes;
+            }
             var layout = new NativeResourceLayoutBinding(target);
             ResourceExpression? bytes = null;
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
@@ -115,6 +124,7 @@ internal static class NativeResourceContractVerifier
                 WorkerResourceMetric.ArrayAllocations => check.Cost!.Arrays,
                 WorkerResourceMetric.AllocatedElements => check.Cost!.Elements,
                 WorkerResourceMetric.AllocatedBytes => bytes!,
+                WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes => stackUpper!,
                 _ => throw new InvalidDataException("Resource metric is unsupported.")
             };
             if (!ResourceBoundOrder.Proves(upper, limit, cancellation))
@@ -124,6 +134,8 @@ internal static class NativeResourceContractVerifier
             result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, new HashSet<string>(StringComparer.Ordinal));
             result.ProofCore = ["native-resource:" + claim.ClaimId,
                 "resource-program:" + WorkerProtocolJson.ComputeSha256(ResourceProgramCodec.Encode(target.ResourceProgram, cancellation))];
+            if (stackUpper != null)
+            { result.ProofCore = [.. result.ProofCore, "resource-stack-model:" + NativeResourceStackVerifier.ModelId]; }
             result.ResourceBound = Evidence(upper.ToDisplayString(), null);
             metadata.Project(result);
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)

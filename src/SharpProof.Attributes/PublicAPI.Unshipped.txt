@@ -8,6 +8,8 @@ SharpProof.Attributes.ResourceMetric.ArrayAllocations = 2 -> SharpProof.Attribut
 SharpProof.Attributes.ResourceMetric.LoopBodyEntries = 1 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.PeakAuxiliaryBytes = 5 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.RetainedBytes = 6 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.SourceActivationDepth = 7 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.SourceStackBytes = 8 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.Unspecified = 0 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceUpperBoundAttribute
 SharpProof.Attributes.ResourceUpperBoundAttribute.Coefficient.get -> long

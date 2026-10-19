@@ -36,12 +36,12 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## C. Quantitative memory and stack
 
-- [ ] Object, string, closure, boxing, and array allocation costs.
-- [ ] Byte bounds under an explicit, versioned runtime layout model.
-- [ ] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
+- [x] Object, string, closure, boxing, and array allocation costs.
+- [x] Byte bounds under an explicit, versioned runtime layout model.
+- [x] Alias/escape and lifetime reasoning; distinguish cumulative allocation,
   peak live auxiliary memory, and retained/returned output.
-- [ ] Stack frame and recursive stack bounds under a declared model.
-- [ ] Independent allocation/liveness controls, mixed-size objects, aliases,
+- [x] Stack frame and recursive stack bounds under a declared model.
+- [x] Independent allocation/liveness controls, mixed-size objects, aliases,
   escaping values, and runtime-layout incompatibility tests.
 
 ## D. Contracts and native verification
@@ -1719,3 +1719,63 @@ coverage shards. Its aggregate reached 3479/3659 changed trusted lines (95.08%,
 percentage enforcement. This evidence predates closure-frame links; fresh
 exact-head CI and gap closure remain required. Broader capture/call lifetimes,
 stack models and remaining E/F requirements are still open.
+
+## Logical source activation bounds
+
+The stack requirement now has an explicit source activation model rather than a
+JIT-frame estimate. Each activation reserves eight-byte variable slots for its
+parameters, declared locals, receiver/result when present, and two bookkeeping
+slots. Generated/runtime/native frames, evaluation temporaries and tail-call
+elimination are outside this model. These bounds do not establish physical stack
+usage or stack-overflow safety.
+
+Compiler resource programs preserve method and constructor activation boundaries,
+including calls in field initializers. Typed activation shapes contain storage
+facts, not supplied depth/byte verdicts. Native derivation takes maxima across
+sequences/choices and loop iterations, accumulates retained recursive activations
+only under checked ranking programs, and adds conservative prefix-call storage.
+Existing cumulative work/allocation visitors pass through activation boundaries.
+
+SourceActivationDepth and SourceStackBytes contracts select this model. Current
+stack claims support Proven upper bounds and explicit Unknown results; completed
+stack-violation replay is not implemented, and protocol validation rejects stack
+refutations. Unknown frames, unmodeled calls and unsupported recursion cannot
+publish partial stack numbers. Strict transport validates shape fields, flags,
+arity and unrelated payloads.
+
+Resource program/evidence model 5, protocol 33, cache 35 and compiler artifact 48
+invalidate older encodings/capabilities. Manifest 6 and expression model 1 remain
+unchanged. Public API entries, owning assertions, acceptance versions and artifact
+snapshots move together. Representative compiler/native/transport and independent
+executed-recursion controls are being validated before broader gates and packaged
+consumer qualification. The full stack milestone is not yet marked complete.
+
+The completed stack checkpoint passed all 1416 analyzer tests, all 711 IR tests,
+685 affected native/protocol/artifact controls, and 27 final stack/consumer
+controls. Two real packaged strict-profile direct-call/recursive stack-contract
+cases passed. Final consumer controls exercise validated cache hits, SARIF model
+projection and rejection of forged stack refutations. Two additional IR controls for
+oversized block/instruction streams passed with no partial memory bounds.
+
+Phase C is now complete for the declared admitted families documented in the
+resource guide: typed allocation costs under the pinned layout, finite owned
+normal-completion reachability, and logical source activation storage with checked
+recursive ranks. This does not expand admission to arbitrary borrowed graphs,
+closure invocation, unbounded lifetime paths or physical JIT/GC peaks; those
+boundaries return Unknown. Broader language admission is future extension work,
+rather than evidence that unsupported cases have proved resource bounds.
+
+Quality/compatibility and full repository formatting passed before final fixture
+additions; scoped whitespace formatting passed for those additions. Documentation
+generation and 724 local links passed. Layout validates 2731 source files,
+59 evaluated projects and all 151 pinned common files. The authoritative production
+inventory validates all 519 trusted paths, including both stack implementation
+files. Final docs and formatting drift checks follow the added validation notes.
+
+Published closure checkpoint 8eb137d67 passed the other 29 checks (six skipped)
+but failed changed-trusted-code coverage: 3587/3765 lines, 95.27%, 178 gaps.
+This predates stack changes. The 100% floor remains unchanged. Coverage gap
+closure and exact-head CI qualification remain mandatory, as do all phase E/F
+unchecked requirements. Latest fetched master 8556188d1 adds exception-constructor
+and callback-effect semantics; it must be incorporated and its affected workflows
+verified before this checkpoint is qualified.

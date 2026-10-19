@@ -14,7 +14,7 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Proven, Is.True, result.UnknownReason);
         Assert.That(result.Bounds!.LoopIterations.Text, Is.EqualTo("max(0, n)"));
         Assert.That(result.Bounds.Arrays.Text, Is.EqualTo("0"));
-        Assert.That(result.Bounds.Program.Children.Single().Kind, Is.EqualTo(SharpProof.Ir.ResourceProgramKind.MetadataCall));
+        Assert.That(result.Bounds.Program.Children.Single().Children.Single().Kind, Is.EqualTo(SharpProof.Ir.ResourceProgramKind.MetadataCall));
         Assert.That(result.Assumptions, Has.Length.EqualTo(1));
         Assert.That(result.Assumptions[0], Does.Contain(ResourceMetadataCostCatalog.ContentSha256));
         Assert.That(result.Assumptions[0], Does.Contain(ResourceMetadataCostCatalog.EvidenceSource));

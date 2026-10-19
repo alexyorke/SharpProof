@@ -374,7 +374,7 @@ public sealed partial class NativeResourceContractTests
             $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true));
         Assert.That(preparation.Compilation.References, Is.Empty);
         Assert.That(preparation.Compilation.ResourceMetadataReferences, Has.Length.EqualTo(1));
-        Assert.That(preparation.Compilation.ResourceMetadataReferences[0].Identity, Is.EqualTo(preparation.ResourceProgram!.Metadata!.AssemblyIdentity));
+        Assert.That(preparation.Compilation.ResourceMetadataReferences[0].Identity, Is.EqualTo(preparation.ResourceProgram!.Children.Single().Metadata!.AssemblyIdentity));
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
         var metadata = result.ResourceBound!.MetadataAssumptions.Single();
@@ -441,7 +441,7 @@ public sealed partial class NativeResourceContractTests
     {
         ArgumentNullException.ThrowIfNull(corruption);
         var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]", "int value=System.Math.Max(n,0);"), reviewedRuntime: true));
-        var reference = preparation.ResourceProgram!.Metadata!;
+        var reference = preparation.ResourceProgram!.Children.Single().Metadata!;
         switch (corruption)
         {
             case "undeclared":

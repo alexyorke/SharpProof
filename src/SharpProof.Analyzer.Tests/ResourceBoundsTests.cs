@@ -241,7 +241,8 @@ public sealed partial class ResourceBoundsTests
         ArgumentNullException.ThrowIfNull(element);
         var result = Analyze($"var values = new {element}[3];", "");
         Assert.That(result.Proven, Is.True, result.UnknownReason);
-        var allocation = result.Bounds!.Program.Allocation;
+        Assert.That(result.Bounds!.Program.Kind, Is.EqualTo(SharpProof.Ir.ResourceProgramKind.Activation));
+        var allocation = result.Bounds.Program.Children.Single().Allocation;
         Assert.That(allocation, Is.Not.Null);
         Assert.That((int)allocation!.Storage, Is.EqualTo(storage));
         Assert.That(allocation.Extent.Constant, Is.EqualTo(new System.Numerics.BigInteger(3)));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
@@ -44,6 +45,20 @@ internal static class ResourceProgramCodec
         writer.WritePropertyName("length");
         if (program.Length is { } length)
         { writer.WriteBase64StringValue(ResourceExpressionCodec.Encode(length, cancellation)); }
+        else
+        { writer.WriteNullValue(); }
+        writer.WritePropertyName("activation");
+        if (program.Activation is { } activation)
+        {
+            writer.WriteStartObject();
+            writer.WriteBoolean("receiver", activation.HasReceiver);
+            writer.WriteBoolean("result", activation.HasResult);
+            writer.WriteStartArray("variables");
+            foreach (var storage in activation.Variables)
+            { writer.WriteNumberValue((int)storage); }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
         else
         { writer.WriteNullValue(); }
         writer.WritePropertyName("allocation");
@@ -114,7 +129,7 @@ internal static class ResourceProgramCodec
         cancellation.ThrowIfCancellationRequested();
         if (--remaining < 0 || depth >= ResourceExpression.MaximumDepth)
         { throw new ResourceExpressionLimitException(); }
-        Fields(node, "kind", "length", "allocation", "rank", "metadata", "repeatKind", "children");
+        Fields(node, "kind", "length", "activation", "allocation", "rank", "metadata", "repeatKind", "children");
         var kind = (ResourceProgramKind)Integer(node.GetProperty("kind"));
         if (!Enum.IsDefined(typeof(ResourceProgramKind), kind))
         { throw new InvalidDataException("Resource program kind is undefined."); }
@@ -122,18 +137,40 @@ internal static class ResourceProgramCodec
         if (!Enum.IsDefined(typeof(ResourceRepeatKind), repeat) || kind != ResourceProgramKind.Repeat && repeat != ResourceRepeatKind.Loop)
         { throw new InvalidDataException("Resource repeat kind is invalid."); }
         var children = node.GetProperty("children");
-        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind == ResourceProgramKind.Repeat ? 1 : 2;
+        var arity = kind is ResourceProgramKind.Zero or ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged or ResourceProgramKind.MetadataBoundary or ResourceProgramKind.MetadataCall ? 0 : kind is ResourceProgramKind.Repeat or ResourceProgramKind.Activation ? 1 : 2;
         if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() != arity)
         { throw new InvalidDataException("Resource program arity is invalid."); }
         var length = node.GetProperty("length");
         var allocationNode = node.GetProperty("allocation");
         var rank = node.GetProperty("rank");
         var metadataNode = node.GetProperty("metadata");
+        var activationNode = node.GetProperty("activation");
         if (kind != ResourceProgramKind.AllocateArray && length.ValueKind != JsonValueKind.Null ||
             kind is not (ResourceProgramKind.AllocateArray or ResourceProgramKind.AllocateManaged) && allocationNode.ValueKind != JsonValueKind.Null ||
             kind != ResourceProgramKind.Repeat && rank.ValueKind != JsonValueKind.Null ||
-            kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null)
+            kind != ResourceProgramKind.MetadataCall && metadataNode.ValueKind != JsonValueKind.Null ||
+            kind != ResourceProgramKind.Activation && activationNode.ValueKind != JsonValueKind.Null)
         { throw new InvalidDataException("Resource program carries an unrelated payload."); }
+        if (kind == ResourceProgramKind.Activation)
+        {
+            ResourceActivationShape? shape = null;
+            if (activationNode.ValueKind != JsonValueKind.Null)
+            {
+                Fields(activationNode, "receiver", "result", "variables");
+                var variables = activationNode.GetProperty("variables");
+                if (variables.ValueKind != JsonValueKind.Array || variables.GetArrayLength() > ResourceActivationShape.MaximumVariables)
+                { throw new InvalidDataException("Activation variable storage is invalid."); }
+                var storage = ImmutableArray.CreateBuilder<ResourceStorageKind>();
+                foreach (var variable in variables.EnumerateArray())
+                { storage.Add((ResourceStorageKind)Integer(variable)); }
+                var receiver = activationNode.GetProperty("receiver");
+                var result = activationNode.GetProperty("result");
+                if (receiver.ValueKind is not (JsonValueKind.True or JsonValueKind.False) || result.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                { throw new InvalidDataException("Activation flags are invalid."); }
+                shape = new(storage.ToImmutable(), receiver.GetBoolean(), result.GetBoolean());
+            }
+            return ResourceProgram.Activate(shape, Read(children[0], depth + 1, ref remaining, cancellation));
+        }
         if (kind == ResourceProgramKind.MetadataCall)
         {
             Fields(metadataNode, "witness", "catalog", "assembly");

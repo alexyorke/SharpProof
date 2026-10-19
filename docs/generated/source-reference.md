@@ -91,7 +91,12 @@ public enum ResourceMetric
     PeakAuxiliaryBytes = 5,
     /// <summary>Owned bytes reachable from the returned value on normal completion.</summary>
     /// <remarks>Borrowed input storage is outside the owned-storage model.</remarks>
-    RetainedBytes = 6
+    RetainedBytes = 6,
+    /// <summary>Maximum simultaneous logical source activations, without tail-call elimination.</summary>
+    SourceActivationDepth = 7,
+    /// <summary>Logical source activation storage under the eight-byte variable-slot model.</summary>
+    /// <remarks>Excludes JIT frame layout, evaluation temporaries and runtime/native stack usage.</remarks>
+    SourceStackBytes = 8
 }
 
 /// <summary>Requires a native proof of a resource upper bound.</summary>
@@ -901,6 +906,8 @@ SharpProof.Attributes.ResourceMetric.ArrayAllocations = 2 -> SharpProof.Attribut
 SharpProof.Attributes.ResourceMetric.LoopBodyEntries = 1 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.PeakAuxiliaryBytes = 5 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.RetainedBytes = 6 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.SourceActivationDepth = 7 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.SourceStackBytes = 8 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.Unspecified = 0 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceUpperBoundAttribute
 SharpProof.Attributes.ResourceUpperBoundAttribute.Coefficient.get -> long

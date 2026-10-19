@@ -813,7 +813,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         return constraint.ResourceUpperBound is { } resource ? new WorkerResourceConstraint
         {
             Metric = (WorkerResourceMetric)resource.Metric,
-            CostModel = resource.Metric == ResourceCostMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : resource.Metric is ResourceCostMetric.PeakAuxiliaryBytes or ResourceCostMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : WorkerResourceModels.CostModel,
+            CostModel = resource.Metric == ResourceCostMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : resource.Metric is ResourceCostMetric.PeakAuxiliaryBytes or ResourceCostMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : resource.Metric is ResourceCostMetric.SourceActivationDepth or ResourceCostMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel,
             UpperBound = ResourceExpressionCodec.Encode(resource.Upper, cancellationToken)
         } : null;
     }

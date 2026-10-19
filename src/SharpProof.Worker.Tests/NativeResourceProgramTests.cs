@@ -326,7 +326,7 @@ public sealed class NativeResourceProgramTests
     public void UnknownDetachedProgramKindsCannotProducePartialCosts()
     {
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
-        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null]);
+        var program = (ResourceProgram)constructor.Invoke([(ResourceProgramKind)999, null, null, ResourceRepeatKind.Loop, System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, null, null]);
         var result = Check(program);
         Assert.That(result.Verified, Is.False);
         Assert.That(result.Cost, Is.Null);

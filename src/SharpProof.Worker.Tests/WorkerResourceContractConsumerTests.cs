@@ -6,6 +6,33 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class WorkerTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LogicalSourceStackContractsReachCacheAndSarifWithTheDeclaredModel(bool bytes)
+    {
+        var metric = bytes ? "SourceStackBytes" : "SourceActivationDepth";
+        var bound = bytes ? 48 : 2;
+        using var project = TestProject.Create("using SharpProof.Attributes; public static class Subject { " +
+            $"[ResourceUpperBound(ResourceMetric.{metric},{bound})] public static void Target(int n) {{ Leaf(n); }} private static void Leaf(int n) {{}} }}");
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        AssertClaimVerdict(first, WorkerClaimOutcome.Proven);
+        AssertClaimVerdict(second, WorkerClaimOutcome.Proven);
+        Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+        Assert.That(WorkerProtocolJson.ValidateForRequest(second, WorkerProtocolJson.ComputeRequestHash(request), second.InputHash,
+            second.Manifest, request, second.Summary.Versions).IsValid, Is.True);
+        var claim = second.ClaimResults.Single();
+        Assert.That(claim.ResourceBound!.CostModel, Is.EqualTo(WorkerResourceModels.StackCostModel));
+        Assert.That(claim.ResourceBound.MetadataAssumptions, Is.Empty);
+        using var sarif = JsonDocument.Parse(Launcher.SarifProjection.Serialize(request, second, project.DirectoryPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(result => result.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("metric").GetString(), Is.EqualTo(metric));
+        claim.Outcome = WorkerClaimOutcome.Refuted;
+        Assert.That(WorkerProtocolJson.Validate(second).IsValid, Is.False);
+    }
     [Test]
     public async Task NativeResourceContractsReachValidatedCacheAndSarifConsumers()
     {

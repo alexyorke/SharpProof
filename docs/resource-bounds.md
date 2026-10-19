@@ -569,3 +569,24 @@ Borrowed non-null captures and broader scopes still require further ownership
 models. Object packing intervals remain separate upper and lower bounds; a loose
 upper bound cannot establish an exact violating cost. Closure invocation effects
 and costs require separate admission.
+
+### Logical source stack contracts
+
+`SourceActivationDepth` bounds simultaneous logical source activations.
+`SourceStackBytes` bounds their declared record storage: eight bytes per
+parameter/local slot, one receiver/result slot when present, and two bookkeeping
+slots per activation. Sequential calls and loop iterations reuse records;
+admitted recursive ranks accumulate retained activations. Constructor initializers
+execute within the constructor record.
+
+These are source-model bounds, excluding JIT frame layout, runtime/native frames,
+evaluation temporaries and tail-call elimination. They do not prove physical stack
+usage or stack-overflow safety. For a static void method with one parameter that
+calls a static void leaf with one parameter, depth is at most two and record
+storage is at most 48 bytes.
+
+Use `ResourceUpperBound(ResourceMetric.SourceActivationDepth, 2)` or
+`ResourceUpperBound(ResourceMetric.SourceStackBytes, 48)` for that example. Unknown
+frame storage, unsupported call/recurrence semantics and unproved comparisons
+return Unknown. Stack refutations are currently unsupported; an inferred upper
+bound alone is never used as an observed violating cost.

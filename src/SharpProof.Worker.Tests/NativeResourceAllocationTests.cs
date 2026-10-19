@@ -188,7 +188,7 @@ public sealed class NativeResourceAllocationTests
         var length = mutation == 1 ? ResourceExpression.Literal(2) : ResourceExpression.One;
         var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
         var program = (ResourceProgram)constructor.Invoke([kind, length, null, ResourceRepeatKind.Loop,
-            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape]);
+            System.Collections.Immutable.ImmutableArray<ResourceProgram>.Empty, null, shape, null]);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var counts = NativeResourceProgramVerifier.Verify(program, "owned", Owner(), cancellation);
         Assert.That(counts.Cost, Is.Null);

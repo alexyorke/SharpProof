@@ -121,6 +121,7 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             var allocation = new Cost(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Object(fields.ToImmutable())));
             var effects = Sequence(initializers, depth + 1);
+            IOperation? constructorBody = null;
             if (!constructor.IsImplicitlyDeclared)
             {
                 if (constructor.DeclaringSyntaxReferences.Length != 1 ||
@@ -133,8 +134,10 @@ internal sealed partial class ResourceBoundsAnalysis
                     declaration.ExpressionBody is { } arrow ? model.GetOperation(arrow.Expression, _cancellation) : null;
                 if (body is null)
                 { return Unknown("MissingConstructorBody"); }
-                effects = effects.Add(CallableBody(constructor, body, depth + 1));
+                constructorBody = body;
+                effects = effects.Add(CallableBodyCore(constructor, body, depth + 1));
             }
+            effects = WithActivation(constructor, constructorBody, effects);
             if (creation.Initializer is { } objectInitializer)
             { effects = effects.Add(Sequence(objectInitializer.Initializers, depth + 1)); }
             return arguments.Add(allocation).Add(effects);

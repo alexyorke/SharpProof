@@ -7,6 +7,30 @@ public sealed class ResourceMemoryProgramTests
 {
     private static readonly ResourceRuntimeLayoutContext Layout = new("CoreCLR", "8.0.32", "x64", 8);
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OversizedControlFlowAndInstructionStreamsReturnNoPartialMemoryBounds(bool blocks)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        if (blocks)
+        {
+            builder.Return(entry, factory.CreateOperation());
+            for (var index = 0; index < ResourceMemoryTrace.MaximumEvents / 4; index++)
+            { builder.Return(builder.CreateBlock(), factory.CreateOperation()); }
+        }
+        else
+        {
+            var value = factory.CreateVariable("value", factory.IntegerType);
+            for (var index = 0; index < ResourceMemoryTrace.MaximumEvents / 4; index++)
+            { builder.Assign(entry, factory.CreateOperation(), value, factory.Integer(index)); }
+            builder.Return(entry, factory.CreateOperation());
+        }
+        var check = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("MemoryProgramBudgetExceeded"));
+    }
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

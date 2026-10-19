@@ -2,9 +2,29 @@ using System.Numerics;
 
 namespace SharpProof.Ir;
 
-internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged }
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation }
 internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
 internal enum ResourceRepeatKind { Loop, TailRecurrence }
+
+// Typed source variables, not a producer-supplied byte count or JIT frame size.
+internal sealed class ResourceActivationShape
+{
+    internal const int MaximumVariables = 256;
+    internal ImmutableArray<ResourceStorageKind> Variables { get; }
+    internal bool HasReceiver { get; }
+    internal bool HasResult { get; }
+
+    internal ResourceActivationShape(ImmutableArray<ResourceStorageKind> variables, bool hasReceiver, bool hasResult)
+    {
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
+        if (variables.Length > MaximumVariables || variables.Any(static storage =>
+            storage is not (ResourceStorageKind.Byte or ResourceStorageKind.Word16 or ResourceStorageKind.Word32 or ResourceStorageKind.Word64 or ResourceStorageKind.Reference)))
+        { throw new ArgumentException("Activation variables require supported primitive/reference storage.", nameof(variables)); }
+        Variables = variables;
+        HasReceiver = hasReceiver;
+        HasResult = hasResult;
+    }
+}
 
 // A closed resource semantics. Lowering must preserve every allocating operation
 // and reject writes/aliases to a repeated region's controlling scalar. A repeat
@@ -32,12 +52,13 @@ internal sealed class ResourceLoopRank
 
 internal sealed class ResourceProgram
 {
-    internal const int ModelVersion = 4;
+    internal const int ModelVersion = 5;
     internal ResourceProgramKind Kind { get; }
     internal ResourceExpression? Length { get; }
     internal ResourceLoopRank? Rank { get; }
     internal ResourceMetadataReference? Metadata { get; }
     internal ResourceAllocationShape? Allocation { get; }
+    internal ResourceActivationShape? Activation { get; }
     internal ResourceRepeatKind RepeatKind { get; }
     internal ImmutableArray<ResourceProgram> Children { get; }
     internal int NodeCount { get; }
@@ -46,7 +67,8 @@ internal sealed class ResourceProgram
     internal static ResourceProgram MetadataBoundary { get; } = new(ResourceProgramKind.MetadataBoundary, null, null, default, []);
 
     private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
-        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null)
+        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null,
+        ResourceActivationShape? activation = null)
     {
         if (children.IsDefault)
         { throw new ArgumentException("Children must be initialized.", nameof(children)); }
@@ -55,9 +77,10 @@ internal sealed class ResourceProgram
         Rank = rank;
         Metadata = metadata;
         Allocation = allocation;
+        Activation = activation;
         RepeatKind = repeatKind;
         Children = children;
-        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
+        var nodes = 1 + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount);
         var depth = 1 + Math.Max(length?.Depth ?? allocation?.Extent.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
         foreach (var child in children)
         {
@@ -127,5 +150,11 @@ internal sealed class ResourceProgram
         rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
         body = ArgumentNullGuard.NotNull(body, nameof(body));
         return new(ResourceProgramKind.Repeat, null, rank, kind, [body]);
+    }
+
+    internal static ResourceProgram Activate(ResourceActivationShape? shape, ResourceProgram body)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        return new(ResourceProgramKind.Activation, null, null, default, [body], activation: shape);
     }
 }

@@ -58,6 +58,8 @@ internal static class NativeResourceProgramVerifier
         {
             case ResourceProgramKind.MetadataBoundary:
                 throw new InvalidDataException("ResourceMetadataAssumptionsNotBound");
+            case ResourceProgramKind.Activation:
+                return Visit(program.Children[0], callableId, owner, bindMetadata, cancellation);
             case ResourceProgramKind.MetadataCall:
                 if (program.Metadata is not { } metadata || bindMetadata?.Invoke(metadata) != true)
                 { throw new InvalidDataException("ResourceMetadataAssumptionsNotBound"); }

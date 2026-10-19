@@ -42,6 +42,8 @@ internal static class NativeResourceAllocationVerifier
         {
             case ResourceProgramKind.Zero:
                 return ResourceExpression.Zero;
+            case ResourceProgramKind.Activation:
+                return Visit(program.Children[0], layout, cancellation);
             case ResourceProgramKind.AllocateManaged:
             case ResourceProgramKind.AllocateArray:
                 if (program.Allocation is not { } allocation)

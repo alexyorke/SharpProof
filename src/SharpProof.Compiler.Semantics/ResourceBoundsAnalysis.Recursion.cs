@@ -12,7 +12,7 @@ internal sealed partial class ResourceBoundsAnalysis
             block.Operations[0] is IReturnOperation { ReturnedValue: null };
     }
 
-    private Cost CallableBody(IMethodSymbol method, IOperation body, int depth)
+    private Cost CallableBodyCore(IMethodSymbol method, IOperation body, int depth)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         body = ArgumentNullGuard.NotNull(body, nameof(body));

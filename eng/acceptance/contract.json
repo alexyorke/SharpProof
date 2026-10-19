@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 32,
+    "protocolVersion": 33,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 47,
+    "compilerArtifactSchemaVersion": 48,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 34,
+    "schemaVersion": 35,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -729,6 +729,7 @@
         "name": "pipelineSourceClosure",
         "paths": [
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.ReferenceInputs.cs",
+          "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Stack.cs",
           "src/SharpProof.Ir/IrClosureFrameSite.cs",
           "src/SharpProof.Ir/IrDelegateCaptureSite.cs",
           "src/SharpProof.Ir/IrFieldSites.cs",
@@ -744,6 +745,7 @@
           "src/SharpProof.Worker/ExplicitThrowSites.cs",
           "src/SharpProof.Worker/NativeEffectClaims.cs",
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceStackVerifier.cs",
           "src/SharpProof.Worker/NativeResourceAllocationVerifier.cs",
           "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/NativeResourceMetadataBinding.cs",
