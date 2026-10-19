@@ -3795,10 +3795,16 @@ requestedCases=2 and totalCases=2. Build/rebuild succeeded with zero warnings/er
 Evidence is exported under artifacts/immutability-m144-campaign. This validates the
 readonly records through the actual scheduler, encoded native runner, sum aggregation,
 JSON publication and clean-source receipt, beyond fragment controls.
-IMM-M145: Migrate twenty Package integration construction scopes across five files:
+IMM-M145: Migrate twenty Package integration construction scopes across four files:
 immutable packaged-analyzer item vectors and private coupled helpers, serial loader
 observations, scoped command argv builders, an atomic ordinal-ignore-case loader cache
 with a live resolver, strict framework artifact map and four environment snapshots.
 Preserve native process/environment objects, dynamic dependency registration visibility,
 last-write-wins cache behavior and argument/JSON ordering. Validate package workflow.
-Status: planned before edits.
+Status: implemented; package workflow validation in progress.
+
+IMM-M145 scope clarification: the twenty planned scopes are in four source files (PackageLayoutSmokeTests, FinalCompilationProbeTests, VerifierPackageDefaultsTests, RuntimeEnvironmentIsolationTests), not five. Explicit duplicate rejection is retained for the artifact map; the live load-context resolver reads the current atomic cache so later registrations remain visible.
+
+IMM-M145 initial package build identified three explicit-guard analyzer errors in the new forwarding wrapper/cache callback. Added equivalent ordered null guards; no runtime test failures occurred before this compile gate. Rerun the complete package workflow after correction.
+
+IMM-M146: Migrate 26 Fuzz test scopes: twenty fixed outer vectors and six owned construction collectors/maps. Preserve nested CLR array and reflection identity subjects, callback aggregation overwrites, candidate insertion order and duplicate values. Freeze after all producer loops/awaited callbacks, before comparison/assertion publication. Validate the complete Fuzz test project after formatting and independent review. Status: planned before edits.
