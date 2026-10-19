@@ -3624,4 +3624,67 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
             .Count(item => item.GetProperty("message").GetProperty("text").GetString()!.Contains("conditional resource metadata", StringComparison.Ordinal)), Is.EqualTo(3));
     }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageChecksComposedCounterRanks(bool violates)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        int countLimit = violates ? 6 : 7;
+        int elementLimit = violates ? 17 : 18;
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, {{countLimit}})]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, {{countLimit}})]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, {{elementLimit}})]
+                public static void Target() {
+                    int left=5,right=4;
+                    while(left>0||right>0) {
+                        if(left>0) { var a=new int[2]; left-=2; }
+                        else { var b=new int[3]; right--; }
+                    }
+                }
+            }
+            """, "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        if (violates)
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        }
+        else
+        { Assert.That(build.ExitCode, Is.Zero, build.Output); }
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", violates ? "Refuted" : "Proven");
+            var evidence = claim.GetProperty("resourceBound");
+            var cost = evidence.GetProperty("metric").GetString() == "AllocatedElements" ? "18" : "7";
+            if (violates)
+            {
+                JsonAssert.Equal(evidence, "observedLowerBound", cost);
+                JsonAssert.Equal(evidence, "evaluatedUpperBound", cost == "18" ? "17" : "6");
+                Assert.That(evidence.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            }
+            else
+            { JsonAssert.Equal(evidence, "inferredUpperBound", cost); }
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        int resourceResults = 0;
+        foreach (var row in sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray())
+        {
+            if (row.GetProperty("ruleId").GetString() == (violates ? "SharpProof.Refuted" : "SharpProof.Proven"))
+            {
+                Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(violates ? "observed prefix:" : "upper bound:"));
+                resourceResults++;
+            }
+        }
+        Assert.That(resourceResults, Is.EqualTo(3));
+    }
 }

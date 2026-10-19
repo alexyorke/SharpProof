@@ -7,6 +7,9 @@ internal sealed partial class ResourceBoundsAnalysis
     private Cost While(IWhileLoopOperation loop, int depth)
     {
         loop = ArgumentNullGuard.NotNull(loop, nameof(loop));
+        if (loop.ConditionIsTop && !loop.ConditionIsUntil &&
+            loop.Condition is IBinaryOperation { OperatorMethod: null, OperatorKind: BinaryOperatorKind.ConditionalOr } phases)
+        { return PhasedWhile(loop, phases, depth); }
         if (!loop.ConditionIsTop || loop.ConditionIsUntil ||
             loop.Condition is not IBinaryOperation { OperatorMethod: null } condition ||
             condition.OperatorKind is not (BinaryOperatorKind.LessThan or BinaryOperatorKind.GreaterThan) ||
@@ -97,6 +100,108 @@ internal sealed partial class ResourceBoundsAnalysis
         return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
 
+    private Cost PhasedWhile(IWhileLoopOperation loop, IBinaryOperation condition, int depth)
+    {
+        loop = ArgumentNullGuard.NotNull(loop, nameof(loop));
+        condition = ArgumentNullGuard.NotNull(condition, nameof(condition));
+        var left = PositiveCounter(condition.LeftOperand);
+        var right = PositiveCounter(condition.RightOperand);
+        if (left is null || right is null || SymbolEqualityComparer.Default.Equals(left, right))
+        { return Unknown("UnsupportedPhaseGuard"); }
+        if (!_localProgress.TryGetValue(left, out var leftInitial) || !_localProgress.TryGetValue(right, out var rightInitial))
+        { return Unknown("UnprovedLoopProgress"); }
+        var operations = loop.Body is IBlockOperation block ? block.Operations : ImmutableArray.Create(loop.Body);
+        if (operations.Length != 1 || operations[0] is not IConditionalOperation { WhenFalse: { } otherwise } select ||
+            !SymbolEqualityComparer.Default.Equals(PositiveCounter(select.Condition), left))
+        { return Unknown("UnsupportedPhaseSelection"); }
+        var leftPhase = ReadCounterPhase(select.WhenTrue, left, leftInitial);
+        var rightPhase = ReadCounterPhase(otherwise, right, rightInitial);
+        if (leftPhase is null || rightPhase is null)
+        { return Unknown("UnprovedLoopProgress"); }
+        // Each continuing branch changes only its selected positive counter.
+        // The other phase's initial value therefore remains a valid envelope.
+        _localProgress.Remove(left);
+        _localProgress.Remove(right);
+        _localInitialConstants.Remove(left);
+        _localInitialConstants.Remove(right);
+        _counters.Add(left, leftInitial);
+        _counters.Add(right, rightInitial);
+        try
+        {
+            var leftCost = Sequence(leftPhase.Value.Prefix, depth + 1);
+            if (_unknown is not null)
+            { return Cost.Zero; }
+            var rightCost = Sequence(rightPhase.Value.Prefix, depth + 1);
+            if (_unknown is not null)
+            { return Cost.Zero; }
+            return leftCost.Scale(leftPhase.Value.Count, leftPhase.Value.Rank, ResourceRepeatKind.Loop)
+                .Add(rightCost.Scale(rightPhase.Value.Count, rightPhase.Value.Rank, ResourceRepeatKind.Loop));
+        }
+        finally
+        {
+            _counters.Remove(left);
+            _counters.Remove(right);
+            _localProgress.Remove(left);
+            _localProgress.Remove(right);
+            _localInitialConstants.Remove(left);
+            _localInitialConstants.Remove(right);
+        }
+    }
+
+    private static ILocalSymbol? PositiveCounter(IOperation operation)
+    {
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
+        return operation is IBinaryOperation
+        {
+            OperatorMethod: null, OperatorKind: BinaryOperatorKind.GreaterThan,
+            LeftOperand: ILocalReferenceOperation counter
+        } comparison && IntegerConstant(comparison.RightOperand) == 0 &&
+            counter.Local.RefKind == RefKind.None &&
+            counter.Local.Type.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64
+            ? counter.Local : null;
+    }
+
+    private (ImmutableArray<IOperation> Prefix, ResourceLoopRank Rank, Bound Count)? ReadCounterPhase(
+        IOperation body, ILocalSymbol counter, Bound initial)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        counter = ArgumentNullGuard.NotNull(counter, nameof(counter));
+        initial = ArgumentNullGuard.NotNull(initial, nameof(initial));
+        var operations = body is IBlockOperation block ? block.Operations : ImmutableArray.Create(body);
+        if (operations.IsEmpty || operations[operations.Length - 1] is not IExpressionStatementOperation step)
+        { return null; }
+        IOperation target;
+        BigInteger amount;
+        bool divide;
+        bool checkedStep;
+        if (step.Operation is IIncrementOrDecrementOperation { OperatorMethod: null, Kind: OperationKind.Decrement } decrement)
+        {
+            target = decrement.Target;
+            amount = 1;
+            divide = false;
+            checkedStep = decrement.IsChecked;
+        }
+        else if (step.Operation is ICompoundAssignmentOperation { OperatorMethod: null } compound &&
+            !compound.InConversion.IsUserDefined && !compound.OutConversion.IsUserDefined &&
+            compound.OperatorKind is BinaryOperatorKind.Subtract or BinaryOperatorKind.Divide &&
+            IntegerConstant(compound.Value) is { } constant && constant > 0)
+        {
+            target = compound.Target;
+            amount = constant;
+            divide = compound.OperatorKind == BinaryOperatorKind.Divide;
+            checkedStep = compound.IsChecked;
+        }
+        else
+        { return null; }
+        var width = counter.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64;
+        if (target is not ILocalReferenceOperation local || !SymbolEqualityComparer.Default.Equals(local.Local, counter) ||
+            amount > (BigInteger.One << (width - 1)) - 1 || divide && amount <= 1)
+        { return null; }
+        var rank = new ResourceLoopRank(divide ? ResourceLoopKind.DecreasingDivide : ResourceLoopKind.DecreasingSubtract,
+            initial.Expression, ResourceExpression.Zero, amount, width, checkedStep);
+        var count = divide ? GeometricCount(initial, amount, descending: true) : DivideCeiling(initial, amount);
+        return (operations.Take(operations.Length - 1).ToImmutableArray(), rank, count);
+    }
     private static BigInteger? IntegerConstant(IOperation? operation)
     {
         return operation?.ConstantValue is { HasValue: true } value ? value.Value switch

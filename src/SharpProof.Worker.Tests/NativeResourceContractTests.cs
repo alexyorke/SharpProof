@@ -63,6 +63,10 @@ public sealed class NativeResourceContractTests
         return preparations.Single();
     }
 
+    [TestCase("LoopBodyEntries", 0, "n", 2, "int left=n,right=n; while(left>0||right>0) { if(left>0) left--; else right--; }")]
+    [TestCase("LoopBodyEntries", 0, "n", 2, "int left=n,right=n; while(left>0||right>0) { if(left>0) left/=2; else right/=2; }")]
+    [TestCase("ArrayAllocations", 0, "n", 2, "int left=n,right=n; while(left>0||right>0) { if(left>0) { var a=new int[2]; left--; } else { var b=new int[3]; right--; } }")]
+    [TestCase("AllocatedElements", 0, "n", 5, "int left=n,right=n; while(left>0||right>0) { if(left>0) { var a=new int[2]; left--; } else { var b=new int[3]; right--; } }")]
     [TestCase("LoopBodyEntries", 0, "n", 1, "int i=0; while(i<n) { i++; }")]
     [TestCase("LoopBodyEntries", 0, "n", 1, "checked { int i=0; while(i<n) { i+=2; } }")]
     [TestCase("LoopBodyEntries", 0, "n", 1, "checked { int i=1; while(i<n) { i*=2; } }")]
@@ -297,6 +301,13 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("7"));
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
     }
+    [TestCase("int left=2147483647,right=2147483647; while(left>0||right>0) { if(left>0) left-=2147483647; else right/=2147483647; }", 2, "3")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left--; else right--; }", 4, "5")]
+    [TestCase("int left=-2,right=3; while(left>0||right>0) { if(left>0) left--; else right--; }", 2, "3")]
+    [TestCase("int left=3,right=-2; while(left>0||right>0) { if(left>0) left--; else right--; }", 2, "3")]
+    [TestCase("int left=8,right=9; while(left>0||right>0) { if(left>0) left/=2; else right/=3; }", 6, "7")]
+    [TestCase("int left=2,right=1; while(left>0||right>0) { if(left>0) { for(int j=0;j<3;j++) {} left--; } else right--; }", 8, "9")]
+    [TestCase("int left=2,right=3; while((left>0)||(right>0)) { if(left>0) left--; else right--; }", 4, "5")]
     [TestCase("int i=0; while(i<5) { i+=2; }", 2, "3")]
     [TestCase("int i=1; while(i<17) { i*=2; }", 2, "3")]
     [TestCase("int remaining=7; while(remaining>1) { remaining-=2; }", 1, "2")]
@@ -493,5 +504,67 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.MetadataAssumptions, Has.Length.EqualTo(2));
         Assert.That(result.Assumptions.Count(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used), Is.EqualTo(2));
+    }
+    [TestCase("LoopBodyEntries", 7)]
+    [TestCase("ArrayAllocations", 7)]
+    [TestCase("AllocatedElements", 18)]
+    public async Task PhasedNativeCertificatesPreserveSeparatePrefixCosts(string metric, long bound)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var preparation = Prepare(Source($"[ResourceUpperBound(ResourceMetric.{metric}, {bound})]",
+            "int left=5,right=4; while(left>0||right>0) { if(left>0) { var a=new int[2]; left-=2; } else { var b=new int[3]; right--; } }"));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo(bound.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    [Test]
+    public async Task PhasedBranchSelectionCannotInventEntriesAfterEarlyReturn()
+    {
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.LoopBodyEntries, 1)]",
+            "int left=3,right=3; while(left>0||right>0) { if(left>0) { return; left--; } else right--; }"));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+    }
+    [Test]
+    public async Task PhasedCalleeInliningPreservesOwnedEntryCounts()
+    {
+        var preparation = Read(CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 9)]
+                public static void Target() { Leaf(); Leaf(); }
+                private static void Leaf() {
+                    int left=2,right=3;
+                    while(left>0||right>0) { if(left>0) left--; else right--; }
+                }
+            }
+            """));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("10"));
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("9"));
+    }
+    [Test]
+    public async Task PhasedRanksKeepPhysicalDomainsSeparateFromNaturalCostSums()
+    {
+        var preparation = Read(CreateArtifact("""
+            using SharpProof.Attributes;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, "n", 2)]
+                public static void Target(long n) {
+                    long left=n,right=n;
+                    while(left>0||right>0) { if(left>0) left--; else right--; }
+                }
+            }
+            """));
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var check = NativeResourceProgramVerifier.Verify(preparation.ResourceProgram!, preparation.Entry.CallableId, preparation.Total!, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.Cost!.LoopEntries.Maximum, Is.EqualTo(new System.Numerics.BigInteger(long.MaxValue) * 2));
     }
 }

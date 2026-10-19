@@ -18,7 +18,8 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 - [x] Descending loops with checked progress and lower bounds.
 - [x] Multiplicative/divisive progress and logarithmic iteration bounds.
 - [x] Dependent nested loop bounds and conservative counter-size environments.
-- [ ] Broader ranking-function synthesis with checked certificates.
+- [x] Broader ranking-function synthesis with checked certificates, including
+  protected two-counter phases.
 - [x] Regression tests for boundary integers, loops that do not terminate, early exit,
   mutation, exceptional exits, and independently counted iteration/allocation costs.
 
@@ -517,16 +518,23 @@ restored response validates. No coverage percentage is inferred until the next
 complete measurement; the 100% baseline and remaining roadmap requirements stay
 unchanged.
 
-## Next ranking increment: composed counter phases
+## Composed counter phases
 
-Admit a top-tested loop with two distinct Int32/Int64 locals, initialized from
+The implementation admits a top-tested loop with two distinct Int32/Int64 locals, initialized from
 supported sizes, and this fixed phase selection:
 
 ```csharp
-while (left > 0 || right > 0)
+public static class PhasedExample
 {
-    if (left > 0) { /* phase prefix */ left -= positiveConstant; }
-    else { /* phase prefix */ right -= positiveConstant; }
+    public static void Run(int leftSize, int rightSize)
+    {
+        int left = leftSize, right = rightSize;
+        while (left > 0 || right > 0)
+        {
+            if (left > 0) { /* phase prefix */ left -= 2; }
+            else { /* phase prefix */ right -= 3; }
+        }
+    }
 }
 ```
 
@@ -550,3 +558,35 @@ Verification must include independent small executions, constant and same-input
 linear contracts, all three resource metrics, exact violating prefixes, and
 explicit Unknown controls. Keep the broader ranking checkbox open until the
 source, native and relevant broader gates pass for this admitted family.
+
+The composed-phase implementation now emits a sequence of existing typed rank
+certificates, with separate prefix costs and protected counter environments.
+Logical-or source guard leaves preserve exactly one body-entry event; the phase
+selection does not create an event. All 149 focused native resource tests passed,
+including repeated inlining, early-return abstention, mixed progress, and costs
+whose natural sums exceed Int64. The source run passed 218 cases before exposing
+one invalid C# test operand; it was replaced with a valid wrapped negative stride.
+The broader analyzer run then passed 1354 cases, with its sole failure in the
+roadmap's fragmentary C# fence. That example is now standalone. The full frontend
+gate passed all 2062 tests. The native restore crash was terminal and its retry
+passed; it did not produce a code failure. The corrected full analyzer gate passed all 1355 tests, and both actual NuGet
+consumer cases passed. Strict builds prove all three valid metrics and reject
+all three smaller bounds with concrete numeric JSON/SARIF evidence.
+
+The broader ranking item is complete for the documented increasing/decreasing,
+geometric, nested and protected two-counter families. Independent controls ran
+200 small two-counter executions, with separate array counts and element costs.
+The native, analyzer, frontend, packaged-consumer and quality gates passed with
+zero build warnings/errors. Progress for unsupported coupled updates stays
+Unknown. The full roadmap remains open for quantitative memory/stack, asymptotic,
+amortized and average-case models, async/concurrency, measurements and final
+coverage qualification.
+
+For published boundary checkpoint `d9760676e`, documentation, toolchain security,
+package/consumer/release and canonical PR workflows all passed. All four coverage
+shards passed, but qualification failed at 2198/2259 changed trusted-code lines
+(97.30%), leaving 61 uncovered lines against the unchanged 100% baseline. Its
+changed-line report lists no remaining gaps in the resource metadata catalog,
+metadata binder, protocol validation or arithmetic-order kernel. The composed
+phase implementation is not part of that measurement and needs its own exact-head
+CI results after publication.

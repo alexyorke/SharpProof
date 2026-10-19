@@ -63,6 +63,15 @@ early returns and exceptional exits, rather than guaranteeing normal completion.
   aliases and jumps. Earlier mutation invalidates the initial-value fact. A
   negative or symbolic initial value cannot be clamped into an increasing rank.
   These rules do not infer ranks for arbitrary while loops.
+- A two-phase `while (left > 0 || right > 0)` can select `if (left > 0)`
+  followed by an else phase. Both counters must be distinct Int32/Int64 locals
+  initialized from supported sizes. Each phase ends with its own decrement,
+  positive constant subtraction, or division by a constant greater than one.
+  No other writes to either counter are admitted. Each phase's prefix cost is
+  scaled by its checked rank bound, then the phase costs add. The sum uses
+  natural-number arithmetic even when it exceeds either physical counter's
+  range. Split logical-or guards record one source entry per actual body entry;
+  the phase-selection conditional adds no loop entry.
 - Sequential costs add. Nested costs multiply. A loop's contribution
   includes its own body entries plus any nested loop entries. Branches take the
   maximum for each metric, so different metrics need not attain their maxima on

@@ -4,6 +4,19 @@ namespace SharpProof.Analyzer.Test;
 
 public sealed partial class ResourceBoundsTests
 {
+    [TestCase("int left=2147483647,right=2147483647; while(left>0||right>0) { if(left>0) left--; else right--; }", "4294967294", "0", "0")]
+    [TestCase("long left=9223372036854775807L,right=9223372036854775807L; while(left>0||right>0) { if(left>0) left--; else right--; }", "18446744073709551614", "0", "0")]
+    [TestCase("int left=2147483647,right=2147483647; while(left>0||right>0) { if(left>0) left-=2147483647; else right/=2147483647; }", "3", "0", "0")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "5", "0", "0")]
+    [TestCase("int left=5,right=4; while(left>0||right>0) { if(left>0) { var a=new int[2]; left-=2; } else { var b=new int[3]; right--; } }", "7", "7", "18")]
+    [TestCase("int left=8,right=9; while(left>0||right>0) { if(left>0) { left/=2; } else { right/=3; } }", "7", "0", "0")]
+    [TestCase("int left=-2,right=3; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "3", "0", "0")]
+    [TestCase("int left=3,right=-2; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "3", "0", "0")]
+    [TestCase("int left=-2,right=-3; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "0", "0", "0")]
+    [TestCase("long left=2; int right=3; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "5", "0", "0")]
+    [TestCase("int left=n,right=n; while(left>0||right>0) { if(left>0) { left--; } else { right--; } }", "(max(0, n) + max(0, n))", "0", "0")]
+    [TestCase("int left=2,right=1; while(left>0||right>0) { if(left>0) { for(int j=0;j<3;j++) {} left--; } else { right--; } }", "9", "0", "0")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) if(left>0) left--; else right--;", "5", "0", "0")]
     [TestCase("int i=0; while(i<5) { var a=new int[2]; i+=2; }", "3", "3", "6")]
     [TestCase("int i=2; while(i<9) { i+=3; }", "3", "0", "0")]
     [TestCase("checked { int i=0; while(i<n) { i+=2; } }", "ceil(max(0, n) / 2)", "0", "0")]
@@ -46,6 +59,21 @@ public sealed partial class ResourceBoundsTests
         }
     }
 
+    [TestCase("int left=2; while(left>0||left>0) { if(left>0) left--; else left--; }", "UnsupportedPhaseGuard")]
+    [TestCase("int right=2; while(n>0||right>0) { if(n>0) n--; else right--; }", "UnsupportedPhaseGuard")]
+    [TestCase("int left=2,right=3; while(left>1||right>0) { if(left>1) left--; else right--; }", "UnsupportedPhaseGuard")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left--; }", "UnsupportedPhaseSelection")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(right>0) right--; else left--; }", "UnsupportedPhaseSelection")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { int other=0; if(left>0) left--; else right--; }", "UnsupportedPhaseSelection")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left++; else right--; }", "UnprovedLoopProgress")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left--; else left--; }", "UnprovedLoopProgress")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) { right++; left--; } else right--; }", "UnstableInputOrCounter")]
+    [TestCase("int left=2,right=3; left++; while(left>0||right>0) { if(left>0) left--; else right--; }", "UnprovedLoopProgress")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left/=1; else right--; }", "UnprovedLoopProgress")]
+    [TestCase("int left=2,right=3; while((left>0)|(right>0)) { if(left>0) left--; else right--; }", "UnsupportedLoop")]
+    [TestCase("int left=2,right=3,third=4; while(left>0||right>0||third>0) { if(left>0) left--; else right--; }", "UnsupportedPhaseGuard")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) { continue; left--; } else right--; }", "UnsupportedOperation:Branch")]
+    [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left-=unchecked((int)2147483648L); else right--; }", "UnprovedLoopProgress")]
     [TestCase("int i=-1; while(i<n) { i++; }", "UnsupportedLoopStart")]
     [TestCase("int i=n; while(i<10) { i++; }", "UnsupportedLoopStart")]
     [TestCase("int i=0; while(i<n) { i+=2; }", "LoopCounterMayOverflow")]
@@ -133,5 +161,42 @@ public sealed partial class ResourceBoundsTests
                 Assert.That(whileGrowResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(grow)));
             }
         }
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PhasedBoundsMatchIndependentCounterExecutions(bool divide)
+    {
+        int checkedExecutions = 0;
+        for (int leftStart = -2; leftStart <= 7; leftStart++)
+        {
+            for (int rightStart = -2; rightStart <= 7; rightStart++)
+            {
+                int left = leftStart, right = rightStart, entries = 0, arrays = 0, elements = 0;
+                while (left > 0 || right > 0)
+                {
+                    Assert.That(++entries, Is.LessThan(100));
+                    arrays++;
+                    if (left > 0)
+                    {
+                        elements += 2;
+                        left = divide ? left / 2 : left - 2;
+                    }
+                    else
+                    {
+                        elements += 3;
+                        right = divide ? right / 3 : right - 3;
+                    }
+                }
+                var leftUpdate = divide ? "left/=2;" : "left-=2;";
+                var rightUpdate = divide ? "right/=3;" : "right-=3;";
+                var result = Analyze($"int left={leftStart},right={rightStart}; while(left>0||right>0) {{ if(left>0) {{ var a=new int[2]; {leftUpdate} }} else {{ var b=new int[3]; {rightUpdate} }} }}");
+                Assert.That(result.Proven, Is.True, result.UnknownReason);
+                Assert.That(result.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(entries)));
+                Assert.That(result.Bounds.Arrays.Constant, Is.EqualTo(new System.Numerics.BigInteger(arrays)));
+                Assert.That(result.Bounds.Elements.Constant, Is.EqualTo(new System.Numerics.BigInteger(elements)));
+                checkedExecutions++;
+            }
+        }
+        Assert.That(checkedExecutions, Is.EqualTo(100));
     }
 }
