@@ -53,6 +53,12 @@ references are compiled to fresh in-memory metadata, including Visual Basic
 references. Requested multi-target roots include every framework by default.
 Dependencies use the SDK-selected compatible target, excluding unused frameworks.
 A selected source reference error stops analysis even when old binaries exist.
+Source generators run once per project with the loaded parse options, additional
+files and analyzer configuration. Loading failures, initialization/execution failures
+and effective generator errors stop inference; warning severity and suppression
+follow project settings. Generated methods are excluded by default, with an explicit
+`generated_code=false` editor setting respected. Generated output keeps its compiler
+file paths and per-file editor settings.
 Project mode reports configured HM0001 diagnostics for each loaded C# target
 framework. A bare project/solution path is accepted too. Original compilation errors
 stop inference with exit code 1; missing files give exit code 2. Unsupported

@@ -94,12 +94,13 @@ internal sealed class ProjectLoadSession
         }
         solution = await ProjectEvaluation.RestoreVisualBasicConstantsAsync(solution, globals, cancellationToken).ConfigureAwait(false);
         project = solution.GetProject(project.Id)!;
-        var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+        var generated = await ProjectGeneration.RunAsync(project, cancellationToken).ConfigureAwait(false);
+        var compilation = generated.Compilation;
         if (compilation is null || Program.ReportCompilerErrors(compilation, cancellationToken))
         { return false; }
         loaded.Add(node, (compilation, project.OutputFilePath, project.OutputRefFilePath));
         if (compilation is CSharpCompilation csharp)
-        { prepared.Add((project.Name, project.FilePath, csharp, project.AnalyzerOptions)); }
+        { prepared.Add((project.Name, project.FilePath, csharp, generated.Options)); }
         else
         { Program.Log.Info("Skipping non-C# project: " + project.Name); }
         return true;
