@@ -151,6 +151,75 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(context.IsDefaultDictionary(property.Instance!), Is.EqualTo(trackedDefaultComparer));
     }
 
+    [TestCase("((System.Collections.Generic.HashSet<int>)data).Count")]
+    [TestCase("(data = new System.Collections.Generic.HashSet<int>()).Count")]
+    public void HashSetOriginIncludesIdentityConversionsAndAssignmentValues(string expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        var (model, syntax, graph, context) = Prepare("", "var data = new System.Collections.Generic.HashSet<int>(); return " + expression + ";");
+        context.TrackDefaultHashSets(graph);
+        var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(
+            syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(context.IsDefaultHashSetOrigin(property.Instance!), Is.True);
+    }
+
+    [Test]
+    public void HashSetClauseDoesNotHideReceiverAllocation()
+    {
+        var (model, syntax, _, context) = Prepare("", "return new System.Collections.Generic.HashSet<int>().Count;");
+        var expression = syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!;
+        var lowered = new RoslynTotalExpressionLowerer(context).LowerClause(model.GetOperation(expression)!);
+        Assert.That(lowered.Classification.IsExact, Is.False);
+        Assert.That(new IrInterpreter(context.Factory).Evaluate(lowered.SafeCondition).Value!.Boolean, Is.False);
+    }
+
+    [TestCase("return data.Count;", 255)]
+    [TestCase("return data.Contains(key + 0) ? 1 : 0;", 254)]
+    public void HashSetBodyRejectsOverDeepReceiverAndArgumentWithoutStores(string body, int depth)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        var (model, syntax, graph, context) = Prepare("int key", "var data = new System.Collections.Generic.HashSet<int>(); " + body);
+        context.TrackDefaultHashSets(graph);
+        SyntaxNode expression = syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!;
+        if (expression is ConditionalExpressionSyntax conditional)
+        { expression = conditional.Condition; }
+        var builder = new IrProgramBuilder(context.Factory);
+        var entry = builder.CreateBlock();
+        var exceptional = builder.CreateBlock();
+        var site = context.Factory.CreateOperation();
+        builder.ExceptionalExit(exceptional, site);
+        var lowered = new RoslynTotalExpressionLowerer(context, builder, exceptional).LowerBodyValue(model.GetOperation(expression)!, entry, depth);
+        Assert.That(lowered.Classification.IsExact, Is.False);
+        Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.ExpressionDepthLimit));
+        builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
+        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+    }
+    [TestCase("List", true)]
+    [TestCase("Queue", true)]
+    [TestCase("Stack", true)]
+    [TestCase("HashSet", false)]
+    public void OpaqueCountFallbackPreservesOnlyCertifiedNonnegativeDomains(string collection, bool nonnegative)
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        var (model, syntax, _, context) = Prepare("System.Collections.Generic." + collection + "<int> data", "return data.Count;");
+        var expression = syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!;
+        var operation = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)model.GetOperation(expression)!;
+        var builder = new IrProgramBuilder(context.Factory);
+        var entry = builder.CreateBlock();
+        var exceptional = builder.CreateBlock();
+        builder.ExceptionalExit(exceptional, context.Factory.CreateOperation());
+        var lowered = new RoslynTotalExpressionLowerer(context, builder, exceptional).EmitOpaqueCall(
+            operation, operation.Property.GetMethod!, [], entry, null, default);
+        Assert.That(lowered.Classification.IsExact, Is.True);
+        builder.Return(lowered.Continuation, context.Site(operation), lowered.Value);
+        var masks = builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+            .OfType<IrAssignInstruction>().Select(assignment => assignment is null ? throw new ArgumentNullException(nameof(assignment)) : assignment.Value)
+            .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd).ToArray();
+        Assert.That(masks.Length, Is.EqualTo(nonnegative ? 1 : 0));
+        if (nonnegative)
+        { Assert.That(new IrInterpreter(context.Factory).Evaluate(masks.Single().Right).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(int.MaxValue))); }
+    }
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, ControlFlowGraph Graph, TotalLoweringContext Context) Prepare(string parameters, string body)
     {
         ArgumentNullException.ThrowIfNull(parameters);

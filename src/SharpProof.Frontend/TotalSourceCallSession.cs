@@ -193,6 +193,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
             parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
                 TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsHashSetReceiverType(parameter.Type) ||
                 parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1");
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
         { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
@@ -324,6 +325,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             TotalLoweringContext.IsListReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
             TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
             TotalLoweringContext.IsStackReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
+            TotalLoweringContext.IsHashSetReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
             method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is INamedTypeSymbol queueReceiver &&
             queueReceiver.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1").ToArray();
         IOperation[] declarationOperations = [];
@@ -350,6 +352,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 continue;
             }
             if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsHashSetReceiverType(parameter.Type) ||
                 parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1") && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
@@ -379,6 +382,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 { frame.SpecializeListParameter(parameter); }
                 if (TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) && caller.IsDefaultDictionaryOrigin(argument.Value))
                 { frame.SpecializeDictionaryOriginParameter(parameter); }
+                if (TotalLoweringContext.IsHashSetReceiverType(parameter.Type) && caller.IsDefaultHashSetOrigin(argument.Value))
+                { frame.SpecializeHashSetOriginParameter(parameter); }
             }
         }
         frame.RefreshSourceBindingTypes();

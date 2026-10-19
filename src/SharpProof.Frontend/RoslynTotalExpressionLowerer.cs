@@ -85,6 +85,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             ListClause(listProperty, state, depth) is { } listClause)
         { return listClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation or IInvocationOperation &&
+            HashSetClause(operation, state, depth) is { } hashSetClause)
+        { return hashSetClause; }
+        if (depth < 256 && operation is IPropertyReferenceOperation or IInvocationOperation &&
             DictionaryClause(operation, state, depth) is { } dictionaryClause)
         { return dictionaryClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation interfaceProperty &&
@@ -288,6 +291,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             _builder!.Allocate(block, _context.Site(operation), _factory.StringType, target, arguments[1], [fill]);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
         }
+        if (depth < 256 && HashSetBody(operation, block, depth) is { } hashSet)
+        { return Capture(operation, hashSet); }
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
             SourceConstruction?.Invoke(sourceCreation, block, depth) is { } constructed)
         { return constructed; }
