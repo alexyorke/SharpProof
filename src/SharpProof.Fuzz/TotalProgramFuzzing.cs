@@ -53,22 +53,26 @@ internal static class TotalProgramDifferentialOracle
         var random = new Random(seed);
         var arrayReads = 0;
         var typeMask = 0;
-        var bodies = new int[7];
+        var bodies = ImmutableArray.CreateBuilder<int>(7);
+        bodies.Count = 7;
         for (var offset = 0; offset < cases; offset += 128)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(128, cases - offset);
-            var inputs = new object?[count][];
-            var members = new string[count];
-            var loops = new bool[count];
+            var inputsBuilder = ImmutableArray.CreateBuilder<object?[]>(count);
+            inputsBuilder.Count = count;
+            var membersBuilder = ImmutableArray.CreateBuilder<string>(count);
+            membersBuilder.Count = count;
+            var loopsBuilder = ImmutableArray.CreateBuilder<bool>(count);
+            loopsBuilder.Count = count;
             for (var index = 0; index < count; index++)
             {
                 var ordinal = offset + index;
                 if (ordinal / Types.Length % 5 == 3)
                 {
                     var reference = ReferenceCase(ordinal, random);
-                    members[index] = reference.Source;
-                    inputs[index] = reference.Inputs;
+                    membersBuilder[index] = reference.Source;
+                    inputsBuilder[index] = reference.Inputs;
                     typeMask |= reference.Mask;
                     bodies[6]++;
                     if (ordinal % 5 == 2)
@@ -77,11 +81,11 @@ internal static class TotalProgramDifferentialOracle
                 }
                 var type = Types[ordinal % Types.Length];
                 typeMask |= 1 << (ordinal % Types.Length);
-                loops[index] = type != "bool" && ordinal / Types.Length % 7 == 6;
-                bodies[type == "bool" ? 4 : loops[index] ? 5 : ordinal / Types.Length % 4]++;
+                loopsBuilder[index] = type != "bool" && ordinal / Types.Length % 7 == 6;
+                bodies[type == "bool" ? 4 : loopsBuilder[index] ? 5 : ordinal / Types.Length % 4]++;
                 var number = random.NextInt64();
-                inputs[index] = [Input(type, number, ordinal)];
-                var body = type == "bool" ? "return !x;" : loops[index]
+                inputsBuilder[index] = [Input(type, number, ordinal)];
+                var body = type == "bool" ? "return !x;" : loopsBuilder[index]
                     ? $"for (int i = 0; i < 2; i++) x = unchecked(({type})(x + 1)); return x;"
                     : ((ordinal / Types.Length) % 4) switch
                     {
@@ -90,10 +94,13 @@ internal static class TotalProgramDifferentialOracle
                         2 => $"try {{ return unchecked(({type})(x + 1)); }} finally {{ x = unchecked(({type})(x + 2)); }}",
                         _ => "return Copy" + ordinal.ToString(CultureInfo.InvariantCulture) + "(x);"
                     };
-                members[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
+                membersBuilder[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
             }
+            var inputs = inputsBuilder.ToImmutable();
+            var members = membersBuilder.ToImmutable();
+            var loops = loopsBuilder.ToImmutable();
             var batch = members.Select((member, index) =>
-                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToImmutableArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;

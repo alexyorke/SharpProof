@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using System.Collections.Immutable;
 using SharpProof.Worker.Protocol;
 
@@ -49,16 +50,18 @@ internal static class CompilerLoweredArtifact
 
         cancellationToken.ThrowIfCancellationRequested();
         artifacts = artifacts.ToImmutableArray();
-        var callables = manifest.Callables.ToDictionary(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId), StringComparer.Ordinal);
-        var claims = manifest.Claims.GroupBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId))
-            .ToDictionary(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+        var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
+            static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.CallableId,
+            static item => item ?? throw new System.ArgumentNullException(nameof(item)), StringComparer.Ordinal);
+        var claims = ImmutableDictionaryCapture.Create(manifest.Claims.GroupBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
+            static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : group.Key,
                 static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Ordinal)).ToImmutableArray()),
                 StringComparer.Ordinal);
         if (artifacts.Count != callables.Count)
         {
             throw new InvalidDataException("The lowered callable payload does not equal the manifest.");
         }
-        var callableIds = new HashSet<string>(StringComparer.Ordinal);
+        var callableIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var artifact in artifacts)
         {
             if (artifact == null ||
@@ -133,13 +136,13 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("Compiler effect-claim evidence is missing.");
         }
 
-        var expected = claims.Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerClaimKind.Effect)).ToArray();
+        var expected = claims.Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerClaimKind.Effect)).ToImmutableArray();
         if (artifact.EffectClaims.Length != expected.Length)
         {
             throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
         }
 
-        var effectClaimIds = new HashSet<string?>(StringComparer.Ordinal);
+        var effectClaimIds = ImmutableHashSet.CreateBuilder<string?>(StringComparer.Ordinal);
         for (var index = 0; index < artifact.EffectClaims.Length; index++)
         {
             if (!effectClaimIds.Add(artifact.EffectClaims[index]?.ClaimId))

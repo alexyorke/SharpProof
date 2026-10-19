@@ -331,7 +331,7 @@ public sealed class FrontendLoweringTests
             .OfType<IBinaryOperation>()
             .Where(static operation =>
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind == BinaryOperatorKind.And))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(pureOperations, Has.Length.EqualTo(2));
         var pureLowerer = new RoslynOperationLowerer(pure.Factory);
         var firstPure = pureLowerer.Lower(pureOperations[0]);
@@ -348,7 +348,7 @@ public sealed class FrontendLoweringTests
         var invocations = impure.TargetExpression
             .DescendantsAndSelf()
             .OfType<IInvocationOperation>()
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(invocations, Has.Length.EqualTo(2));
         var impureLowerer = new RoslynOperationLowerer(impure.Factory);
         var firstImpure = impureLowerer.Lower(invocations[0]);
@@ -383,7 +383,7 @@ public sealed class FrontendLoweringTests
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind is
                     BinaryOperatorKind.And or
                     BinaryOperatorKind.Or))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(operations, Has.Length.EqualTo(2));
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
 
@@ -427,7 +427,7 @@ public sealed class FrontendLoweringTests
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -442,7 +442,7 @@ public sealed class FrontendLoweringTests
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node)))
             .OfType<IParameterReferenceOperation>()
             .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Parameter.Ordinal))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(references, Has.Length.EqualTo(2));
 
         var factory = new IrFactory();
@@ -497,7 +497,7 @@ public sealed class FrontendLoweringTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToArray();
+            .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
@@ -513,7 +513,7 @@ public sealed class FrontendLoweringTests
         var overloads = subject.GetMembers("Overload")
             .OfType<IMethodSymbol>()
             .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters[0].RefKind))
-            .ToArray();
+            .ToImmutableArray();
         var local = tree.GetRoot().DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
             .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetDeclaredSymbol(node)))
@@ -638,7 +638,7 @@ public sealed class FrontendLoweringTests
             """,
             returnExpressionOnly: false);
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
-        var operations = compiled.TargetRoot.DescendantsAndSelf().ToArray();
+        var operations = compiled.TargetRoot.DescendantsAndSelf().ToImmutableArray();
         Assert.That(operations.Length, Is.GreaterThan(8));
         foreach (var operation in operations)
         {
@@ -666,29 +666,28 @@ public sealed class FrontendLoweringTests
             """);
         var operations = compiled.TargetExpression
             .DescendantsAndSelf()
-            .ToArray();
-        var visits = new Dictionary<IOperation, int>(
+            .ToImmutableArray();
+        var visitBuilder = ImmutableDictionary.CreateBuilder<IOperation, int>(
             ReferenceEqualityComparer.Instance);
         var lowerer = new RoslynOperationLowerer(compiled.Factory)
         {
             CustomLowering = operation =>
             {
                 ArgumentNullException.ThrowIfNull(operation);
-                visits[operation] = visits.GetValueOrDefault(operation) + 1;
+                visitBuilder[operation] = visitBuilder.TryGetValue(operation, out var count) ? count + 1 : 1;
                 return default;
             }
         };
 
         var result = lowerer.Lower(compiled.TargetExpression);
+        var visits = visitBuilder.ToImmutable();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 result.Classification.Abstention,
                 Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
-            var expectedOperations = new HashSet<IOperation>(
-                operations,
-                ReferenceEqualityComparer.Instance);
+            var expectedOperations = operations.ToImmutableHashSet<IOperation>(ReferenceEqualityComparer.Instance);
             Assert.That(expectedOperations.Count, Is.EqualTo(operations.Length));
             Assert.That(visits.Count, Is.EqualTo(expectedOperations.Count));
             Assert.That(expectedOperations.SetEquals(visits.Keys), Is.True);
@@ -1233,7 +1232,7 @@ public sealed class FrontendLoweringTests
     private static int MeasureOperationDepth(IOperation operation, int depth)
     {
         System.ArgumentNullException.ThrowIfNull(operation);
-        var children = operation.ChildOperations.ToArray();
+        var children = operation.ChildOperations.ToImmutableArray();
         return children.Length == 0
             ? depth
             : children.Max(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (MeasureOperationDepth(child, depth + 1)));
@@ -1299,7 +1298,7 @@ public sealed class FrontendLoweringTests
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 diagnostics,
                 Is.Empty,

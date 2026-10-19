@@ -190,7 +190,7 @@ internal static class SarifProjection
         System.ArgumentNullException.ThrowIfNull(result);
         var assumptions = result.Assumptions
             .Where(IsPolicyAssumption)
-            .ToArray();
+            .ToImmutableArray();
         var level = LauncherPresentation.Level(
             request.AssumptionPolicy, "none");
         return Result(
@@ -371,7 +371,7 @@ internal static class SarifProjection
         var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
             '/', StringSplitOptions.RemoveEmptyEntries);
-        var reducedSegments = new List<string>(segments.Length);
+        var reducedSegments = ImmutableArray.CreateBuilder<string>(segments.Length);
         foreach (var segment in segments)
         {
             if (segment == ".")
@@ -393,7 +393,7 @@ internal static class SarifProjection
         }
 
         var prefix = windowsPath ? normalized[..2] + "/" : "/";
-        return prefix + string.Join("/", reducedSegments);
+        return prefix + string.Join("/", reducedSegments.ToImmutable());
     }
 
     private static string DirectoryUri(string path)

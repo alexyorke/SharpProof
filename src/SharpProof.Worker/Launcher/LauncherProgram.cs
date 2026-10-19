@@ -335,8 +335,11 @@ internal static class Program
         }
         var incompleteCount = response.CallableResults.Count(
             static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete));
-        var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
+        var callablesById = ImmutableDictionaryCapture.Create(
+            response.Manifest.Callables,
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
+            StringComparer.Ordinal);
         foreach (var result in response.CallableResults)
         {
             if (result.Coverage != WorkerCallableCoverage.Incomplete)
@@ -428,8 +431,11 @@ internal static class Program
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
-        var callablesById = response.Manifest.Callables.ToDictionary(
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId), StringComparer.Ordinal);
+        var callablesById = ImmutableDictionaryCapture.Create(
+            response.Manifest.Callables,
+            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
+            StringComparer.Ordinal);
         var reported = false;
         foreach (var result in response.CallableResults)
         {
@@ -437,7 +443,7 @@ internal static class Program
                 .Where(static assumption =>
                     assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind is WorkerAssumptionKind.UserAssume or
                         WorkerAssumptionKind.TrustedBoundary))
-                .ToArray();
+                .ToImmutableArray();
             if (assumptions.Length == 0)
             {
                 continue;
@@ -497,9 +503,9 @@ internal static class Program
             return;
         }
         var members = PublicationLease.ValidateMembers(
-            new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
+            ImmutableArray.Create(arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath)
                 .Where(path => path != null)!);
-        if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
+        if (members.Intersect(ImmutableArray.Create(arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath)
             .Select(PublicationLease.CanonicalMember), PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
@@ -696,7 +702,7 @@ internal sealed partial class LauncherArguments
             return false;
         }
 
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var values = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         for (var index = 1; index < args.Length; index += 2)
         {
             var key = args[index];
@@ -724,7 +730,7 @@ internal sealed partial class LauncherArguments
             return false;
         }
 
-        arguments = new LauncherArguments(values);
+        arguments = new LauncherArguments(values.ToImmutable());
         return true;
     }
 
@@ -757,10 +763,11 @@ internal sealed partial class LauncherArguments
 
     internal void ValidateDistinctPaths(string? cacheDirectory = null)
     {
-        var outputs = new string?[]
-        {
+        ImmutableArray<string?> outputCandidates =
+        [
             RequestPath, ResultPath, PublishRequestPath, PublishResultPath, PublishCompilerManifestPath, PublishSarifPath
-        }.OfType<string>().ToArray();
+        ];
+        var outputs = outputCandidates.OfType<string>().ToImmutableArray();
         PublicationPaths.ValidateWorkerRuntime(outputs, typeof(Program).Assembly.Location);
         PublicationPaths.ValidateWorkerRuntime(outputs, OptionalFullPath("worker"));
         if (Directory.Exists(ResultPath))
@@ -769,7 +776,7 @@ internal sealed partial class LauncherArguments
                 "The SharpProof result path must name a file.");
         }
 
-        string?[] candidates = [
+        ImmutableArray<string?> candidates = [
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
@@ -777,7 +784,7 @@ internal sealed partial class LauncherArguments
         // Linux reports canonical publication aliases through its structured
         // failure path; Windows rejects filesystem aliases during admission.
         var paths = candidates.OfType<string>().Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : (OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path)).ToArray();
+            path is null ? throw new System.ArgumentNullException(nameof(path)) : (OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path)).ToImmutableArray();
         if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(

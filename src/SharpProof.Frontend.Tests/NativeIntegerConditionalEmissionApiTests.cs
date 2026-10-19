@@ -217,7 +217,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         return image.ToArray();
     }
 
-    private static string[] TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(byte[] bytes)
     {
         System.ArgumentNullException.ThrowIfNull(bytes);
         using var image = new MemoryStream(bytes);
@@ -226,7 +226,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
         var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
-        var calls = new List<string>();
+        var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
             ushort value = il[offset++];
@@ -254,7 +254,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
             }
             offset += size;
         }
-        return [.. calls];
+        return calls.ToImmutable();
     }
 
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)

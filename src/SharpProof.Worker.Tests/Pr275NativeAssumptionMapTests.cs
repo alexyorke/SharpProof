@@ -53,9 +53,9 @@ public sealed class Pr275NativeAssumptionMapTests
         Assert.That(core.IsDefault, Is.False);
         Assert.That(core, Has.Length.EqualTo(1));
         Assert.That(core.Single(), Is.EqualTo(justification));
-        var ownedIds = new Dictionary<ProofJustification, string> { [justification] = clause.AssumptionId! };
+        var ownedIds = ImmutableDictionary<ProofJustification, string>.Empty.Add(justification, clause.AssumptionId!);
         Assert.That(CallableProofCore.AssumptionIds(core, ownedIds), Is.EqualTo(new[] { clause.AssumptionId }));
         // An absent raw map entry contributes no ID; it grants no claim or proof publication.
-        Assert.That(CallableProofCore.AssumptionIds(core, new Dictionary<ProofJustification, string>()), Is.Empty);
+        Assert.That(CallableProofCore.AssumptionIds(core, ImmutableDictionary<ProofJustification, string>.Empty), Is.Empty);
     }
 }

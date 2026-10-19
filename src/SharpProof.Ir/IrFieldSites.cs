@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Ir;
 
 // A field is a member whose name has this prefix. Its pure opaque
@@ -23,9 +24,9 @@ internal static class IrFieldSites
 // the callable entered.
 public sealed class IrObjectState
 {
-    internal Dictionary<IrMemberId, IrValue> Fields { get; } = [];
+    internal ImmutableDictionary<IrMemberId, IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<IrMemberId, IrValue>();
 
-    internal Dictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue> KeyedFields { get; } = [];
+    internal ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder KeyedFields { get; } = ImmutableDictionary.CreateBuilder<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>();
 
     internal IrObjectState WithKeyedField(IrMemberId field, IrValue key, IrValue value)
     {
@@ -81,11 +82,11 @@ internal static class IrArrayStorage
 // identity.
 internal sealed class IrHeap
 {
-    private readonly Dictionary<IrValue, Dictionary<int, IrValue>> _elements = new(IrValueIdentity.Instance);
-    private readonly Dictionary<object, Dictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>> _keyedFields = new(ObjectKey.Instance);
-    private readonly HashSet<IrValue> _freshArrays = new(IrValueIdentity.Instance);
-    private readonly HashSet<object> _freshObjects = new(ObjectKey.Instance);
-    internal Dictionary<(object Identity, IrMemberId Field), IrValue> Fields { get; } = new(FieldKey.Instance);
+    private readonly ImmutableDictionary<IrValue, ImmutableDictionary<int, IrValue>.Builder>.Builder _elements = ImmutableDictionary.CreateBuilder<IrValue, ImmutableDictionary<int, IrValue>.Builder>(IrValueIdentity.Instance);
+    private readonly ImmutableDictionary<object, ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder>.Builder _keyedFields = ImmutableDictionary.CreateBuilder<object, ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder>(ObjectKey.Instance);
+    private readonly ImmutableHashSet<IrValue>.Builder _freshArrays = ImmutableHashSet.CreateBuilder<IrValue>(IrValueIdentity.Instance);
+    private readonly ImmutableHashSet<object>.Builder _freshObjects = ImmutableHashSet.CreateBuilder<object>(ObjectKey.Instance);
+    internal ImmutableDictionary<(object Identity, IrMemberId Field), IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<(object Identity, IrMemberId Field), IrValue>(FieldKey.Instance);
     internal bool ConsumedApproximation { get; private set; }
     private bool UnknownContents { get; set; }
 
@@ -126,7 +127,7 @@ internal sealed class IrHeap
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var identity = sequence.SequenceIdentity;
         if (!_elements.TryGetValue(identity, out var elements))
-        { _elements.Add(identity, elements = []); }
+        { _elements.AddUnique(identity, elements = ImmutableDictionary.CreateBuilder<int, IrValue>()); }
         elements[index] = value;
     }
 
@@ -148,7 +149,7 @@ internal sealed class IrHeap
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
         if (!_keyedFields.TryGetValue(owner.Reference, out var cells))
-        { _keyedFields.Add(owner.Reference, cells = []); }
+        { _keyedFields.AddUnique(owner.Reference, cells = ImmutableDictionary.CreateBuilder<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>()); }
         cells[(field, key.Type, key.IntegerBits)] = value;
     }
 

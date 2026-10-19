@@ -2418,3 +2418,16 @@ Preserve rank buffers, Roslyn Construct arguments, PE/file/Assembly byte arrays,
 interpreter arguments and the two distinct-copy alias witnesses. Compile the complete
 frontend project and run its ordinary suite; fix internal readonly helper type assumptions
 where necessary without changing native argument contracts. Status: open before edits.
+
+M057 read-only consumer review confirms no field-store enumeration/concrete Dictionary
+consumer; nested map creation retains AddUnique and all reference/key comparers. Public
+WithField still returns the same mutable subject. The current regenerated universe is
+1,867 C# files (3,276 candidate rows) and 84 PowerShell scripts (1,106 rows); raw/interpolated
+source preservation verifies 2,875 tokens across 618 changed C# files against master.
+
+M058 dry-run coordinator correction: SourceParameterAdmissionBudgetCoverageTests:18 is
+also a current object[] adapter for TypedProgramSubject.Invoke/Execute, not a read-only
+snapshot conversion. Preserve it along with the previous 17 exclusions. The checked
+syntax-token selection is therefore 141 replacements, with 18 native/alias buffers kept.
+The scratch syntax tool's initial missing CompilationUnitSyntax cast was corrected before
+any source write; the dry-run parsed all selected tokens and preserved raw source text.

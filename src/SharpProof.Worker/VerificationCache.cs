@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 namespace SharpProof.Worker;
 
 // A content-addressed store of complete worker responses. The key is the
@@ -155,7 +156,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.LastWriteTimeUtc))
             .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Name), StringComparer.Ordinal)
-            .ToList();
+            .ToImmutableArray();
         var total = entries.Sum(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Length));
         foreach (var file in entries)
         {

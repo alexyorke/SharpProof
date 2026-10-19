@@ -188,7 +188,7 @@ $canonicalTimingOutput = Join-Path $timingDirectory (
 $timingOutput = Join-Path $timingDirectory (
     $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
     $timingSuffix + '.json')
-$priorDurations = @{}
+$priorDurationBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, long]([StringComparer]::OrdinalIgnoreCase)
 foreach ($priorTimingPath in $(if ($Fast) {
             @($canonicalTimingOutput, $timingOutput)
         }
@@ -204,7 +204,7 @@ foreach ($priorTimingPath in $(if ($Fast) {
         foreach ($task in @($prior.tasks)) {
             $elapsed = [long]$task.elapsedMilliseconds
             if ($elapsed -gt 0) {
-                $priorDurations[[string]$task.name] = $elapsed
+                $priorDurationBuilder[[string]$task.name] = $elapsed
             }
         }
     }
@@ -214,6 +214,8 @@ foreach ($priorTimingPath in $(if ($Fast) {
             $_.Exception.Message)
     }
 }
+
+$priorDurations = $priorDurationBuilder.ToImmutable()
 
 $mainParallelism = [Math]::Max(
     1,
@@ -297,7 +299,7 @@ $workerRemainderHeavyTaskFilter =
 "($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
 $workerRemainderOtherTaskFilter =
 "($workerRemainderTaskFilter)&($workerRemainderOtherFilter)"
-$tasks = [Collections.Generic.List[object]]::new()
+$taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
         foreach ($project in $semanticProjects) {
@@ -306,7 +308,7 @@ if (-not $ArchitectureOnly) {
                     'SharpProof.Architecture.Tests.csproj')) {
                 continue
             }
-            $tasks.Add([pscustomobject]@{
+            $taskBuilder.Add([pscustomobject]@{
                     Name                         = 'semantic-' + (
                         [IO.Path]::GetFileNameWithoutExtension(
                             $project)).ToLowerInvariant()
@@ -320,7 +322,7 @@ if (-not $ArchitectureOnly) {
         }
     }
     else {
-        $tasks.Add(
+        $taskBuilder.Add(
             [pscustomobject]@{
                 Name                         = 'semantic-projects'
                 Target                       = $semanticSolutionFilter
@@ -335,7 +337,7 @@ if (-not $ArchitectureOnly) {
             })
     }
     if ($coverageEnabled) {
-        $tasks.Add([pscustomobject]@{
+        $taskBuilder.Add([pscustomobject]@{
                 Name                         = 'semantic-gates'
                 Target                       = Join-Path $repositoryRoot $gatesProject
                 Filter                       = $semanticFilter
@@ -392,7 +394,7 @@ if (-not $ArchitectureOnly) {
             DefaultEstimatedMilliseconds = 160000L
         })
     foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
-        $tasks.Add([pscustomobject]@{
+        $taskBuilder.Add([pscustomobject]@{
                 Name                         = $descriptor.Name
                 Target                       = $testProject
                 Filter                       = $descriptor.Filter
@@ -408,7 +410,7 @@ if (-not $ArchitectureOnly) {
     }
 }
 if ($architectureShardingEnabled) {
-    $tasks.Add([pscustomobject]@{
+    $taskBuilder.Add([pscustomobject]@{
             Name                         = 'architecture'
             EvidenceKind                 = 'ArchitectureOnly'
             Target                       = Join-Path $repositoryRoot (
@@ -427,7 +429,8 @@ if ($CoverageTaskGroup -ne 'All') {
         'worker-remainder-other',
         'worker-fixed-checksum')
     # Capture the name first: inside switch, $_ is the switch value.
-    $tasks = [Collections.Generic.List[object]]@($tasks | Where-Object {
+    $taskSnapshot = $taskBuilder.ToImmutable()
+    $selectedTasks = @($taskSnapshot | Where-Object {
             $taskName = [string]$_.Name
             switch ($CoverageTaskGroup) {
                 'Gates' { $taskName -cin $gatesTaskNames }
@@ -435,11 +438,13 @@ if ($CoverageTaskGroup -ne 'All') {
                 'Projects' { $taskName -cnotin ($gatesTaskNames + $workerTaskNames) }
             }
         })
-    if ($tasks.Count -eq 0) {
+    $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($selectedTask in $selectedTasks) { $taskBuilder.Add($selectedTask) }
+    if ($taskBuilder.Count -eq 0) {
         throw "Coverage task group '$CoverageTaskGroup' selected no tasks."
     }
 }
-foreach ($task in $tasks) {
+foreach ($task in $taskBuilder) {
     $task | Add-Member -NotePropertyName EstimatedMilliseconds `
         -NotePropertyValue $(if ($priorDurations.ContainsKey($task.Name)) {
             [long]$priorDurations[$task.Name]
@@ -448,7 +453,8 @@ foreach ($task in $tasks) {
             [long]$task.DefaultEstimatedMilliseconds
         })
 }
-$tasks = @($tasks | Sort-Object `
+$taskSnapshot = $taskBuilder.ToImmutable()
+$tasks = @($taskSnapshot | Sort-Object `
     @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
     @{ Expression = 'Name'; Descending = $false })
 
@@ -479,8 +485,8 @@ if ($retainCanonicalResults) {
     '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' |
         Set-Content -LiteralPath $discoverySettings -Encoding utf8NoBOM
 }
-$timings = [Collections.Generic.List[object]]::new()
-$failures = [Collections.Generic.List[string]]::new()
+$timings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+$failureBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 $campaignFailure = $null
 
@@ -609,7 +615,7 @@ try {
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0
             })) {
-        $failures.Add(
+        $failureBuilder.Add(
             "$($failure.Test.Name) exited $($failure.ExitCode).")
     }
 }
@@ -626,6 +632,7 @@ finally {
         Remove-Item -LiteralPath $partitionFilter -Force
     }
     $campaign.Stop()
+    $timingSnapshot = $timings.ToImmutable()
     try {
         $temporaryTiming =
         $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
@@ -639,7 +646,7 @@ finally {
             coverageTaskGroup        = $CoverageTaskGroup
             parallelism              = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-            tasks                    = @($timings | Sort-Object name)
+            tasks                    = @($timingSnapshot | Sort-Object name)
         } | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
         Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
@@ -652,7 +659,8 @@ finally {
     }
 }
 
-if ($failures.Count -ne 0) {
+$failures = $failureBuilder.ToImmutable()
+if ($failures.Length -ne 0) {
     throw "Parallel semantic tests failed:`n$($failures -join "`n")"
 }
 if (-not $Quiet) {

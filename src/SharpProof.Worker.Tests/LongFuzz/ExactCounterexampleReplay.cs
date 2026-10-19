@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using SharpProof.Worker.Protocol;
@@ -34,25 +35,26 @@ internal static class ExactCounterexampleReplay
             return new(ExactReplayStatus.Unsupported, "No executable postcondition entry model was reported.");
         }
 
-        var displays = new List<string>();
+        var displays = ImmutableArray.CreateBuilder<string>();
         foreach (var value in model)
         {
             displays.Add(value is null ? "<null binding>"
                 : value.Variable + "=" + value.Value + " (" + value.Kind + ")");
         }
-        var display = string.Join("; ", displays);
-        var bindings = new Dictionary<string, WorkerModelValue>(StringComparer.Ordinal);
+        var display = string.Join("; ", displays.ToImmutable());
+        var bindingBuilder = ImmutableDictionary.CreateBuilder<string, WorkerModelValue>(StringComparer.Ordinal);
         foreach (var value in model)
         {
-            if (value is null || value.Variable is null || !bindings.TryAdd(value.Variable, value))
+            if (value is null || value.Variable is null || !bindingBuilder.TryAdd(value.Variable, value))
             {
                 return new(ExactReplayStatus.InvalidModel, "Null or duplicate entry binding; " + display);
             }
         }
-        if (bindings.Count != 4)
+        if (bindingBuilder.Count != 4)
         {
             return new(ExactReplayStatus.InvalidModel, "Expected exactly parameter:0..3; " + display);
         }
+        var bindings = bindingBuilder.ToImmutable();
         for (var ordinal = 0; ordinal < 4; ordinal++)
         {
             if (!bindings.ContainsKey("parameter:" + ordinal.ToString(CultureInfo.InvariantCulture)))

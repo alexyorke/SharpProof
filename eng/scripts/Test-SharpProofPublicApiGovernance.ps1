@@ -11,7 +11,7 @@ $scratch = Join-Path $temporaryParent ('SharpProofPublicApiGovernance.' + [Guid]
 $evidence = Join-Path $repository ('artifacts/public-api-governance/' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($evidence) | Out-Null
 $priorRepository = $env:SHARPPROOF_REPO_ROOT
-$receipts = [Collections.Generic.List[object]]::new()
+$receipts = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
 function Invoke-CheckedGit {
     param([string[]]$Arguments)
@@ -74,8 +74,9 @@ try {
         $apiFiles = @('PublicAPI.Shipped.txt', 'PublicAPI.Unshipped.txt' | ForEach-Object {
                 Join-Path $scratch ('src/SharpProof.Attributes/' + $_)
             })
-        $apiContents = [Collections.Generic.List[byte[]]]::new()
-        foreach ($file in $apiFiles) { $apiContents.Add([IO.File]::ReadAllBytes($file)) }
+        $apiContentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[byte[]]()
+        foreach ($file in $apiFiles) { $apiContentBuilder.Add([IO.File]::ReadAllBytes($file)) }
+        $apiContents = $apiContentBuilder.ToImmutable()
         $project = Join-Path $scratch 'src/SharpProof.Attributes/SharpProof.Attributes.csproj'
         $projectContents = [IO.File]::ReadAllBytes($project)
         try {
@@ -107,7 +108,8 @@ try {
         }
         finally { [IO.File]::WriteAllBytes($nullableSource, $nullableContents) }
         Invoke-GovernanceBuild 'restored'
-        [ordered]@{ schemaVersion = 1; controls = $receipts.ToArray() } | ConvertTo-Json -Depth 4 |
+        $receiptSnapshot = $receipts.ToImmutable()
+        [ordered]@{ schemaVersion = 1; controls = @($receiptSnapshot) } | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath (Join-Path $evidence 'controls.json') -Encoding utf8NoBOM
     }
     finally { Pop-Location }

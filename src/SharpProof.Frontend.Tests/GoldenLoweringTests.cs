@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -49,7 +50,7 @@ public sealed class GoldenLoweringTests
         var compilation = CSharpCompilation.Create("GoldenLowering", [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target")).ToArray();
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target")).ToImmutableArray();
         var method = methods.Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Body != null || node.ExpressionBody != null));
         var total = fixture.Source.StartsWith("// golden-mode: Total\n", StringComparison.Ordinal);
         var factory = new IrFactory(total ? IrExecutionSemantics.Total : IrExecutionSemantics.Legacy);
@@ -81,7 +82,7 @@ public sealed class GoldenLoweringTests
             : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, TestContext.CurrentContext.CancellationToken)
             : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
-        var terms = new Dictionary<IrId, IrTerm>();
+        var termBuilder = ImmutableDictionary.CreateBuilder<IrId, IrTerm>();
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"mode: {factory.Semantics}");
         output.AppendLine(CultureInfo.InvariantCulture, $"classification: {result.Classification.Decision}/{result.Classification.Abstention}");
@@ -122,7 +123,7 @@ public sealed class GoldenLoweringTests
                 RememberInstruction(instruction);
             }
         }
-        foreach (var term in terms.Values.OrderBy(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Id.Value)))
+        foreach (var term in termBuilder.ToImmutable().Values.OrderBy(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Id.Value)))
         {
             var type = factory.GetTypeInfo(term.Type);
             var bits = term is IrIntegerTerm integer ? " bits=" + integer.Bits.ToString(CultureInfo.InvariantCulture) : "";
@@ -142,7 +143,7 @@ public sealed class GoldenLoweringTests
             Assert.That(context!.Parameters, Has.Length.EqualTo(1));
             var input = context.Parameters[0].Entry;
             var allocated = 0;
-            var observations = new List<(IrAssignInstruction Marker, bool Value, bool Approximation)>();
+            var observationBuilder = ImmutableArray.CreateBuilder<(IrAssignInstruction Marker, bool Value, bool Approximation)>();
             var replay = new IrProgramReplayOptions(_ => null)
             {
                 AllocationObserver = _ => allocated++,
@@ -151,7 +152,7 @@ public sealed class GoldenLoweringTests
                     System.ArgumentNullException.ThrowIfNull(assignment);
                     System.ArgumentNullException.ThrowIfNull(value);
                     if (result.CallPreconditions.ContainsKey(assignment))
-                    { observations.Add((assignment, value.Boolean, approximation)); }
+                    { observationBuilder.Add((assignment, value.Boolean, approximation)); }
                 }
             };
             var inputs = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(factory.GetVariableInfo(input).Type,
@@ -165,7 +166,7 @@ public sealed class GoldenLoweringTests
                 output.AppendLine(CultureInfo.InvariantCulture,
                     $"call-precondition: {marker.Value.CalleeIdentity} clause={marker.Value.ClauseOrdinal} reached={reached} value={(reached ? tested!.Boolean.ToString() : "none")}");
             }
-            foreach (var observation in observations)
+            foreach (var observation in observationBuilder.ToImmutable())
             {
                 var clause = result.CallPreconditions[observation.Marker];
                 output.AppendLine(CultureInfo.InvariantCulture,
@@ -318,11 +319,12 @@ public sealed class GoldenLoweringTests
 
         void RememberTerm(IrTerm term)
         {
-            if (!terms.TryAdd(term.Id, term))
+            if (termBuilder.ContainsKey(term.Id))
             {
                 return;
             }
-            IEnumerable<IrTerm> children = term switch
+            termBuilder.AddUnique(term.Id, term);
+            ImmutableArray<IrTerm> children = term switch
             {
                 IrOpaqueTerm value => value.Receiver == null ? value.Arguments : value.Arguments.Insert(0, value.Receiver),
                 IrUnaryTerm value => [value.Operand],

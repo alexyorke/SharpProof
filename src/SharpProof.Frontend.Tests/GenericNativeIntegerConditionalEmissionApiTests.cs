@@ -77,7 +77,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var method = invocation.TargetMethod;
-        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
+        var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToImmutableArray();
         var raw = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 0));
         var generic = candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 1));
         var attribute = raw.GetAttributes().Single();
@@ -144,7 +144,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         }
     }
 
-    private static string[] TraceCalls(byte[] bytes)
+    private static ImmutableArray<string> TraceCalls(byte[] bytes)
     {
         System.ArgumentNullException.ThrowIfNull(bytes);
         using var image = new MemoryStream(bytes);
@@ -153,7 +153,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
         var target = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(method => metadata.GetString(method.Name) == "Target");
         var il = pe.GetMethodBody(target.RelativeVirtualAddress).GetILBytes()!;
-        var calls = new List<string>();
+        var calls = ImmutableArray.CreateBuilder<string>();
         for (var offset = 0; offset < il.Length;)
         {
             ushort value = il[offset++];
@@ -185,7 +185,7 @@ public sealed class GenericNativeIntegerConditionalEmissionApiTests
             }
             offset += size;
         }
-        return [.. calls];
+        return calls.ToImmutable();
     }
 
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
