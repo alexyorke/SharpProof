@@ -5,6 +5,21 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class NativeSpecifiedCallTests
 {
+    [Test]
+    public async Task QueueDistinctClosedGenericReceiversCannotShareLogicalCount()
+    {
+        await CheckInterfaceArrayContract("System.Collections.Generic.Queue<int> first, System.Collections.Generic.Queue<string> second",
+            "Contract.Requires(first != null && second != null && first.Count == 1 && second.Count == 1); Contract.Ensures(Contract.Result<int>() == 1); first.Dequeue(); return second.Count;", WorkerClaimOutcome.Proven);
+    }
+
+    [Test]
+    public async Task IncompatibleQueueFieldMutationCannotBecomeAnAuthoritativeCounterexample()
+    {
+        await CheckInterfaceArrayContract("Holder holder",
+            "Contract.Requires(holder != null && holder.First != null && holder.Second != null && holder.First.Count == 1); Contract.Ensures(Contract.Result<int>() == 0); var before = holder.Second.Count; holder.First.Dequeue(); return holder.Second.Count - before;", WorkerClaimOutcome.Unknown,
+            members: "public sealed class Holder { public System.Collections.Generic.Queue<int> First; public System.Collections.Generic.Queue<string> Second; }");
+    }
+
     [TestCase("var data = new System.Collections.Generic.Queue<int>(); return data.Count;", 0)]
     [TestCase("var data = new System.Collections.Generic.Queue<int>(0); return data.Count;", 0)]
     [TestCase("var data = new System.Collections.Generic.Queue<int>(17); data.Enqueue(17); data.Enqueue(23); return data.Dequeue() * 100 + data.Dequeue() + data.Count;", 1723)]
