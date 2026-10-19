@@ -14,7 +14,7 @@ function ConvertTo-SharpProofTrxName {
 function Get-SharpProofTrxDiscoveryNames {
     param([object[]]$Discovery)
 
-    $rawNames = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    $rawNames = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::Ordinal)
     foreach ($case in $Discovery) {
         $rawName = $case.assembly + '|' + $case.fullyQualifiedName
         $encodedName = $case.assembly + '|' + (ConvertTo-SharpProofTrxName -Name $case.fullyQualifiedName)
@@ -29,19 +29,20 @@ function Get-SharpProofTrxDiscoveryNames {
 function Read-SharpProofCanonicalCases {
     param([string]$Root)
 
-    $cases = [Collections.Generic.List[object]]::new()
-    $identities = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $identities = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.trx' -File)) {
         [xml]$trx = Get-Content -LiteralPath $file.FullName -Raw
-        $definitions = @{}
+        $definitionBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
         foreach ($definition in $trx.SelectNodes('//*[local-name()="UnitTest"]')) {
             $definitionId = [string]$definition.id
-            if ([string]::IsNullOrWhiteSpace($definitionId) -or $definitions.ContainsKey($definitionId)) {
+            if ([string]::IsNullOrWhiteSpace($definitionId) -or $definitionBuilder.ContainsKey($definitionId)) {
                 throw 'Canonical TRX definition has an absent or duplicated test identity.'
             }
-            $definitions[$definitionId] = $definition
+            $definitionBuilder.Add($definitionId, $definition)
         }
-        $results = @($trx.SelectNodes('//*[local-name()="UnitTestResult"]'))
+        $definitions = $definitionBuilder.ToImmutable()
+        $results = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($trx.SelectNodes('//*[local-name()="UnitTestResult"]')))
         $counters = $trx.SelectSingleNode('//*[local-name()="Counters"]')
         if ($null -eq $counters -or $results.Count -eq 0 -or
             $results.Count -ne [int]$counters.total) {
@@ -49,7 +50,7 @@ function Read-SharpProofCanonicalCases {
         }
         foreach ($result in $results) {
             $execution = [string]$result.executionId
-            $definition = $definitions[[string]$result.testId]
+            $definition = if ($definitions.ContainsKey([string]$result.testId)) { $definitions[[string]$result.testId] } else { $null }
             if ($null -eq $definition -or [string]$definition.id -cne [string]$result.testId) {
                 throw 'Canonical TRX result has no matching execution definition.'
             }
@@ -80,7 +81,7 @@ function Read-SharpProofCanonicalCases {
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical cohort has no actual TRX cases.' }
-    return @($cases | Sort-Object { $_.assembly }, { $_.testId }, { $_.executionId })
+    return @($cases.ToImmutable() | Sort-Object { $_.assembly }, { $_.testId }, { $_.executionId })
 }
 
 function Assert-SharpProofHistoricalCaseAliases {
@@ -88,10 +89,10 @@ function Assert-SharpProofHistoricalCaseAliases {
 
     # These two GUID collisions and twofold name multiplicities occur in
     # authenticated bf6b and 32b Frontend TRX. Distinct inputs share SetName.
-    $known = @{
-        '06d903a7-4bce-3d34-b913-60c489b39f2a' = 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: int Target(string x) => x is not null ? x.Length : 0; #0'
-        '1b1e9d07-66cf-197c-b1d4-b3710a68a33b' = 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: bool Target(object x) => x is null or not null; #True'
-    }
+    $knownBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::OrdinalIgnoreCase)
+    $knownBuilder.Add('06d903a7-4bce-3d34-b913-60c489b39f2a', 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: int Target(string x) => x is not null ? x.Length : 0; #0')
+    $knownBuilder.Add('1b1e9d07-66cf-197c-b1d4-b3710a68a33b', 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: bool Target(object x) => x is null or not null; #True')
+    $known = $knownBuilder.ToImmutable()
     foreach ($group in @($Cases | Group-Object { $_.assembly + '|' + $_.testId } | Where-Object { $_.Count -gt 1 })) {
         $case = $group.Group[0]
         if ($group.Count -ne 2 -or -not $known.ContainsKey($case.testId) -or
@@ -104,9 +105,9 @@ function Assert-SharpProofHistoricalCaseAliases {
             @($group.Group | ForEach-Object { $_.executionId } | Select-Object -Unique).Count -ne 2) {
             throw 'Canonical TRX has an unintended duplicate test GUID.'
         }
-        $discovered = @($Discovery | Where-Object {
-                $_.assembly -ceq $case.assembly -and $_.fullyQualifiedName -ceq $case.fullyQualifiedName
-            })
+        $discovered = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Discovery | Where-Object {
+                    $_.assembly -ceq $case.assembly -and $_.fullyQualifiedName -ceq $case.fullyQualifiedName
+                }))
         if ($discovered.Count -ne 2 -or @($discovered | ForEach-Object { $_.nunitId } | Select-Object -Unique).Count -ne 2) {
             throw 'Historical TRX name alias lacks two distinct actual NUnit discovery identities.'
         }
@@ -116,21 +117,22 @@ function Assert-SharpProofHistoricalCaseAliases {
 function Read-SharpProofCanonicalDiscovery {
     param([string]$Root)
 
-    $cases = [Collections.Generic.List[object]]::new()
-    $ids = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $ids = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     foreach ($dump in @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.discovery.dump' -File)) {
         $assembly = $dump.Name.Substring(0, $dump.Name.Length - '.discovery.dump'.Length)
         $taskRoot = Split-Path -Parent $dump.DirectoryName
-        $selectedNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $selectedNames = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
         foreach ($name in Get-Content -LiteralPath (Join-Path $taskRoot 'discovered-tests.txt')) {
             [void]$selectedNames.Add([string]$name)
         }
+        $selectedNames = $selectedNames.ToImmutable()
         [xml]$document = Get-Content -LiteralPath $dump.FullName -Raw
         foreach ($test in $document.SelectNodes('//*[local-name()="test-case"]')) {
             $name = [string]$test.fullname
             if (-not $selectedNames.Contains($name)) { continue }
-            $categories = @($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') |
-                    ForEach-Object { [string]$_.value })
+            $categories = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') |
+                        ForEach-Object { [string]$_.value }))
             if (@($categories | Where-Object { $_ -in @('Performance', 'Coverage', 'Corpus') }).Count) { continue }
             $id = [string]$test.id
             if ([string]::IsNullOrWhiteSpace($id) -or -not $ids.Add($assembly + '|' + $id)) {
@@ -140,7 +142,7 @@ function Read-SharpProofCanonicalDiscovery {
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical NUnit per-case discovery is empty.' }
-    return @($cases | Sort-Object { $_.assembly }, { $_.nunitId })
+    return @($cases.ToImmutable() | Sort-Object { $_.assembly }, { $_.nunitId })
 }
 
 function Assert-SharpProofCanonicalOutcomes {
@@ -148,15 +150,15 @@ function Assert-SharpProofCanonicalOutcomes {
 
     # These six exact identities/reasons were NotExecuted in authenticated
     # bf6b coverage artifact 11832715058; they are existing Explicit fixtures.
-    $known = @{
-        '5cd4e5c7-9f73-10c1-7c2c-636c241172c5' = 'ControlFlowLongFuzzTests.GeneratedControlFlowClaimsAgreeWithRuntime'
-        'b5009c46-3dd2-c61d-cf8e-ec663ae861ca' = 'TypedFeatureLongFuzzTests.GeneratedTypedClaimsAgreeWithClr'
-        '4dc99683-82af-ebfd-e344-78b6c2879455' = 'AnalyzerPipelineLongFuzzTests.GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime'
-        '230ff36e-e535-704c-3792-7b29dd55347b' = 'CompositionalLongFuzzTests.GeneratedCompositionsAgreeWithClr'
-        '2da18c89-eef0-4b0f-6dbe-375956629323' = 'TypedWidthLongFuzzTests.GeneratedWidthClaimsAgreeWithClrWitnesses'
-        '5dbb42c1-950e-a564-1fb7-0c9e9c268eca' = 'ContractMatrixLongFuzzTests.GeneratedContractsAgreeWithClrAdmission'
-    }
-    $skipped = @($Cases | Where-Object { $_.outcome -cne 'Passed' })
+    $knownBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::OrdinalIgnoreCase)
+    $knownBuilder.Add('5cd4e5c7-9f73-10c1-7c2c-636c241172c5', 'ControlFlowLongFuzzTests.GeneratedControlFlowClaimsAgreeWithRuntime')
+    $knownBuilder.Add('b5009c46-3dd2-c61d-cf8e-ec663ae861ca', 'TypedFeatureLongFuzzTests.GeneratedTypedClaimsAgreeWithClr')
+    $knownBuilder.Add('4dc99683-82af-ebfd-e344-78b6c2879455', 'AnalyzerPipelineLongFuzzTests.GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime')
+    $knownBuilder.Add('230ff36e-e535-704c-3792-7b29dd55347b', 'CompositionalLongFuzzTests.GeneratedCompositionsAgreeWithClr')
+    $knownBuilder.Add('2da18c89-eef0-4b0f-6dbe-375956629323', 'TypedWidthLongFuzzTests.GeneratedWidthClaimsAgreeWithClrWitnesses')
+    $knownBuilder.Add('5dbb42c1-950e-a564-1fb7-0c9e9c268eca', 'ContractMatrixLongFuzzTests.GeneratedContractsAgreeWithClrAdmission')
+    $known = $knownBuilder.ToImmutable()
+    $skipped = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Cases | Where-Object { $_.outcome -cne 'Passed' }))
     if ($Cohort -eq 'Gates' -and $skipped.Count) { throw 'Canonical Gates has an unsuccessful case.' }
     if ($Cohort -eq 'Remaining' -and $skipped.Count -ne $known.Count) {
         throw 'Canonical non-Gates skip census differs from the existing six Explicit fixtures.'
@@ -186,12 +188,12 @@ function Save-SharpProofCanonicalCohort {
         $commit -cne $env:GITHUB_SHA) {
         throw 'Retained canonical cohort requires the actual GitHub run, attempt, and checked-out SHA.'
     }
-    $cases = @(Read-SharpProofCanonicalCases -Root $Root)
-    $discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $Root)
+    $cases = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Read-SharpProofCanonicalCases -Root $Root))
+    $discoveredCases = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Read-SharpProofCanonicalDiscovery -Root $Root))
     Assert-SharpProofHistoricalCaseAliases -Cases $cases -Discovery $discoveredCases
-    $expectedNames = @($Expected | ForEach-Object { [string]$_.Name } | Sort-Object)
-    $completedNames = @($Completed | ForEach-Object { [string]$_.Test.Name } | Sort-Object)
-    $discovered = [Collections.Generic.List[string]]::new()
+    $expectedNames = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Expected | ForEach-Object { [string]$_.Name } | Sort-Object))
+    $completedNames = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($Completed | ForEach-Object { [string]$_.Test.Name } | Sort-Object))
+    $discovered = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($task in $Expected) {
         $discoveryPath = Join-Path $Root ($task.Name + '/discovered-tests.txt')
         if (-not (Test-Path -LiteralPath $discoveryPath -PathType Leaf)) {
@@ -213,14 +215,14 @@ function Save-SharpProofCanonicalCohort {
         configuration   = $Configuration
         filter          = $Filter
         projects        = @($Projects | Sort-Object)
-        expectedTasks   = $expectedNames
-        completedTasks  = $completedNames
+        expectedTasks   = @($expectedNames)
+        completedTasks  = @($completedNames)
         completed       = @($Completed | ForEach-Object {
                 [ordered]@{ name = $_.Test.Name; exitCode = $_.ExitCode; elapsedMilliseconds = $_.ElapsedMilliseconds }
             })
-        discovered      = @($discovered.ToArray())
-        discoveredCases = $discoveredCases
-        cases           = $cases
+        discovered      = @($discovered.ToImmutable())
+        discoveredCases = @($discoveredCases)
+        cases           = @($cases)
     }
     $receipt | ConvertTo-Json -Depth 7 |
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort.json') -Encoding utf8NoBOM
@@ -230,23 +232,23 @@ function Assert-SharpProofCanonicalCohorts {
     param([string]$Root, [string]$RepositoryRoot)
 
     $canonicalFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-    $projects = @((Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw |
-                ConvertFrom-Json).solution.projects | ForEach-Object { ([string]$_).Replace('\', '/') })
+    $projects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@((Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw |
+                    ConvertFrom-Json).solution.projects | ForEach-Object { ([string]$_).Replace('\', '/') }))
     $gatesProject = 'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
     $commit = [string](& git -C $RepositoryRoot rev-parse HEAD)
     if ($LASTEXITCODE -ne 0) { throw 'Canonical aggregate source commit could not be read.' }
     $tree = [string](& git -C $RepositoryRoot rev-parse 'HEAD^{tree}')
     if ($LASTEXITCODE -ne 0) { throw 'Canonical aggregate source tree could not be read.' }
-    $allIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $testOwners = @{}
-    $summary = [Collections.Generic.List[object]]::new()
+    $allIds = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    $testOwners = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]([StringComparer]::OrdinalIgnoreCase)
+    $summary = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     foreach ($cohort in @('Remaining', 'Gates')) {
         $cohortRoot = Join-Path $Root $cohort.ToLowerInvariant()
         $receipt = Get-Content -LiteralPath (Join-Path $cohortRoot 'canonical-cohort.json') -Raw | ConvertFrom-Json
-        $expectedProjects = @($projects | Where-Object {
-                if ($cohort -eq 'Gates') { $_ -ceq $gatesProject }
-                else { $_ -cne $gatesProject }
-            } | Sort-Object)
+        $expectedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($projects | Where-Object {
+                    if ($cohort -eq 'Gates') { $_ -ceq $gatesProject }
+                    else { $_ -cne $gatesProject }
+                } | Sort-Object))
         if ([int]$receipt.schemaVersion -ne 1 -or $receipt.cohort -cne $cohort -or
             $receipt.commit -cne $commit -or $receipt.tree -cne $tree -or
             $receipt.commit -cne $env:GITHUB_SHA -or
@@ -256,50 +258,58 @@ function Assert-SharpProofCanonicalCohorts {
             (@($receipt.projects) -join "`n") -cne ($expectedProjects -join "`n")) {
             throw 'Canonical cohort does not match this attempt and the complete project partition.'
         }
-        $expectedTasks = if ($cohort -eq 'Gates') { @('semantic-projects') }
-        else { @('semantic-projects', 'worker-claim-manifest', 'worker-compiler-manifest', 'worker-core', 'worker-remainder-heavy', 'worker-remainder-other') | Sort-Object }
+        $expectedTasks = if ($cohort -eq 'Gates') { [Collections.Immutable.ImmutableArray]::Create[string]('semantic-projects') }
+        else { [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(@('semantic-projects', 'worker-claim-manifest', 'worker-compiler-manifest', 'worker-core', 'worker-remainder-heavy', 'worker-remainder-other') | Sort-Object)) }
         if ((@($receipt.expectedTasks) -join "`n") -cne ($expectedTasks -join "`n") -or
             (@($receipt.completedTasks) -join "`n") -cne ($expectedTasks -join "`n") -or
             @($receipt.completed | Where-Object { $_.exitCode -ne 0 }).Count -ne 0) {
             throw 'Canonical cohort did not successfully complete every unchanged task.'
         }
-        $cases = @(Read-SharpProofCanonicalCases -Root $cohortRoot)
-        $serializedCases = ConvertTo-Json -InputObject $cases -Depth 5 -Compress
+        $cases = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Read-SharpProofCanonicalCases -Root $cohortRoot))
+        $serializedCases = ConvertTo-Json -InputObject @($cases) -Depth 5 -Compress
         $recordedCases = ConvertTo-Json -InputObject @($receipt.cases | Sort-Object { $_.assembly }, { $_.testId }, { $_.executionId }) -Depth 5 -Compress
         if ($serializedCases -cne $recordedCases) {
             throw 'Canonical case identities or outcomes differ from their real TRX receipts.'
         }
         Assert-SharpProofCanonicalOutcomes -Cases $cases -Cohort $cohort
-        [string[]]$discovered = @(Get-ChildItem -LiteralPath $cohortRoot -Recurse -Filter 'discovered-tests.txt' -File |
-                ForEach-Object { Get-Content -LiteralPath $_.FullName })
-        [Array]::Sort($discovered, [StringComparer]::Ordinal)
+        $discoveredBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $discoveredBuilder.AddRange([string[]]@(Get-ChildItem -LiteralPath $cohortRoot -Recurse -Filter 'discovered-tests.txt' -File |
+                    ForEach-Object { Get-Content -LiteralPath $_.FullName }))
+        $discoveredBuilder.Sort([StringComparer]::Ordinal)
+        $discovered = $discoveredBuilder.ToImmutable()
         if (($discovered -join "`n") -cne (@($receipt.discovered) -join "`n")) {
             throw 'Canonical method-name discovery differs from its retained receipt.'
         }
-        $discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $cohortRoot)
+        $discoveredCases = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(Read-SharpProofCanonicalDiscovery -Root $cohortRoot))
         Assert-SharpProofHistoricalCaseAliases -Cases $cases -Discovery $discoveredCases
-        if ((ConvertTo-Json -InputObject $discoveredCases -Depth 5 -Compress) -cne
+        if ((ConvertTo-Json -InputObject @($discoveredCases) -Depth 5 -Compress) -cne
             (ConvertTo-Json -InputObject @($receipt.discoveredCases | Sort-Object { $_.assembly }, { $_.nunitId }) -Depth 5 -Compress)) {
             throw 'Canonical per-case NUnit identities differ from actual discovery XML.'
         }
-        [string[]]$discoveredNames = @(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases)
-        [string[]]$observedNames = @($cases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName })
-        [Array]::Sort($discoveredNames, [StringComparer]::Ordinal)
-        [Array]::Sort($observedNames, [StringComparer]::Ordinal)
+        $discoveredNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $discoveredNameBuilder.AddRange([string[]]@(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases))
+        $observedNameBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $observedNameBuilder.AddRange([string[]]@($cases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName }))
+        $discoveredNameBuilder.Sort([StringComparer]::Ordinal)
+        $observedNameBuilder.Sort([StringComparer]::Ordinal)
+        $discoveredNames = $discoveredNameBuilder.ToImmutable()
+        $observedNames = $observedNameBuilder.ToImmutable()
         if (($discoveredNames -join "`n") -cne ($observedNames -join "`n")) {
             throw 'Canonical parameterized case-name multisets differ between actual NUnit discovery and TRX.'
         }
-        $requiredAssemblies = @($expectedProjects | ForEach-Object {
-                [xml]$projectDocument = Get-Content -LiteralPath (Join-Path $RepositoryRoot $_) -Raw
-                $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
-                $assemblyName = if ($null -eq $declaredName) { [IO.Path]::GetFileNameWithoutExtension($_) } else { [string]$declaredName.InnerText }
-                if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
-                    throw "Canonical project has an unresolved assembly identity: $_"
-                }
-                $assemblyName + '.dll'
-            })
-        if ($cohort -eq 'Remaining') { $requiredAssemblies += 'SharpProof.Worker.Test.dll' }
-        $observedAssemblies = @($cases | ForEach-Object { $_.assembly } | Sort-Object -Unique)
+        $requiredAssemblyBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $requiredAssemblyBuilder.AddRange([string[]]@($expectedProjects | ForEach-Object {
+                    [xml]$projectDocument = Get-Content -LiteralPath (Join-Path $RepositoryRoot $_) -Raw
+                    $declaredName = $projectDocument.SelectSingleNode('/Project/PropertyGroup/AssemblyName')
+                    $assemblyName = if ($null -eq $declaredName) { [IO.Path]::GetFileNameWithoutExtension($_) } else { [string]$declaredName.InnerText }
+                    if ([string]::IsNullOrWhiteSpace($assemblyName) -or $assemblyName.Contains('$(')) {
+                        throw "Canonical project has an unresolved assembly identity: $_"
+                    }
+                    $assemblyName + '.dll'
+                }))
+        if ($cohort -eq 'Remaining') { $requiredAssemblyBuilder.Add('SharpProof.Worker.Test.dll') }
+        $requiredAssemblies = $requiredAssemblyBuilder.ToImmutable()
+        $observedAssemblies = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($cases | ForEach-Object { $_.assembly } | Sort-Object -Unique))
         if (($observedAssemblies -join "`n") -cne (@($requiredAssemblies | Sort-Object) -join "`n")) {
             throw 'Canonical TRX assembly ownership does not match its complete partition.'
         }
@@ -313,13 +323,13 @@ function Assert-SharpProofCanonicalCohorts {
                 throw 'Canonical children executed overlapping execution identities.'
             }
         }
-        $summary.Add([ordered]@{ cohort = $cohort; projects = $expectedProjects; cases = $cases.Count;
+        $summary.Add([ordered]@{ cohort = $cohort; projects = @($expectedProjects); cases = $cases.Count;
                 passed      = @($cases | Where-Object { $_.outcome -ceq 'Passed' }).Count;
                 notExecuted = @($cases | Where-Object { $_.outcome -ceq 'NotExecuted' }).Count
             })
     }
     [ordered]@{ schemaVersion = 1; commit = $commit; tree = $tree; runId = $env:GITHUB_RUN_ID;
-        runAttempt = $env:GITHUB_RUN_ATTEMPT; cases = $allIds.Count; cohorts = @($summary)
+        runAttempt = $env:GITHUB_RUN_ATTEMPT; cases = $allIds.Count; cohorts = @($summary.ToImmutable())
     } |
         ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath (Join-Path $Root 'canonical-cohort-validation.json') -Encoding utf8NoBOM

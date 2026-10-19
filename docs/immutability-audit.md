@@ -2536,3 +2536,20 @@ Use builder.Sort(Ordinal) instead of mutable temporary sort arrays; append requi
 Worker assembly through a builder. Validate actual parser controls plus negative collision,
 missing-definition and duplicate execution cases; retain authenticated GitHub/Git gates.
 Status: open before edits.
+
+Master 7e0e485a merge verified at 6821867d9: no textual conflicts; coordinator and
+read-only agent reviewed automatic List/receiver/session merges and preserved opaque
+value-domain and generic helper semantics. Full ordinary Release semantic suite passed
+11,771 tests in 23 framework summaries and six isolated scheduler tasks, zero failures
+or skips. Raw/interpolated comparison preserved all 2,959 tokens across 646 changed
+C# files against this master. This run includes M058-M064; M065 began afterward.
+
+IMM-M065 outcome: scoped builders and frozen internal snapshots preserve case-insensitive
+map lookup, strict duplicate identity checks, ordinal sorted multisets and Worker assembly
+inclusion. Parser regression controls pass deterministic ordering, encoded-name collision,
+parameterized multiplicity, missing-definition diagnostics and duplicate execution/NUnit
+identities. A separate synthetic publication probe produced byte-identical cohort JSON
+against the pre-edit implementation and confirmed singleton/plural array wire shape.
+Synthetic metadata was confined to that probe and is not authenticated CI evidence.
+Script formatter checked 87 PowerShell and 19 shell files, formatting one file; the
+publication probe passed again after formatting. Comprehensive residual audit stays open.
