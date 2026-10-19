@@ -127,6 +127,9 @@ internal static class DotnetApiInventory
             "M:System.Collections.Generic.IList`1.Insert(System.Int32,`0)" or "M:System.Collections.Generic.List`1.GetRange(System.Int32,System.Int32)" &&
             CSharpOperationSemantics.IsListStateDeclaration(symbol))
         { evidence.Add("intrinsic=list-insertion-range-state"); }
+        if ((symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod) is { } queueMethod && CSharpOperationSemantics.IsQueueStateMember(queueMethod))
+        { evidence.Add("intrinsic=concrete-queue-state"); }
+
         if (CSharpOperationSemantics.IsDictionaryStateDeclaration(symbol))
         {
             evidence.Add("intrinsic=fresh-default-integer-key-dictionary-state");

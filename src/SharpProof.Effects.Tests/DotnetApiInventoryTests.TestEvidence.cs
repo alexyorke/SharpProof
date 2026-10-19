@@ -64,6 +64,11 @@ public sealed partial class DotnetApiInventoryTests
                     () => CheckListRangeIntrinsic(compilation, row.Id, true) || CheckListRangeIntrinsic(compilation, row.Id, true, referenceValues: true) ||
                         CheckOpaqueListStorageIntrinsic(compilation, true, rangeMethod: row.Id));
             }
+            if (row.Evidence.Contains("intrinsic=concrete-queue-state", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest, "default/capacity constructors; FIFO shared aliases and null/reference values; compiled IR versus CLR; native incoming, Old, scalar boundaries, opaque generic values, unknown writer and effect controls in QueueState tests", () => CheckQueueStateIntrinsic(compilation, false), () => CheckQueueStateIntrinsic(compilation, true));
+            }
+
             if (row.Evidence.Contains("intrinsic=fresh-list-state", StringComparison.Ordinal))
             {
                 var arrays = row.Evidence.Contains("intrinsic=scalar-array-backed-interface", StringComparison.Ordinal);
