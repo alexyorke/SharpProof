@@ -3665,3 +3665,12 @@ assets fallback, ordering and direct/resolved precedence. Canonical formatting a
 Literal checkpoint after M135/M136: all 3,471 raw/interpolated text tokens across
 794 changed C# files match master 16063804e; interpolation expressions/ordinary strings
 are outside this literal check and are reviewed separately.
+
+IMM-M138: Replace internal fuzz seed List/HashSet accumulators with immutable array/
+set builders; freeze schedule/manifest vectors at publication and native stdout at
+capture. Preserve duplicate checks, case budgets, validation/callback/error ordering,
+source cleanliness and evidence wire array shape. Keep the existing typed schedule
+input contract while its consumers are reviewed. Validate baseline/current schedule,
+manifest and Git-capture scenarios before commit. Status: planned before edits.
+Latest canonical layout passed 2,620 source files, 59 projects, 151 unchanged pinned
+common files and 59 evaluated projects.
