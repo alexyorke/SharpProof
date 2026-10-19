@@ -3856,3 +3856,5 @@ IMM-M155: Migrate four Specs test data scopes across three files: scoped substit
 IMM-M152/M154 verified: all 41 ordinary tests in the three affected Smt classes passed with zero failures/skips/build warnings/errors and 19 exact embedded PDB outputs. Independent review confirmed default guards, two-pass predicate enumeration, expected native expression identity, row/outer freeze order, finally disposal and unchanged actual native timeout/runner retirement assertions. Whitespace check completed. Status: both batches implemented and verified.
 
 IMM-M153 literal control: all 3,668 raw/interpolated literal tokens across 852 changed C# files match current merged master, including source blocks in the eight rewritten compilation-helper callers.
+
+IMM-M153 verified: all 640 ordinary Contracts tests passed with zero failures/skips/build warnings/errors and 16 exact embedded PDB outputs. Main and independent review confirmed all eight compilation and twelve scalar-input callers, boxed switch values, default guards and ordinal indexing. Literal control confirms unchanged source blocks. Status: implemented and verified.

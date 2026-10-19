@@ -67,7 +67,7 @@ public sealed class TypedContractLoweringTests
         Assert.That(binding.Clauses, Is.Empty);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(int.MaxValue));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([int.MaxValue]));
         Assert.That(execution.Status, Is.EqualTo(throws ? IrProgramExecutionStatus.Exception : IrProgramExecutionStatus.Returned));
         if (!throws)
         {
@@ -96,7 +96,7 @@ public sealed class TypedContractLoweringTests
         var clause = subject.Bind().Clauses.Single();
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(first, second));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([first, second]));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.Value, execution.Values).Value!.Boolean, Is.True);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, execution.Values).Value!.Boolean, Is.EqualTo(safe));
@@ -117,7 +117,7 @@ public sealed class TypedContractLoweringTests
             """);
         var clause = subject.Bind().Clauses.Single();
         var interpreter = new IrInterpreter(subject.Factory);
-        var values = subject.Values(int.MaxValue);
+        var values = subject.Values([int.MaxValue]);
         Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.True);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.EqualTo(safe));
     }
@@ -138,7 +138,7 @@ public sealed class TypedContractLoweringTests
             }
             """);
         var clause = subject.Bind().Clauses.Single();
-        var values = subject.Values(0);
+        var values = subject.Values([0]);
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.True);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.False);
@@ -159,7 +159,7 @@ public sealed class TypedContractLoweringTests
             }
             """);
         var clause = subject.Bind().Clauses.Single();
-        var values = subject.Values(0);
+        var values = subject.Values([0]);
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, values).Value!.Boolean, Is.True);
         Assert.That(interpreter.Evaluate(clause.Value, values).Value!.Boolean, Is.EqualTo(expectedValue));
@@ -181,7 +181,7 @@ public sealed class TypedContractLoweringTests
         var clause = subject.Bind().Clauses.Single();
         var program = subject.Lower();
         Assert.That(program.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(program.Program, subject.EntryValues(4, 2));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(program.Program, subject.EntryValues([4, 2]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, execution.Values).Value!.Boolean, Is.True);
@@ -207,7 +207,7 @@ public sealed class TypedContractLoweringTests
         var clause = subject.Bind().Clauses.Single();
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(input, divisor));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([input, divisor]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, execution.Values).Value!.Boolean, Is.EqualTo(safe));
@@ -236,7 +236,7 @@ public sealed class TypedContractLoweringTests
         var clause = subject.Bind().Clauses.Single();
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(input));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([input]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(clause.SafeCondition, execution.Values).Value!.Boolean, Is.EqualTo(safe));
@@ -284,7 +284,7 @@ public sealed class TypedContractLoweringTests
             1000, [], postconditionGuard: ensures.SafeCondition, replayOptions: null);
         var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(5));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([5]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));
         Assert.That(execution.Values[binding.Entry].IntegerNumericValue, Is.EqualTo(new BigInteger(5)));
@@ -308,7 +308,7 @@ public sealed class TypedContractLoweringTests
         var lowering = subject.Lower();
         var binding = subject.Context.Parameters.Single();
         var result = subject.Context.Result!.Value;
-        var values = subject.Values(0).Add(result, subject.Value(result, 0));
+        var values = subject.Values([0]).Add(result, subject.Value(result, 0));
         var query = new VerificationQuery(subject.Factory, [],
             new Goal(subject.Factory, subject.Factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value),
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [.. values.Keys]);
@@ -478,7 +478,7 @@ public sealed class TypedContractLoweringTests
         Assert.That(binding.Clauses.Single().Evidence, Is.EqualTo(BoundContractEvidence.Companion));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(5));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues([5]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(BigInteger.Zero));
     }
@@ -504,7 +504,7 @@ public sealed class TypedContractLoweringTests
         Assert.That(binding.Clauses[0].Evidence, Is.EqualTo(companion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation));
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, subject.EntryValues(5));
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, subject.EntryValues([5]));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5)));
     }
@@ -579,18 +579,20 @@ public sealed class TypedContractLoweringTests
             return new RoslynProgramLowerer(Factory).LowerCandidate(graph, Context);
         }
 
-        internal ImmutableDictionary<IrVarId, IrValue> EntryValues(params int[] inputs)
+        internal ImmutableDictionary<IrVarId, IrValue> EntryValues(ImmutableArray<int> inputs)
         {
-            System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+            if (inputs.IsDefault)
+            { throw new ArgumentNullException(nameof(inputs)); }
             return ImmutableDictionaryCapture.Create(
                 Context.Parameters,
                 binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
                 binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, inputs[binding.Parameter.Ordinal])));
         }
 
-        internal ImmutableDictionary<IrVarId, IrValue> Values(params int[] inputs)
+        internal ImmutableDictionary<IrVarId, IrValue> Values(ImmutableArray<int> inputs)
         {
-            System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+            if (inputs.IsDefault)
+            { throw new ArgumentNullException(nameof(inputs)); }
             return ImmutableDictionaryCapture.Create(
                 Context.Parameters.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)
                     .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal])))))),

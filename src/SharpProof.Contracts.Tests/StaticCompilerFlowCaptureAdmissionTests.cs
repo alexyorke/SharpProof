@@ -79,7 +79,7 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         var chooseVariable = bindings.Single(binding => SymbolEqualityComparer.Default.Equals(binding.Symbol, source.Parameters[0])).Variable;
         var valueVariable = bindings.Single(binding => SymbolEqualityComparer.Default.Equals(binding.Symbol, source.Parameters[1])).Variable;
         var interpreter = new IrInterpreter(factory);
-        object[] inputs = typeName switch
+        ImmutableArray<object> inputs = typeName switch
         {
             "int" => [-1L, 0L, 1L],
             "bool" => [false, true],
