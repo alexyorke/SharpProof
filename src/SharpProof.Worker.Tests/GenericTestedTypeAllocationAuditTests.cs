@@ -56,7 +56,7 @@ public sealed class GenericTestedTypeAllocationAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericTestedTypeAllocationOracle", isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         CaseObservation control;
         try
         {

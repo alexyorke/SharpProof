@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -122,7 +123,7 @@ public sealed class ArrayInitializerFinallyPurityTests
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
         System.ArgumentNullException.ThrowIfNull(source);
-        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        ImmutableArray<string> symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols),
             "/project/Subject.cs");

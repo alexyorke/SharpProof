@@ -65,31 +65,31 @@ public sealed class DeclarationCoverageAccountingTests
     public async Task ClassifiesOnlyDeclarationTokensAndRetainsExecutableOrUnknownRows()
     {
         var cases = ImmutableArray.Create<(string Name, string Declaration, bool Omit)>(
-                ("method header", "public int M(int value)\n { return value; }", true),
-                ("abstract slot", "public abstract int M(int value);", true),
-                ("uninitialized field", "private readonly int value;", true),
-                ("initializer", "private int value = Compute();\n private static int Compute() => 1;", false),
-                ("constant initializer", "private const int Value = 1;", true),
-                ("constant alias", "private const int First = 1, Value = First + 1;", true),
-                ("constant expression", "private const int Value = (1 << 10) + 2;", true),
-                ("readonly literal initializer", "private static readonly int Value = 1;", false),
-                ("constant sharing runtime row", "private const int Value = 1; private int runtime = 2;", false),
-                ("local constant", "public int M() { const int value = 1; return value; }", false),
-                ("expression body", "public int M() => 1;", false),
-                ("inline body", "public int M() { return 1; }", false),
-                ("auto accessor", "public int Value { get; set; }", false),
-                ("accessor body", "public int Value { get { return 1; } }", false),
-                ("property initializer", "public int Value { get; } = 1;", false),
-                ("attribute", "[System.Obsolete] public int M()\n { return 1; }", false),
-                ("constructor base initializer", "public Subject() : base()\n { }", false),
-                ("constructor this initializer", "public Subject() : this(1)\n { }\n private Subject(int value) { }", false),
-                ("default parameter", "public int M(int value = 1)\n { return value; }", true),
-                ("mixed fields", "private int a, b = 1;", false),
-                ("event field", "public event System.Action Changed;", true),
-                ("invalid syntax", "public int M(\n { return 1; }", false),
-                ("multiline string", "public string M() => \"\"\"\n text\n \"\"\";", false),
-                ("primary constructor base", "public class Derived(int value) : Subject(Compute())\n { private static int Compute() => 1; }", false),
-                ("multiline primary constructor base", "public class Derived(int value) :\n Subject(Compute())\n { private static int Compute() => 1; }", false));
+            ("method header", "public int M(int value)\n { return value; }", true),
+            ("abstract slot", "public abstract int M(int value);", true),
+            ("uninitialized field", "private readonly int value;", true),
+            ("initializer", "private int value = Compute();\n private static int Compute() => 1;", false),
+            ("constant initializer", "private const int Value = 1;", true),
+            ("constant alias", "private const int First = 1, Value = First + 1;", true),
+            ("constant expression", "private const int Value = (1 << 10) + 2;", true),
+            ("readonly literal initializer", "private static readonly int Value = 1;", false),
+            ("constant sharing runtime row", "private const int Value = 1; private int runtime = 2;", false),
+            ("local constant", "public int M() { const int value = 1; return value; }", false),
+            ("expression body", "public int M() => 1;", false),
+            ("inline body", "public int M() { return 1; }", false),
+            ("auto accessor", "public int Value { get; set; }", false),
+            ("accessor body", "public int Value { get { return 1; } }", false),
+            ("property initializer", "public int Value { get; } = 1;", false),
+            ("attribute", "[System.Obsolete] public int M()\n { return 1; }", false),
+            ("constructor base initializer", "public Subject() : base()\n { }", false),
+            ("constructor this initializer", "public Subject() : this(1)\n { }\n private Subject(int value) { }", false),
+            ("default parameter", "public int M(int value = 1)\n { return value; }", true),
+            ("mixed fields", "private int a, b = 1;", false),
+            ("event field", "public event System.Action Changed;", true),
+            ("invalid syntax", "public int M(\n { return 1; }", false),
+            ("multiline string", "public string M() => \"\"\"\n text\n \"\"\";", false),
+            ("primary constructor base", "public class Derived(int value) : Subject(Compute())\n { private static int Compute() => 1; }", false),
+            ("multiline primary constructor base", "public class Derived(int value) :\n Subject(Compute())\n { private static int Compute() => 1; }", false));
         var root = TestRepository.FindRoot();
         var temporary = Path.Combine(Path.GetTempPath(), "SharpProofDeclarationsTest." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
@@ -99,7 +99,7 @@ public sealed class DeclarationCoverageAccountingTests
             {
                 var path = Path.Combine(temporary, index + ".cs");
                 File.WriteAllText(path, "public abstract class Subject\n{\n" + item.Declaration + "\n}\n");
-                return new { path = item.Name, sourcePath = path, languageVersion = "preview", preprocessorSymbols = Array.Empty<string>() };
+                return new { path = item.Name, sourcePath = path, languageVersion = "preview", preprocessorSymbols = ImmutableArray<string>.Empty };
             }).ToImmutableArray();
             var request = Path.Combine(temporary, "request.json");
             await File.WriteAllTextAsync(request, JsonSerializer.Serialize(documents));

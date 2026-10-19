@@ -413,7 +413,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(BitConverter.ToUInt16(original, rowOffset + 2), Is.EqualTo(expectedType));
         Assert.That(BitConverter.ToUInt16(original, rowOffset + 4), Is.EqualTo(valueOffset));
         var mutated = (byte[])original.Clone();
-        int[] allowedOffsets;
+        ImmutableArray<int> allowedOffsets;
         if (mutation is "nil-value" or "invalid-constructor-tag")
         {
             var cell = rowOffset + (mutation == "nil-value" ? 4 : 2);

@@ -90,7 +90,7 @@ public sealed class DictionaryOpaqueCountOracleTests
         var compilation = TestCompilation.Create("DictionaryOpaqueCountOracle", ("Probe.cs", source));
         var syntax = compilation.SyntaxTrees.Single();
         compilation = compilation.ReplaceSyntaxTree(syntax,
-            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(Array.Empty<string>())));
+            syntax.WithRootAndOptions(syntax.GetRoot(), ((CSharpParseOptions)syntax.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty)));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(";", emitted.Diagnostics));

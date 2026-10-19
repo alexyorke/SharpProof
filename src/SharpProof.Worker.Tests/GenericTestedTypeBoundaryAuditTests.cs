@@ -25,7 +25,7 @@ public sealed class GenericTestedTypeBoundaryAuditTests
     [Test]
     public async Task BoundaryClaimsMatchFrozenControlsAndMeasuredClr()
     {
-        string[] boundaries = ["fixed-int", "reference-T", "nullable-as-T", "unreachable-U"];
+        ImmutableArray<string> boundaries = ["fixed-int", "reference-T", "nullable-as-T", "unreachable-U"];
         var observationBuilder = ImmutableArray.CreateBuilder<BoundaryObservation>();
         foreach (var boundary in boundaries)
         {

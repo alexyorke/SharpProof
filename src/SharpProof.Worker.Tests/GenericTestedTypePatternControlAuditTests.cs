@@ -39,7 +39,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
         Assert.That(Directory.Exists(evidenceDirectory), Is.False, "Preserve every previous observation run.");
         Directory.CreateDirectory(evidenceDirectory);
         var observationBuilder = ImmutableArray.CreateBuilder<PatternObservation>();
-        foreach (var form in new[] { "discard-declaration", "parenthesized-type" })
+        foreach (var form in ImmutableArray.Create("discard-declaration", "parenthesized-type"))
         {
             observationBuilder.Add(await ObserveForm(form, evidenceDirectory));
         }
@@ -146,7 +146,7 @@ public sealed class GenericTestedTypePatternControlAuditTests
                 Assert.That((controlFlags & MethodImplAttributes.NoOptimization) != 0, Is.False);
                 Assert.That(hasBox, Is.True, form + ": decoded generic box opcode.");
                 Assert.That(hasIsinst, Is.True, form + ": decoded generic isinst opcode.");
-                foreach (var observation in new[] { measured, control })
+                foreach (var observation in ImmutableArray.Create(measured, control))
                 {
                     Assert.That(observation.Actual, Is.EqualTo(observation.Expected), observation.Name);
                     Assert.That(observation.TrueResults, Is.EqualTo(MeasurementCount), observation.Name);

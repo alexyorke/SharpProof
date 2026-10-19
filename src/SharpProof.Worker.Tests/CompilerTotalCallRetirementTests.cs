@@ -42,7 +42,7 @@ public sealed class CompilerTotalCallRetirementTests
     [Test]
     public async Task ClosedGenericSourceFramesRemainIndependent()
     {
-        var targets = new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values.ToArray();
+        var targets = new ClaimManifestBuilder(ClosedFormsCompilation).Build().Targets.Values.ToImmutableArray();
         Assert.That(targets, Has.Length.EqualTo(2));
         foreach (var target in targets)
         {
@@ -195,7 +195,7 @@ public sealed class CompilerTotalCallRetirementTests
         {
             Assert.That(resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name,
                 TestContext.CurrentContext.CancellationToken, out _, out _, out var selectedPath), Is.True);
-            Assert.That(new[] { implementationPath, duplicatePath }, Does.Contain(selectedPath));
+            Assert.That(ImmutableArray.Create(implementationPath, duplicatePath), Does.Contain(selectedPath));
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
 

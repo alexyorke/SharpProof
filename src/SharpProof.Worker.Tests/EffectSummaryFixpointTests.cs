@@ -31,11 +31,11 @@ public sealed class EffectSummaryFixpointTests
         Assert.That(summaries, Has.Count.EqualTo(3));
         Assert.That(summaries.Values.All(summary => summary.MayEffects.HasFlag(SourceMayEffect.Allocation) &&
             summary.UnknownEffects == SourceMayEffect.None && summary.MayDiverge), Is.True);
-        var expected = summaries.ToArray();
-        { graph = graph with { Bodies = (graph.Bodies.Reverse().ToArray()).ToImmutableArray() }; }
+        var expected = summaries.ToImmutableArray();
+        { graph = graph with { Bodies = graph.Bodies.Reverse().ToImmutableArray() }; }
         foreach (var body in graph.Bodies)
-        { { { graph = graph with { Bodies = graph.Bodies.ReplaceReference(body, body with { Callees = (body.Callees.Reverse().ToArray()).ToImmutableArray() }) }; } } }
-        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: TestContext.CurrentContext.CancellationToken).ToArray(), Is.EqualTo(expected));
+        { { { graph = graph with { Bodies = graph.Bodies.ReplaceReference(body, body with { Callees = body.Callees.Reverse().ToImmutableArray() }) }; } } }
+        Assert.That(EffectSummaryFixpoint.ComputeValidated(graph, cancellationToken: TestContext.CurrentContext.CancellationToken).ToImmutableArray(), Is.EqualTo(expected));
     }
 
     [Test]
@@ -120,8 +120,8 @@ public sealed class EffectSummaryFixpointTests
             EffectsCompleteAtEntry = true,
             Graph = leaf.Graph,
             Callees = index < 4095 ? [(index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)] : cycle ? ["0"] : []
-        }).ToArray();
-        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies.ToImmutableArray() }, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        }).ToImmutableArray();
+        var summaries = EffectSummaryFixpoint.ComputeValidated(new CompilerReachableSourceArtifact { Bodies = bodies }, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(summaries, Has.Count.EqualTo(4096));
         Assert.That(summaries.Values.All(summary => summary.MayEffects == SourceMayEffect.None && summary.MayDiverge == cycle), Is.True);
     }

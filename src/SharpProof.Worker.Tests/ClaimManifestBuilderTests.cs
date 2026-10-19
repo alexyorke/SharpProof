@@ -1367,8 +1367,7 @@ public sealed class ClaimManifestBuilderTests
             target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Placement)),
             Is.EqualTo(ImmutableArray.Create<ContractClausePlacement?>(
                 ContractClausePlacement.ValidPrologue,
-                ContractClausePlacement.Conditional
-            )));
+                ContractClausePlacement.Conditional)));
         Assert.That(
             binding.Failure,
             Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
@@ -1452,7 +1451,7 @@ public sealed class ClaimManifestBuilderTests
                 public void Method() { }
             }
             """));
-        var targets = result.Targets.Values.ToArray();
+        var targets = result.Targets.Values.ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -1521,8 +1520,10 @@ public sealed class ClaimManifestBuilderTests
         var result = Build((
             "Subject.cs",
             WorkerTestSources.UnsupportedEffectCallables));
-        var targets = result.Targets.Values.ToDictionary(
+        var targets = ImmutableDictionaryCapture.Create(
+            result.Targets.Values,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
 
         AssertUnsupportedEffectTargets(
@@ -1538,8 +1539,10 @@ public sealed class ClaimManifestBuilderTests
         var result = Build((
             "Subject.cs",
             WorkerTestSources.UnsupportedContractCallables));
-        var targets = result.Targets.Values.ToDictionary(
+        var targets = ImmutableDictionaryCapture.Create(
+            result.Targets.Values,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
@@ -1579,8 +1582,10 @@ public sealed class ClaimManifestBuilderTests
                 }
             }
             """));
-        var targets = result.Targets.Values.ToDictionary(
+        var targets = ImmutableDictionaryCapture.Create(
+            result.Targets.Values,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
 
         AssertUnsupportedEffectTargets(
@@ -2157,8 +2162,10 @@ public sealed class ClaimManifestBuilderTests
                 }
             }
             """));
-        var targets = discovery.Targets.Values.ToDictionary(
+        var targets = ImmutableDictionaryCapture.Create(
+            discovery.Targets.Values,
             static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
         var wrongAllowed = targets["WrongAllowed"].EffectClaims.Single().Evidence;
         var exactAllowed = targets["ExactAllowed"].EffectClaims.Single().Evidence;
@@ -2257,7 +2264,7 @@ public sealed class ClaimManifestBuilderTests
     }
 
     private static void AssertUnsupportedEffectTargets(
-        IReadOnlyDictionary<string, ManifestCallableTarget> targets,
+        ImmutableDictionary<string, ManifestCallableTarget> targets,
         params string[] expectedNames)
     {
         System.ArgumentNullException.ThrowIfNull(expectedNames, nameof(expectedNames));
@@ -2353,8 +2360,7 @@ public sealed class ClaimManifestBuilderTests
                     "/TestCaseFilter:FullyQualifiedName=" +
                     typeof(ClaimManifestBuilderTests).FullName + "." +
                     nameof(
-                        DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery)
-                ));
+                        DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery)));
             startInfo.Environment[childVariable] = "1";
             using var temporary = new TempDirectory("nested-callable-stack-");
             var marker = Path.Combine(temporary.FullName, "marker");

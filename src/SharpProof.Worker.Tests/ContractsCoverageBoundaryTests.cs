@@ -278,7 +278,7 @@ public sealed class ContractsCoverageBoundaryTests
             }
             """);
         var tree = compilation.SyntaxTrees.Single();
-        var ordinaryOptions = ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        var ordinaryOptions = ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(ImmutableArray<string>.Empty);
         compilation = compilation.RemoveAllSyntaxTrees()
             .AddSyntaxTrees(tree.WithRootAndOptions(await tree.GetRootAsync(), ordinaryOptions));
         Assert.That(ordinaryOptions.PreprocessorSymbolNames, Is.Empty);

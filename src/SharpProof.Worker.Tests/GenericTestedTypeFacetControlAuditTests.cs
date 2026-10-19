@@ -52,7 +52,7 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         image.Position = 0;
         var runtime = new AssemblyLoadContext("GenericTestedTypeFacetControl", isCollectible: true);
-        CaseObservation[] cases;
+        ImmutableArray<CaseObservation> cases;
         try
         {
             var generic = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
@@ -104,7 +104,11 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         artifact = project.Artifact;
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        var expectedClaims = ImmutableDictionaryCapture.Create(manifest.Claims, claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+        var expectedClaims = ImmutableDictionaryCapture.Create(
+            manifest.Claims,
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {
             System.ArgumentNullException.ThrowIfNull(claim);

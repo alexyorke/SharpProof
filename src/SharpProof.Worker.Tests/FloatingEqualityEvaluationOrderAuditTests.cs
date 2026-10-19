@@ -57,7 +57,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(call.TargetMethod.IsStatic, Is.True);
             Assert.That(call.TargetMethod.ReturnType.SpecialType, Is.EqualTo(expectedType));
             Assert.That(call.TargetMethod.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType)),
-                Is.EqualTo(new[] { expectedType, SpecialType.System_Int32 }));
+                Is.EqualTo(ImmutableArray.Create(expectedType, SpecialType.System_Int32)));
             Assert.That(call.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ArgumentKind)),
                 Is.EqualTo(ExplicitArgumentKinds));
         }
@@ -88,7 +88,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(method.ReturnType, Is.EqualTo(typeof(int)));
             Assert.That(method.GetParameters().Single().ParameterType,
                 Is.EqualTo(valueType == "double" ? typeof(double) : typeof(float)));
-            object[] witnesses = valueType == "double" ? [double.NaN, 1.25d] : [float.NaN, 1.25f];
+            ImmutableArray<object> witnesses = valueType == "double" ? [double.NaN, 1.25d] : [float.NaN, 1.25f];
             var observationBuilder = ImmutableArray.CreateBuilder<string>();
             foreach (var witness in witnesses)
             {

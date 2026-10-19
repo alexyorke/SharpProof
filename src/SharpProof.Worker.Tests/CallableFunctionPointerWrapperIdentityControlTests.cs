@@ -141,7 +141,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
     {
         var argument = generic ? "T" : "int";
         var pointer = $"delegate*<{argument},int>";
-        string[] types = [pointer, pointer + "*", pointer + "[]", pointer + "[][]", pointer + "[,]",
+        ImmutableArray<string> types = [pointer, pointer + "*", pointer + "[]", pointer + "[][]", pointer + "[,]",
             $"System.Collections.Generic.List<{pointer}[]>", $"System.Collections.Generic.LinkedList<{pointer}[]>",
             $"Box<{pointer}[]>.Inner"];
         var genericParameters = generic ? "<T>" : string.Empty;

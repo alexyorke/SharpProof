@@ -99,8 +99,8 @@ public sealed class CompilerReferenceStackMergeCoverageTests
             Assert.That(shapes[callIndex]!.Value, Has.Length.EqualTo(1));
             Assert.That(shapes[callIndex]!.Value[0].Accepts(call.Method.Parameters[0].Type), Is.True);
         }
-        object?[] firstValues = [null, firstType == "string" ? "first" : new object()];
-        object?[] secondValues = [null, secondType == "string" ? "second" : new object()];
+        ImmutableArray<object?> firstValues = [null, firstType == "string" ? "first" : new object()];
+        ImmutableArray<object?> secondValues = [null, secondType == "string" ? "second" : new object()];
         foreach (var first in firstValues)
         {
             foreach (var second in secondValues)
