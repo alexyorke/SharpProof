@@ -1059,10 +1059,6 @@ public sealed class ApiSpecTests
         var standard = supported
             .Where(static constructor =>
                 constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName == "Exception"))
-            .Concat(supported.Where(static constructor =>
-                constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName ==
-                "InvalidOperationException" &&
-                constructor.Parameters.Length == 1)))
             .ToArray();
         var invalidOperationParameterless =
             invalidOperation.InstanceConstructors.Single(
@@ -1085,9 +1081,8 @@ public sealed class ApiSpecTests
             Assert.That(
                 resolved.TryGet(invalidOperationParameterless, out var spec) &&
                 spec.Template.Facets.Effects.Effects ==
-                (SpecEffect.WritesReceiverState |
-                    SpecEffect.ReadsAmbientState |
-                    SpecEffect.Synchronization),
+                SpecEffect.Unknown && spec.Template.Facets.Throws.Behavior == SpecThrowBehavior.Unknown &&
+                spec.Template.Facets.Termination!.Behavior == SpecTerminationBehavior.Unknown,
                 Is.True);
             Assert.That(
                 resolved.Lookup(aggregateEnumerable).Status,

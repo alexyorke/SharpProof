@@ -120,18 +120,22 @@ public sealed class NativeEffectContractTests
     }
 
     // A thrown exception needs Throws and a listed type; creating it allocates.
+    // Default resource-message construction additionally synchronizes.
     [TestCase("SharpProofEffect.Throws | SharpProofEffect.Allocates, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }",
-        typeof(ProvenOutcome))]
+        typeof(RefutedOutcome), false, true)]
+    [TestCase("SharpProofEffect.Throws | SharpProofEffect.Allocates, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }",
+        typeof(ProvenOutcome), true)]
     [TestCase("SharpProofEffect.Allocates", typeof(RefutedOutcome))]
     [TestCase("SharpProofEffect.Throws | SharpProofEffect.Allocates, ThrownExceptions = new[] { typeof(System.ArgumentException) }",
         typeof(RefutedOutcome))]
-    public async Task ThrowsNeedDeclaredTypes(string effects, Type outcome)
+    public async Task ThrowsNeedDeclaredTypes(string effects, Type? outcome, bool explicitMessage = false, bool resourceSynchronization = false)
     {
         System.ArgumentNullException.ThrowIfNull(effects);
-        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await VerifyAsync("[EffectContract(" + effects + ")] public void Target(bool flag) { " +
-            "if (flag) throw new System.InvalidOperationException(); }");
-        Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
+            "if (flag) throw " + (explicitMessage ? "new System.InvalidOperationException(\"failure\")" : "new System.InvalidOperationException()") + "; }");
+        Assert.That(result.Outcome, outcome == null ? Is.Null : Is.TypeOf(outcome), result.Reason.ToString());
+        if (resourceSynchronization)
+        { Assert.That(result.LockWitness, Is.Not.Null); }
     }
 
     // Reading the length or an element of an argument's sequence reads

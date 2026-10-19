@@ -352,6 +352,12 @@ internal sealed class PassiveCallableVcPlan
                 : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
         {
             ConcreteHavocValueProvider = ReplayFrameworkValue,
+            ConcreteLockCompletionProvider = (instruction, receiver) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                ArgumentNullException.ThrowIfNull(receiver);
+                return CompleteExceptionResourceLock(Factory, instruction, receiver, ProbeExceptionResourceLock);
+            },
             AllocationObserver = allocationObserver,
             SnapshotVariables = _candidate.Parameters.Select(parameter => parameter.Old).ToImmutableHashSet(),
             WriteObserver = writeObserver,
@@ -366,7 +372,129 @@ internal sealed class PassiveCallableVcPlan
     {
         ArgumentNullException.ThrowIfNull(request);
         return ObserveIntegralConvertInitialization(Factory, request, WarmIntegralConvert) ??
-            ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+            ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ??
+            ObserveExceptionInitialization(Factory, request, WarmExceptionConstructor) ??
+            ObserveExceptionResourceLock(Factory, request, ProbeExceptionResourceLock) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
+    }
+
+    internal sealed record ResourceLockObservation(object? Synchronization);
+
+    internal static IrValue? ObserveExceptionResourceLock(IrFactory factory, IrHavocRequest request,
+        Func<string, ResourceLockObservation?> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        var type = factory.GetVariableInfo(request.Variable).Type;
+        if (request.Origin != IrHavocOrigin.Approximation || type != factory.BooleanType && type != factory.ObjectType ||
+            IrOpaqueCallSite.ExceptionResourceLockKind(factory, request.Site) is not { } kind)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        ResourceLockObservation? observation;
+        try
+        { observation = observe(kind); }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException or System.Resources.MissingManifestResourceException)
+        { return null; }
+        if (observation == null)
+        { return null; }
+        // The Boolean certifies that this replay can expose an extra framework
+        // lock event. False does not assert absence of other framework effects.
+        if (type == factory.BooleanType)
+        { return factory.CreateBooleanValue(observation.Synchronization != null); }
+        return observation.Synchronization is { } synchronization ? factory.CreateReferenceValue(type, synchronization) : null;
+    }
+
+    internal static bool? CompleteExceptionResourceLock(IrFactory factory, IrLockInstruction instruction, IrValue receiver,
+        Func<string, ResourceLockObservation?> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(instruction);
+        ArgumentNullException.ThrowIfNull(receiver);
+        if (IrOpaqueCallSite.ExceptionResourceLockKind(factory, instruction.Operation) is not { } kind)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        if (receiver.Kind != IrValueKind.Reference)
+        { return false; }
+        try
+        { return observe(kind)?.Synchronization is { } synchronization && ReferenceEquals(receiver.Reference, synchronization); }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException or System.Resources.MissingManifestResourceException)
+        { return false; }
+    }
+
+    internal static ResourceLockObservation? ProbeExceptionResourceLock(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        if (!WarmExceptionConstructor(kind))
+        { return null; }
+        return new(ObserveResourceLockModule(typeof(Exception).Assembly.ManifestModule.ModuleVersionId, static () =>
+        {
+            var resources = typeof(Exception).Assembly.GetType("System.SR", throwOnError: true)!;
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+            return (bool)resources.GetField("s_usingResourceKeys", flags)!.GetValue(null)!
+                ? null : resources.GetField("_lock", flags)!.GetValue(null);
+        }));
+    }
+
+    internal static object? ObserveResourceLockModule(Guid module, Func<object?> observe)
+    {
+        ArgumentNullException.ThrowIfNull(observe);
+        // Audited .NET 10.0.13 linux-amd64 CoreLib. For nonempty resource keys,
+        // SR.InternalGetResourceString enters SR._lock before all culture calls.
+        // Other modules retain the existing normal-completion replay projection
+        // but cannot certify this additional synchronization witness.
+        return module == new Guid("9f81bf37-7ee9-46d6-8148-5938d2a8d041") ? observe() : null;
+    }
+
+    internal static IrValue? ObserveExceptionInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
+            IrOpaqueCallSite.ExceptionInitializationKind(factory, request.Site) is not { } kind)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        try
+        {
+            if (!observe(kind))
+            { return null; }
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException or System.Resources.MissingManifestResourceException)
+        { return null; }
+        return factory.CreateBooleanValue(false);
+    }
+
+    internal static bool WarmExceptionConstructor(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        if (!IrOpaqueCallSite.IsExceptionInitializationKind(kind))
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        // Only the actual invariant, non-derived culture context is eligible.
+        // No locale switch, satellite loading, user culture or arbitrary format
+        // argument is executed to manufacture replay authority.
+        var ui = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        if (ui.GetType() != typeof(System.Globalization.CultureInfo) || culture.GetType() != typeof(System.Globalization.CultureInfo) ||
+            ui.Name.Length != 0 || culture.Name.Length != 0)
+        { return false; }
+#pragma warning disable CA2208 // Observe exact parameterless runtime APIs, rather than validating this helper's arguments.
+        Exception probe = kind switch
+        {
+            "Argument" => new ArgumentException(),
+            "ArgumentNull" => new ArgumentNullException(),
+            "ArgumentNullName" => new ArgumentNullException(nameof(kind)),
+            "ArgumentRange" => new ArgumentOutOfRangeException(),
+            "ArgumentRangeName" => new ArgumentOutOfRangeException(nameof(kind)),
+            "InvalidOperation" => new InvalidOperationException(),
+            "InvalidOperationNull" => new InvalidOperationException((string?)null),
+            "DivideByZero" => new DivideByZeroException(),
+            "IOException" => new IOException(),
+            "ObjectDisposedName" => new ObjectDisposedException(nameof(kind)),
+            "Aggregate" => new AggregateException(),
+            "AggregateNull" => new AggregateException((string?)null),
+            // The whitelist above leaves only KeyNotFoundNull here.
+            _ => new KeyNotFoundException((string?)null)
+        };
+#pragma warning restore CA2208
+        return probe.GetType().Assembly == typeof(Exception).Assembly;
     }
 
     internal static IrValue? ObserveIntegralConvertInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)
@@ -503,7 +631,12 @@ internal sealed class PassiveCallableVcPlan
         if (_locks.IsEmpty)
         { return goal; }
         return Factory.Binary(IrBinaryOperator.AndAlso, goal,
-            EffectGoalBuilder.NoReachableSites(Factory, _locks.Select(synchronization => synchronization.Reach)));
+            // The owned resource event describes only a completed framework
+            // critical section. Its remaining callback/runtime effects are
+            // already represented by the constructor's conservative call path.
+            // Ordinary source locks still block proofs past synchronization.
+            EffectGoalBuilder.NoReachableSites(Factory, _locks.Where(synchronization =>
+                IrOpaqueCallSite.ExceptionResourceLockKind(Factory, synchronization.Site) == null).Select(synchronization => synchronization.Reach)));
     }
 
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)

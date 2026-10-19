@@ -527,8 +527,13 @@ public sealed partial class IrLockInstruction
         var receiver = state.Interpreter.Evaluate(this.Receiver, state.Values, state.CancellationToken);
         if (receiver.Status != IrEvaluationStatus.Value)
         { return IrProgramInterpreter.FromEvaluation(receiver, this, state.Values, state.Steps); }
+        var completed = state.ReplayOptions?.ConcreteLockCompletionProvider?.Invoke(this, receiver.Value!);
+        if (completed == false)
+        { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "Framework synchronization was not observed."); }
         state.ReplayOptions?.LockObserver?.Invoke(this);
         state.ReplayOptions?.LockPrefixObserver?.Invoke(this, state.Values.ConsumedApproximation);
+        if (completed == true)
+        { return null; }
         return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps,
             "Concrete execution stopped at a synchronization attempt.");
     }

@@ -305,14 +305,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IObjectCreationOperation exceptionCreation &&
             CSharpOperationSemantics.IsCoreExceptionCreation(exceptionCreation))
         {
+            var values = new IrTerm[exceptionCreation.Arguments.Length];
             foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
             {
                 var lowered = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!lowered.Classification.IsExact)
                 { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+                lowered = Pin(operation, lowered);
+                values[argument.Parameter!.Ordinal] = lowered.Value;
                 block = lowered.Continuation;
             }
-            return AllocateValue(operation, block);
+            // newobj allocates before the constructor executes. A callback
+            // failure must not erase that already observable allocation.
+            var allocated = AllocateValue(operation, block);
+            block = ExceptionConstructorRuntimeEffects(exceptionCreation, values, allocated.Continuation);
+            return new(allocated.Value, block, allocated.Classification);
         }
         if (depth < 256 && operation is IDelegateCreationOperation capturedDelegate && RootClosure?.Matches(capturedDelegate) == true)
         { return RootClosureFrame is { } frame ? AllocateCapturedDelegate(operation, frame, block) : AllocateValue(operation, block); }
@@ -987,6 +994,72 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (CSharpOperationSemantics.IsNonnegativeCollectionCount(method))
         { result = _factory.Binary(IrBinaryOperator.BitwiseAnd, result, _factory.Integer(int.MaxValue)); }
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
+    }
+
+    private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, IrTerm[] values, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (ShadowCallSkeleton)
+        { return block; }
+        var constructor = operation.Constructor!;
+        var guard = CSharpOperationSemantics.ExceptionConstructorMessageGuard(constructor);
+        if (guard == -1)
+        { return block; }
+        if (guard is not { } ordinal)
+        { return ExceptionResourceEffects(operation, values, block); }
+        // Arguments have already been evaluated and pinned. A compiler-known
+        // nonnull message cannot take the resource path; omit that unreachable
+        // effect site so syntactic advisory summaries retain the same boundary.
+        var message = operation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == ordinal).Value;
+        if (message.ConstantValue is { HasValue: true, Value: string })
+        { return block; }
+        var runtime = _builder!.CreateBlock("exception:resource-message");
+        var done = _builder.CreateBlock("exception:initialized");
+        _builder.Branch(block, _context.Site(operation),
+            _factory.Binary(IrBinaryOperator.Equal, values[ordinal], _factory.Null(_factory.StringType)), runtime, done);
+        // Resource managers can invoke user culture callbacks. Neither catalog
+        // facts about ordinary construction nor a fresh receiver certify their
+        // effects, exception set, allocation or termination.
+        var initialized = ExceptionResourceEffects(operation, values, runtime);
+        _builder.Goto(initialized, _context.Site(operation), done);
+        return done;
+    }
+
+    private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, IrTerm[] values, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var constructor = operation.Constructor!;
+        if (CSharpOperationSemantics.ExceptionInitializationKind(constructor) is not { } kind)
+        { return EmitOpaqueCall(operation, constructor, values, block, null, IrOpaqueCallEffects.All).Continuation; }
+        if (CSharpOperationSemantics.IsExceptionResourceLockDeclaration(constructor))
+        {
+            var lockSite = _factory.CreateOperation(IrOpaqueCallSite.ExceptionResourceLock(kind),
+                _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
+            var certifiedLock = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(block, lockSite, IrHavocKind.Variables, IrHavocOrigin.Approximation, certifiedLock);
+            var synchronization = _builder.CreateBlock("exception:resource-lock");
+            var afterSynchronization = _builder.CreateBlock("exception:after-resource-lock");
+            _builder.Branch(block, lockSite, _factory.Variable(certifiedLock), synchronization, afterSynchronization);
+            var resourceLock = _context.Temporary(_factory.ObjectType);
+            _builder.Havoc(synchronization, lockSite, IrHavocKind.Variables, IrHavocOrigin.Approximation, resourceLock);
+            _builder.Lock(synchronization, lockSite, _factory.Variable(resourceLock));
+            _builder.Goto(synchronization, lockSite, afterSynchronization);
+            block = afterSynchronization;
+        }
+        var site = _factory.CreateOperation(IrOpaqueCallSite.ExceptionInitialization(kind),
+            _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
+        var initialize = _context.Temporary(_factory.BooleanType);
+        _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, initialize);
+        var runtime = _builder.CreateBlock("exception:ambient-initialization");
+        var done = _builder.CreateBlock("exception:ready");
+        _builder.Branch(block, site, _factory.Variable(initialize), runtime, done);
+        var initialized = EmitOpaqueCall(operation, constructor, values, runtime, null, IrOpaqueCallEffects.All).Continuation;
+        _builder.Goto(initialized, site, done);
+        return done;
     }
 
     // `new T(arguments)` with a metadata constructor evaluates its arguments,
