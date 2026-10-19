@@ -17,13 +17,13 @@ public sealed class MetadataProgramSourceReplayTests
         ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
-            var premises = actual.Premises;
+            var compiled = await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var premises = compiled.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
             Assert.That(premises[0].HasTotal, Is.True);
             Assert.That(premises[0].HasResult, Is.True);
-            Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
+            Assert.That(compiled.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
         }
         var replay = new MetadataProgramSourceReplay(12345);
         await replay.CompareBatchAsync(cases, 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -41,12 +41,12 @@ public sealed class MetadataProgramSourceReplayTests
         ImmutableArray<MetadataProgramSourceCase> cases = [new(library, PositiveSubject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
-            var premises = actual.Premises;
+            var compiled = await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var premises = compiled.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].HasTotal, Is.True);
             Assert.That(premises[0].HasResult, Is.True);
-            Action invoke = () => actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]);
+            Action invoke = () => compiled.Subject.GetMethod("Target0")!.Invoke(null, [7L]);
             var exception = Assert.Throws<TargetInvocationException>(invoke);
             Assert.That(exception!.InnerException, Is.TypeOf<DivideByZeroException>());
         }
@@ -71,12 +71,12 @@ public sealed class MetadataProgramSourceReplayTests
         ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, extra, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
-            var premises = actual.Premises;
+            var compiled = await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var premises = compiled.Premises;
             Assert.That(premises, Has.Length.EqualTo(2));
             Assert.That(premises.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.HasTotal && item.HasResult)), Is.True);
-            Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
-            Assert.That(actual.Subject.GetMethod("Target1")!.Invoke(null, [7L]), Is.EqualTo(8L));
+            Assert.That(compiled.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
+            Assert.That(compiled.Subject.GetMethod("Target1")!.Invoke(null, [7L]), Is.EqualTo(8L));
         }
         var replay = new MetadataProgramSourceReplay(12347);
         Func<Task> compare = () => replay.CompareBatchAsync(cases, 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -93,12 +93,12 @@ public sealed class MetadataProgramSourceReplayTests
         ImmutableArray<MetadataProgramSourceCase> cases = [new(PositiveLibrary, subject, 7L)];
         using (var actual = new MetadataSourceCompilation(cases))
         {
-            await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
-            var premises = actual.Premises;
+            var compiled = await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var premises = compiled.Premises;
             Assert.That(premises, Has.Length.EqualTo(1));
             Assert.That(premises[0].HasTotal, Is.True);
             Assert.That(premises[0].HasResult, Is.False);
-            var method = actual.Subject.GetMethod("Target0")!;
+            var method = compiled.Subject.GetMethod("Target0")!;
             Assert.That(method.ReturnType, Is.EqualTo(typeof(void)));
             Assert.That(method.Invoke(null, [7L]), Is.Null);
         }
