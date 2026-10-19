@@ -3044,3 +3044,15 @@ Add(null) had the same coercion. The final native adapter allocates a string buf
 copies the immutable snapshot directly, retaining a trailing null for explicit null
 AdditionalArguments. This preserves the old API behavior and required native shape.
 Other collection captures in these scripts remain separately open.
+
+IMM-M091: Fuzz/Gates test materialization universe has 60 ToArray rows: select 51
+read-only projections, reuse three already immutable roots and retain six actual
+runtime/reflection/parser-byte adapters. Main traced boolean parameter controls and
+Total source observations: the outer false-input vector and result aggregation arrays
+are not mutable SUTs. Freeze boolean inputs and build observation values/classifications
+with scoped builders, preserving reflection argument arrays and result order. Narrow
+private names/boolean helper inputs to concrete immutable vectors; keep native case
+Arguments untouched. Nested corpus groups become immutable vectors, with initialized
+vector guards replacing now-inapplicable null checks. Validate complete Fuzz tests and
+relevant Gates tests plus required corpus controls; keep embedded source bytes intact.
+Status: open before edits.
