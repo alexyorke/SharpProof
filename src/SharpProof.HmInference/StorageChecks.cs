@@ -55,7 +55,11 @@ internal static class StorageChecks
             var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false)).GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
             if (diagnostics.Any(d => { ArgumentNullException.ThrowIfNull(d); return d.Id == "AD0001"; }))
             { throw new InvalidOperationException("Analyzer failed for " + test.Name); }
-            if (diagnostics.Length != 1 || diagnostics[0].Id != "HM0001")
+            var targetRoot = await compilation.SyntaxTrees.Single().GetRootAsync(cancellationToken).ConfigureAwait(false);
+            var targetMethod = targetRoot.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                .Single(method => { ArgumentNullException.ThrowIfNull(method); return method.Identifier.ValueText == "M"; });
+            if (diagnostics.Count(d => { ArgumentNullException.ThrowIfNull(d); return d.Id == "HM0001" && d.Location.SourceSpan == targetMethod.Identifier.Span; }) != 1
+                || diagnostics.Length != Program.Results(compilation, cancellationToken).Count(r => { ArgumentNullException.ThrowIfNull(r); return r.Status == "Suggestion"; }))
             { throw new InvalidOperationException("Storage diagnostics disagree for " + test.Name); }
             Program.Log.Info("PASS " + test.Name);
         }

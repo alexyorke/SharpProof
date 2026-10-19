@@ -64,7 +64,7 @@ internal static class NullableAsyncChecks
             ("AsyncCustomAwaiter", "static async Task<int> M(Box task,bool ignored)=>await task; class Box { public System.Runtime.CompilerServices.TaskAwaiter<int> GetAwaiter()=>Task.FromResult(1).GetAwaiter(); }", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::Cases.Box task, T1 ignored)"),
             ("AsyncTypedLocalRejected", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Rejected", null),
             ("AsyncGenericRoot", "static async Task<T> M<T>(Task<T> task)=>await task;", "Concrete", null),
-            ("AsyncVoidExcluded", "static async void M(int x) { await Task.Yield(); }", "Skipped", null),
+            ("AsyncVoidRoot", "static async void M(int x) { await Task.Yield(); }", "Suggestion", "void M<T1>(T1 x)"),
             ("AsyncForeachExcluded", "static async Task<int> M(System.Collections.Generic.IAsyncEnumerable<int> xs,int seed) { await foreach(var x in xs) seed=x; return seed; }", "Skipped", null),
             ("NullableReferenceAssignment", "static string? M(string? x,string y) { x=y; return x; }", "Suggestion", "T1? M<T1>(T1? x, T1 y) where T1 : class"),
             ("NullableToNonnullableAssignment", "static string M(string x,string? y) { x=y; return x; }", "Suggestion", "T1 M<T1>(T1 x, T1? y) where T1 : class"),

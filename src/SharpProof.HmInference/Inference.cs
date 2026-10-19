@@ -46,9 +46,9 @@ public static partial class Inference
         public MethodResult Analyze(MethodDeclarationSyntax method)
         {
             var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
-            if (symbol.ReturnsVoid || symbol.IsExtern || method.Modifiers.Any(SyntaxKind.PartialKeyword))
+            if (symbol.IsExtern || method.Modifiers.Any(SyntaxKind.PartialKeyword))
             {
-                throw new InferenceException("Extern, partial and void root methods are unsupported.");
+                throw new InferenceException("Extern and partial root methods are unsupported.");
             }
 
             SetAsyncReturn(symbol);
@@ -82,11 +82,14 @@ public static partial class Inference
             HmType result;
             if (method.ExpressionBody is not null)
             {
-                result = Returned(method.ExpressionBody.Expression);
+                if (symbol.ReturnsVoid || asyncReturn is { Arity: 0 })
+                { Expression(method.ExpressionBody.Expression); result = new("void"); }
+                else
+                { result = Returned(method.ExpressionBody.Expression); }
             }
             else if (method.Body is not null)
             {
-                result = asyncReturn is { Arity: 0 } ? AsyncBody(method.Body) : Block(method.Body);
+                result = symbol.ReturnsVoid || asyncReturn is { Arity: 0 } ? VoidBody(method.Body) : Block(method.Body);
             }
             else
             {
@@ -189,7 +192,7 @@ public static partial class Inference
 
             ImportConstructedConstraints(symbol.ReturnType, result);
             var nullableConstraints = NullableConstraints(parameters, result, variables);
-            var candidate = method.WithReturnType(SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
+            var candidate = method.WithReturnType(returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
                 if (p is null)
                 {
@@ -265,8 +268,10 @@ public static partial class Inference
                 var changedCalls = afterRoot.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
                 for (var i = 0; i < originalCalls.Length; i++)
                 {
-                    var before = beforeModel.GetSymbolInfo(originalCalls[i], cancellationToken).Symbol as IMethodSymbol;
-                    var after = afterModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
+                    var before = (beforeModel.GetOperation(originalCalls[i], cancellationToken) as IInvocationOperation)?.TargetMethod
+                        ?? beforeModel.GetSymbolInfo(originalCalls[i], cancellationToken).Symbol as IMethodSymbol;
+                    var after = (afterModel.GetOperation(changedCalls[i], cancellationToken) as IInvocationOperation)?.TargetMethod
+                        ?? afterModel.GetSymbolInfo(changedCalls[i], cancellationToken).Symbol as IMethodSymbol;
                     var definition = (before?.ReducedFrom ?? before)?.OriginalDefinition;
                     if (SymbolEqualityComparer.Default.Equals(definition, symbol.OriginalDefinition) && after?.DeclaringSyntaxReferences.Any(reference =>
                     {
@@ -287,6 +292,31 @@ public static partial class Inference
                     {
                         return new(symbol.Name, "Rejected", "Generalization changes a selected method overload.");
                     }
+                }
+                var beforeGroups = MethodGroups(beforeRoot, beforeModel);
+                var afterGroups = MethodGroups(afterRoot, afterModel);
+                if (beforeGroups.Length != afterGroups.Length)
+                { return new(symbol.Name, "Rejected", "Generalization changes method group resolution."); }
+                for (var i = 0; i < beforeGroups.Length; i++)
+                {
+                    var before = (beforeModel.GetOperation(beforeGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
+                        ?? (IMethodSymbol)beforeModel.GetSymbolInfo(beforeGroups[i], cancellationToken).Symbol!;
+                    var after = (afterModel.GetOperation(afterGroups[i], cancellationToken) as IMethodReferenceOperation)?.Method
+                        ?? (IMethodSymbol)afterModel.GetSymbolInfo(afterGroups[i], cancellationToken).Symbol!;
+                    if (SymbolEqualityComparer.Default.Equals(before.OriginalDefinition, symbol.OriginalDefinition)
+                        && after.DeclaringSyntaxReferences.Any(reference =>
+                        {
+                            if (reference is null)
+                            { throw new ArgumentNullException(nameof(reference)); }
+                            return reference.SyntaxTree == changed && reference.Span.Start == changedMethod.SpanStart;
+                        }))
+                    {
+                        if (!(sourceTree == tree && method.Span.Contains(beforeGroups[i].Span)) && !SameCallSignature(before, after))
+                        { return new(symbol.Name, "Rejected", "Generalization changes a supplied method group signature."); }
+                    }
+                    else if ((before.ReducedFrom ?? before).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                        != (after.ReducedFrom ?? after).OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+                    { return new(symbol.Name, "Rejected", "Generalization changes a selected method group overload."); }
                 }
                 var originalCreations = beforeRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
                 var changedCreations = afterRoot.DescendantNodes().OfType<BaseObjectCreationExpressionSyntax>().ToArray();
@@ -669,6 +699,10 @@ public static partial class Inference
         private HmType Expression(ExpressionSyntax expression)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (expression is IdentifierNameSyntax or GenericNameSyntax or MemberAccessExpressionSyntax
+                && model.GetSymbolInfo(expression, cancellationToken).Symbol is IMethodSymbol group
+                && model.GetTypeInfo(expression, cancellationToken).ConvertedType is INamedTypeSymbol { TypeKind: TypeKind.Delegate } target)
+            { return MethodGroup(expression, group, target); }
             switch (expression)
             {
                 case AwaitExpressionSyntax awaited:
@@ -797,50 +831,8 @@ public static partial class Inference
                     }
 
                     return CSharpTypes.Rigid(createdArray);
-                case LambdaExpressionSyntax lambda:
-                    var lambdaParameters = lambda switch
-                    {
-                        SimpleLambdaExpressionSyntax simple => new[]
-                        {
-                            simple.Parameter
-                        },
-                        ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.ParameterList.Parameters.ToArray(),
-                        _ => throw new InferenceException("Unsupported lambda.")
-                    };
-                    if (lambda.AsyncKeyword != default || lambdaParameters.Any(p =>
-                    {
-                        if (p is null)
-                        {
-                            throw new global::System.ArgumentNullException(nameof(p));
-                        }
-
-                        return p.Modifiers.Count != 0 || p.AttributeLists.Count != 0;
-                    }) || lambda.AttributeLists.Count != 0)
-                    {
-                        throw new InferenceException("Only synchronous lambdas without modifiers or attributes are supported.");
-                    }
-
-                    var inputs = lambdaParameters.Select(p =>
-                    {
-                        if (p is null)
-                        {
-                            throw new global::System.ArgumentNullException(nameof(p));
-                        }
-
-                        return p.Type is null ? HmType.Variable() : CSharpTypes.Rigid(model.GetTypeInfo(p.Type, cancellationToken).Type!);
-                    }).ToArray();
-                    for (var i = 0; i < inputs.Length; i++)
-                    {
-                        environment.Add(model.GetDeclaredSymbol(lambdaParameters[i], cancellationToken)!, inputs[i]);
-                    }
-
-                    var output = lambda.Body is ExpressionSyntax body ? Returned(body) : Block((BlockSyntax)lambda.Body);
-                    foreach (var parameter in lambdaParameters)
-                    {
-                        environment.Remove(model.GetDeclaredSymbol(parameter, cancellationToken)!);
-                    }
-
-                    return HmType.Function(inputs, output);
+                case AnonymousFunctionExpressionSyntax lambda:
+                    return Lambda(lambda);
                 case InvocationExpressionSyntax invocation:
                     if (model.GetOperation(invocation, cancellationToken) is INameOfOperation)
                     {
@@ -1334,18 +1326,12 @@ public static partial class Inference
 
             if (called.MethodKind == MethodKind.DelegateInvoke)
             {
-                if (called.ReturnsVoid)
-                {
-                    throw new InferenceException("Void delegate calls are unsupported.");
-                }
-
-                var inputs = called.Parameters.Select(_ => HmType.Variable()).ToArray();
-                var output = HmType.Variable();
-                HmType.Unify(Expression(invocation.Expression), HmType.Function(inputs, output));
-                BindArguments(operation, inputs);
-                return output;
+                var receiver = invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Invoke" } member
+                    ? member.Expression : invocation.Expression;
+                var signature = DelegateSignature(called.ContainingType, Expression(receiver));
+                BindArguments(operation, signature.Inputs);
+                return signature.Output;
             }
-
             if (SymbolEqualityComparer.Default.Equals(called, currentMethod))
             {
                 BindArguments(operation, currentFunction!.Arguments.Take(currentFunction.Arguments.Length - 1).ToArray());

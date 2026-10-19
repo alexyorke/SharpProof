@@ -18,13 +18,14 @@ The README describes today's supported subset; it is not the completion spec.
 | Nullable types, null/default/coalescing/conditional access | Verified: reference/value wrappers, class/struct constraints and conservative nullable operations; imported unconstrained nullable T? schemes remain open |
 | Generic constraints and name allocation | Existing constraints retained and names reserved; class/class?/struct/unmanaged/notnull/new(), interface, base and dependent constraints imported from calls and constructed signature types; constraint simplification and unsupported type shapes remain open; new compiler warnings reject candidates |
 | Task/ValueTask async roots and await | Verified: generic/non-generic roots, nullable results and preserved awaiter bindings; IDE-fix runtime checks cover suspension, cancellation and faults |
-| Async lambdas/void roots, iterators/enumeration, custom async builders | Open |
+| Void and async void roots; async/anonymous lambdas | Implemented: delegate Invoke signatures, per-lambda async contexts and explicit return types; runtime code-fix checks cover captures, callbacks, suspension, faults and cancellation |
+| Iterators/enumeration and custom async builders | Open |
 | Try/catch/finally, using/await using and lock | Implemented: filtered catches, rethrow, finalizer flow and concrete lifetime receivers; IDE-fix runtime checks preserve disposal pattern selection. Structural disposal constraint generalization remains open |
 | Goto and labels | Open |
 | Declaration/type/property/list patterns | Open |
 | Custom enumerables and Deconstruct | Open |
 | Field/property/indexer stores and object/collection initializers | Verified: conservative receiver/value types, overload/conversion tests and runtime probe; anonymous objects and record with expressions remain open |
-| Void/custom delegates and method groups | Open |
+| Void/custom delegates and method groups | Implemented: Action and generic/non-generic delegates, static/instance method groups, conservative variance/extension conversions and cross-file binding checks; ref delegates, attributed/modified lambdas and expression trees remain open |
 | User operators/conversions and non-array params collections | Open |
 | Nested generic, pointer/function-pointer and ref-like types | Open |
 | Mutually recursive C# groups | Open |

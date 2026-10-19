@@ -15,7 +15,8 @@ public static partial class Inference
         {
             if (method is null)
             { throw new ArgumentNullException(nameof(method)); }
-            if (!method.IsAsync)
+            asyncReturn = null;
+            if (!method.IsAsync || method.ReturnsVoid)
             { return; }
             if (method.ReturnType is not INamedTypeSymbol named || named.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks"
                 || named.Name is not ("Task" or "ValueTask") || named.Arity > 1)
@@ -39,14 +40,14 @@ public static partial class Inference
                 : new(declared.Name, value);
         }
 
-        private HmType AsyncBody(BlockSyntax body)
+        private HmType VoidBody(BlockSyntax body)
         {
             if (body is null)
             { throw new ArgumentNullException(nameof(body)); }
             var flow = Scoped(() => Statements(body.Statements.ToArray()));
             if (flow.ReturnType is not null || flow.Breaks || flow.Continues)
             {
-                throw new InferenceException("Invalid non-generic async return flow.");
+                throw new InferenceException("Invalid void return flow.");
             }
             return new("void");
         }
@@ -61,9 +62,13 @@ public static partial class Inference
             {
                 foreach (var owner in expression.Ancestors())
                 {
-                    if (owner is LambdaExpressionSyntax lambda)
+                    if (owner is AnonymousFunctionExpressionSyntax lambda)
                     {
-                        converted = (model.GetTypeInfo(lambda, cancellationToken).ConvertedType as INamedTypeSymbol)?.DelegateInvokeMethod?.ReturnType ?? converted;
+                        if (model.GetOperation(lambda, cancellationToken) is IAnonymousFunctionOperation function)
+                        {
+                            converted = function.Symbol.IsAsync && function.Symbol.ReturnType is INamedTypeSymbol { Arity: 1 } task
+                                ? task.TypeArguments[0] : function.Symbol.ReturnType;
+                        }
                         break;
                     }
                     if (owner is LocalFunctionStatementSyntax local)

@@ -138,7 +138,13 @@ New names avoid identifiers already in the declaration. Attributes and
 ref/out/in/params modifiers are preserved; optional parameter types remain
 concrete to retain their defaults. Ref arguments at call sites remain unsupported.
 
-The adapter skips async lambdas, async void roots, async iterators/enumeration,
+The adapter supports void/async void roots, Task/ValueTask async and anonymous
+lambdas, Action and custom delegates, and static/instance method-group conversions.
+Each lambda has its own async return context. Explicit parameter/return types stay
+concrete; variance and reduced extension method groups retain their target types.
+Supplied method groups are rechecked for selected overloads after rewriting.
+
+The adapter skips async iterators/enumeration,
 custom async return builders, custom operators, expanded non-array params
 collections, unsupported patterns and other unimplemented syntax. It does not
 infer mutually recursive C# method groups or fully simplify arbitrary combinations
@@ -155,7 +161,8 @@ its operand is not executed, because the lookup still has to compile.
 Loop analysis accumulates constraints over monomorphic bindings; it does not
 generalize at iteration boundaries or prove termination. Loops conservatively
 fall through, so methods whose only return is inside an infinite loop are skipped.
-Goto, foreach over custom enumerables and void delegate calls remain unsupported.
+Goto and foreach over custom enumerables remain unsupported. Ref delegates,
+attributed/modified lambdas and expression trees remain unsupported.
 Switch statements support constant labels and guards,
 not declaration/type patterns. Try/catch/finally supports exception locals, filters,
 rethrow and pending loop/return exits. Using statements/declarations, await using

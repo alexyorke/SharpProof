@@ -14,6 +14,7 @@ version=$(HM_PACKAGE="$package" pwsh -NoLogo -NoProfile -Command '
         $entry = $archive.Entries | Where-Object { $_.FullName.EndsWith(".nuspec") }
         $reader = [IO.StreamReader]::new($entry.Open())
         try { [xml]$spec = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        if ($spec.package.metadata.repository.commit -cne $env:SHARPPROOF_HM_SOURCE_COMMIT) { throw "Package repository commit does not match the verified source." }
         $spec.package.metadata.version
     } finally { $archive.Dispose() }
 ')
@@ -27,8 +28,15 @@ cat > "$consumer/Consumer.csproj" <<EOF
 EOF
 cat > "$consumer/Input.cs" <<'EOF'
 #nullable enable
+using System;
 using System.Threading.Tasks;
+delegate void PackageSink<T>(T value);
+sealed class PackageBox<T> { public T Get()=>default!; }
 static class Sample {
+    public static void Forward(Action<int> action,int value) => action(value);
+    public static Func<Task<int>> Capture(int value) => async () => { await Task.Yield(); return value; };
+    public static Func<int> Group(PackageBox<int> box) => box.Get;
+    public static void Apply(PackageSink<int> sink,int value) => sink(value);
     public static int Identity(int value) => value;
     public static int? NullableIdentity(int? value) => value;
     public static string? NullableReferenceIdentity(string? value) => value;
@@ -43,10 +51,10 @@ EOF
 NUGET_PACKAGES="$consumer/packages" dotnet build "$consumer/Consumer.csproj" -v:normal > "$consumer/build.log" 2>&1 || { tail -60 "$consumer/build.log"; exit 1; }
 if ! grep -q 'warning HM0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 if grep -Eq 'CS8032|AD0001' "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
-for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'where T1 : struct' 'where T1 : class'; do
+for expected in 'NullableIdentity<T1>' 'NullableReferenceIdentity<T1>' 'AsyncIdentity<T1>' 'Forward<T1>' 'Capture<T1>' 'Group<T1>' 'Apply<T1>' 'where T1 : struct' 'where T1 : class'; do
   if ! grep -Fq "$expected" "$consumer/build.log"; then tail -60 "$consumer/build.log"; exit 1; fi
 done
 mkdir -p "$evidence/packages"
 cp "$package" "$evidence/packages/"
 cp "$consumer/build.log" "$evidence/package-consumer.txt"
-printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' | tee "$evidence/package-checks.txt"
+printf '%s\n' 'PASS PortablePackageContents' 'PASS NuGetConsumerAnalyzerLoad' 'PASS NuGetNullableAsyncDiagnostics' 'PASS NuGetDelegateAsyncDiagnostics' 'PASS PackageSourceCommit' | tee "$evidence/package-checks.txt"
