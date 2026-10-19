@@ -50,9 +50,9 @@ internal sealed class TotalProgramSourceReplay
     {
         cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var count = cases.Count;
-        var members = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Member)).ToArray();
-        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Arguments)).ToArray();
-        var loops = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsLoop)).ToArray();
+        var members = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Member)).ToImmutableArray();
+        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Arguments)).ToImmutableArray();
+        var loops = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsLoop)).ToImmutableArray();
         totalCases += count;
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " + string.Join("\n", members) + " }",
             new CSharpParseOptions(LanguageVersion.CSharp12), "total-fuzz.cs", cancellationToken: cancellationToken);
@@ -70,7 +70,7 @@ internal sealed class TotalProgramSourceReplay
                 ?? throw new InvalidOperationException("Generated Total type is missing from the emitted assembly.");
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
             var methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))).ToArray();
+                .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))).ToImmutableArray();
             if (methods.Length != count)
             { throw new InvalidOperationException("Generated Total method count does not match its case universe."); }
             for (var index = 0; index < methods.Length; index++)
@@ -104,7 +104,7 @@ internal sealed class TotalProgramSourceReplay
                 if (!lower.IsExact)
                 { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
                 var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-                var entries = context.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+                var entries = ImmutableDictionaryCapture.Create(context.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
                     parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases)));
                 var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
                 var original = new IrProgramInterpreter(factory).Execute(lower.Program,
@@ -117,9 +117,13 @@ internal sealed class TotalProgramSourceReplay
                 var site = factory.CreateOperation("total-fuzz-postcondition");
                 IrTerm trueGoal = observed == null ? factory.Boolean(false) : factory.Binary(IrBinaryOperator.Equal,
                     factory.Variable(context.Result!.Value), loops[index] ? factory.Variable(context.Parameters[0].Current) : TotalProgramDifferentialOracle.Term(factory, observed));
-                var requirements = entries.Select(entry => new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, entry.Key, entry.Value), factory.Boolean(true), site)).ToList();
+                var requirements = ImmutableArray.CreateBuilder<PassiveContractClause>(context.Parameters.Length);
+                foreach (var parameter in context.Parameters)
+                {
+                    requirements.Add(new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, parameter.Entry, entries[parameter.Entry]), factory.Boolean(true), site));
+                }
                 var referenceParameters = context.Parameters.Where(parameter =>
-                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType)).ToArray();
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType)).ToImmutableArray();
                 for (var left = 0; left < referenceParameters.Length; left++)
                 {
                     for (var right = left + 1; right < referenceParameters.Length; right++)
@@ -134,7 +138,7 @@ internal sealed class TotalProgramSourceReplay
                 }
                 var candidate = new PassiveCallableCandidate(method.Identifier.ValueText, lower.Program,
                     [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState)))], context.Result,
-                    [.. requirements],
+                    requirements.ToImmutable(),
                     [new(trueGoal, factory.Boolean(true), site), new(factory.Unary(IrUnaryOperator.Not, trueGoal), factory.Boolean(true), site)]);
                 if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken))
                 { Fail(method.Identifier.ValueText + ": native admission " + reason); continue; }

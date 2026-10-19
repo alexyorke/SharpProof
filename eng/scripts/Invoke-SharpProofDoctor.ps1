@@ -19,8 +19,8 @@ if ($sdk -notmatch '^\d+\.\d+\.\d+' -or [version](($sdk -split '-')[0]) -lt [ver
 }
 $runtimes = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& dotnet --list-runtimes 2>$null))
 $configuration = $null
-$packages = @()
-$resolvedPackages = @()
+$packages = [Collections.Immutable.ImmutableArray[object]]::Empty
+$resolvedPackages = [Collections.Immutable.ImmutableArray[object]]::Empty
 New-Variable -Name packageIds -Option Constant -Value (
     [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')))
 if (-not [string]::IsNullOrWhiteSpace($Target)) {
@@ -43,35 +43,35 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
     else {
         $evaluation = $raw | ConvertFrom-Json
         $configuration = $evaluation.Properties
-        $packages = @($evaluation.Items.PackageReference | Where-Object { $_.Identity -in $packageIds } | ForEach-Object {
-                $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
-                [ordered]@{ id = $_.Identity; version = $version }
-            })
-        if ($packages.Count -eq 0) { Add-Check 'packages' 'warning' 'No direct SharpProof package references were evaluated.' 'Add SharpProof and restore the project; transitive references require inspection of the restored assets file.' }
-        else { Add-Check 'packages' 'ok' "$($packages.Count) direct SharpProof package references found." }
+        $packages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($evaluation.Items.PackageReference | Where-Object { $_.Identity -in $packageIds } | ForEach-Object {
+                    $version = if ($_.PSObject.Properties['Version']) { $_.Version } else { '' }
+                    [ordered]@{ id = $_.Identity; version = $version }
+                }))
+        if ($packages.Length -eq 0) { Add-Check 'packages' 'warning' 'No direct SharpProof package references were evaluated.' 'Add SharpProof and restore the project; transitive references require inspection of the restored assets file.' }
+        else { Add-Check 'packages' 'ok' "$($packages.Length) direct SharpProof package references found." }
         $assetsPath = $configuration.ProjectAssetsFile
         if ($assetsPath -and -not [IO.Path]::IsPathRooted($assetsPath)) { $assetsPath = Join-Path $configuration.MSBuildProjectDirectory $assetsPath }
-        if ($packages.Count -and (-not $assetsPath -or -not (Test-Path -LiteralPath $assetsPath -PathType Leaf))) {
+        if ($packages.Length -and (-not $assetsPath -or -not (Test-Path -LiteralPath $assetsPath -PathType Leaf))) {
             Add-Check 'restore' 'warning' 'Restored package assets are unavailable; package imports and resolved versions may be incomplete.' 'Restore the consumer in this environment, then repeat doctor. Versions listed here are evaluated direct references.'
         }
         if ($assetsPath -and (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
             try {
                 $assets = Get-Content -LiteralPath $assetsPath -Raw | ConvertFrom-Json -AsHashtable
                 if ($assets.Contains('libraries') -and $assets.libraries -is [Collections.IDictionary]) {
-                    $resolvedPackages = @($assets.libraries.Keys | Sort-Object | ForEach-Object {
-                            $parts = $_ -split '/', 2
-                            if ($parts.Count -eq 2 -and $parts[0] -in $packageIds) {
-                                [ordered]@{ id = $parts[0]; version = $parts[1] }
-                            }
-                        })
+                    $resolvedPackages = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($assets.libraries.Keys | Sort-Object | ForEach-Object {
+                                $parts = $_ -split '/', 2
+                                if ($parts.Count -eq 2 -and $parts[0] -in $packageIds) {
+                                    [ordered]@{ id = $parts[0]; version = $parts[1] }
+                                }
+                            }))
                 }
-                Add-Check 'resolved-packages' 'ok' "$($resolvedPackages.Count) SharpProof packages found in existing restored assets (including transitive references)." 'Restore again if package inputs have changed; doctor does not establish that existing assets are current.'
+                Add-Check 'resolved-packages' 'ok' "$($resolvedPackages.Length) SharpProof packages found in existing restored assets (including transitive references)." 'Restore again if package inputs have changed; doctor does not establish that existing assets are current.'
             }
             catch {
                 Add-Check 'resolved-packages' 'warning' 'Existing package assets could not be inspected.' 'Restore the consumer and repeat doctor; evaluated direct references are still shown.'
             }
         }
-        $versionPackages = if ($resolvedPackages.Count) { $resolvedPackages } else { $packages }
+        $versionPackages = if ($resolvedPackages.Length) { $resolvedPackages } else { $packages }
         $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($versionPackages | ForEach-Object { $_.version } | Where-Object { $_ } | Select-Object -Unique))
         if ($versions.Length -gt 1) { Add-Check 'package-versions' 'warning' 'SharpProof package versions differ.' 'Align SharpProof package versions; existing resolved assets take precedence over evaluated direct version expressions.' }
         if ($configuration.TargetFrameworks -and -not $TargetFramework) {

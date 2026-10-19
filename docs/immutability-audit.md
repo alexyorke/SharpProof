@@ -3652,3 +3652,16 @@ package vectors while preserving ordered inner wire records, existing no-target 
 failed-evaluation empty results, assets error handling, direct/resolved preference,
 JSON arrays and version order. Validate with canonical Doctor regressions plus
 baseline/current empty/singleton/multiple package controls. Status: planned.
+
+IMM-M136 verified: all 302 ordinary Release Fuzz tests pass, zero failures/skips/
+build warnings/errors; 87 exact embedded PDB outputs. Canonical whitespace required
+zero changes. Main and independent review confirm strict duplicate capture, ordered
+parameter/alias observation, one-entry indexer semantics and preserved inner reflection
+arrays/reference alias maps. The native byte-buffer boundary remains separate.
+IMM-M137 verified: baseline/current direct JSON publication controls pass for empty,
+singleton and plural package vectors, including missing versions and irrelevant package
+filtering; actual Doctor regressions pass. Independent review confirms error timing,
+assets fallback, ordering and direct/resolved precedence. Canonical formatting applied.
+Literal checkpoint after M135/M136: all 3,471 raw/interpolated text tokens across
+794 changed C# files match master 16063804e; interpolation expressions/ordinary strings
+are outside this literal check and are reviewed separately.

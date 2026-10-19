@@ -126,9 +126,9 @@ internal sealed class MetadataProgramSourceReplay
     {
         cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var count = cases.Count;
-        var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
-        var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
-        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToArray();
+        var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToImmutableArray();
+        var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToImmutableArray();
+        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToImmutableArray();
         totalCases += count;
         using var actual = new MetadataSourceCompilation(cases);
         await actual.CompileAsync(cancellationToken, timingSink);
@@ -137,7 +137,7 @@ internal sealed class MetadataProgramSourceReplay
         var preparations = actual.Preparations;
         if (preparations.Length != count)
         { throw new InvalidOperationException("Metadata case universe does not match collected callables."); }
-        var owned = preparations.ToDictionary(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
+        var owned = ImmutableDictionaryCapture.Create(preparations, item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
         timingSink?.Invoke("artifact", stage.ElapsedMilliseconds);
         stage.Restart();
         for (var index = 0; index < count; index++)
@@ -165,10 +165,9 @@ internal sealed class MetadataProgramSourceReplay
             { Fail(name + ": unexpected compiled fault " + exception.InnerException?.GetType().Name); continue; }
             var factory = total.Program.Factory;
             var parameter = total.Parameters.Single();
-            var entries = new Dictionary<IrVarId, IrValue>
-            {
-                [parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], [])
-            };
+            var entriesBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+            entriesBuilder[parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], []);
+            var entries = entriesBuilder.ToImmutable();
             var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, []);
             var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||
