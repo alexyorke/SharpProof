@@ -1114,3 +1114,14 @@ supply a complete effect summary, which remains Unknown. The regression now
 checks that distinction explicitly; all 88 manifest cases passed. Broader closure scopes,
 sharing, lifetime/peak/retained memory, stack and phase E/F remain required, along
 with unchanged 100% coverage qualification and exact-head CI.
+
+The closure implementation is committed at 399215b6b. Latest master 9e3b1ade2
+(HashSet state and signed callback counts) is merged at c8baf35fb. The one
+insertion conflict preserves both repeated-character string construction and
+HashSet lowering. Combined-state validation passed 581 focused resource,
+delegate, closure, manifest, HashSet and constructor controls, all 2121 frontend
+tests, all quality/compatibility categories, documentation generation and 723
+local links. Layout evaluated 2713 source files, 59 projects and 151 pinned common
+files. Published b3e0d2db6 coverage failed in the semantic-projects shard on the
+same stale manifest expectation now corrected; it produced no qualified aggregate.
+Fresh exact-head CI and unchanged 100% coverage qualification remain open.
