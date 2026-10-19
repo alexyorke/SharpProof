@@ -3432,3 +3432,13 @@ no same-builder enumeration mutation across parent/child imports, call-map snaps
 filter-resolver boundary and stable token ordinals. Remaining direct Frontend roots are
 intentional immutable FIFO/LIFO traversal and atomic shared caches. M115/M117 Fuzz and
 Contracts implementation remains under validation, including friend-access metadata.
+
+IMM-M118: Main traced fifteen Worker Q-Z strict map projections and three membership
+sets, plus six serial shadow-source collector scopes. Reuse strict builder capture with
+existing comparers and eager selector/duplicate timing; preserve mutable IR graph builder
+and native input arrays. Presentation labels are read-only input snapshots: derive the
+incomplete map after asserting the complete map, leaving native proof unchanged. Freeze
+shadow callback maps after awaited producers, outer result/check arrays after source loops
+and ordered proof-loss strings after claim loops. Retain numeric outputs and lifecycle
+state. Validate scalar, source/IL exception, graph, label/core and source-universe controls.
+Status: open before edits.
