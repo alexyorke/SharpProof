@@ -19,7 +19,7 @@ public sealed class TotalProgramSourceReplayTests
     {
         const string member = "public static long Target0(long value) => value;";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12345);
         await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -34,7 +34,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) { " +
             "for (int i = 0; i < 2; i++) value = unchecked(value + 1); return value; }";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 9L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(9L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         var replay = new TotalProgramSourceReplay(12346);
         await replay.CompareBatchAsync([new(member, [7L], true)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -48,7 +48,7 @@ public sealed class TotalProgramSourceReplayTests
     {
         var member = LockMember(0);
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.True);
         Assert.That(reference.Classifications[0].Execution, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         var replay = new TotalProgramSourceReplay(12347);
@@ -73,7 +73,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) { " +
             "try { return 49L / value; } catch (System.Exception error) { return 0; } }";
         var reference = ObserveActualSource([member], ["Target0"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L)));
         Assert.That(reference.Classifications[0].Exact, Is.False);
         var replay = new TotalProgramSourceReplay(12351);
         await replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -116,7 +116,7 @@ public sealed class TotalProgramSourceReplayTests
         const string member = "public static long Target0(long value) => value; " +
             "public static long Target1(long value) => value + 1L;";
         var reference = ObserveActualSource([member], ["Target0", "Target1"]);
-        Assert.That(reference.Values, Is.EqualTo(new object?[] { 7L, 8L }));
+        Assert.That(reference.Values, Is.EqualTo(ImmutableArray.Create<object?>(7L, 8L)));
         Assert.That(reference.Classifications, Has.Length.EqualTo(2));
         Assert.That(reference.Classifications.All(item => item.Exact), Is.True);
         var replay = new TotalProgramSourceReplay(12349);

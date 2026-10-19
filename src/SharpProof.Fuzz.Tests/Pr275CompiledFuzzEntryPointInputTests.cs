@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using NUnit.Framework;
 using SharpProof.Fuzz;
@@ -75,9 +76,10 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
         Assert.That(exception.InnerException, Is.SameAs(cause));
     }
 
-    private static void AssertRejected(string[] arguments, string message)
+    private static void AssertRejected(ImmutableArray<string> arguments, string message)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(message);
         var result = InvokeCompiledEntryPoint(arguments);
         Assert.That(result.Exit, Is.EqualTo(2));
@@ -86,9 +88,10 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
             "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]" + Environment.NewLine));
     }
 
-    private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(string[] arguments)
+    private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(ImmutableArray<string> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         var entryPoint = typeof(FuzzOptions).Assembly.EntryPoint;
         Assert.That(entryPoint, Is.Not.Null);
         Assert.That(entryPoint!.ReturnType, Is.EqualTo(typeof(int)));
@@ -100,7 +103,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
         {
             Console.SetOut(output);
             Console.SetError(error);
-            var exit = (int)entryPoint.Invoke(null, [arguments])!;
+            var exit = (int)entryPoint.Invoke(null, [arguments.ToArray()])!;
             return (exit, output.ToString(), error.ToString());
         }
         finally

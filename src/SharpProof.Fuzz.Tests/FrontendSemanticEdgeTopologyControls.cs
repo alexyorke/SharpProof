@@ -20,7 +20,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
             Exact("long", "0L; } namespace Other { public static class SharpProofGeneratedFrontendEdges { " +
-                "public static long Other() => 0L; } } public static class Tail { public static long Value => 0L")
+                "public static long Other() => 0L; } } public static class Tail { public static long Value => 0L", [])
         ];
         var root = CompileActual(cases);
         Assert.That(root.DescendantNodes().OfType<ClassDeclarationSyntax>().Count(type =>
@@ -35,8 +35,8 @@ public sealed class FrontendSemanticEdgeTopologyControls
     {
         ImmutableArray<FrontendSemanticEdgeCase> cases =
         [
-            Exact("long", "0L"),
-            Exact("/*", "*/ long EdgeTarget0(long value) => value", 7L)
+            Exact("long", "0L", []),
+            Exact("/*", "*/ long EdgeTarget0(long value) => value", [7L])
         ];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
@@ -54,7 +54,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
     [Test]
     public void ActualAbsentExpectedMethodIsRejected()
     {
-        ImmutableArray<FrontendSemanticEdgeCase> cases = [Exact("/*", "*/ long EdgeTarget1() => 0L")];
+        ImmutableArray<FrontendSemanticEdgeCase> cases = [Exact("/*", "*/ long EdgeTarget1() => 0L", [])];
         var root = CompileActual(cases);
         var subject = root.Members.OfType<ClassDeclarationSyntax>().Single();
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
@@ -65,9 +65,10 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge method shape."));
     }
 
-    private static FrontendSemanticEdgeCase Exact(string returnType, string expression, params object?[] arguments)
+    private static FrontendSemanticEdgeCase Exact(string returnType, string expression, ImmutableArray<object?> arguments)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(expression);
         System.ArgumentNullException.ThrowIfNull(returnType);
         return new(returnType, "", expression, arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);

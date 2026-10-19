@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
@@ -23,9 +24,9 @@ public sealed class FuzzOracleCollectionBoundaryTests
         Assert.That(FuzzRunner.SelectFailureKeys([frontend.Status], [finite.Status], [partial.Status]),
             Is.Empty);
 
-        FuzzOracleStatus[] frontendStatuses = absentOracle == 0 ? [] : [frontend.Status];
-        FuzzOracleStatus[] finiteStatuses = absentOracle == 1 ? [] : [finite.Status];
-        FuzzOracleStatus[] partialStatuses = absentOracle == 2 ? [] : [partial.Status];
+        ImmutableArray<FuzzOracleStatus> frontendStatuses = absentOracle == 0 ? [] : [frontend.Status];
+        ImmutableArray<FuzzOracleStatus> finiteStatuses = absentOracle == 1 ? [] : [finite.Status];
+        ImmutableArray<FuzzOracleStatus> partialStatuses = absentOracle == 2 ? [] : [partial.Status];
         await TestContext.Out.WriteLineAsync(
             $"Actual frontend(seed 12345), finite(Total true), partial(seed 12345) outputs: " +
             $"{frontend.Status}/{finite.Status}/{partial.Status}; matched lengths 1/1/1; " +

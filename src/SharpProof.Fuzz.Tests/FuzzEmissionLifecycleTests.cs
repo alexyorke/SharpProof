@@ -475,8 +475,8 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(IrStructuralShrinker.StructuralSize(completion), Is.EqualTo(unaryCount + 3));
         var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>(3);
         var references = ImmutableArray.CreateBuilder<PartialTermSemanticOutcome>(3);
-        bool[] inputs = unaryCount == 2 ? [true, false, false] : [true, false];
-        bool[] guards = unaryCount == 2 ? [true, true, false] : [true, true];
+        ImmutableArray<bool> inputs = unaryCount == 2 ? [true, false, false] : [true, false];
+        ImmutableArray<bool> guards = unaryCount == 2 ? [true, true, false] : [true, true];
         var context = new AssemblyLoadContext("BooleanDepthReferenceControl", isCollectible: true);
         try
         {

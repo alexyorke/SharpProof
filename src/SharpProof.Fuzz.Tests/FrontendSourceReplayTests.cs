@@ -104,12 +104,15 @@ public sealed class FrontendSourceReplayTests
                 nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static void AssertActualCompilation(string source, GeneratedCSharpCase[] inputs,
-        long[] expected, bool[] hasExpressionBody)
+    private static void AssertActualCompilation(string source, ImmutableArray<GeneratedCSharpCase> inputs,
+        ImmutableArray<long> expected, ImmutableArray<bool> hasExpressionBody)
     {
-        System.ArgumentNullException.ThrowIfNull(expected, nameof(expected));
-        System.ArgumentNullException.ThrowIfNull(hasExpressionBody, nameof(hasExpressionBody));
-        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        if (expected.IsDefault)
+        { throw new ArgumentNullException(nameof(expected)); }
+        if (hasExpressionBody.IsDefault)
+        { throw new ArgumentNullException(nameof(hasExpressionBody)); }
+        if (inputs.IsDefault)
+        { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using NUnit.Framework;
@@ -80,11 +81,12 @@ public sealed class FuzzCliTests
     }
 
     private static async Task<int> RunEntryPointAsync(
-        string[] arguments,
+        ImmutableArray<string> arguments,
         TextWriter output,
         TextWriter error)
     {
-        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(error);
         System.ArgumentNullException.ThrowIfNull(output);
         var originalOutput = Console.Out;
@@ -95,7 +97,7 @@ public sealed class FuzzCliTests
         {
             var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
             Assert.That(entryPoint, Is.Not.Null);
-            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments]));
+            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments.ToArray()]));
             return result switch
             {
                 Task<int> task => await task,
