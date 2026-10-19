@@ -40,12 +40,22 @@ public sealed partial class NativeSpecifiedCallTests
     {
         await CheckInterfaceArrayContract("int[] data", "Contract.Requires(data != null && data.Length > 1); Contract.Ensures(Contract.Result<int>() == 0); Clear<int>(data); return data[1];", WorkerClaimOutcome.Proven,
             members: "static void Clear<T>(T[] data) { Forward<T>(data); } static void Forward<U>(U[] data) { System.Array.Clear(data, 0, data.Length); }");
+        await CheckInterfaceArrayContract("int[] data", "Contract.Requires(data != null && data.Length > 1); Contract.Ensures(Contract.Result<int>() == 1); Clear<int>(data); return data[1];", WorkerClaimOutcome.Refuted,
+            members: "static void Clear<T>(T[] data) { Forward<T>(data); } static void Forward<U>(U[] data) { System.Array.Clear(data, 0, data.Length); }");
     }
 
     [Test]
     public async Task ArrayClearDoesNotSurviveAnOpaqueLaterWriter()
     {
         await CheckInterfaceArrayContract("int[] data", "Contract.Requires(data != null && data.Length > 0); Contract.Ensures(Contract.Result<int>() == 0); System.Array.Clear(data); System.Array.Copy(new int[] { 17 }, data, 1); return data[0];", WorkerClaimOutcome.Unknown);
+    }
+
+    [TestCase("int[] data = null; var state = 0; try { System.Array.Clear(data, state = 1, state = 2); return -1; } catch (System.Exception) { return state; }", 2)]
+    [TestCase("int[] data = null; var state = 0; var value = int.MaxValue; try { System.Array.Clear(data, checked(value + 1), state = 7); return -1; } catch (System.OverflowException) { return state; } catch (System.Exception) { return state + 10; }", 0)]
+    public async Task ArrayClearArgumentFaultsAndAssignmentsPrecedeNullChecks(string body, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        await CheckInterfaceArrayContract("", "Contract.Ensures(Contract.Result<int>() == " + expected + "); " + body, WorkerClaimOutcome.Proven);
     }
 
     [Test]

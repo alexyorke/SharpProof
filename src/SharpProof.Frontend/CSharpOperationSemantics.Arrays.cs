@@ -5,7 +5,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsArrayClear(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return method.IsStatic && method.ReturnsVoid && method.ContainingType.SpecialType == SpecialType.System_Array &&
+        return method.Name == "Clear" && method.ContainingType.SpecialType == SpecialType.System_Array && method.IsStatic && method.ReturnsVoid &&
             IsFrameworkCollectionMember(method) && method.GetDocumentationCommentId() is
                 "M:System.Array.Clear(System.Array)" or "M:System.Array.Clear(System.Array,System.Int32,System.Int32)";
     }

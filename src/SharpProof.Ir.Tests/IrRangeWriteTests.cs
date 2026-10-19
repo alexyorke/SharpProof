@@ -89,6 +89,14 @@ public sealed class IrRangeWriteTests
         var array = factory.Variable(variable);
         var first = new object();
         var second = new object();
+        object[] actual = [first, second];
+        Array.Clear(actual, 1, 1);
+        Assert.That(ReferenceEquals(actual[0], first) && actual[1] == null, Is.True);
+        string[] covariant = ["first", "second"];
+        object[] view = covariant;
+        Array.Clear(view, 1, 1);
+        Assert.That(covariant[0], Is.EqualTo("first"));
+        Assert.That(covariant[1], Is.Null);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var identity = factory.CreateVariable("first", factory.ObjectType);
