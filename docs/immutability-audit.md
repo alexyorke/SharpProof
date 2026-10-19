@@ -3125,3 +3125,14 @@ build paths. Null/empty/additional argv cases preserve binding errors as well as
 the native adapter copies the frozen builder snapshot without null normalization.
 Formatting checks all 87 PowerShell and 19 shell scripts, zero changes remaining.
 Main verified native shapes and read-only review found no concrete defect.
+
+IMM-M097: Main traced seven further Gates construction accumulators: catalog files,
+source IDs, source locations and declaration hashes; importer declaration deduplication
+and round-robin candidate selection; static-write replay parameter inputs. Use scoped
+immutable builders. Freeze catalog files before declaration indexing/publication and
+source IDs at return; keep ordinal duplicate diagnostics and first-seen selection order.
+Preserve candidate count validation/insufficient/diversity guard order and freeze only
+after validation. Replay inputs retain indexer overwrite semantics when entry/current
+IDs coincide, then freeze before execution. Validate catalog/import and real native
+static-write witness workflows. Resource-owning allocation caches remain separate.
+Status: open before edits.
