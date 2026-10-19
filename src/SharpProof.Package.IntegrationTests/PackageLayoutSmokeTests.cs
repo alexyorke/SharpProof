@@ -25,6 +25,8 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ConcurrentDictionary<string, string>
         s_sharedCompilationServerIds = new(StringComparer.Ordinal);
 
+    private static readonly string[] s_nativeResourceMetricNames = ["LoopBodyEntries", "ArrayAllocations", "AllocatedElements"];
+
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
@@ -3475,5 +3477,39 @@ public sealed class PackageLayoutSmokeTests
         string Output)
     {
         public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    }
+    [Test]
+    public async Task MainPackageProvesNativeResourceBoundsAndPublishesMetricEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, "n", 1)]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, "n", 1)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, "n", 3)]
+                public static void Allocate(int n) { for(int i=0;i<n;i++) { var buffer=new int[3]; } }
+            }
+            """, "all");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, "build", workspace.ConsumerProject,
+            "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            JsonAssert.Equal(claim.GetProperty("resourceBound"), "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.CostModel);
+            Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+        }
+        Assert.That(claims.Select(claim => claim.ValueKind == JsonValueKind.Undefined ? throw new ArgumentException("Value must be initialized.", nameof(claim)) : claim.GetProperty("resourceBound").GetProperty("metric").GetString()),
+            Is.EquivalentTo(s_nativeResourceMetricNames));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Proven"), Is.EqualTo(3));
     }
 }

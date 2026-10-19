@@ -719,9 +719,10 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             EffectContractKind =
                 CompilerEffectEvaluationWireMappings.ToWorker(
                     evaluation.Kind),
+            ResourceUpperBound = CreateResourceConstraint(evaluation.Constraint, cancellationToken),
             Location = ToSourceLocation(location)
         };
-        var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
+        var evidence = CreateEffectEvidence(claimId, evaluation, isSupported, cancellationToken);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
         return new ManifestEffectClaim(entry, evidence, evaluation.Reason != EffectEvaluationReason.UnsupportedContract);
     }
@@ -729,7 +730,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
     private static CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
         EffectClaimDeclaration evaluation,
-        bool isSupported)
+        bool isSupported, CancellationToken cancellationToken)
     {
         claimId = RepositoryParameterGuard.NotNull(claimId, nameof(claimId));
         evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
@@ -750,6 +751,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     evaluation.Certainty),
             Constraint = new CompilerEffectConstraintArtifact
             {
+                ResourceUpperBound = CreateResourceConstraint(evaluation.Constraint, cancellationToken),
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),
                 AllowedCapabilities = ToWorkerCapabilities(evaluation.Constraint.Capabilities),
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
@@ -766,6 +768,16 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
         }
         return evidence;
+    }
+
+    private static WorkerResourceConstraint? CreateResourceConstraint(EffectClaimConstraint constraint, CancellationToken cancellationToken)
+    {
+        constraint = ArgumentNullGuard.NotNull(constraint, nameof(constraint));
+        return constraint.ResourceUpperBound is { } resource ? new WorkerResourceConstraint
+        {
+            Metric = (WorkerResourceMetric)resource.Metric,
+            UpperBound = ResourceExpressionCodec.Encode(resource.Upper, cancellationToken)
+        } : null;
     }
 
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
@@ -905,6 +917,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "ContractFor" or
                     "EnforcePure" or
                     "ZeroAllocations" or
+                    "ResourceUpperBound" or
                     "AllowedCapabilities" or
                     "DoesNotThrow" or
                     "AllowedExceptions" or
@@ -917,6 +930,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "ContractForAttribute" or
                     "EnforcePureAttribute" or
                     "ZeroAllocationsAttribute" or
+                    "ResourceUpperBoundAttribute" or
                     "AllowedCapabilitiesAttribute" or
                     "DoesNotThrowAttribute" or
                     "AllowedExceptionsAttribute" or

@@ -5,7 +5,7 @@ namespace SharpProof.CompilerArtifact;
 
 // The callable payload is the admission reason, the compiler's effect claims
 // and the Total programs; the worker verifies only those programs.
-internal static class CompilerLoweredArtifact
+internal static partial class CompilerLoweredArtifact
 {
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
@@ -19,11 +19,14 @@ internal static class CompilerLoweredArtifact
     {
         cancellationToken.ThrowIfCancellationRequested();
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        var resource = EncodeResource(preparation, cancellationToken);
         return new CompilerCallableArtifact
         {
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
             EffectClaims = preparation.EffectClaims.ToArray(),
+            ResourceProgram = resource.Program,
+            ResourceUnknownReason = resource.Unknown,
             Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken),
             TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken)
         };
@@ -110,11 +113,15 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
 
+        var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
+        var resource = DecodeResource(artifact, entry, claims, total, cancellationToken);
         return new CompilerCallablePreparation(entry, artifact.FailureReason)
         {
             EffectClaims = DecodeEffects(artifact, claims, cancellationToken),
             Compilation = compilation,
-            Total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken),
+            Total = total,
+            ResourceProgram = resource.Program,
+            ResourceUnknownReason = resource.Unknown,
             TotalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken)
         };
     }
@@ -153,7 +160,8 @@ internal static class CompilerLoweredArtifact
             cancellationToken.ThrowIfCancellationRequested();
             var evidence = artifact.EffectClaims[index];
             CompilerEffectClaimArtifactCodec.Validate(evidence);
-            if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
+            if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind ||
+                !WorkerProtocolMetadata.ResourceConstraintsEqual(evidence.Constraint.ResourceUpperBound, expected[index].ResourceUpperBound))
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
             }

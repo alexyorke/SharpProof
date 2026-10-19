@@ -133,6 +133,11 @@ internal static class SarifProjection
             : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
                 " at " + effectWitness.Location.Path + ":" + effectWitness.Location.Line +
                 ":" + effectWitness.Location.Column + "]";
+        var resource = result.ResourceBound is { } bound
+            ? bound.InferredUpperBound is { } upper
+                ? " [" + bound.Metric + " upper bound: " + upper + "; " + bound.CostModel + "]"
+                : " [resource: " + bound.UnknownReason + "]"
+            : string.Empty;
         var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
         return Result(
             "SharpProof." + outcome,
@@ -140,7 +145,7 @@ internal static class SarifProjection
             presentation.Level,
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId +
-                implementationIlAssumption + reason + vacuity + witness +
+                implementationIlAssumption + reason + vacuity + witness + resource +
                 (outcome == WorkerClaimOutcome.Unknown ? ". " + LauncherPresentation.UnknownGuidance(reasonValue) : string.Empty),
             effectWitness?.Location ?? claim.Location,
             result.ClaimId,

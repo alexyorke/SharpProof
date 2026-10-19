@@ -106,6 +106,9 @@ internal static class CompilerManifestArtifactProducer
             evidence[index] = claim.Evidence;
         }
         artifact.EffectClaims = evidence;
+        if (evidence.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+            artifact.ResourceProgram is null && artifact.ResourceUnknownReason is null)
+        { artifact.ResourceUnknownReason = "CompilationOrBodyUnavailable"; }
         return artifact;
     }
 

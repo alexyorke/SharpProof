@@ -48,6 +48,8 @@ internal static class AdvisoryEffectClaims
         site = RepositoryParameterGuard.NotNull(site, nameof(site));
         switch (kind)
         {
+            case EffectEvaluationContractKind.ResourceUpperBound:
+                return null; // Quantitative claims use the native resource-program checker.
             case EffectEvaluationContractKind.ZeroAllocations:
                 return site.Kind is AdvisoryEffectSiteKind.Allocation or AdvisoryEffectSiteKind.Lock or AdvisoryEffectSiteKind.Throw ||
                     site.Kind == AdvisoryEffectSiteKind.Call && (site.Effects & IrOpaqueCallEffects.Allocates) != 0

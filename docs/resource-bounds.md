@@ -149,3 +149,54 @@ nor partial metadata proof assumptions.
 
 See [milestone progress](resource-bounds-progress.md) for verification evidence,
 implementation status, and subsequent work.
+
+## Native resource contracts
+
+`ResourceUpperBound` selects an independent native obligation through the
+existing Effects feature. Use the standard package's native verification flow
+from [getting started](getting-started.md); SP0060 remains an optional source
+summary and does not replace these worker outcomes.
+
+```csharp
+using SharpProof.Attributes;
+
+public static class NativeAllocationExample
+{
+    [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, "n", 1)]
+    [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, "n", 1)]
+    [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, "n", 3)]
+    public static void Allocate(int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            var buffer = new int[3];
+        }
+    }
+}
+```
+
+The mathematical bound is `constant + coefficient * entrySize`. Omit the size
+and coefficient for a constant bound. A size is an Int32/Int64 parameter name or
+an array parameter followed by `.Length`. Negative scalars and null arrays have
+entry size zero. Arithmetic does not wrap. A supplied size requires a positive
+coefficient, and both numeric terms must be nonnegative. The compiler binds the
+name to its parameter ordinal and physical domain; arbitrary source expressions
+and property getters are not accepted as size names.
+
+Each attribute has its own result. The worker derives cumulative upper bounds
+from the closed resource program and checks the declared inequality. Unsupported
+bodies, unstable progress, missing initialization evidence and unbound metadata
+assumptions produce Unknown. A modeled upper bound larger than the requested
+limit also remains Unknown until an actual violating execution is established;
+an upper envelope alone does not refute a contract.
+
+Compiler-elided calls, including contract clauses, do not add runtime costs or
+argument allocations. Enabled conditional calls retain their normal costs.
+The reserved contract symbol remains invalid for production compilation.
+
+Validated results and SARIF expose `resourceBound` evidence with the metric,
+cost model, expression/program versions, declared-bound digest and inferred
+upper bound. Unknown evidence contains its reason and no partial numeric bound.
+Metric or declared-bound mismatches are rejected, including cached responses.
+The compiler carries declarations and programs; it cannot supply a resource
+proof verdict or substitute a qualitative trusted effect summary.

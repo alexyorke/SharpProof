@@ -72,6 +72,7 @@ internal static class ContractApiCatalog
     internal const string ContractFor = AttributesNamespace + ".ContractForAttribute";
     internal const string EnforcePure = AttributesNamespace + ".EnforcePureAttribute";
     internal const string ZeroAllocations = AttributesNamespace + ".ZeroAllocationsAttribute";
+    internal const string ResourceUpperBound = AttributesNamespace + ".ResourceUpperBoundAttribute";
     internal const string AllowedCapabilities = AttributesNamespace + ".AllowedCapabilitiesAttribute";
     internal const string DoesNotThrow = AttributesNamespace + ".DoesNotThrowAttribute";
     internal const string AllowedExceptions = AttributesNamespace + ".AllowedExceptionsAttribute";
@@ -121,6 +122,11 @@ internal static class ContractApiCatalog
             new(
                 ZeroAllocations,
                 "ZeroAllocationsAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                ResourceUpperBound,
+                "ResourceUpperBoundAttribute",
                 ContractApiAttributeCategory.Effect,
                 ContractApiSelectionFeature.Effects),
             new(
@@ -217,6 +223,7 @@ internal static partial class ContractApiMetadata
         ContractApiCatalog.EnforcePure;
     internal const string ZeroAllocations =
         ContractApiCatalog.ZeroAllocations;
+    internal const string ResourceUpperBound = ContractApiCatalog.ResourceUpperBound;
     internal const string AllowedCapabilities =
         ContractApiCatalog.AllowedCapabilities;
     internal const string DoesNotThrow =

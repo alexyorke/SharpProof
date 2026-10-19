@@ -18,6 +18,8 @@ internal sealed partial class ResourceBoundsAnalysis
     private Cost Call(IInvocationOperation invocation, int depth)
     {
         invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
+        if (_compilation is not null && (_resourceEmission ??= new CSharpInvocationEmissionPolicy(_compilation)).IsElided(invocation))
+        { return Cost.Zero; }
         var target = invocation.TargetMethod;
         target = target.PartialImplementationPart ?? target;
         if (_activeMethods.Contains(target))

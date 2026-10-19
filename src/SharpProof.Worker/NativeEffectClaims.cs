@@ -1,6 +1,6 @@
 namespace SharpProof.Worker;
 
-// Z3 decides every effect claim over the Total program.
+// Native checkers decide effect claims over compiler-owned programs.
 // A proof is a complete may-effect summary; a refutation names the first
 // replayed violating site.
 internal static class NativeEffectClaims
@@ -9,7 +9,7 @@ internal static class NativeEffectClaims
     {
         return kind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
             WorkerEffectContractKind.ZeroAllocations or WorkerEffectContractKind.EnforcePure or
-            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract;
+            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract or WorkerEffectContractKind.ResourceUpperBound;
     }
 
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
@@ -50,6 +50,11 @@ internal static class NativeEffectClaims
         foreach (var claim in claims)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound)
+            {
+                results.Add(NativeResourceContractVerifier.Verify(target, claim, cancellationToken));
+                continue;
+            }
             var check = claim.ContractKind switch
             {
                 WorkerEffectContractKind.ZeroAllocations => await NativeEffectSiteVerifier.VerifyAsync(target, budgets, cancellationToken).ConfigureAwait(false),

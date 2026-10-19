@@ -10,18 +10,18 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "13";
+    public const string Current = "14";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 15;
+    public const int Current = 16;
 }
 
 public static class WorkerManifestVersions
 {
-    public const int Current = 5;
+    public const int Current = 6;
 }
 
 public static class WorkerLauncherDefaults
@@ -153,7 +153,54 @@ public enum WorkerEffectContractKind
     AllowedCapabilities = 3,
     DoesNotThrow = 4,
     AllowedExceptions = 5,
-    EffectContract = 6
+    EffectContract = 6,
+    ResourceUpperBound = 7
+}
+
+public enum WorkerResourceMetric
+{
+    Unspecified = 0,
+    LoopBodyEntries = 1,
+    ArrayAllocations = 2,
+    AllocatedElements = 3
+}
+
+public static class WorkerResourceModels
+{
+    public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
+    public const int Expression = 1;
+    public const int Program = 1;
+    public const int MaximumExpressionBytes = 1024 * 1024;
+}
+
+public sealed class WorkerResourceConstraint
+{
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; set; }
+    [JsonRequired]
+    public string CostModel { get; set; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; set; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public byte[] UpperBound { get; set; } = [];
+}
+
+public sealed class WorkerResourceBoundEvidence
+{
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; set; }
+    [JsonRequired]
+    public string CostModel { get; set; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; set; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public int ProgramModel { get; set; } = WorkerResourceModels.Program;
+    [JsonRequired]
+    public string DeclaredBoundSha256 { get; set; } = string.Empty;
+    [JsonRequired]
+    public string? InferredUpperBound { get; set; }
+    [JsonRequired]
+    public string? UnknownReason { get; set; }
 }
 
 public sealed class WorkerSourceLocation
@@ -200,6 +247,8 @@ public sealed class WorkerClaimManifestEntry
     public WorkerClaimEvidence Evidence { get; set; }
     [JsonRequired]
     public WorkerEffectContractKind EffectContractKind { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceConstraint? ResourceUpperBound { get; set; }
     [JsonRequired]
     public WorkerSourceLocation Location { get; set; } = new();
 }
@@ -400,6 +449,8 @@ public sealed class WorkerClaimResult
     public WorkerEffectEvidenceCertainty EffectCertainty { get; set; }
     [JsonRequired]
     public WorkerEffectViolationWitness? EffectWitness { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceBoundEvidence? ResourceBound { get; set; }
     [JsonRequired]
     public WorkerVacuityKind Vacuity { get; set; }
     [JsonRequired]
@@ -539,7 +590,8 @@ internal static class WorkerProtocolMetadata
         WorkerClaimEvidence.ReturnAttribute, WorkerClaimEvidence.Attribute,
         WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
         WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
-        WorkerEffectContractKind.EffectContract,
+        WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
+        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements,
         WorkerRunStatus.Unspecified, WorkerRunStatus.Complete, WorkerRunStatus.TimedOut, WorkerRunStatus.Canceled, WorkerRunStatus.Failed,
         WorkerCallableCoverage.Unspecified, WorkerCallableCoverage.Complete, WorkerCallableCoverage.Incomplete,
         WorkerClaimOutcome.Unspecified, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown,
@@ -595,7 +647,8 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedCapabilities)
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.DoesNotThrow)
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedExceptions)
-            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract);
+            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract)
+            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.ResourceUpperBound);
     internal static bool MatchesCallableCoverage(WorkerCallableCoverage coverage, WorkerCallableCoverageReason reason) =>
         coverage switch
         {
@@ -741,7 +794,21 @@ internal static class WorkerProtocolMetadata
         new("callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
         new("callable_assumption_usage", static value => (value.Assumptions ?? []).All(static item => item != null && !item.Used)),
     ];
+    internal static bool ResourceConstraintsEqual(WorkerResourceConstraint? left, WorkerResourceConstraint? right)
+    {
+        return ReferenceEquals(left, right) || left is not null && right is not null &&
+            left.Metric == right.Metric && left.CostModel == right.CostModel && left.ExpressionModel == right.ExpressionModel &&
+            left.UpperBound is not null && right.UpperBound is not null && left.UpperBound.SequenceEqual(right.UpperBound);
+    }
+    internal static bool HasValidResourceConstraint(WorkerEffectContractKind kind, WorkerResourceConstraint? constraint)
+    {
+        if (kind != WorkerEffectContractKind.ResourceUpperBound) { return constraint is null; }
+        return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
+            constraint.CostModel == WorkerResourceModels.CostModel && constraint.ExpressionModel == WorkerResourceModels.Expression &&
+            constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
+    }
     internal static readonly WorkerProtocolRule<WorkerClaimManifestEntry>[] ManifestClaimRules = [
+        new("claim_resource_constraint", static value => HasValidResourceConstraint(value.EffectContractKind, value.ResourceUpperBound)),
         new("claim_ordinal", static value => value.Ordinal >= 0),
         new("claim_kind", static value => WorkerProtocolJson.IsDefined(value.Kind, WorkerClaimKind.Unspecified)),
         new("claim_evidence", static value => WorkerProtocolJson.IsDefined(value.Evidence, WorkerClaimEvidence.Unspecified)),

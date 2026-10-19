@@ -1,3 +1,14 @@
 #nullable enable
 SharpProof.Attributes.EffectContractAttribute.PreconditionFree.get -> bool
 SharpProof.Attributes.EffectContractAttribute.PreconditionFree.set -> void
+SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.AllocatedElements = 3 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.ArrayAllocations = 2 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.LoopBodyEntries = 1 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceMetric.Unspecified = 0 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceUpperBoundAttribute
+SharpProof.Attributes.ResourceUpperBoundAttribute.Coefficient.get -> long
+SharpProof.Attributes.ResourceUpperBoundAttribute.Constant.get -> long
+SharpProof.Attributes.ResourceUpperBoundAttribute.Metric.get -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceUpperBoundAttribute.ResourceUpperBoundAttribute(SharpProof.Attributes.ResourceMetric metric, long constant, string? sizeParameter = null, long coefficient = 0) -> void
+SharpProof.Attributes.ResourceUpperBoundAttribute.SizeParameter.get -> string?

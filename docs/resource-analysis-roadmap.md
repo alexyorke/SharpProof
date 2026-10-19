@@ -45,12 +45,12 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
 
 ## D. Contracts and native verification
 
-- [ ] Resource contract API and compiler-bound validation/selection.
-- [ ] Compiler-neutral proof/cost representation and collector artifact encoding.
+- [x] Resource contract API and compiler-bound validation/selection.
+- [x] Compiler-neutral proof/cost representation and collector artifact encoding.
 - [ ] Native-worker checking of resource proofs and numeric contract violations.
-- [ ] Protocol, manifest, schema and cache-identity integration.
-- [ ] SARIF/result projection with independent claim outcomes and Unknown reasons.
-- [ ] Reject malformed/unowned proof records; verify packaged consumer behavior.
+- [x] Protocol, manifest, schema and cache-identity integration.
+- [x] SARIF/result projection with independent claim outcomes and Unknown reasons.
+- [x] Reject malformed/unowned proof records; verify packaged consumer behavior.
 
 ## E. Asymptotic and aggregate analysis
 
@@ -241,3 +241,50 @@ native metadata assumptions and replayed numeric violations remain open. This
 module verifies a supplied closed program; it is not yet a published native
 resource-claim workflow. Broader ranking synthesis and all required phases C-F
 remain incomplete.
+
+## Native resource contract integration (in progress)
+
+The public API now declares constant or linear bounds for loop-body entries,
+primitive-array allocations and allocated elements. Trusted compiler identity,
+parameter binding, independent attribute outcomes and invalid-metadata abstention
+use the existing Effects selection path. Resource programs are attached only to
+selected resource contracts. The consumer binds their expressions to concrete
+callable parameter types and rejects unowned records, mismatched constraints and
+compiler-supplied proof or trusted-cost verdicts.
+
+The native checker derives cumulative costs, then applies sufficient nonnegative
+arithmetic rules to prove the declared inequality. Failure of that comparison
+is Unknown, not a numeric refutation. Compiler-elided clauses and their arguments
+are omitted through the repository's existing conditional-call policy. Enabled
+conditional calls retain their costs.
+
+Protocol 14, manifest 6, cache 16 and compiler artifact 32 bind the new declaration,
+program and result shapes. Resource evidence reaches validated worker responses,
+cache hits and SARIF, with metric/model identities and declared-bound digests.
+Quantitative memory/stack and later phases remain open. Replayed numeric
+violations, native metadata assumptions, broader ranking synthesis, packaged
+consumer coverage and final protocol/cache qualification are still required.
+
+The first integrated run verified the full worker/cache/SARIF path and most
+focused cases. Tests were corrected to exercise the untrusted consumer decoder
+and production parse options; the versioned manifest hash fixture was updated.
+The full IR suite now passes 502 tests, including independent controls over 256
+linear coefficient/constant combinations. The final focused native/protocol run
+passed all 181 tests. The full analyzer suite passed 1271 tests; architecture
+passed 10 tests; documentation, evaluated layout and all quality/compatibility
+categories passed. Final layout evaluated 2637 source files and 59 projects.
+
+A strict consumer built from the actual NuGet packages passed: all three metrics
+produced Proven results and validated JSON/SARIF evidence. The full worker suite
+passed 5675 tests and failed only three old schema-number fixtures. Their schema
+values were corrected without changing verdict assertions; all 82 targeted
+schema/golden tests then passed. Additional arithmetic-domain and malformed-record
+boundary controls passed with the full IR suite, now 508 tests. All recorded
+builds reported zero warnings/errors. A final real-worker/cache/SARIF control
+also passed after null-constraint validation was hardened.
+
+CI for published predecessor `80a15d016` failed the required 100% coverage gate:
+91 resource-code lines were uncovered. The exact report has been inspected;
+targeted boundary coverage work is in progress. The coverage baseline is
+unchanged. Coverage qualification, native numeric refutations and every remaining
+unchecked roadmap requirement still block completion; the MR remains draft.

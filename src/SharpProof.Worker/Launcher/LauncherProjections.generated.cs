@@ -23,6 +23,12 @@ internal static partial class LauncherPresentation
         SharpProof.Worker.Protocol.WorkerClaimManifestEntry claim
     )
     {
+        if (claim.Kind == SharpProof.Worker.Protocol.WorkerClaimKind.Effect &&
+            claim.EffectContractKind == SharpProof.Worker.Protocol.WorkerEffectContractKind.ResourceUpperBound)
+        {
+            return claim.ResourceUpperBound is { } resource ? "resource:" + resource.Metric :
+                throw new ArgumentException("A resource claim requires its constraint.", nameof(claim));
+        }
         return claim.Kind switch
         {
             SharpProof.Worker.Protocol.WorkerClaimKind.Postcondition => "Postcondition",

@@ -39,6 +39,19 @@ internal static class EffectClaimDeclarations
         Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
             new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
             contract.Kind != EffectContractResolutionKind.Invalid, true);
+        foreach (var attribute in Select(attributes, session.Attributes.ResourceUpperBound))
+        {
+            var resource = ResourceUpperBoundContract.Decode(method, attribute);
+            var constraint = EffectClaimConstraint.Empty with
+            {
+                ResourceUpperBound = resource ?? new ResourceBoundConstraint(ResourceCostMetric.LoopBodyEntries, ResourceExpression.Zero)
+            };
+            var valid = resource is not null;
+            evaluations.Add(new(EffectEvaluationContractKind.ResourceUpperBound, [attribute], EffectEvaluationOutcome.Unknown,
+                valid ? EffectEvaluationReason.EffectSummaryIncomplete : EffectEvaluationReason.UnsupportedContract,
+                valid ? EffectEvaluationCertainty.IncompleteMayEffectSummary : EffectEvaluationCertainty.Unavailable,
+                "native-resource", constraint));
+        }
         return evaluations.ToImmutable();
 
         void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,

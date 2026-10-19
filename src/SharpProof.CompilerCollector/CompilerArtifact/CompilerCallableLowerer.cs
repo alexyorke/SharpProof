@@ -52,7 +52,25 @@ internal sealed class CompilerCallableLowerer
                 [.. total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
-        return new(target.Entry, reason) { Total = total, TotalEntry = entry };
+        ResourceProgram? resourceProgram = null;
+        string? resourceUnknown = null;
+        if (target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
+        {
+            if (total is null || total.IsBodyAbstraction)
+            { resourceUnknown = "ResourceOwnerUnavailable"; }
+            else if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel is null || target.Method.MethodKind != MethodKind.Ordinary)
+            { resourceUnknown = "UnsupportedResourceCallable"; }
+            else
+            {
+                var body = declaration.Body is { } block ? target.SemanticModel.GetOperation(block, cancellationToken) :
+                    declaration.ExpressionBody is { } arrow ? target.SemanticModel.GetOperation(arrow.Expression, cancellationToken) : null;
+                var resource = ResourceBoundsAnalysis.Analyze(target.Method, body, cancellationToken);
+                resourceProgram = resource.Bounds?.Program;
+                resourceUnknown = resource.UnknownReason;
+            }
+        }
+        return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown };
     }
 
     private WorkerClaimReason Classify(ManifestCallableTarget target, bool hasTotal, CancellationToken cancellationToken)

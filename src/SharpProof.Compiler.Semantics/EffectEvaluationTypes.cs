@@ -7,7 +7,8 @@ internal enum EffectEvaluationContractKind
     AllowedCapabilities,
     DoesNotThrow,
     AllowedExceptions,
-    EffectContract
+    EffectContract,
+    ResourceUpperBound
 }
 
 internal enum EffectEvaluationOutcome

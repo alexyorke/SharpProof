@@ -112,4 +112,32 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.UnknownReason, Is.EqualTo("AnalysisBudgetExceeded"));
         Assert.That(result.Bounds, Is.Null);
     }
+    [TestCase(false, "0")]
+    [TestCase(true, "1")]
+    public void ConditionalCallElisionIncludesArgumentAllocations(bool defined, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        var source = (defined ? "#define RESOURCE_RUNTIME\n" : "") + """
+            public static class C {
+                [System.Diagnostics.Conditional("RESOURCE_RUNTIME")]
+                static void Sink(int[] values) {}
+                public static void Root() { Sink(new int[4]); }
+            }
+            """;
+        var result = AnalyzeSource(source);
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void CompilerElidedContractArgumentsDoNotAddRuntimeCosts()
+    {
+        var result = AnalyzeSource("""
+            public static class C {
+                public static void Root() { SharpProof.Attributes.Contract.Requires(new int[4].Length == 4); }
+            }
+            """);
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("0"));
+    }
 }

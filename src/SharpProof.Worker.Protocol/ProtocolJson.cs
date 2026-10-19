@@ -718,6 +718,7 @@ public static partial class WorkerProtocolJson
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
                 ? HasValidEffectWitness(claim!.EffectContractKind, value.EffectWitness)
                 : value.EffectWitness == null, "response.effect_witness");
+        errors.Check(HasValidResourceEvidence(claim, value), "response.resource_evidence");
         if (value.EffectWitness != null)
         {
             errors.Check(HasValidLocation(value.EffectWitness.Location), "response.effect_witness_location");
@@ -731,6 +732,28 @@ public static partial class WorkerProtocolJson
             value.Assumptions,
             manifestIndexes.GetCallableAssumptions(owner.CallableId)),
             "response.claim_assumption_set");
+    }
+    private static bool HasValidResourceEvidence(WorkerClaimManifestEntry? claim, WorkerClaimResult value)
+    {
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        var resource = claim?.ResourceUpperBound;
+        if (resource is null)
+        { return value.ResourceBound is null; }
+        if (!WorkerProtocolMetadata.HasValidResourceConstraint(claim!.EffectContractKind, resource))
+        { return false; }
+        var evidence = value.ResourceBound;
+        if (evidence is null)
+        { return value.Outcome != WorkerClaimOutcome.Proven || value.Vacuity != WorkerVacuityKind.None; }
+        if (evidence.Metric != resource.Metric || evidence.CostModel != resource.CostModel ||
+            evidence.ExpressionModel != WorkerResourceModels.Expression || evidence.ProgramModel != WorkerResourceModels.Program ||
+            evidence.DeclaredBoundSha256 != ComputeSha256(resource.UpperBound))
+        { return false; }
+        return value.Outcome switch
+        {
+            WorkerClaimOutcome.Proven => evidence.UnknownReason is null && !string.IsNullOrWhiteSpace(evidence.InferredUpperBound) && evidence.InferredUpperBound!.Length <= 16384,
+            WorkerClaimOutcome.Unknown => evidence.InferredUpperBound is null && !string.IsNullOrWhiteSpace(evidence.UnknownReason) && evidence.UnknownReason!.Length <= 256 && !evidence.UnknownReason.Any(static character => char.IsControl(character)),
+            _ => false
+        };
     }
     internal static bool HasValidEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason,
         WorkerEffectEvidenceCertainty certainty)

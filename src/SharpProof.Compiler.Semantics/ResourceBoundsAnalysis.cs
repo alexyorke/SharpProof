@@ -99,6 +99,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private readonly HashSet<ISymbol> _activeMethods = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _assumptions = new(StringComparer.Ordinal);
     private ResolvedApiSpecTable? _resourceSpecifications;
+    private CSharpInvocationEmissionPolicy? _resourceEmission;
     private readonly Compilation? _compilation;
     private string? _unknown;
     private int _remaining = 4096;

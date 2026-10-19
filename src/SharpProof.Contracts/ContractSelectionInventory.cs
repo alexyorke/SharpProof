@@ -23,6 +23,7 @@ internal sealed class ContractSelectionInventory
         ContractFor = _identity.ResolveAttribute(ContractApiMetadata.ContractFor);
         EnforcePure = _identity.ResolveAttribute(ContractApiMetadata.EnforcePure);
         ZeroAllocations = _identity.ResolveAttribute(ContractApiMetadata.ZeroAllocations);
+        ResourceUpperBound = _identity.ResolveAttribute(ContractApiMetadata.ResourceUpperBound);
         AllowedCapabilities = _identity.ResolveAttribute(ContractApiMetadata.AllowedCapabilities);
         DoesNotThrow = _identity.ResolveAttribute(ContractApiMetadata.DoesNotThrow);
         AllowedExceptions = _identity.ResolveAttribute(ContractApiMetadata.AllowedExceptions);
@@ -63,6 +64,7 @@ internal sealed class ContractSelectionInventory
     {
         get;
     }
+    internal INamedTypeSymbol? ResourceUpperBound { get; }
     internal INamedTypeSymbol? AllowedCapabilities
     {
         get;
@@ -147,6 +149,7 @@ internal sealed class ContractSelectionInventory
         attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return Is(attribute, EnforcePure) ||
         Is(attribute, ZeroAllocations) ||
+        Is(attribute, ResourceUpperBound) ||
         Is(attribute, AllowedCapabilities) ||
         Is(attribute, DoesNotThrow) ||
         Is(attribute, AllowedExceptions) ||

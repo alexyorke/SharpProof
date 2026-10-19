@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 13,
-    "manifestSchemaVersion": 5,
-    "compilerArtifactSchemaVersion": 31,
+    "protocolVersion": 14,
+    "manifestSchemaVersion": 6,
+    "compilerArtifactSchemaVersion": 32,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 15,
+    "schemaVersion": 16,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -299,6 +299,7 @@
           "src/SharpProof.Attributes/SharpProofSuppressAttribute.cs",
           "src/SharpProof.Attributes/SharpProofTrustedAttribute.cs",
           "src/SharpProof.Attributes/ZeroAllocationsAttribute.cs",
+          "src/SharpProof.Attributes/ResourceUpperBoundAttribute.cs",
           "src/SharpProof.Attributes/SharpProofEffect.cs",
           "src/SharpProof.Attributes/SharpProofCapability.cs"
         ]
@@ -370,6 +371,8 @@
           "src/SharpProof.Ir/IrModel.generated.cs",
           "src/SharpProof.Ir/IrProgram.cs",
           "src/SharpProof.Ir/ResourceExpression.cs",
+          "src/SharpProof.Ir/ResourceBoundOrder.cs",
+          "src/SharpProof.Ir/ResourceBoundConstraint.cs",
           "src/SharpProof.Ir/ResourceProgram.cs"
         ]
       },
@@ -380,6 +383,8 @@
           "src/SharpProof.CompilerArtifact/ResourceExpressionCodec.cs",
           "src/SharpProof.CompilerArtifact/ResourceExpressionOwnership.cs",
           "src/SharpProof.CompilerArtifact/ResourceProgramCodec.cs",
+          "src/SharpProof.CompilerArtifact/CompilerLoweredArtifact.Resources.cs",
+          "src/SharpProof.CompilerArtifact/ResourceProgramOwnership.cs",
           "src/SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
       },
@@ -394,6 +399,7 @@
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Calls.cs",
           "src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Recursion.cs",
           "src/SharpProof.Compiler.Semantics/ResourceMetadataCostCatalog.cs",
+          "src/SharpProof.Compiler.Semantics/ResourceUpperBoundContract.cs",
           "src/SharpProof.Analyzer.Core/ResourceBoundsDiagnostics.cs",
           "src/SharpProof.Compiler.Semantics/EffectEvaluationTypes.cs",
           "src/SharpProof.Analyzer.Core/Advisory/AdvisoryInterpreter.cs",
@@ -716,6 +722,7 @@
           "src/SharpProof.Worker/ExplicitThrowSites.cs",
           "src/SharpProof.Worker/NativeEffectClaims.cs",
           "src/SharpProof.Worker/NativeResourceProgramVerifier.cs",
+          "src/SharpProof.Worker/NativeResourceContractVerifier.cs",
           "src/SharpProof.Worker/Vc/LoopInvariantCandidates.cs",
           "eng/CompilerAdditionalTextStability.cs",
           "src/SharpProof.Frontend/CSharpOperationSemantics.ThrowClassification.cs",
