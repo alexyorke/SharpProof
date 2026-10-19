@@ -2975,3 +2975,12 @@ IMM-M086 verified: all 1,072 targeted Worker map/oracle tests pass with zero
 failures/skips/warnings/errors. Main reviewed all eight exact initializer nodes before
 applying changes; interpreter/substitution keys, values and nested SUT objects retain
 their original identity and evaluation order.
+
+IMM-M083 verified: all 5,484 selected ordinary Worker tests excluding LongFuzz pass,
+zero failures/skips and zero build warnings/errors. The final expected-vector helper
+change is additionally covered by M084's 117 passing focused tests. Main checked all
+109 selected excerpts and coupled syntax-path, compiled-output and TestProject input
+changes. Three proof/core roots are reused directly, native emitted-image bytes remain
+unchanged, and JSON evidence still publishes arrays/nulls in the same ordered shapes.
+The 143-test count difference from M080's full Worker run reflects the explicit
+LongFuzz filter, not a claim that the broader universe was retested here.

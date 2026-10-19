@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -76,8 +77,8 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
             sourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             entryKind = entry.Kind.ToString(),
             entryReason = entry.Reason.ToString(),
-            core = entry.ProofCore.ToArray(),
-            usedAssumptions = entry.UsedAssumptionIds.Order().ToArray(),
+            core = entry.ProofCore,
+            usedAssumptions = entry.UsedAssumptionIds.Order().ToImmutableArray(),
             projectedOutcome = projected.Outcome.ToString(),
             projectedReason = projected.Reason.ToString(),
             projectedCertainty = projected.EffectCertainty.ToString(),

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -142,7 +143,7 @@ public sealed class WorkerVcExceptionSearchTests
             Assert.That(response.Errors, Is.Empty);
             var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
                 .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
             Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
             Assert.That(posts[1].Model, Is.Not.Empty);
             Assert.That(posts[0].Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)),

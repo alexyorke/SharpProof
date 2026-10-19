@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -89,7 +90,7 @@ public sealed class WorkerFactorResourceBoundaryTests
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(instructions.Single(instruction =>
@@ -164,10 +165,10 @@ public sealed class WorkerFactorResourceBoundaryTests
             outcome = result.Outcome?.GetType().Name,
             reason = result.Reason.ToString(),
             result.QueryCompleted,
-            core = result.Core.ToArray(),
+            core = result.Core,
             model = result.EntryModel.OrderBy(pair => pair.Key.Value).Select(pair => new
-            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToArray(),
-            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToArray(),
+            { variable = pair.Key.Value, kind = pair.Value.Kind.ToString(), integer = pair.Value.IntegerNumericValue.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToImmutableArray(),
+            bodyAssumptions = result.BodyAssumptions.Select(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).ToImmutableArray(),
             callPreconditionWitness = result.CallPreconditionWitness?.Value,
             consumedBefore = before,
             consumedAfter = after,

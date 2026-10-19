@@ -56,7 +56,7 @@ public sealed class SynchronizedMethodPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -156,7 +156,7 @@ public sealed class SynchronizedMethodPurityAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -164,7 +164,7 @@ public sealed class SynchronizedMethodPurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The synchronized source method cannot be Proven EnforcePure."
                 : "The NoInlining-only control remains Proven EnforcePure with complete native may-effect evidence."
         });

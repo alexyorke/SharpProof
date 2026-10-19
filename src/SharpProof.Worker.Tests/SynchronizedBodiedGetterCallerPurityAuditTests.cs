@@ -67,7 +67,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -102,9 +102,9 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             var calledGetter = (MethodInfo)target.Module.ResolveMethod(callToken)!;
             var returnedField = getter.Module.ResolveField(fieldToken)!;
             var flags = getter.GetMethodImplementationFlags();
-            var receivers = s_inputValues.Select(input => constructor.Invoke([input])).ToArray();
-            var executions = receivers.Select(receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (target.CreateDelegate<Func<int>>(receiver))).ToArray();
-            var closedReceiversMatch = executions.Select((execute, index) => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (ReferenceEquals(execute.Target, receivers[index]))).ToArray();
+            var receivers = s_inputValues.Select(input => constructor.Invoke([input])).ToImmutableArray();
+            var executions = receivers.Select(receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (target.CreateDelegate<Func<int>>(receiver))).ToImmutableArray();
+            var closedReceiversMatch = executions.Select((execute, index) => execute is null ? throw new System.ArgumentNullException(nameof(execute)) : (ReferenceEquals(execute.Target, receivers[index]))).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(calledGetter.DeclaringType, Is.EqualTo(subject));
@@ -248,7 +248,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
             BoundReceiverMatchesTargetParameter = SymbolEqualityComparer.Default.Equals(receiverParameter, targetSymbol.Parameters.Single()),
             GetterReturnedField = getterFieldRead.Field.ToDisplayString(),
             GetterFieldReadonly = getterFieldRead.Field.IsReadOnly,
-            GetterSourceAttributes = getterSymbol.GetAttributes().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString())).ToArray(),
+            GetterSourceAttributes = getterSymbol.GetAttributes().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString())).ToImmutableArray(),
             SelectedSourceIsTarget = SymbolEqualityComparer.Default.Equals(selectedTarget.Method, targetSymbol),
             SelectedSourceIsGetter = SymbolEqualityComparer.Default.Equals(selectedTarget.Method, getterSymbol)
         });
@@ -295,7 +295,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -303,7 +303,7 @@ public sealed class SynchronizedBodiedGetterCallerPurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The caller of the synchronized bodied getter cannot be Proven EnforcePure."
                 : "The caller of the NoInlining-only bodied getter remains Proven EnforcePure with complete native may-effect evidence."
         });

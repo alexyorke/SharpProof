@@ -53,7 +53,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:

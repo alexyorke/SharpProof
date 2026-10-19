@@ -71,7 +71,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -95,7 +95,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             var setterIl = setter.GetMethodBody()!.GetILAsByteArray()!;
             var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
             var instructions = ReadTargetIl(targetIl);
-            var virtualCalls = instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x6f)).ToArray();
+            var virtualCalls = instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x6f)).ToImmutableArray();
             Assert.That(virtualCalls, Has.Length.EqualTo(2));
             var getterCall = virtualCalls[0];
             var setterCall = virtualCalls[1];
@@ -358,7 +358,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToArray(),
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -366,7 +366,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The synchronized getter executes before the divide-by-zero fault, so the compound caller cannot be Proven EnforcePure."
                 : "The NoInlining-only getter compound caller remains complete Proven EnforcePure under its value==0 precondition."
         });

@@ -402,7 +402,7 @@ public sealed partial class WorkerTests
         var preconditions = result.Assumptions.Where(
             static assumption =>
                 assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind ==
-                WorkerAssumptionKind.Precondition)).ToArray();
+                WorkerAssumptionKind.Precondition)).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -837,7 +837,7 @@ public sealed partial class WorkerTests
             cacheEnabled: false);
         var results = response.ClaimResults.OrderBy(result =>
             result is null ? throw new System.ArgumentNullException(nameof(result)) : (response.Manifest.Claims.Single(claim =>
-                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)).EffectContractKind)).ToArray();
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId)).EffectContractKind)).ToImmutableArray();
         var responseJson = WorkerProtocolJson.SerializeResponse(response);
 
         using (Assert.EnterMultipleScope())
@@ -877,7 +877,7 @@ public sealed partial class WorkerTests
                 .Where(diagnostic =>
                     diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
                 .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 sourceErrors,
                 Is.Empty,
@@ -1095,7 +1095,7 @@ public sealed partial class WorkerTests
         using var worker = new SharpProofWorker(new CountingBackend(BackendCheckResult.Unsatisfiable([])));
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var effectClaims = response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))).ToArray();
+            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(effectClaims, Has.Length.EqualTo(3));
@@ -1253,7 +1253,7 @@ public sealed partial class WorkerTests
                 static result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.EffectWitness?.Kind ?? string.Empty),
                 StringComparer.Ordinal)
-            .ToArray();
+            .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
@@ -2121,7 +2121,7 @@ public sealed partial class WorkerTests
         var expectedUsedIds = snapshot.CompilerManifest.Callables.Single()
             .Total!.Clauses.Where(static clause =>
                 clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume))
-            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId)).ToArray();
+            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId)).ToImmutableArray();
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
 
@@ -2137,7 +2137,7 @@ public sealed partial class WorkerTests
             Is.EqualTo(IrExecutionSemantics.Total));
         var userAssumptions = record.Assumptions
             .Where(static evidence =>
-                evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToArray();
+                evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -2308,7 +2308,7 @@ public sealed partial class WorkerTests
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                         "." + methodName + "(",
                         StringComparison.Ordinal)))
-                .ToArray();
+                .ToImmutableArray();
             Assert.That(
                 matching,
                 Has.Length.EqualTo(1),
@@ -2430,7 +2430,7 @@ public sealed partial class WorkerTests
             .Where(record => record is null ? throw new System.ArgumentNullException(nameof(record)) : (GetCallableId(response, record).Contains(
                 ".Empty",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -4780,7 +4780,7 @@ public sealed partial class WorkerTests
             Assert.That(coordination.Created, Is.EqualTo(2));
             Assert.That(coordination.MaximumActive, Is.EqualTo(2));
             Assert.That(coordination.Disposed, Is.EqualTo(2));
-            var callableIds = response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)).ToArray();
+            var callableIds = response.CallableResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)).ToImmutableArray();
             Assert.That(callableIds, Is.EqualTo(callableIds.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)));
         }
     }
@@ -5443,7 +5443,7 @@ public sealed partial class WorkerTests
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"using SharpProof.Attributes; internal static class Padding{index} {{ internal static int Identity(int value) {{ Contract.Ensures(Contract.Result<int>() == value); return value; }} }}"))
             .Prepend(("Subject.cs", TautologySource))
-            .ToArray();
+            .ToImmutableArray();
         using var project = TestProject.Create(sources);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodWallTimeMilliseconds = 1;
@@ -5486,7 +5486,7 @@ public sealed partial class WorkerTests
                     "Subject",
                     $"Subject{index}",
                     StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         using var projectProject = TestProject.Create(projectSources);
         var projectRequest = projectProject.CreateRequest(cacheEnabled: false);
         projectRequest.Budgets.MethodWallTimeMilliseconds = 40;
@@ -6317,13 +6317,14 @@ public sealed partial class WorkerTests
         private readonly ImmutableArray<string>.Builder _additionalReferencePaths = ImmutableArray.CreateBuilder<string>();
         private bool _useNetCoreReferencePack;
 
-        private TestProject(TempDirectory temporary, string[] sourcePaths)
+        private TestProject(TempDirectory temporary, ImmutableArray<string> sourcePaths)
         {
-            System.ArgumentNullException.ThrowIfNull(sourcePaths, nameof(sourcePaths));
+            if (sourcePaths.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sourcePaths)); }
             System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             DirectoryPath = temporary.FullName;
-            SourcePaths = sourcePaths.ToImmutableArray();
+            SourcePaths = sourcePaths;
             CacheDirectory = Path.Combine(DirectoryPath, "cache");
         }
 
@@ -6350,6 +6351,13 @@ public sealed partial class WorkerTests
             params (string FileName, string Source)[] sources)
         {
             System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+            return Create(sources.ToImmutableArray());
+        }
+
+        internal static TestProject Create(ImmutableArray<(string FileName, string Source)> sources)
+        {
+            if (sources.IsDefault)
+            { throw new ArgumentException("Array must be initialized.", nameof(sources)); }
             var temporary = TempDirectory.CreateOwned(
                 "SharpProof.Worker.Test",
                 string.Empty,
@@ -6366,7 +6374,7 @@ public sealed partial class WorkerTests
                         source.Source,
                         new System.Text.UTF8Encoding(false));
                     return sourcePath;
-                }).ToArray();
+                }).ToImmutableArray();
                 return new TestProject(temporary, sourcePaths);
             }
             catch

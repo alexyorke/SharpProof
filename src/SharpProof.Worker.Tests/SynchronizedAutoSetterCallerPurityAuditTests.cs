@@ -70,7 +70,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -118,7 +118,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             var baseConstructor = (ConstructorInfo)constructor.Module.ResolveMethod(baseConstructorToken)!;
             setterFlags = setter.GetMethodImplementationFlags();
             var execute = target.CreateDelegate<Func<int, int>>();
-            var returnValues = s_inputValues.Select(input => execute(input)).ToArray();
+            var returnValues = s_inputValues.Select(input => execute(input)).ToImmutableArray();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(calledConstructor.DeclaringType, Is.EqualTo(cell));
@@ -299,7 +299,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToArray(),
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToImmutableArray(),
             Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
@@ -307,7 +307,7 @@ public sealed class SynchronizedAutoSetterCallerPurityAuditTests
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToArray(),
+            })).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The fresh-receiver caller of the synchronized auto setter cannot be Proven EnforcePure."
                 : "The fresh-receiver caller of the NoInlining-only auto setter remains complete Proven EnforcePure."
         });

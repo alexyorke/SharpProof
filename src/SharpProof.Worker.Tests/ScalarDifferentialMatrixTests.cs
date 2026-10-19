@@ -373,9 +373,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         var supportedResults = response.ClaimResults;
         var proven = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)).ToImmutableArray();
         var refuted = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)).ToArray();
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(supportedResults, Has.Length.EqualTo(64));
@@ -404,7 +404,7 @@ public sealed class ScalarDifferentialMatrixTests
             var methodResults = supportedResults.Where(result =>
                 result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                     "." + item.MethodName + "(",
-                    StringComparison.Ordinal))).ToArray();
+                    StringComparison.Ordinal))).ToImmutableArray();
             Assert.That(
                 methodResults.Where(result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) is 0 or 1))
@@ -451,7 +451,7 @@ public sealed class ScalarDifferentialMatrixTests
             var comparisonResults = supportedResults.Where(result =>
                 result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                     "." + comparisonName + "(",
-                    StringComparison.Ordinal))).ToArray();
+                    StringComparison.Ordinal))).ToImmutableArray();
             Assert.That(
                 comparisonResults.Where(result =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) < 4))
@@ -657,7 +657,7 @@ public sealed class ScalarDifferentialMatrixTests
             .Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
                 "Conversion(",
                 StringComparison.Ordinal)))
-            .ToArray();
+            .ToImmutableArray();
         var methodNames = new[]
         {
             "UncheckedLongConversion",

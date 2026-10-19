@@ -317,7 +317,7 @@ public sealed class WorkerVcShadowSourceGateTests
                     check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
             }
             var owned = project.Snapshot.Callables.ToDictionary(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId), StringComparer.Ordinal);
-            var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToArray();
+            var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
             Assert.That(checks.Keys, Is.SubsetOf(expected.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))), sourceCase.Name);
             postconditions += expected.Length;
             foreach (var claim in expected)

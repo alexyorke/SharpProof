@@ -41,8 +41,8 @@ public sealed partial class WorkerTests
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;
         var claim = preparation.EffectClaims.Single();
-        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
-        var locks = instructions.OfType<IrLockInstruction>().ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var locks = instructions.OfType<IrLockInstruction>().ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(claim.ContractKind, Is.EqualTo(effectSummary
@@ -97,7 +97,7 @@ public sealed partial class WorkerTests
         }
         if (contradictory)
         {
-            var requires = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToArray();
+            var requires = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
             Assert.That(requires, Has.Length.EqualTo(2));
             Assert.That(requires.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Used)), Is.True);
             Assert.That(result.ProofCore, Is.Not.Empty);

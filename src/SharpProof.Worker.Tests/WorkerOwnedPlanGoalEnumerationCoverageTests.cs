@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
@@ -37,7 +38,7 @@ public sealed partial class WorkerTests
         Assert.That(total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
             .Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)), Is.EqualTo(1));
-        var actualGoals = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToArray();
+        var actualGoals = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
         Assert.That(actualGoals, Has.Length.EqualTo(2));
         Assert.That(actualGoals.Select(goal => goal is null ? throw new System.ArgumentNullException(nameof(goal)) : (goal.ClaimId)), Is.EquivalentTo(preparation.Entry.ClaimIds));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);

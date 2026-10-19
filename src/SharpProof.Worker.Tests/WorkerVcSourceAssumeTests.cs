@@ -163,7 +163,7 @@ public sealed class WorkerVcSourceAssumeTests
         var total = artifact.Callables.Single().Total!;
         var originalClauses = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)).ToImmutableArray();
         var clauses = originalClauses;
-        var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToArray();
+        var points = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assume)).ToImmutableArray();
         switch (mutation)
         {
             case "id":

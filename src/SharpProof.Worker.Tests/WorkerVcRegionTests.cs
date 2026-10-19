@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Verify;
@@ -107,7 +108,7 @@ public sealed class WorkerVcRegionTests
         Assert.That(response.Errors, Is.Empty);
         var ids = preparation.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures))
             .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToHashSet(StringComparer.Ordinal);
-        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
+        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EquivalentTo(ids));
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
         if (kind == "assume")
@@ -161,7 +162,7 @@ public sealed class WorkerVcRegionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
-        var claims = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)).ToArray();
+        var claims = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)).ToImmutableArray();
         var first = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claims[0].ClaimId));
         Assert.That(first.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         if (kind is "captured-return" or "nested-rethrow")

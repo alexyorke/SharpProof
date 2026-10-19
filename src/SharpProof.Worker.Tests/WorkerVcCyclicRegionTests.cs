@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Verify;
 using SharpProof.Smt;
@@ -146,7 +147,7 @@ public sealed class WorkerVcCyclicRegionTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(RepeatedFilterSource);
         var total = artifact.Callables.Single().Total!;
-        var throws = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).ToArray();
+        var throws = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).ToImmutableArray();
         Assert.That(throws, Is.Not.Empty);
         foreach (var instruction in throws)
         {
@@ -206,7 +207,7 @@ public sealed class WorkerVcCyclicRegionTests
         Assert.That(cached.Errors, Is.Empty);
         var ordinals = cached.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
             .ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-        var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToArray();
+        var posts = cached.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
         Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
             Is.EqualTo(new[] { repeated ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
         Assert.That(posts[1].Model, Is.Not.Empty);

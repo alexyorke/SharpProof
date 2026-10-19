@@ -97,7 +97,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var local = reference.Local;
         var declaration = local.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).First();
         var ownerReferences = ((IMethodSymbol)local.ContainingSymbol).DeclaringSyntaxReferences
-            .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToArray();
+            .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToImmutableArray();
         var admittedOwner = ownerReferences.FirstOrDefault(node =>
             node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.SyntaxTree == declaration.SyntaxTree && node.Span.Contains(declaration.Span)));
         var astContainer = language == "CSharp"
@@ -123,7 +123,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
             RuntimeInputs = new[] { 7, -3 },
             sample.RuntimeOutputs,
             LocalDeclaration = Site(declaration),
-            ActualOwnerReferences = ownerReferences.Select(Site).ToArray(),
+            ActualOwnerReferences = ownerReferences.Select(Site).ToImmutableArray(),
             ActualOwnerAdmitted = admittedOwner != null,
             AdmittedOwner = Site(admittedOwner),
             AdmittedOwnerChildPath = admittedPath,
@@ -165,13 +165,13 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var owner = sample.Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
         var tree = sample.Compilation.SyntaxTrees.Single();
         var model = sample.Compilation.GetSemanticModel(tree);
-        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToArray();
+        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToImmutableArray();
         var astContainer = language == "CSharp" ? actualOwnerReferences.Single()
             : tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.MethodBlockSyntax>().Single();
         var queries = astContainer.DescendantNodes().Where(static node =>
-            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax)).ToArray();
+            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax)).ToImmutableArray();
         Assert.That(queries, Is.Not.Empty);
-        var paths = queries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (IndependentPath(astContainer, query))).ToArray();
+        var paths = queries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (IndependentPath(astContainer, query))).ToImmutableArray();
         Assert.That(paths, Is.All.Not.Null);
         bool? queryOwnerAdmitted = language == "CSharp"
             ? queries.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (actualOwnerReferences.Any(reference =>
@@ -191,10 +191,10 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
             EmitSucceeded = true,
             RuntimeInputs = new[] { 7, -3 },
             sample.RuntimeOutputs,
-            ActualOwnerReferences = actualOwnerReferences.Select(Site).ToArray(),
+            ActualOwnerReferences = actualOwnerReferences.Select(Site).ToImmutableArray(),
             AstContainerRole = language == "CSharp" ? "actual-method-declaration" : "VB-MethodBlock-AST-only",
             AstContainer = Site(astContainer),
-            QuerySites = queries.Select(Site).ToArray(),
+            QuerySites = queries.Select(Site).ToImmutableArray(),
             QueryChildPaths = paths,
             Fingerprint = fingerprint
         });
@@ -241,14 +241,15 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         }
     }
 
-    private static int[]? IndependentPath(SyntaxNode container, SyntaxNode target)
+    private static ImmutableArray<int>? IndependentPath(SyntaxNode container, SyntaxNode target)
     {
         System.ArgumentNullException.ThrowIfNull(container);
-        var pending = new Stack<(SyntaxNode Node, int[] Path)>();
-        pending.Push((container, []));
-        while (pending.Count != 0)
+        var pending = ImmutableStack<(SyntaxNode Node, ImmutableArray<int> Path)>.Empty;
+        pending = pending.Push((container, ImmutableArray<int>.Empty));
+        while (!pending.IsEmpty)
         {
-            var (node, path) = pending.Pop();
+            var (node, path) = pending.Peek();
+            pending = pending.Pop();
             if (SameSite(node, target))
             {
                 var reconstructed = container;
@@ -257,9 +258,9 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
                 Assert.That(SameSite(reconstructed, target), Is.True);
                 return path;
             }
-            var children = node.ChildNodes().ToArray();
+            var children = node.ChildNodes().ToImmutableArray();
             for (var ordinal = children.Length - 1; ordinal >= 0; ordinal--)
-            { pending.Push((children[ordinal], path.Append(ordinal).ToArray())); }
+            { pending = pending.Push((children[ordinal], path.Append(ordinal).ToImmutableArray())); }
         }
         return null;
     }
@@ -276,9 +277,10 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         return node == null ? null : new(node.RawKind, node.SpanStart, node.Span.Length);
     }
 
-    private static CompiledObservation CompileAndRun(string language, string source, int[] expected)
+    private static CompiledObservation CompileAndRun(string language, string source, ImmutableArray<int> expected)
     {
-        System.ArgumentNullException.ThrowIfNull(expected);
+        if (expected.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(expected)); }
         System.ArgumentNullException.ThrowIfNull(source);
         System.ArgumentNullException.ThrowIfNull(language);
         var references = TestMetadataReferences.WithSharpProof;
@@ -293,17 +295,17 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("RelativeSyntaxBaseline", isCollectible: true);
-        int[] outputs;
+        ImmutableArray<int> outputs;
         try
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject", throwOnError: true)!.GetMethod("Root")!;
-            outputs = new[] { 7, -3 }.Select(value => (int)method.Invoke(null, [value])!).ToArray();
+            outputs = new[] { 7, -3 }.Select(value => (int)method.Invoke(null, [value])!).ToImmutableArray();
             Assert.That(outputs, Is.EqualTo(expected));
         }
         finally
         { runtime.Unload(); }
-        return new(compilation, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))), outputs.ToImmutableArray());
+        return new(compilation, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))), outputs);
     }
 
     private static void WriteObservation(object value)

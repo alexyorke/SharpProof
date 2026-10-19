@@ -52,7 +52,7 @@ public sealed class VerificationTargetSchedulerTests
             {
                 claimed.Add(index);
             }
-        })).ToArray();
+        })).ToImmutableArray();
         await Task.WhenAll(workers);
         Assert.That(claimed, Is.EquivalentTo(Enumerable.Range(0, targetCount)));
         Assert.That(scheduler.TryClaim(out _), Is.False);
@@ -77,7 +77,7 @@ public sealed class VerificationTargetSchedulerTests
             }
             await release.Task;
             Assert.That(scheduler.TryClaim(out _), Is.False);
-        })).ToArray();
+        })).ToImmutableArray();
         try
         {
             await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
