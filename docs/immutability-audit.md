@@ -3610,3 +3610,9 @@ Preserve case-sensitive sorted path uniqueness, original PowerShell Unique compa
 empty/singleton array shape, duplicate plan validation, parallel normalization completion
 and error order, and nested native JSON/runtime subjects. Validate baseline/current
 fragments and full script format/contract controls. Status: open before edits.
+IMM-M132 verified: canonical Release package workflow passes 383 tests with one
+expected VerificationFailsExplicitlyOnUnsupportedHosts skip across 39 isolated shards,
+zero failures/build warnings/errors; 87 exact embedded PDB outputs. Independent review
+confirms ordinal atomic cache GetOrAdd behavior, nested expected dependencies, fixed
+vector order and preserved native PNG scratch/input subjects. M131/M133 targeted gates
+and M132 workflow complete; M134 script implementation remains open.

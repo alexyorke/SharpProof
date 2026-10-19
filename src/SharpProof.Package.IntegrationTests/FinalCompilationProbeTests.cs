@@ -54,10 +54,7 @@ public sealed class FinalCompilationProbeTests
 
         Assert.That(
             artifacts.Keys,
-            Is.EquivalentTo(new[] {
-                NetStandardTargetFramework,
-                NetTargetFramework
-            }));
+            Is.EquivalentTo(ImmutableArray.Create(NetStandardTargetFramework, NetTargetFramework)));
         var netStandard = artifacts[NetStandardTargetFramework];
         var net = artifacts[NetTargetFramework];
         using (Assert.EnterMultipleScope())

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Reflection;
@@ -22,15 +21,15 @@ namespace SharpProof.Package.Test;
 [Parallelizable(ParallelScope.Children)]
 public sealed class PackageLayoutSmokeTests
 {
-    private static readonly ConcurrentDictionary<string, string>
-        s_sharedCompilationServerIds = new(StringComparer.Ordinal);
+    private static ImmutableDictionary<string, string>
+        s_sharedCompilationServerIds = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
     }
 
-    private static readonly byte[] PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    private static readonly ImmutableArray<byte> PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
 
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
@@ -204,9 +203,7 @@ public sealed class PackageLayoutSmokeTests
             {
                 foreach (var library in target.Value.EnumerateObject())
                 {
-                    foreach (var assetKind in new[] {
-                                 "native", "runtime", "runtimeTargets"
-                             })
+                    foreach (var assetKind in ImmutableArray.Create("native", "runtime", "runtimeTargets"))
                     {
                         if (!library.Value.TryGetProperty(
                                 assetKind,
@@ -283,7 +280,7 @@ public sealed class PackageLayoutSmokeTests
             "shared",
             "netstandard2.0");
         using var loader = new PackageAnalyzerAssemblyLoader();
-        foreach (var dependencyDirectory in new[] { analyzerDirectory, collectorDirectory, sharedDirectory })
+        foreach (var dependencyDirectory in ImmutableArray.Create(analyzerDirectory, collectorDirectory, sharedDirectory))
         {
             foreach (var dependency in Directory.EnumerateFiles(dependencyDirectory, "*.dll"))
             {
@@ -294,24 +291,17 @@ public sealed class PackageLayoutSmokeTests
         var failures = new List<string>();
         var analyzers = new List<DiagnosticAnalyzer>();
         var generators = new List<ISourceGenerator>();
-        foreach (var path in new[]
-                 {
-                     Path.Combine(
+        foreach (var path in ImmutableArray.Create(Path.Combine(
                          analyzerDirectory,
-                         "SharpProof.Analyzer.dll"),
-                     Path.Combine(
+                         "SharpProof.Analyzer.dll"), Path.Combine(
                          analyzerDirectory,
-                         "SharpProof.ContractForGenerator.dll"),
-                     Path.Combine(
+                         "SharpProof.ContractForGenerator.dll"), Path.Combine(
                          collectorDirectory,
-                         "SharpProof.CompilerCollector.dll"),
-                     Path.Combine(
+                         "SharpProof.CompilerCollector.dll"), Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Analyzer.Core.dll"),
-                     Path.Combine(
+                         "SharpProof.Analyzer.Core.dll"), Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Compiler.Semantics.dll")
-                 })
+                         "SharpProof.Compiler.Semantics.dll")))
         {
             var reference = new AnalyzerFileReference(path, loader);
             reference.AnalyzerLoadFailed += (_, args) =>
@@ -747,11 +737,7 @@ public sealed class PackageLayoutSmokeTests
             Path.Combine(root, "package;layout"));
         var packageBuild = Directory.CreateDirectory(
             Path.Combine(packageRoot.FullName, "buildTransitive"));
-        foreach (var fileName in new[] {
-                     "SharpProof.ConsumerContract.props",
-                     "SharpProof.props",
-                     "SharpProof.targets"
-                 })
+        foreach (var fileName in ImmutableArray.Create("SharpProof.ConsumerContract.props", "SharpProof.props", "SharpProof.targets"))
         {
             File.Copy(
                 Path.Combine(
@@ -1238,11 +1224,7 @@ public sealed class PackageLayoutSmokeTests
         var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
         var registrations = root.Elements("UsingTask").ToImmutableArray();
         Assert.That(registrations, Has.Length.EqualTo(8));
-        foreach (var taskName in new[]
-                 {
-                     "InvalidatePublishedResult", "RunVerifier",
-                     "ValidatePublishedVerificationResult", "ResetPublishedVerification"
-                 })
+        foreach (var taskName in ImmutableArray.Create("InvalidatePublishedResult", "RunVerifier", "ValidatePublishedVerificationResult", "ResetPublishedVerification"))
         {
             var coreRegistrations = 0;
             var fullRegistrations = 0;
@@ -1884,22 +1866,17 @@ public sealed class PackageLayoutSmokeTests
     private static void VerifyPackageGraph(PackagedProductFeed feed)
     {
         System.ArgumentNullException.ThrowIfNull(feed);
-        var expectedDependencies =
-            new Dictionary<string, (string Id, string Version)[]>(
-                StringComparer.Ordinal)
-            {
-                [PackagedProductFeed.AttributesPackageId] = [],
-                [PackagedProductFeed.MainPackageId] = [
-                    (
-                        PackagedProductFeed.VerifierPackageId,
-                        "[" + feed.Version + "]")
-                ],
-                [PackagedProductFeed.VerifierPackageId] = [
-                    (
-                        PackagedProductFeed.AttributesPackageId,
-                        "[" + feed.Version + "]")
-                ]
-            };
+        var expectedDependencyBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<(string Id, string Version)>>(StringComparer.Ordinal);
+        expectedDependencyBuilder[PackagedProductFeed.AttributesPackageId] = [];
+        expectedDependencyBuilder[PackagedProductFeed.MainPackageId] =
+        [
+            (PackagedProductFeed.VerifierPackageId, "[" + feed.Version + "]")
+        ];
+        expectedDependencyBuilder[PackagedProductFeed.VerifierPackageId] =
+        [
+            (PackagedProductFeed.AttributesPackageId, "[" + feed.Version + "]")
+        ];
+        var expectedDependencies = expectedDependencyBuilder.ToImmutable();
         foreach (var package in feed.Packages)
         {
             using var archive = ZipFile.OpenRead(package.Path);
@@ -2399,9 +2376,7 @@ public sealed class PackageLayoutSmokeTests
                 "buildTransitive/SharpProof.Verifier.props"),
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
-        foreach (var dependencies in new[] {
-                     "tools/net10/SharpProof.Worker.deps.json"
-                 })
+        foreach (var dependencies in ImmutableArray.Create("tools/net10/SharpProof.Worker.deps.json"))
         {
             Assert.That(
                 ReadArchiveText(archive, dependencies),
@@ -2458,7 +2433,7 @@ public sealed class PackageLayoutSmokeTests
             "tools/net10/Microsoft.Z3.dll",
             z3.GetProperty("managedAssemblyBytes").GetInt64(),
             z3.GetProperty("managedAssemblySha256").GetString()!);
-        foreach (var architecture in new[] { "arm64", "x64" })
+        foreach (var architecture in ImmutableArray.Create("arm64", "x64"))
         {
             var mac = catalog.RootElement.GetProperty("macos").GetProperty(architecture);
             VerifyPackagePayload(
@@ -2543,7 +2518,8 @@ public sealed class PackageLayoutSmokeTests
     {
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         var fullPath = Path.GetFullPath(workingDirectory);
-        return s_sharedCompilationServerIds.GetOrAdd(
+        return ImmutableInterlocked.GetOrAdd(
+            ref s_sharedCompilationServerIds,
             fullPath,
             static _ => "sharpproof-package-layout-" +
                 Guid.NewGuid().ToString("N"));

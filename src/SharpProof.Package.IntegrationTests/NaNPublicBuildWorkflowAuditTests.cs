@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -66,7 +67,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         await File.WriteAllBytesAsync(Path.Combine(consumer, "global.json"),
             await File.ReadAllBytesAsync(Path.Combine(repository, "global.json")));
         var nugetConfig = IsolatedPackageFeedConfiguration.Write(consumer, feed.Source);
-        foreach (var name in new[] { "Consumer.csproj", "global.json", "NuGet.config" })
+        foreach (var name in ImmutableArray.Create("Consumer.csproj", "global.json", "NuGet.config"))
         {
             await SaveFileAsync(Path.Combine(consumer, name), Path.Combine(evidence, name));
         }
@@ -91,7 +92,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         await TestContext.Out.WriteLineAsync("PUBLIC CONSUMER BUILD\n" + build.CombinedOutput);
 
         var publication = Path.Combine(consumer, "obj", "Release", "net8.0", "SharpProof");
-        foreach (var name in new[] { "request.json", "result.json", "compiler-manifest.json" })
+        foreach (var name in ImmutableArray.Create("request.json", "result.json", "compiler-manifest.json"))
         {
             Assert.That(File.Exists(Path.Combine(publication, name)), Is.True,
                 "Missing public publication artifact " + name + ".\n" + build.CombinedOutput);

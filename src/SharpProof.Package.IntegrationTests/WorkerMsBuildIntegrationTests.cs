@@ -750,7 +750,7 @@ public sealed class WorkerMsBuildIntegrationTests
             IdentitySource, ("TargetFrameworks", "net8.0;net9.0"));
 
         var build = await BuildOkAsync(project.BuildParallelAsync(verify: true));
-        foreach (var framework in new[] { "net8.0", "net9.0" })
+        foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var request = WorkerProtocolJson.DeserializeRequest(
                 await File.ReadAllTextAsync(
@@ -784,7 +784,7 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofCompilerManifestFile", "evidence/compiler-manifest.json"));
 
         var build = await BuildOkAsync(project.BuildAsync(verify: true));
-        foreach (var framework in new[] { "net8.0", "net9.0" })
+        foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var directory = Path.Combine(project.Root, "evidence", framework);
             var requestPath = Path.Combine(directory, "request.json");
@@ -814,7 +814,7 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofVerifySarifFile", "evidence/result.sarif"));
 
         var build = await BuildOkAsync(project.BuildParallelAsync(verify: true));
-        foreach (var framework in new[] { "net8.0", "net9.0" })
+        foreach (var framework in ImmutableArray.Create("net8.0", "net9.0"))
         {
             var sarif = Path.Combine(
                 project.Root,
@@ -874,10 +874,7 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             System.ArgumentNullException.ThrowIfNull(output);
             var markerIdentities = new List<string>();
-            foreach (var framework in new[]
-                     {
-                         "net9.0", "net8.0", "netstandard2.0"
-                     })
+            foreach (var framework in ImmutableArray.Create("net9.0", "net8.0", "netstandard2.0"))
             {
                 var sarif = Path.Combine(
                     project.Root,
@@ -1905,7 +1902,7 @@ public sealed class WorkerMsBuildIntegrationTests
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         _ = await BuildOkAsync(project.BuildAsync(verify: true));
-        var stableMembers = new[] { project.RequestPath, project.ResultPath, project.CompilerManifestPath };
+        var stableMembers = ImmutableArray.Create(project.RequestPath, project.ResultPath, project.CompilerManifestPath);
         var original = stableMembers.ToDictionary(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), File.ReadAllBytes, StringComparer.Ordinal);
         var invocationManifest = project.CopyCompilerManifestForInvocation();
         var privateRequest = project.VerifyOutputPath("net8.0", "parent-request.json");
@@ -2169,7 +2166,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var collisionWorker = project.CollisionWorkerPath;
         Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
         File.Copy(sourceWorker, collisionWorker, overwrite: true);
-        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        foreach (var extension in ImmutableArray.Create(".deps.json", ".runtimeconfig.json"))
         {
             File.Copy(
                 Path.ChangeExtension(sourceWorker, extension),
@@ -2191,12 +2188,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
         var stableManifest = await File.ReadAllBytesAsync(
             project.CompilerManifestPath);
-        foreach (var cachePath in new[] {
-            project.ResultPath,
-            project.RequestPath,
-            project.CompilerManifestPath,
-            WorkerOutputPath()
-        })
+        foreach (var cachePath in ImmutableArray.Create(project.ResultPath, project.RequestPath, project.CompilerManifestPath, WorkerOutputPath()))
         {
             var failed = await project.RunVerificationTargetAsync(
                 ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
