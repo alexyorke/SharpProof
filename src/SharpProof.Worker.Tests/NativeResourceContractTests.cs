@@ -63,6 +63,12 @@ public sealed class NativeResourceContractTests
         return preparations.Single();
     }
 
+    [TestCase("LoopBodyEntries", 0, "n", 1, "int i=0; while(i<n) { i++; }")]
+    [TestCase("LoopBodyEntries", 0, "n", 1, "checked { int i=0; while(i<n) { i+=2; } }")]
+    [TestCase("LoopBodyEntries", 0, "n", 1, "checked { int i=1; while(i<n) { i*=2; } }")]
+    [TestCase("LoopBodyEntries", 0, "n", 1, "int remaining=n; while(remaining>2) { remaining-=3; }")]
+    [TestCase("ArrayAllocations", 0, "n", 1, "int i=0; while(i<n) { var a=new int[2]; i++; }")]
+    [TestCase("AllocatedElements", 0, "n", 2, "int i=0; while(i<n) { var a=new int[2]; i++; }")]
     [TestCase("LoopBodyEntries", 0, "n", 1, "Contract.Requires(n>=0); for(int i=0;i<n;i++) {}")]
     [TestCase("LoopBodyEntries", 0, "n", 1, "for(int i=0;i<n;i++) {}")]
     [TestCase("ArrayAllocations", 0, "n", 1, "for(int i=0;i<n;i++) { var a = new int[2]; }")]
@@ -291,6 +297,10 @@ public sealed class NativeResourceContractTests
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("7"));
         Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
     }
+    [TestCase("int i=0; while(i<5) { i+=2; }", 2, "3")]
+    [TestCase("int i=1; while(i<17) { i*=2; }", 2, "3")]
+    [TestCase("int remaining=7; while(remaining>1) { remaining-=2; }", 1, "2")]
+    [TestCase("checked { int i=2147483646; while(i<2147483647) { i+=2; } }", 0, "1")]
     [TestCase("for(int i=0;i<4;i++) {}", 2, "3")]
     [TestCase("for(int i=0;(i<4);i++) {}", 2, "3")]
     [TestCase("for(long i=0;i<4;i++) {}", 2, "3")]

@@ -94,6 +94,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private readonly CancellationToken _cancellation;
     private readonly Dictionary<ISymbol, Bound> _counters = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, Bound> _localProgress = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, BigInteger> _localInitialConstants = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, Bound?> _scalarArguments = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, Bound?> _arrayArguments = new(SymbolEqualityComparer.Default);
     private readonly HashSet<ISymbol> _activeMethods = new(SymbolEqualityComparer.Default);
@@ -188,10 +189,13 @@ internal sealed partial class ResourceBoundsAnalysis
                 break;
             case IVariableDeclaratorOperation variable:
                 _localProgress.Remove(variable.Symbol);
+                _localInitialConstants.Remove(variable.Symbol);
                 if (variable.Symbol.Type.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 &&
                     variable.Initializer is { } progressInitializer)
                 {
                     var constant = IntegerConstant(progressInitializer.Value);
+                    if (constant is { } exact)
+                    { _localInitialConstants[variable.Symbol] = exact; }
                     var progress = constant is { } integer ? Bound.Number(BigInteger.Max(0, integer)) : Size(progressInitializer.Value);
                     if (progress is not null)
                     { _localProgress[variable.Symbol] = progress; }
@@ -292,7 +296,10 @@ internal sealed partial class ResourceBoundsAnalysis
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         if (target is ILocalReferenceOperation written)
-        { _localProgress.Remove(written.Local); }
+        {
+            _localProgress.Remove(written.Local);
+            _localInitialConstants.Remove(written.Local);
+        }
         return target switch
         {
             ILocalReferenceOperation local => local.Local.RefKind == RefKind.None && !_counters.ContainsKey(local.Local),

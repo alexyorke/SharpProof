@@ -468,7 +468,7 @@ and 722 local links passed. Layout evaluated 2651 source files, 59 projects and
 151 pinned common files. Final spelling checked all 71 configured files with
 zero findings. A broad worker run caught the general-reference transport
 regression; the producer now emits only the resource-used reference subset,
-leaving general references excluded. The corrected full worker gate is running.
+leaving general references excluded. The corrected full worker gate passed all 5809 tests with zero warnings/errors.
 All other unchecked roadmap items and final 100% coverage remain required.
 
 Published metadata checkpoint: `2e9ecfb61fc005a4808729e19e86e50fc51567ad`.
@@ -483,3 +483,23 @@ three reversed maximum trees must stop at the shared comparison budget. All 12
 arithmetic-order tests passed with zero build warnings/errors. This exercises
 two previously uncovered rule families; complete coverage must still be measured
 and qualified, and no coverage percentage is inferred from these test results.
+
+The next phase extends checked ranking synthesis for top-tested while loops.
+Increasing additive/multiplicative ranks require an unchanged, exact nonnegative
+constant initializer; a clamped size envelope cannot establish the actual
+initial counter value. Decreasing additive ranks can use nonnegative constant
+lower bounds. The compiler emits the existing typed rank certificates for native
+checking. Mutation, unsupported starts, missing progress and unchecked overflow
+remain Unknown. Source, independent execution, native proof and exact-prefix
+replay controls passed: 190 focused source-resource tests and 129 native resource
+tests, followed by the full 1322-test analyzer gate. Builds reported zero warnings
+or errors. The broader ranking checkbox remains open for multi-counter synthesis.
+
+Exact-head coverage for metadata checkpoint `2e9ecfb61` completed all four shards
+successfully but failed qualification at 1766/1833 changed trusted-code lines
+(96.34%), leaving 67 uncovered lines. The 100% baseline is unchanged. Its package,
+consumer and release workflow passed. The local arithmetic follow-up and while
+extension were not part of that measurement. The next ranking work is checked
+composition of multiple counter phases; unsupported coupled updates will remain
+Unknown. Remaining metadata/protocol coverage gaps are also being mapped to
+boundary controls rather than excluded from qualification.

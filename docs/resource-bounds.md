@@ -53,11 +53,16 @@ early returns and exceptional exits, rather than guaranteeing normal completion.
   proven nonnegative envelope. Dependent inner bounds and allocation sizes use
   that envelope, which may be loose. Arbitrary arithmetic bounds and other local
   values, do/foreach, break, continue and goto remain Unknown.
-- A local initialized from a supported size can serve as the rank for
-  `while (remaining > 0)`. A final `--`, `-= positiveConstant`, or `/= constant`
-  (divisor greater than one) must decrease that rank. The prefix rejects all
-  other counter writes, aliases and jumps. Earlier mutation invalidates the
-  initial-size fact. This rule does not infer ranks for arbitrary while loops.
+- Top-tested `while` loops can use increasing or decreasing local ranks.
+  Increasing `<` loops require an unchanged, exact nonnegative constant start,
+  with a final `++`, `+= positiveConstant`, or `*= factor` (start one and factor
+  greater than one). Unchecked updates must stay representable; checked overflow
+  ends the bounded execution prefix. Decreasing `>` loops start from a supported
+  size and use final `--`/`-= positiveConstant` with a nonnegative constant lower
+  bound, or `/= factor` toward zero. The prefix rejects other counter writes,
+  aliases and jumps. Earlier mutation invalidates the initial-value fact. A
+  negative or symbolic initial value cannot be clamped into an increasing rank.
+  These rules do not infer ranks for arbitrary while loops.
 - Sequential costs add. Nested costs multiply. A loop's contribution
   includes its own body entries plus any nested loop entries. Branches take the
   maximum for each metric, so different metrics need not attain their maxima on

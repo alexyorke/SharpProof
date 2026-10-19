@@ -4,6 +4,15 @@ namespace SharpProof.Analyzer.Test;
 
 public sealed partial class ResourceBoundsTests
 {
+    [TestCase("int i=0; while(i<5) { var a=new int[2]; i+=2; }", "3", "3", "6")]
+    [TestCase("int i=2; while(i<9) { i+=3; }", "3", "0", "0")]
+    [TestCase("checked { int i=0; while(i<n) { i+=2; } }", "ceil(max(0, n) / 2)", "0", "0")]
+    [TestCase("long i=0; while(i<n) { i+=2; }", "ceil(max(0, n) / 2)", "0", "0")]
+    [TestCase("int i=1; while(i<17) { i*=2; }", "5", "0", "0")]
+    [TestCase("checked { int i=1; while(i<n) { i*=2; } }", "ceil_log(max(0, n), 2)", "0", "0")]
+    [TestCase("int remaining=n; while(remaining>2) { remaining-=3; }", "ceil(max(0, (max(0, n) - 2)) / 3)", "0", "0")]
+    [TestCase("int remaining=7; while(remaining>1) { remaining-=2; }", "3", "0", "0")]
+    [TestCase("checked { int i=0; while(i<2147483647) { i+=2; } }", "1073741824", "0", "0")]
     [TestCase("for (int i=0; i<5; i+=2) { var a = new int[2]; }", "3", "3", "6")]
     [TestCase("for (int i=2; i<9; i+=3) { var a = new int[2]; }", "3", "3", "6")]
     [TestCase("checked { for (int i=0; i<n; i+=2) {} }", "ceil(max(0, n) / 2)", "0", "0")]
@@ -37,6 +46,17 @@ public sealed partial class ResourceBoundsTests
         }
     }
 
+    [TestCase("int i=-1; while(i<n) { i++; }", "UnsupportedLoopStart")]
+    [TestCase("int i=n; while(i<10) { i++; }", "UnsupportedLoopStart")]
+    [TestCase("int i=0; while(i<n) { i+=2; }", "LoopCounterMayOverflow")]
+    [TestCase("int i=1; while(i<n) { i*=2; }", "LoopCounterMayOverflow")]
+    [TestCase("int i=1; while(i<10) { i*=1; }", "UnprovedLoopProgress")]
+    [TestCase("int i=0; i++; while(i<n) { i++; }", "UnprovedLoopProgress")]
+    [TestCase("int i=0; while(i<n) { i=1; i++; }", "UnstableInputOrCounter")]
+    [TestCase("int i=0; while(i<n) { if(n>0) continue; i++; }", "UnsupportedOperation:Branch")]
+    [TestCase("int i=0; while(i<n) { i--; }", "UnprovedLoopProgress")]
+    [TestCase("int remaining=n; while(remaining>2) { remaining/=2; }", "UnprovedLoopProgress")]
+    [TestCase("int i=0; while(i<n) { i++; } while(i<n) { i++; }", "UnprovedLoopProgress")]
     [TestCase("for (int i=0; i<n; i+=2) {}", "LoopCounterMayOverflow")]
     [TestCase("for (int i=1; i<n; i*=2) {}", "LoopCounterMayOverflow")]
     [TestCase("for (int i=0; i<n; i*=2) {}", "LoopCounterMayOverflow")]
@@ -84,6 +104,12 @@ public sealed partial class ResourceBoundsTests
                 Assert.That(downResult.Proven, Is.True, downResult.UnknownReason);
                 Assert.That(upResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(up)));
                 Assert.That(downResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(down)));
+                var whileUpResult = Analyze($"int counter=2; while(counter<{end}) {{ counter+={stride}; }}");
+                var whileDownResult = Analyze($"int counter={end}; while(counter>1) {{ counter-={stride}; }}");
+                Assert.That(whileUpResult.Proven, Is.True, whileUpResult.UnknownReason);
+                Assert.That(whileDownResult.Proven, Is.True, whileDownResult.UnknownReason);
+                Assert.That(whileUpResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(up)));
+                Assert.That(whileDownResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(down)));
                 int remaining = end, drained = 0;
                 while (remaining > 0)
                 { drained++; remaining -= stride; }
@@ -102,6 +128,9 @@ public sealed partial class ResourceBoundsTests
                 Assert.That(shrinkResult.Proven, Is.True, shrinkResult.UnknownReason);
                 Assert.That(growResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(grow)));
                 Assert.That(shrinkResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(shrink)));
+                var whileGrowResult = Analyze($"int counter=1; while(counter<{end}) {{ counter*={stride}; }}");
+                Assert.That(whileGrowResult.Proven, Is.True, whileGrowResult.UnknownReason);
+                Assert.That(whileGrowResult.Bounds!.LoopIterations.Constant, Is.EqualTo(new System.Numerics.BigInteger(grow)));
             }
         }
     }

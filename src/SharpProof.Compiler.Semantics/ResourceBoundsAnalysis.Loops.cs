@@ -8,55 +8,91 @@ internal sealed partial class ResourceBoundsAnalysis
     {
         loop = ArgumentNullGuard.NotNull(loop, nameof(loop));
         if (!loop.ConditionIsTop || loop.ConditionIsUntil ||
-            loop.Condition is not IBinaryOperation { OperatorKind: BinaryOperatorKind.GreaterThan, OperatorMethod: null } condition ||
-            condition.LeftOperand is not ILocalReferenceOperation counter ||
-            IntegerConstant(condition.RightOperand) != 0)
+            loop.Condition is not IBinaryOperation { OperatorMethod: null } condition ||
+            condition.OperatorKind is not (BinaryOperatorKind.LessThan or BinaryOperatorKind.GreaterThan) ||
+            condition.LeftOperand is not ILocalReferenceOperation counter)
         { return Unknown("UnsupportedLoop"); }
         if (!_localProgress.TryGetValue(counter.Local, out var initial))
         { return Unknown("UnprovedLoopProgress"); }
+        var increasing = condition.OperatorKind == BinaryOperatorKind.LessThan;
+        var comparison = Size(condition.RightOperand);
+        var lower = IntegerConstant(condition.RightOperand);
+        if (comparison is null || !increasing && (lower is null || lower.Value < 0))
+        { return Unknown("UnsupportedLoopBound"); }
         var operations = loop.Body is IBlockOperation block ? block.Operations : ImmutableArray.Create(loop.Body);
         if (operations.IsEmpty || operations[operations.Length - 1] is not IExpressionStatementOperation step)
         { return Unknown("UnprovedLoopProgress"); }
         IOperation? target;
         BigInteger amount;
-        bool geometric;
-        if (step.Operation is IIncrementOrDecrementOperation { OperatorMethod: null, Kind: OperationKind.Decrement } decrement)
+        BinaryOperatorKind kind;
+        bool checkedStep;
+        if (step.Operation is IIncrementOrDecrementOperation { OperatorMethod: null } increment)
         {
-            target = decrement.Target;
+            target = increment.Target;
             amount = 1;
-            geometric = false;
+            kind = increment.Kind == OperationKind.Increment ? BinaryOperatorKind.Add : BinaryOperatorKind.Subtract;
+            checkedStep = increment.IsChecked;
         }
         else if (step.Operation is ICompoundAssignmentOperation { OperatorMethod: null } compound &&
             !compound.InConversion.IsUserDefined && !compound.OutConversion.IsUserDefined &&
-            compound.OperatorKind is BinaryOperatorKind.Subtract or BinaryOperatorKind.Divide &&
+            compound.OperatorKind is BinaryOperatorKind.Add or BinaryOperatorKind.Multiply or BinaryOperatorKind.Subtract or BinaryOperatorKind.Divide &&
             IntegerConstant(compound.Value) is { } constant && constant > 0)
         {
             target = compound.Target;
             amount = constant;
-            geometric = compound.OperatorKind == BinaryOperatorKind.Divide;
+            kind = compound.OperatorKind;
+            checkedStep = compound.IsChecked;
         }
         else
         { return Unknown("UnprovedLoopProgress"); }
         if (target is not ILocalReferenceOperation local ||
             !SymbolEqualityComparer.Default.Equals(local.Local, counter.Local) ||
             counter.Local.RefKind != RefKind.None ||
-            counter.Local.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64) ||
-            amount > (counter.Local.Type.SpecialType == SpecialType.System_Int32 ? new BigInteger(int.MaxValue) : new BigInteger(long.MaxValue)) ||
-            geometric && amount <= 1)
+            counter.Local.Type.SpecialType is not (SpecialType.System_Int32 or SpecialType.System_Int64))
         { return Unknown("UnprovedLoopProgress"); }
-        var count = geometric ? GeometricCount(initial, amount, descending: true) : DivideCeiling(initial, amount);
-        // The rank is the nonnegative counter size. Every continuing path must
-        // reach the checked tail update: all other writes, aliases, jumps and
-        // continue statements in the prefix are rejected by the closed visitor.
+        var maximum = counter.Local.Type.SpecialType == SpecialType.System_Int32 ? new BigInteger(int.MaxValue) : new BigInteger(long.MaxValue);
+        if (amount > maximum)
+        { return Unknown("UnprovedLoopProgress"); }
+        Bound count;
+        Bound envelope;
+        ResourceLoopKind rankKind;
+        if (increasing && kind is BinaryOperatorKind.Add or BinaryOperatorKind.Multiply)
+        {
+            // A nonnegative size envelope is insufficient for an increasing
+            // rank: clamping a negative initializer would lose real iterations.
+            if (!_localInitialConstants.TryGetValue(counter.Local, out var start) || start < 0)
+            { return Unknown("UnsupportedLoopStart"); }
+            if (!checkedStep && (comparison.Maximum is not { } limit ||
+                (kind == BinaryOperatorKind.Add ? limit - 1 + amount > maximum : (limit - 1) * amount > maximum)))
+            { return Unknown("LoopCounterMayOverflow"); }
+            if (kind == BinaryOperatorKind.Multiply && (start != 1 || amount <= 1))
+            { return Unknown("UnprovedLoopProgress"); }
+            count = kind == BinaryOperatorKind.Add ? DivideCeiling(Difference(comparison, start), amount)
+                : GeometricCount(comparison, amount, descending: false);
+            envelope = comparison;
+            rankKind = kind == BinaryOperatorKind.Add ? ResourceLoopKind.IncreasingAdd : ResourceLoopKind.IncreasingMultiply;
+        }
+        else if (!increasing && kind is BinaryOperatorKind.Subtract or BinaryOperatorKind.Divide)
+        {
+            if (kind == BinaryOperatorKind.Divide && (lower != 0 || amount <= 1))
+            { return Unknown("UnprovedLoopProgress"); }
+            count = kind == BinaryOperatorKind.Subtract ? DivideCeiling(Difference(initial, lower!.Value), amount)
+                : GeometricCount(initial, amount, descending: true);
+            envelope = initial;
+            rankKind = kind == BinaryOperatorKind.Subtract ? ResourceLoopKind.DecreasingSubtract : ResourceLoopKind.DecreasingDivide;
+        }
+        else
+        { return Unknown("UnprovedLoopProgress"); }
+        // Every continuing path must reach this tail update. The closed body
+        // visitor rejects other counter writes, aliases, jumps and continues.
         _localProgress.Remove(counter.Local);
-        _counters.Add(counter.Local, initial);
+        _localInitialConstants.Remove(counter.Local);
+        _counters.Add(counter.Local, envelope);
         var body = Sequence(operations.Take(operations.Length - 1), depth + 1);
         _counters.Remove(counter.Local);
         _localProgress.Remove(counter.Local);
-        var checkedStep = step.Operation is IIncrementOrDecrementOperation update ? update.IsChecked :
-            ((ICompoundAssignmentOperation)step.Operation).IsChecked;
-        var rank = new ResourceLoopRank(geometric ? ResourceLoopKind.DecreasingDivide : ResourceLoopKind.DecreasingSubtract,
-            initial.Expression, ResourceExpression.Zero, amount,
+        _localInitialConstants.Remove(counter.Local);
+        var rank = new ResourceLoopRank(rankKind, initial.Expression, comparison.Expression, amount,
             counter.Local.Type.SpecialType == SpecialType.System_Int32 ? 32 : 64, checkedStep);
         return body.Scale(count, rank, ResourceRepeatKind.Loop);
     }
