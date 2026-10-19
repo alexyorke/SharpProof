@@ -73,7 +73,10 @@ jobs:
         with:
           download-packages: "false"
 
+      # On pull requests, ci.yml's canonical-gates runs the same format-check
+      # for the same commit and build-and-test requires it.
       - name: Require repository linting and formatting before packaging or release
+        if: github.event_name != 'pull_request'
         run: docker compose run --rm tooling format-check
 
       - name: Pack and validate the package graph
