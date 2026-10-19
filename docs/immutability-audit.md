@@ -3646,3 +3646,9 @@ capture, preserve parameter order explicitly for requirements, freeze ordered cl
 builders after alias relations are appended, and preserve inner reflection arrays
 and mutable reference-identity alias state. Validate all ordinary Fuzz tests.
 Status: planned before edits.
+
+IMM-M137: Review Doctor's four remaining package snapshot assignments. Freeze outer
+package vectors while preserving ordered inner wire records, existing no-target and
+failed-evaluation empty results, assets error handling, direct/resolved preference,
+JSON arrays and version order. Validate with canonical Doctor regressions plus
+baseline/current empty/singleton/multiple package controls. Status: planned.
