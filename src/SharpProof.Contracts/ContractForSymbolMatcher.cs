@@ -586,7 +586,7 @@ internal static class ContractForSymbolMatcher
 
                 if (method.Arity != 0)
                 {
-                    method = method.Construct(state.target.TypeArguments.ToArray());
+                    method = method.Construct(state.target.TypeArguments, state.target.TypeArgumentNullableAnnotations);
                 }
 
                 return (!RequiresConstructedSignatureCheck(state.target) ||
@@ -624,10 +624,15 @@ internal static class ContractForSymbolMatcher
                             companionLayers[index].OriginalDefinition))) ??
                   throw new ArgumentException(
                       "The nested companion type could not be specialized.");
-            constructed = definition.Arity == 0
-                ? definition
-                : definition.Construct(
-                    targetLayers[targetIndex++].TypeArguments.ToArray());
+            if (definition.Arity == 0)
+            {
+                constructed = definition;
+            }
+            else
+            {
+                var targetLayer = targetLayers[targetIndex++];
+                constructed = definition.Construct(targetLayer.TypeArguments, targetLayer.TypeArgumentNullableAnnotations);
+            }
         }
 
         return constructed ?? throw new ArgumentException(

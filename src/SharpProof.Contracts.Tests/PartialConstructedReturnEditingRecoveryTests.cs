@@ -59,7 +59,7 @@ public sealed class PartialConstructedReturnEditingRecoveryTests
         Assert.That(callOperation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)callOperation!).TargetMethod;
         Assert.That(target.OriginalDefinition, Is.SameAs(definition));
-        var actualImplementation = implementation.Construct(target.TypeArguments.ToArray());
+        var actualImplementation = implementation.Construct(target.TypeArguments, target.TypeArgumentNullableAnnotations);
         Assert.That(SymbolEqualityComparer.Default.Equals(target.ReturnType,
             actualImplementation.ReturnType), Is.EqualTo(coincident));
         var binder = new ContractBinder(compilation, new IrFactory());

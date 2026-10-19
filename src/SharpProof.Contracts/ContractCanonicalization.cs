@@ -225,7 +225,7 @@ internal sealed class ContractCanonicalization(
 
                     return (definition.Arity == 0
                             ? definition
-                            : definition.Construct([.. state.arguments]))
+                            : definition.Construct(state.arguments, state.arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray()))
                         .WithNullableAnnotation(state.named.NullableAnnotation);
                 }, out ITypeSymbol? specializedType)
                 ? specializedType : null;

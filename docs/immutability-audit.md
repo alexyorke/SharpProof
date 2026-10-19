@@ -3762,3 +3762,16 @@ existing immutable check/run vectors directly. This wrapper is shallow: parsed e
 Doctor configuration remains a separately open nested-value scope. Validate real write
 rejection, baseline JSON/property/filter/measure behavior, Doctor and seed regressions.
 Status: planned before edits.
+
+IMM-M142 full semantic checkpoint verified at pushed source 44e7c9b03: 11,854
+ordinary Release tests pass, zero failures/skips/build warnings/errors, 23 framework
+summaries across six isolated tasks using 32 scheduler slots; 225 exact embedded PDB
+outputs. This checkpoint includes M131-M142 and excludes later M143/M144 source edits.
+Latest literal check matches all 3,561 raw/interpolated text tokens across 823 changed
+C# files against master16063804e. Earlier unproven vc-shadow timeout did not recur.
+
+IMM-M143 verified: all 640 ordinary Release Contracts tests pass, zero failures/
+skips/build warnings/errors; 16 exact embedded PDB outputs. Thirty pinned Roslyn4.14
+native/immutable annotation/arity/exception controls pass and independent review
+confirms all four files, target-layer increment, non-null symbol provenance and matching
+nullable annotation vectors. Canonical whitespace check requires zero changes.
