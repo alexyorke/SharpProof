@@ -224,7 +224,7 @@ block: b70 finally:entry
 block: b71 throw
   i116 op39 Throw Overflow -> b73 source=total-cross-frame-search.cs:tokens["(","byte",")","(","value","+","256",")"]#1
 block: b72 normal
-  i117 op40 Assign v46:byte[width=8,signed=False] = (("byte"#t4)v45) source=total-cross-frame-search.cs:tokens["(","byte",")","(","value","+","256",")"]#1
+  i117 op40 Assign v46:byte[width=8,signed=False] = (("byte"#t5)v45) source=total-cross-frame-search.cs:tokens["(","byte",")","(","value","+","256",")"]#1
   i118 op41 Assign v47:int[width=32,signed=True] = (("int"#t1)v46) source=total-cross-frame-search.cs:tokens["(","byte",")","(","value","+","256",")"]#1
   i119 op42 Assign v34:int[width=32,signed=True] = v47 source=total-cross-frame-search.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
   i120 op42 Write Local source=total-cross-frame-search.cs:tokens["value","=","checked","(","(","byte",")","(","value","+","256",")",")"]#1
@@ -351,8 +351,8 @@ term: ir68 Variable type=t1:int width=32 signed=True value=v45
 term: ir69 Binary type=t0:bool width=0 signed=False value=(v45 < 0)
 term: ir70 Integer type=t1:int width=32 signed=True bits=255 value=255
 term: ir71 Binary type=t0:bool width=0 signed=False value=(v45 > 255)
-term: ir72 Cast type=t4:byte width=8 signed=False value=(("byte"#t4)v45)
-term: ir73 Variable type=t4:byte width=8 signed=False value=v46
+term: ir72 Cast type=t5:byte width=8 signed=False value=(("byte"#t5)v45)
+term: ir73 Variable type=t5:byte width=8 signed=False value=v46
 term: ir74 Cast type=t1:int width=32 signed=True value=(("int"#t1)v46)
 term: ir75 Variable type=t1:int width=32 signed=True value=v47
 term: ir76 Variable type=t0:bool width=0 signed=False value=v27

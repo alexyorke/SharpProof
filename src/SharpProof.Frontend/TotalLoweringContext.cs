@@ -69,6 +69,8 @@ public sealed partial class TotalLoweringContext
     private readonly Dictionary<BasicBlock, ExactSpecificationContinuation> _exactSpecificationContinuations = [];
     private ControlFlowGraph? _exactSpecificationGraph;
     private Compilation? _exactSpecificationCompilation;
+    // Array symbol reconstruction does not admit a frame for semantic lowering.
+    private Compilation? _sourceTypeCompilation;
     private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
     private readonly List<(IrTerm Condition, OperationId Site)> _entryAssumptions = [];
     private int _temporary;
@@ -120,7 +122,7 @@ public sealed partial class TotalLoweringContext
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        return new(Factory, target, _document, 0, allowGenericContainer: true) { AllowObjectWidening = AllowObjectWidening };
+        return new(Factory, target, _document, 0, allowGenericContainer: true) { AllowObjectWidening = AllowObjectWidening, _sourceTypeCompilation = Compilation ?? _sourceTypeCompilation };
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {

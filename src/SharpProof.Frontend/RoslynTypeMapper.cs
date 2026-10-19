@@ -7,6 +7,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer = static type => type;
     private readonly Dictionary<ITypeSymbol, bool> _closedSealedTypes = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<ITypeSymbol> _classTypesChecked = new(SymbolEqualityComparer.Default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
@@ -63,8 +64,45 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             }
             if (certified)
             { _factory.RegisterClosedSealedReferenceType(mapped); }
+            if (_classTypesChecked.Add(type))
+            {
+                RegisterClassChain(type);
+                if (type is INamedTypeSymbol { IsReferenceType: true } named)
+                {
+                    if (named.TypeKind == TypeKind.Interface)
+                    { _factory.RegisterInterfaceReferenceType(mapped); }
+                    if (named.AllInterfaces.Length <= 128)
+                    {
+                        foreach (var implemented in named.AllInterfaces)
+                        { _factory.RegisterImplementedReferenceInterface(mapped, GetTypeId(implemented)); }
+                    }
+                }
+            }
         }
         return mapped;
+    }
+
+    private void RegisterClassChain(ITypeSymbol type)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
+        if (!CompilerIdentityBridge.IsClosedReferenceType(type, cancellation.Token))
+        { return; }
+        var chain = new List<INamedTypeSymbol>();
+        for (var current = (INamedTypeSymbol)type; current.SpecialType != SpecialType.System_Object; current = current.BaseType!)
+        {
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (chain.Count == 64 || current.BaseType == null || current.SpecialType != SpecialType.None)
+            { return; }
+            chain.Add(current);
+        }
+        IrTypeId? parent = null;
+        for (var index = chain.Count - 1; index >= 0; index--)
+        {
+            var symbol = chain[index];
+            var id = _factory.GetOrCreateReferenceType(CompilerIdentityBridge.InternType(_factory, symbol), CompilerIdentityBridge.CreateTypeDisplay(symbol));
+            _factory.RegisterClosedClassReferenceType(id, parent);
+            parent = id;
+        }
     }
 
     internal bool IsSupportedValueDomain(ITypeSymbol? type)
