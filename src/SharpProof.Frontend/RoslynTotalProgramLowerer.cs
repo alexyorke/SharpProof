@@ -43,6 +43,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         }
         catch (FrontendLoweringRejectionException incomplete)
         { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg"), incomplete.Reason); }
+        catch (RegionIncompleteException incomplete)
+        { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg"), incomplete.Reason); }
         finally
         { _calls?.Leave(_context.Target); }
     }

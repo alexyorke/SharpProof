@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 // A callable input: its value on entry, its current storage and its Old
 // snapshot.
-public class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
+public sealed class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
 {
     public IrVarId Entry { get; } = (entry.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(entry)) : entry);
     public IrVarId Current { get; } = (current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : current);
@@ -10,11 +10,14 @@ public class TotalInputBinding(IrVarId entry, IrVarId current, IrVarId preState)
 }
 
 public sealed class TotalParameterBinding(IParameterSymbol parameter, IrVarId entry, IrVarId current, IrVarId preState)
-    : TotalInputBinding(
+{
+    public TotalInputBinding Input { get; } = new(
         entry.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(entry)) : entry,
         current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : current,
-        preState.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(preState)) : preState)
-{
+        preState.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(preState)) : preState);
+    public IrVarId Entry => Input.Entry;
+    public IrVarId Current => Input.Current;
+    public IrVarId PreState => Input.PreState;
     public IParameterSymbol Parameter { get; } = (parameter ?? throw new System.ArgumentNullException(nameof(parameter)));
 }
 
@@ -157,7 +160,8 @@ public sealed partial class TotalLoweringContext
     { return Target.MethodKind == MethodKind.Constructor ? null : ReceiverValue(state); }
 
     internal ImmutableArray<TotalInputBinding> Inputs =>
-        Receiver == null ? [.. Parameters] : [.. Parameters, Receiver];
+        Receiver == null ? [.. Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input)]
+            : [.. Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input), Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; private set; }
