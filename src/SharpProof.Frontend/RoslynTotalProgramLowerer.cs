@@ -136,7 +136,19 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             var frameType = _context.Factory.GetOrCreateReferenceType(_context.Factory.CreateIdentity(), "root-parameter-closure-frame");
             _context.Factory.RegisterClosureFrameType(frameType, closure.Fields);
             var frame = _context.Temporary(frameType);
-            _builder.Allocate(entry, structural, frameType, frame);
+            _builder.Allocate(entry, _context.Factory.CreateOperation(IrClosureFrameSite.Description), frameType, frame);
+            for (var slot = 0; slot < closure.Parameters.Length; slot++)
+            {
+                SpendRegion();
+                IrTerm captured = _context.Factory.Variable(_context.Parameters[closure.Parameters[slot].Ordinal].Current);
+                if (closure.Fields[slot] == ResourceStorageKind.Reference)
+                { captured = _context.Factory.Cast(_context.Factory.ObjectType, captured); }
+                var member = _context.Factory.GetOrCreateMember(_context.Factory.CreateIdentity(), _context.Factory.ObjectType,
+                    IrClosureFrameSite.FieldName(slot), captured.Type, false);
+                _builder.FieldStore(entry, _context.FreshWriteSite(graph.OriginalOperation), IrWriteRegion.Field,
+                    _context.Factory.Cast(_context.Factory.ObjectType, _context.Factory.Variable(frame)), member, captured);
+            }
+            _expressions.RootClosureFrame = _context.Factory.Variable(frame);
         }
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
         { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }

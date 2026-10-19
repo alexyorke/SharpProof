@@ -534,7 +534,7 @@ Their 64-byte storage under the declared layout participates in aliasing,
 reference guards, auxiliary memory and retained output. Scalar boxes use fresh
 24-byte object storage for the admitted Boolean/integer payloads.
 
-Closure captures, cached conversions, metadata method targets
+Broader closure captures, cached conversions, metadata method targets
 and unsupported initialization remain Unknown without partial lifetime metrics.
 Delegate invocation costs and effects require their own admission and are not
 implied by allocation or lifetime evidence.
@@ -551,5 +551,21 @@ Both extraction and completed replay require the compiler marker, delegate type,
 scoped target field and ordered initialization. Missing, mismatched, null,
 overwritten or borrowed edges produce Unknown, as does a target equal to the
 newly allocated delegate. Bindings whose
-construction may be erased, closure links and unsupported target bindings remain
+construction may be erased, broader closure links and unsupported target bindings remain
 Unknown. Capture storage does not imply any bound on invoking the target method.
+
+### Root closure frame links
+
+Admitted root parameter closures initialize their certified slots in order and
+link the returned delegate to that frame. Primitive captures retain their typed
+storage even when input values are unknown. Inlined source factories can capture
+owned references, including child graphs and shared objects. A one-reference
+frame, a 64-byte delegate, a 24-byte captured object and its 32-byte child array
+retain 144 newly owned bytes under the declared layout; two reference slots
+sharing that same graph retain 152 bytes.
+
+Missing, reordered, mismatched or overwritten capture stores remain Unknown.
+Borrowed non-null captures and broader scopes still require further ownership
+models. Object packing intervals remain separate upper and lower bounds; a loose
+upper bound cannot establish an exact violating cost. Closure invocation effects
+and costs require separate admission.

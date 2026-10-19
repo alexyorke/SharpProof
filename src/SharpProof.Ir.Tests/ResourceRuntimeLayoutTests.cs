@@ -192,6 +192,8 @@ public sealed class ResourceRuntimeLayoutTests
         CheckMeasured(ResourceAllocationShape.Closure([ResourceStorageKind.Word32]), CreateClosure);
         Assert.That(Measure(static () => RootParameterClosure(42)), Is.EqualTo(88));
         Assert.That(Measure(static () => RootMixedClosure(42, SharedReference)), Is.EqualTo(96));
+        Assert.That(Measure(CreateOwnedClosureGraph), Is.EqualTo(144));
+        Assert.That(Measure(CreateSharedClosureGraph), Is.EqualTo(152));
         Assert.That(Measure(static () => new InitializedFieldCell()), Is.EqualTo(64));
         Assert.That(Measure(static () => new InitializedPropertyCell()), Is.EqualTo(64));
         Assert.That(Measure(static () => new InitializedFieldCell { Data = new int[4] }), Is.EqualTo(104));
@@ -250,6 +252,45 @@ public sealed class ResourceRuntimeLayoutTests
     {
         private readonly int[] _values = new int[1];
         internal int Read() { return _values.Length; }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object CreateOwnedClosureGraph()
+    { return CaptureOwnedGraph(new DelegateGraphReceiver()); }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int> CaptureOwnedGraph(DelegateGraphReceiver value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return () => value.Read();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static object CreateSharedClosureGraph()
+    {
+        var value = new DelegateGraphReceiver();
+        return CaptureSharedGraph(value, value);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Func<int> CaptureSharedGraph(DelegateGraphReceiver first, DelegateGraphReceiver second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        return () => first.Read() + second.Read();
+    }
+
+    [Test]
+    public void RuntimeClosureFramesRetainOwnedAndSharedChildren()
+    {
+        var owned = (Func<int>)CreateOwnedClosureGraph();
+        var shared = (Func<int>)CreateSharedClosureGraph();
+        Assert.That(owned.Target, Is.Not.Null);
+        Assert.That(shared.Target, Is.Not.Null);
+        Assert.That(owned(), Is.EqualTo(1));
+        Assert.That(shared(), Is.EqualTo(2));
+        GC.KeepAlive(owned);
+        GC.KeepAlive(shared);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

@@ -87,6 +87,8 @@ internal static class ResourceMemoryProgram
         var objects = new HashSet<int>();
         var fieldSlots = new Dictionary<IrMemberId, int>();
         var pendingCaptures = new Dictionary<int, IrMemberId>();
+        var frames = new HashSet<int>();
+        var pendingFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
         for (var index = 0; index < instructions.Count; index++)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -119,7 +121,24 @@ internal static class ResourceMemoryProgram
                     { return Unknown("MemoryAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
                     IrMemberId? capturedField = null;
-                    if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
+                    var frameCaptures = ImmutableArray<IrMemberId>.Empty;
+                    if (factory.TryGetClosureFrameType(objectAllocation.AllocatedType, out var frameStorage))
+                    {
+                        if (!IrClosureFrameSite.Matches(factory, objectAllocation))
+                        { return Unknown("MemoryClosureCaptureIncomplete"); }
+                        var captures = ImmutableArray.CreateBuilder<IrMemberId>();
+                        for (var frameSlot = 0; frameSlot < frameStorage.Length; frameSlot++)
+                        {
+                            if (!IrClosureFrameSite.TryGetCapture(factory, objectAllocation,
+                                index + frameSlot + 1 < instructions.Count ? instructions[index + frameSlot + 1] : null,
+                                frameSlot, frameStorage[frameSlot], out var capture))
+                            { return Unknown("MemoryClosureCaptureIncomplete"); }
+                            captures.Add(capture);
+                        }
+                        frameCaptures = captures.ToImmutable();
+                        objectShape = ResourceAllocationShape.Object(frameStorage);
+                    }
+                    else if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
                     { objectShape = ResourceAllocationShape.Delegate(); }
                     else if (IrDelegateCaptureSite.Matches(factory, objectAllocation))
                     {
@@ -144,6 +163,12 @@ internal static class ResourceMemoryProgram
                     objects.Add(nextObject);
                     if (capturedField is { } requiredCapture)
                     { pendingCaptures.Add(nextObject, requiredCapture); }
+                    if (!frameCaptures.IsEmpty)
+                    {
+                        frames.Add(nextObject);
+                        foreach (var capture in frameCaptures)
+                        { pendingFrameCaptures.Add((nextObject, capture)); }
+                    }
                     trace.Add(new(ResourceMemoryEventKind.Allocate, nextObject, objectSlot, 0, objectLower, objectUpper));
                     break;
                 case IrAllocationInstruction allocation:
@@ -190,10 +215,16 @@ internal static class ResourceMemoryProgram
                     var member = factory.GetMemberInfo(field);
                     if (member.IsStatic || !member.ParameterTypes.IsEmpty)
                     { return Unknown("MemoryFieldStoreUnsupported"); }
+                    var frameCapture = frames.Contains(receiver);
+                    if ((frameCapture || IrClosureFrameSite.IsCaptureField(factory, field)) &&
+                        !pendingFrameCaptures.Remove((receiver, field)))
+                    { return Unknown("MemoryClosureCaptureUnsupported"); }
                     if (factory.GetTypeInfo(member.ReturnType).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)
                     {
                         if (!TryReference(stored.Value, factory, values, out var child, fields: referenceFields))
                         { return Unknown("MemoryFieldStoreUnsupported"); }
+                        if (frameCapture && child == receiver)
+                        { return Unknown("MemoryClosureCaptureUnsupported"); }
                         if (IrDelegateCaptureSite.IsTargetField(factory, field))
                         {
                             if (child == 0 || child == receiver || !pendingCaptures.TryGetValue(receiver, out var required) || required != field)

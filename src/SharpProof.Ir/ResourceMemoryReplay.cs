@@ -93,6 +93,8 @@ internal sealed class ResourceMemoryReplay
         var objects = new HashSet<int>();
         var fieldSlots = new Dictionary<IrMemberId, int>();
         var pendingCaptures = new Dictionary<int, IrMemberId>();
+        var frames = new HashSet<int>();
+        var pendingFrameCaptures = new HashSet<(int Receiver, IrMemberId Field)>();
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         events.Add(new(ResourceMemoryEventKind.Allocate, ResourceMemoryProgram.EmptyStringIdentity, ResourceMemoryProgram.EmptyStringIdentity, 0));
@@ -130,7 +132,24 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown("MemoryReplayAllocationUnsupported"); }
                     ResourceAllocationShape objectShape;
                     IrMemberId? capturedField = null;
-                    if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
+                    var frameCaptures = ImmutableArray<IrMemberId>.Empty;
+                    if (factory.TryGetClosureFrameType(objectAllocation.AllocatedType, out var frameStorage))
+                    {
+                        if (!IrClosureFrameSite.Matches(factory, objectAllocation))
+                        { return Unknown("MemoryReplayClosureCaptureIncomplete"); }
+                        var captures = ImmutableArray.CreateBuilder<IrMemberId>();
+                        for (var frameSlot = 0; frameSlot < frameStorage.Length; frameSlot++)
+                        {
+                            if (!IrClosureFrameSite.TryGetCapture(factory, objectAllocation,
+                                index + frameSlot + 1 < _observed.Count ? _observed[index + frameSlot + 1].Instruction : null,
+                                frameSlot, frameStorage[frameSlot], out var capture))
+                            { return Unknown("MemoryReplayClosureCaptureIncomplete"); }
+                            captures.Add(capture);
+                        }
+                        frameCaptures = captures.ToImmutable();
+                        objectShape = ResourceAllocationShape.Object(frameStorage);
+                    }
+                    else if (IrStaticDelegateAllocationSite.Matches(factory, objectAllocation))
                     { objectShape = ResourceAllocationShape.Delegate(); }
                     else if (IrDelegateCaptureSite.Matches(factory, objectAllocation))
                     {
@@ -154,6 +173,12 @@ internal sealed class ResourceMemoryReplay
                     objects.Add(identities.Count);
                     if (capturedField is { } requiredCapture)
                     { pendingCaptures.Add(identities.Count, requiredCapture); }
+                    if (!frameCaptures.IsEmpty)
+                    {
+                        frames.Add(identities.Count);
+                        foreach (var capture in frameCaptures)
+                        { pendingFrameCaptures.Add((identities.Count, capture)); }
+                    }
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(objectTarget, slots), 0, objectLower, objectUpper));
                     liveRoots.Add(objectTarget);
                     break;
@@ -203,11 +228,17 @@ internal sealed class ResourceMemoryReplay
                     var member = factory.GetMemberInfo(field);
                     if (!objects.Contains(receiver) || member.IsStatic || !member.ParameterTypes.IsEmpty || value.Type != member.ReturnType)
                     { return Unknown("MemoryReplayFieldStoreUnsupported"); }
+                    var frameCapture = frames.Contains(receiver);
+                    if ((frameCapture || IrClosureFrameSite.IsCaptureField(factory, field)) &&
+                        !pendingFrameCaptures.Remove((receiver, field)))
+                    { return Unknown("MemoryReplayClosureCaptureUnsupported"); }
                     if (value.Kind is IrValueKind.Reference or IrValueKind.Sequence or IrValueKind.String or IrValueKind.Null)
                     {
                         var child = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
                         if (value.Kind != IrValueKind.Null && child == 0)
                         { return Unknown("MemoryReplayBorrowedReference"); }
+                        if (frameCapture && child == receiver)
+                        { return Unknown("MemoryReplayClosureCaptureUnsupported"); }
                         if (IrDelegateCaptureSite.IsTargetField(factory, field))
                         {
                             if (child == 0 || child == receiver || !pendingCaptures.TryGetValue(receiver, out var required) || required != field)

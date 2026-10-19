@@ -9,12 +9,15 @@ internal sealed class RootParameterClosurePlan
 {
     internal IMethodSymbol Lambda { get; }
     internal ImmutableArray<ResourceStorageKind> Fields { get; }
+    internal ImmutableArray<IParameterSymbol> Parameters { get; }
 
-    private RootParameterClosurePlan(IMethodSymbol lambda, ImmutableArray<ResourceStorageKind> fields)
+    private RootParameterClosurePlan(IMethodSymbol lambda, ImmutableArray<ResourceStorageKind> fields, ImmutableArray<IParameterSymbol> parameters)
     {
         Lambda = RepositoryParameterGuard.NotNull(lambda, nameof(lambda));
         RepositoryParameterGuard.RequireInitialized(fields.IsDefault, nameof(fields), "Array must be initialized.");
         Fields = fields;
+        RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
+        Parameters = parameters;
     }
 
     internal bool Matches(IDelegateCreationOperation creation)
@@ -66,7 +69,8 @@ internal sealed class RootParameterClosurePlan
             parameters.Add(parameter);
         }
         var fields = ImmutableArray.CreateBuilder<ResourceStorageKind>();
-        foreach (var parameter in parameters.OrderBy(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Ordinal))
+        var orderedParameters = parameters.OrderBy(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Ordinal).ToImmutableArray();
+        foreach (var parameter in orderedParameters)
         {
             var storage = parameter.Type.IsReferenceType ? ResourceStorageKind.Reference : parameter.Type.SpecialType switch
             {
@@ -80,6 +84,6 @@ internal sealed class RootParameterClosurePlan
             { return null; }
             fields.Add(storage);
         }
-        return new(anonymous.Symbol, fields.ToImmutable());
+        return new(anonymous.Symbol, fields.ToImmutable(), orderedParameters);
     }
 }

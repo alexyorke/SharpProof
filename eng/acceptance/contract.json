@@ -729,6 +729,7 @@
         "name": "pipelineSourceClosure",
         "paths": [
           "src/SharpProof.Frontend/RoslynTotalProgramLowerer.ReferenceInputs.cs",
+          "src/SharpProof.Ir/IrClosureFrameSite.cs",
           "src/SharpProof.Ir/IrDelegateCaptureSite.cs",
           "src/SharpProof.Ir/IrFieldSites.cs",
           "src/SharpProof.Ir/IrInvariantRelations.cs",

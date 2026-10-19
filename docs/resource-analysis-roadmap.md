@@ -1671,3 +1671,51 @@ included. No coverage exclusion or floor reduction was introduced. The latest
 numerical aggregate remains constructor checkpoint f98b6d080: 3395/3577 changed
 trusted lines (94.91%, 182 gaps). Fresh exact-head CI and coverage qualification
 remain required for this extension.
+
+## Closure frame capture links
+
+Admitted root parameter closures now initialize every captured slot at entry in
+certificate order, using scoped synthetic fields with checked storage types.
+Their returned delegate records the mandatory target edge to the frame. The
+closure plan retains the ordered parameter symbols as well as storage widths,
+so initialization uses the actual bound values instead of inferred defaults.
+
+Extraction and completed replay require the frame marker, complete ordered slot
+stores and matching receiver/member/storage roles. They reject omissions,
+reordering, mismatched widths, overwritten slots and impossible direct frame
+self-references. Null captured references remain valid; non-null references must
+be owned. Existing graph traversal preserves shared captures and captured child
+graphs without counting shared objects twice. Primitive inputs need not have
+known values when their storage and construction path are fixed.
+
+The initial build caught a local-name collision in the extractor; it was fixed.
+Representative verification then passed 13 IR admission/replay controls and 18
+native tests, including existing cumulative closure bounds and packing intervals.
+New controls cover primitive frames, inlined source factories, owned reference
+captures and borrowed-reference Unknown results. Broader checks, lifetime packing
+controls, independent runtime graph measurements and packaged workflows are in
+progress. The new helper is included in the explicit trusted-source inventory.
+Closure invocation, broader capture scopes and remaining C/E/F requirements stay
+open; existing wire transport and model identities remain unchanged.
+
+Final verification passed all 711 IR tests and all 2122 frontend tests. Runtime
+controls independently measured 144-byte owned and 152-byte shared closure
+bundles and verified their returned target/child behavior. Required parameter
+guards were added to those runtime test helpers after the broader build flagged
+them. All 864 affected worker controls passed, followed by six final factory
+cases including known-null captures, shared children and mixed primitive/reference
+slots. Lifetime packing controls preserve Refuted/Unknown/Proven separation.
+
+Six actual packaged primitive/owned/shared closure proof and refutation cases
+passed, bringing cumulative validated lifetime package controls to 60. Layout
+passed for 2727 source files, 59 projects and all 151 pinned common files.
+Authoritative production inventory validates all 517 trusted paths, including the
+new closure helper. Quality/compatibility, scoped C# formatting, documentation
+generation and 724 local links passed.
+
+Published capture checkpoint f306d8dfb passed canonical/package gates and all four
+coverage shards. Its aggregate reached 3479/3659 changed trusted lines (95.08%,
+180 gaps), failing the unchanged 100% floor. The inventory repair now reaches
+percentage enforcement. This evidence predates closure-frame links; fresh
+exact-head CI and gap closure remain required. Broader capture/call lifetimes,
+stack models and remaining E/F requirements are still open.
