@@ -1,6 +1,6 @@
 namespace SharpProof.Contracts;
 
-public sealed partial class ContractBindingResult
+internal sealed partial class ContractBindingResult
 {
     public bool IsSuccess => Failure == ContractBindingFailure.None;
 

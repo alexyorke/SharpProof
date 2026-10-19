@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ProtocolInvalidEffectContractTests
+internal sealed class Wave8ProtocolInvalidEffectContractTests
 {
     [TestCase(WorkerEffectContractKind.Unspecified)]
     [TestCase((WorkerEffectContractKind)int.MaxValue)]

@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists)
     {

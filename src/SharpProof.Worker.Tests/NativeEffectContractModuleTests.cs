@@ -7,7 +7,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeEffectContractModuleTests
+internal sealed class NativeEffectContractModuleTests
 {
     private const WorkerEffectSet Reads = WorkerEffectSet.ReadsReceiverState | WorkerEffectSet.ReadsArgumentState |
         WorkerEffectSet.ReadsCapturedState | WorkerEffectSet.ReadsStaticState | WorkerEffectSet.ReadsAmbientState;

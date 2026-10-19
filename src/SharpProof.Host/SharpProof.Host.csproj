@@ -11,5 +11,11 @@
     <InternalsVisibleTo Include="SharpProof.BuildTasks" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <!-- Child process compiled at test time against this assembly. -->
+    <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>
 </Project>

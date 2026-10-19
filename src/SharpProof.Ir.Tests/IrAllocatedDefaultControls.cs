@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrAllocatedDefaultControls
+internal sealed class IrAllocatedDefaultControls
 {
     [TestCase(IrTypeKind.Boolean)]
     [TestCase(IrTypeKind.Integer)]

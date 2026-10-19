@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrConstantInitializerControls
+internal sealed class IrConstantInitializerControls
 {
     [TestCase(IrTypeKind.Boolean)]
     [TestCase(IrTypeKind.Integer)]

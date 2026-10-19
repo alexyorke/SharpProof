@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public sealed partial class IrProgramExecutionResult
+internal sealed partial class IrProgramExecutionResult
 {
     public IrValue? GetCurrentValue(IrVarId variable)
     {
@@ -9,7 +9,7 @@ public sealed partial class IrProgramExecutionResult
     }
 }
 
-public sealed class IrProgramInterpreter(IrFactory factory)
+internal sealed class IrProgramInterpreter(IrFactory factory)
 {
     internal readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -435,12 +435,12 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 }
 
-public abstract partial class IrInstruction
+internal abstract partial class IrInstruction
 {
     internal abstract IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state);
 }
 
-public sealed partial class IrAllocationInstruction
+internal sealed partial class IrAllocationInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -489,7 +489,7 @@ public sealed partial class IrAllocationInstruction
     }
 }
 
-public sealed partial class IrLockInstruction
+internal sealed partial class IrLockInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -505,7 +505,7 @@ public sealed partial class IrLockInstruction
     }
 }
 
-public sealed partial class IrWriteInstruction
+internal sealed partial class IrWriteInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -552,7 +552,7 @@ public sealed partial class IrWriteInstruction
     }
 }
 
-public sealed partial class IrAssignInstruction
+internal sealed partial class IrAssignInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -570,7 +570,7 @@ public sealed partial class IrAssignInstruction
     }
 }
 
-public sealed partial class IrLoadInstruction
+internal sealed partial class IrLoadInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -580,7 +580,7 @@ public sealed partial class IrLoadInstruction
     }
 }
 
-public sealed partial class IrStoreInstruction
+internal sealed partial class IrStoreInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -590,7 +590,7 @@ public sealed partial class IrStoreInstruction
     }
 }
 
-public sealed partial class IrCallInstruction
+internal sealed partial class IrCallInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -626,7 +626,7 @@ public sealed partial class IrCallInstruction
     }
 }
 
-public sealed partial class IrAssumeInstruction
+internal sealed partial class IrAssumeInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -636,7 +636,7 @@ public sealed partial class IrAssumeInstruction
     }
 }
 
-public sealed partial class IrAssertInstruction
+internal sealed partial class IrAssertInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -646,7 +646,7 @@ public sealed partial class IrAssertInstruction
     }
 }
 
-public sealed partial class IrHavocInstruction
+internal sealed partial class IrHavocInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -683,7 +683,7 @@ public sealed partial class IrHavocInstruction
     }
 }
 
-public sealed partial class IrThrowInstruction
+internal sealed partial class IrThrowInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -696,7 +696,7 @@ public sealed partial class IrThrowInstruction
     }
 }
 
-public sealed partial class IrExceptionalExitInstruction
+internal sealed partial class IrExceptionalExitInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -711,7 +711,7 @@ public sealed partial class IrExceptionalExitInstruction
     }
 }
 
-public sealed partial class IrBranchInstruction
+internal sealed partial class IrBranchInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -733,7 +733,7 @@ public sealed partial class IrBranchInstruction
     }
 }
 
-public sealed partial class IrGotoInstruction
+internal sealed partial class IrGotoInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
@@ -745,7 +745,7 @@ public sealed partial class IrGotoInstruction
     }
 }
 
-public sealed partial class IrReturnInstruction
+internal sealed partial class IrReturnInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {

@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public sealed class RoslynOperationLowerer
+internal sealed class RoslynOperationLowerer
 {
     private const int MaximumLoweringDepth = 256;
     private readonly IrFactory _factory;

@@ -5,7 +5,7 @@ using System.Numerics;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrTypedIntegerTests
+internal sealed class IrTypedIntegerTests
 {
     [Test]
     public void TypedInterningIncludesWidthAndSignAndKeepsLegacySeparate()

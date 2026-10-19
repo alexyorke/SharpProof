@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // of any other object: `this` is a never-null trailing input, a value, and
 // the receiver of inlined instance callees.
 [TestFixture]
-public sealed class WorkerVcThisFieldTests
+internal sealed class WorkerVcThisFieldTests
 {
     private const string Source =
         """

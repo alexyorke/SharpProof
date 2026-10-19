@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class StringFromEndIndexBoundaryTests
+internal sealed class StringFromEndIndexBoundaryTests
 {
     [Test]
     public async Task NullReceiverFromEndIndexMustNotProveDoesNotThrow()

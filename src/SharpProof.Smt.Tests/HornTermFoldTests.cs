@@ -1,7 +1,7 @@
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
-public sealed class HornTermFoldTests
+internal sealed class HornTermFoldTests
 {
     [Test]
     public void EmptyTermSequenceHasNoFoldResult()

@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // their values, objects are compared by identity, and Contract.Old reads the
 // fields as the callable entered.
 [TestFixture]
-public sealed class WorkerVcFieldTests
+internal sealed class WorkerVcFieldTests
 {
     private const string Source =
         """

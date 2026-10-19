@@ -5,7 +5,7 @@ using ErrorBuilder = System.Collections.Immutable.ImmutableArray<SharpProof.Work
 
 namespace SharpProof.Worker.Protocol;
 
-public static partial class WorkerProtocolJson
+internal static partial class WorkerProtocolJson
 {
     private static JsonSerializerOptions CreateOptions()
     {

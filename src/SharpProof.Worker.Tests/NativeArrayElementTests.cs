@@ -9,7 +9,7 @@ namespace SharpProof.Worker.Test;
 // Element stores fault on a null array and an index outside it, and write
 // Element state. Once a body writes elements, element reads are approximations.
 [TestFixture]
-public sealed class NativeArrayElementTests
+internal sealed class NativeArrayElementTests
 {
     private const string Guarded = "Contract.Requires(values != null && values.Length > 2); ";
 

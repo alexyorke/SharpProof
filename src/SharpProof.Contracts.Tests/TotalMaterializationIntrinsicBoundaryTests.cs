@@ -8,7 +8,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class TotalMaterializationIntrinsicBoundaryTests
+internal sealed class TotalMaterializationIntrinsicBoundaryTests
 {
     [TestCase("ResultRequires", ContractBindingFailure.ResultOutsideEnsures)]
     [TestCase("WrongResultSignature", ContractBindingFailure.InvalidIntrinsicSignature)]

@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ExceptionInitializationAuditTests
+internal sealed class Wave8ExceptionInitializationAuditTests
 {
     [TestCase("DoesNotThrow", false)]
     [TestCase("DoesNotThrow", true)]

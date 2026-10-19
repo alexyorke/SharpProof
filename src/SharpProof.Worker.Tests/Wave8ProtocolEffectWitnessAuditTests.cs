@@ -6,7 +6,7 @@ using LauncherProgram = SharpProof.Worker.Launcher.Program;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class Wave8ProtocolEffectWitnessAuditTests
+internal sealed class Wave8ProtocolEffectWitnessAuditTests
 {
     private static IEnumerable<TestCaseData> WitnessCases()
     {

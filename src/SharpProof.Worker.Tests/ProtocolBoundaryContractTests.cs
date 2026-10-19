@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class ProtocolBoundaryContractTests
+internal sealed class ProtocolBoundaryContractTests
 {
     [Test]
     public void BoundedStreamPreservesReadOnlyContractAndOwnsInput()

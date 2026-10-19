@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcArrayInitializerAfterLoopControlTests
+internal sealed class WorkerVcArrayInitializerAfterLoopControlTests
 {
     [TestCase("var values = new bool[] { true, false }; return values[0] ? 1 : 0;", 1, 1, WorkerClaimOutcome.Proven)]
     [TestCase("var values = new long[] { 3L, 4L }; return (int)values[1];", 4, 4, WorkerClaimOutcome.Proven)]

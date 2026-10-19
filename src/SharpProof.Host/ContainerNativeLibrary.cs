@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace SharpProof.Host;
 
-public static class ContainerNativeLibrary
+internal static class ContainerNativeLibrary
 {
     private const string Z3ImportName = "libz3";
     private static readonly object Gate = new();

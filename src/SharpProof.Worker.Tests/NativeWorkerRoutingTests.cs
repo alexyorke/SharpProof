@@ -8,7 +8,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class NativeWorkerRoutingTests
+internal sealed class NativeWorkerRoutingTests
 {
     [TestCase(false)]
     [TestCase(true)]

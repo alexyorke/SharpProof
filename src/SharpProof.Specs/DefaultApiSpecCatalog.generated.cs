@@ -5,14 +5,14 @@
 #nullable enable
 namespace SharpProof.Specs;
 
-public enum SpecEvidenceKind
+internal enum SpecEvidenceKind
 {
     Documented,
     Observed
 }
 
 [Flags]
-public enum SpecEffect
+internal enum SpecEffect
 {
     None = 0,
     Unknown = 1 << 0,
@@ -29,27 +29,27 @@ public enum SpecEffect
     Nondeterminism = 1 << 11
 }
 
-public enum SpecAllocationBehavior
+internal enum SpecAllocationBehavior
 {
     None,
     MayAllocate,
     Unknown
 }
 
-public enum SpecThrowBehavior
+internal enum SpecThrowBehavior
 {
     DoesNotThrow,
     MayThrow,
     Unknown
 }
 
-public enum SpecTerminationBehavior
+internal enum SpecTerminationBehavior
 {
     Terminates,
     Unknown
 }
 
-public enum SpecNullness
+internal enum SpecNullness
 {
     NotApplicable,
     NonNull,
@@ -58,7 +58,7 @@ public enum SpecNullness
     Unknown
 }
 
-public enum SpecCardinality
+internal enum SpecCardinality
 {
     NotApplicable,
     Empty,
@@ -67,24 +67,24 @@ public enum SpecCardinality
     Unknown
 }
 
-public enum SpecTargetMemberKind
+internal enum SpecTargetMemberKind
 {
     Constructor,
     Method,
     PropertyGet
 }
 
-public enum SpecVariableRole
+internal enum SpecVariableRole
 {
     Receiver,
     Parameter,
     Result
 }
 
-public sealed record SpecEvidence(SpecEvidenceKind Kind, string Source);
-public sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence);
-public sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence);
-public sealed record SpecThrowFacet(
+internal sealed record SpecEvidence(SpecEvidenceKind Kind, string Source);
+internal sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence);
+internal sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence);
+internal sealed record SpecThrowFacet(
     SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames,
     SpecEvidence Evidence)
 {
@@ -98,13 +98,13 @@ public sealed record SpecThrowFacet(
         NormalCompletion = normalCompletion;
     }
 }
-public sealed record SpecTerminationFacet(
+internal sealed record SpecTerminationFacet(
     SpecTerminationBehavior Behavior, SpecEvidence Evidence);
-public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);
-public sealed record SpecCardinalityFacet(
+internal sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);
+internal sealed record SpecCardinalityFacet(
     SpecCardinality Result, int? ExactCount, SpecEvidence Evidence);
 
-public enum ApiSpecReferenceFamily
+internal enum ApiSpecReferenceFamily
 {
     Unspecified,
     MicrosoftNetCoreReferencePack,
@@ -114,19 +114,19 @@ public enum ApiSpecReferenceFamily
     SharpProofPackage
 }
 
-public sealed record ApiSpecFacets(
+internal sealed record ApiSpecFacets(
     SpecEffectFacet Effects, SpecAllocationFacet Allocation,
     SpecThrowFacet Throws, SpecNullnessFacet Nullness,
     SpecCardinalityFacet Cardinality,
     SpecTerminationFacet? Termination = null);
 
-public sealed record ApiSpecAssemblyIdentity(
+internal sealed record ApiSpecAssemblyIdentity(
     string Name,
     string PublicKeyToken,
     ApiSpecReferenceFamily ReferenceFamily =
         ApiSpecReferenceFamily.Unspecified);
 
-public sealed record ApiSpecTarget(
+internal sealed record ApiSpecTarget(
     string WitnessIdentifier, string DocumentationCommentId,
     string ContainingTypeMetadataName, SpecTargetMemberKind MemberKind,
     string MemberName, bool IsStatic, int GenericArity,
@@ -134,53 +134,53 @@ public sealed record ApiSpecTarget(
     IrTypeKind? ResultType,
     ImmutableArray<ApiSpecAssemblyIdentity> ApprovedAssemblies);
 
-public abstract record SpecTermDeclaration(IrTypeKind Type);
+internal abstract record SpecTermDeclaration(IrTypeKind Type);
 
-public sealed record SpecVariableDeclaration(SpecVariableRole Role, int Ordinal, IrTypeKind Type)
+internal sealed record SpecVariableDeclaration(SpecVariableRole Role, int Ordinal, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-public sealed record SpecBooleanDeclaration(bool Value)
+internal sealed record SpecBooleanDeclaration(bool Value)
     : SpecTermDeclaration(IrTypeKind.Boolean);
 
-public sealed record SpecIntegerDeclaration(long Value)
+internal sealed record SpecIntegerDeclaration(long Value)
     : SpecTermDeclaration(IrTypeKind.Integer);
 
-public sealed record SpecStringDeclaration(string Value)
+internal sealed record SpecStringDeclaration(string Value)
     : SpecTermDeclaration(IrTypeKind.String);
 
-public sealed record SpecNullDeclaration(IrTypeKind Type)
+internal sealed record SpecNullDeclaration(IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-public sealed record SpecUnaryDeclaration(
+internal sealed record SpecUnaryDeclaration(
     IrUnaryOperator Operator, SpecTermDeclaration Operand, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-public sealed record SpecBinaryDeclaration(
+internal sealed record SpecBinaryDeclaration(
     IrBinaryOperator Operator, SpecTermDeclaration Left,
     SpecTermDeclaration Right, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-public sealed record SpecConditionalDeclaration(
+internal sealed record SpecConditionalDeclaration(
     SpecTermDeclaration Condition, SpecTermDeclaration WhenTrue,
     SpecTermDeclaration WhenFalse, IrTypeKind Type)
     : SpecTermDeclaration(Type);
 
-public sealed record SpecLengthDeclaration(SpecTermDeclaration Value)
+internal sealed record SpecLengthDeclaration(SpecTermDeclaration Value)
     : SpecTermDeclaration(IrTypeKind.Integer);
 
-public sealed record SpecPostconditionDeclaration(SpecTermDeclaration Condition, SpecEvidence Evidence);
+internal sealed record SpecPostconditionDeclaration(SpecTermDeclaration Condition, SpecEvidence Evidence);
 
-public sealed record ApiSpecDeclaration(
+internal sealed record ApiSpecDeclaration(
     ApiSpecTarget Target, ApiSpecFacets Facets,
     ImmutableArray<SpecPostconditionDeclaration> Postconditions);
 
-public sealed record SpecVariableInfo(
+internal sealed record SpecVariableInfo(
     SpecVarId Id, SpecVariableRole Role, int Ordinal, IrTypeKind Type);
 
-public sealed record SpecPostcondition(
+internal sealed record SpecPostcondition(
     SpecTermDeclaration Condition, SpecEvidence Evidence);
 
-public sealed class ApiSpecTemplate
+internal sealed class ApiSpecTemplate
 {
     internal ApiSpecTemplate(
         SpecId id, ApiSpecTarget target, ApiSpecFacets facets,
@@ -212,7 +212,7 @@ public sealed class ApiSpecTemplate
     public ImmutableArray<SpecPostcondition> Postconditions { get; }
 }
 
-public sealed partial class ApiSpecTable
+internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
     public const string DefaultTableVersion = "8";

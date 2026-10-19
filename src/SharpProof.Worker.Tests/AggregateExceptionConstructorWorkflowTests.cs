@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class AggregateExceptionConstructorWorkflowTests
+internal sealed class AggregateExceptionConstructorWorkflowTests
 {
     [TestCase("[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.AggregateException(\"outer\", (System.Exception)null); }", WorkerClaimOutcome.Unknown)]
     [TestCase("[DoesNotThrow] public static object Target(System.Exception inner) { return new System.AggregateException(\"outer\", inner); }", WorkerClaimOutcome.Unknown)]

@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Product domain for sequence emptiness and length.
 /// </summary>
-public sealed class SequenceCardinalityDomain : CanonicalAbstractDomain<SequenceCardinalityValue>
+internal sealed class SequenceCardinalityDomain : CanonicalAbstractDomain<SequenceCardinalityValue>
 {
     private readonly IntervalDomain _intervals = IntervalDomain.Instance;
 

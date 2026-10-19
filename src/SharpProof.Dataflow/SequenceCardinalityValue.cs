@@ -1,6 +1,6 @@
 namespace SharpProof.Dataflow;
 
-public enum SequenceCardinalityKind
+internal enum SequenceCardinalityKind
 {
     Bottom,
     Empty,
@@ -11,7 +11,7 @@ public enum SequenceCardinalityKind
 /// <summary>
 /// Sequence emptiness refined by a non-negative length interval.
 /// </summary>
-public readonly record struct SequenceCardinalityValue
+internal readonly record struct SequenceCardinalityValue
 {
     internal SequenceCardinalityValue(SequenceCardinalityKind kind, IntervalValue length /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {

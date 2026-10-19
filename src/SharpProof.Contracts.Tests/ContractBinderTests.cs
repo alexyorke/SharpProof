@@ -9,7 +9,7 @@ using SharpProof.Testing;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractBinderTests
+internal sealed class ContractBinderTests
 {
     [TestCase(false)]
     [TestCase(true)]

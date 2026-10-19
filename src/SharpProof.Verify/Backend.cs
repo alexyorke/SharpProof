@@ -1,13 +1,13 @@
 namespace SharpProof.Verify;
 
-public enum BackendCheckStatus
+internal enum BackendCheckStatus
 {
     Unsatisfiable,
     Satisfiable,
     Unknown
 }
 
-public enum BackendFailureReason
+internal enum BackendFailureReason
 {
     None,
     UnsupportedEncoding,
@@ -19,7 +19,7 @@ public enum BackendFailureReason
     Incomplete
 }
 
-public sealed partial class BackendModel
+internal sealed partial class BackendModel
 {
     public BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments)
         : this(
@@ -31,7 +31,7 @@ public sealed partial class BackendModel
     }
 }
 
-public sealed partial class BackendCheckResult
+internal sealed partial class BackendCheckResult
 {
     public static BackendCheckResult Unsatisfiable(IEnumerable<int> assumptionIndices)
     {
@@ -65,14 +65,14 @@ public sealed partial class BackendCheckResult
     }
 }
 
-public interface ISmtBackend
+internal interface ISmtBackend
 {
     Task<BackendCheckResult> CheckAsync(
         VerificationQuery query,
         CancellationToken cancellationToken);
 }
 
-public sealed class VerificationQuery
+internal sealed class VerificationQuery
 {
     public VerificationQuery(
         IrFactory factory,

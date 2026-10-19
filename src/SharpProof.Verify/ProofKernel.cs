@@ -1,6 +1,6 @@
 namespace SharpProof.Verify;
 
-public sealed class ProofKernel(ISmtBackend backend)
+internal sealed class ProofKernel(ISmtBackend backend)
 {
     private readonly ISmtBackend _backend =
         ArgumentNullGuard.NotNull(backend, nameof(backend));

@@ -13,7 +13,7 @@ namespace SharpProof.Dataflow;
 /// <see cref="CanonicalAbstractDomain{T}"/> to enable the direct path.
 /// </remarks>
 /// <typeparam name="T">The immutable abstract value type.</typeparam>
-public interface IAbstractDomain<T>
+internal interface IAbstractDomain<T>
 {
     T Bottom
     {

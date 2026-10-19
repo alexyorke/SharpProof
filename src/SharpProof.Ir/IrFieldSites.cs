@@ -21,7 +21,7 @@ internal static class IrFieldSites
 
 // The identity of an object in a counterexample, with its fields' values as
 // the callable entered.
-public sealed class IrObjectState
+internal sealed class IrObjectState
 {
     internal Dictionary<IrMemberId, IrValue> Fields { get; } = [];
 

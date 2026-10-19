@@ -18,7 +18,7 @@ internal sealed class TotalMetadataRequiresBindingResult(ImmutableArray<BoundTot
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 }
 
-public sealed class BoundTotalContractClause
+internal sealed class BoundTotalContractClause
 {
     internal BoundTotalContractClause(BoundContractKind kind, GuardedExpression expression,
         OperationId sourceOperation, string diagnosticText, BoundContractEvidence evidence = BoundContractEvidence.CompilerBoundInvocation,
@@ -44,7 +44,7 @@ public sealed class BoundTotalContractClause
     public SyntaxReference? SourceSyntax { get; }
 }
 
-public sealed class TotalContractBindingResult
+internal sealed class TotalContractBindingResult
 {
     internal TotalContractBindingResult(ImmutableArray<BoundTotalContractClause> clauses, ContractBindingFailure failure, object origin)
     {
@@ -61,7 +61,7 @@ public sealed class TotalContractBindingResult
     internal object Origin { get; }
 }
 
-public sealed partial class ContractBinder
+internal sealed partial class ContractBinder
 {
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
     // authoritative while the native worker route is qualified.

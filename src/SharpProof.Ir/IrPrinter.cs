@@ -1,6 +1,6 @@
 namespace SharpProof.Ir;
 
-public sealed partial class IrPrinter(IrFactory factory)
+internal sealed partial class IrPrinter(IrFactory factory)
 {
     private const int MaximumFormatDepth = 1024;
 

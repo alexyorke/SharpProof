@@ -4,7 +4,7 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrProgramTests
+internal sealed class IrProgramTests
 {
     [Test]
     public void AssignmentsReadTheCurrentVariableValue()

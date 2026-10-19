@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerVcFieldArrayFreshnessTests
+internal sealed class WorkerVcFieldArrayFreshnessTests
 {
     [TestCase("var fresh = new int[1]; return box.Data[0];", 7, 7, WorkerClaimOutcome.Proven)]
     [TestCase("var fresh = new int[] { 0 }; return box.Data[0];", 7, 7, WorkerClaimOutcome.Proven)]

@@ -36,7 +36,7 @@ internal static partial class CSharpOperationSemantics
     }
 }
 
-public sealed partial class TotalLoweringContext
+internal sealed partial class TotalLoweringContext
 {
     private readonly HashSet<ISymbol> _defaultDictionaries = new(SymbolEqualityComparer.Default);
     private readonly HashSet<CaptureId> _defaultDictionaryCaptures = [];

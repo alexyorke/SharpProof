@@ -11,7 +11,7 @@ namespace SharpProof.Worker.Test;
 // A call that is neither inlined nor modeled is opaque: unknown result, an
 // exception of unknown type, and unknown effects.
 [TestFixture]
-public sealed class NativeOpaqueCallTests
+internal sealed class NativeOpaqueCallTests
 {
     [TestCase(false, false, "untouched")]
     [TestCase(false, true, "untouched")]

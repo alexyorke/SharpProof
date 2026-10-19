@@ -1,6 +1,6 @@
 namespace SharpProof.Frontend;
 
-public static class CompilerIdentityBridge
+internal static class CompilerIdentityBridge
 {
     internal static bool IsClosedSealedReferenceType(ITypeSymbol type, CancellationToken cancellationToken)
     {

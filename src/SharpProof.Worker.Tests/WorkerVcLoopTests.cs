@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class WorkerVcLoopTests
+internal sealed class WorkerVcLoopTests
 {
     internal const string AssumeLoopSource = """
         using SharpProof.Attributes;

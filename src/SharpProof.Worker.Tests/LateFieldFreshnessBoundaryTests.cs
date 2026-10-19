@@ -4,7 +4,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class LateFieldFreshnessBoundaryTests
+internal sealed class LateFieldFreshnessBoundaryTests
 {
     [TestCase(false, WorkerClaimOutcome.Proven)]
     [TestCase(true, WorkerClaimOutcome.Refuted)]

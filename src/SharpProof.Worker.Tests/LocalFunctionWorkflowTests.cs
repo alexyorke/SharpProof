@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 // private static method: the native verifier decides a caller of either
 // alike, and a false postcondition never yields a proof.
 [TestFixture]
-public sealed class LocalFunctionWorkflowTests
+internal sealed class LocalFunctionWorkflowTests
 {
     [TestCase("return Add(0, 1); static int Add(int a, int b) => a + b;", "return Add(0, 1);", 1, WorkerClaimOutcome.Proven)]
     [TestCase("int Add(int a, int b) { return a + b; } return Add(0, 1);", "return Add(0, 1);", 1, WorkerClaimOutcome.Proven)]

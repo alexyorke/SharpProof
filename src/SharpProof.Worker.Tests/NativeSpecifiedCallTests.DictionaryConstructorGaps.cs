@@ -6,7 +6,7 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
-public sealed partial class NativeSpecifiedCallTests
+internal sealed partial class NativeSpecifiedCallTests
 {
     [TestCase("", "return data.Count;", 0, WorkerClaimOutcome.Proven)]
     [TestCase("where T : System.IComparable<T>", "return data.Count;", 0, WorkerClaimOutcome.Proven)]
