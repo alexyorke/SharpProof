@@ -3702,3 +3702,9 @@ IMM-M139 verified: all 2,064 ordinary Release Frontend and 640 Contracts tests p
 zero failures/skips/build warnings/errors; 9 and 16 exact embedded PDB outputs.
 Canonical formatting requires zero changes. Independent review confirms ordinary/
 region/nested lowering propagation, pure-clause separation and no stale context use.
+
+IMM-M141: Migrate 33 reviewed Worker A-G construction rows: fixed vectors, strict
+lookup maps, scoped region/line-set builders and immutable DFS stacks. Preserve
+NUnit/reflection adapters, intentional JSON mutation delegates, stream buffers,
+wrong-case inputs and LIFO/source order. Validate affected fixtures after independent
+review. Status: planned before edits. Analyzer collector follow-up remains separate.
