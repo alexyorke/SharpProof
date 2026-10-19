@@ -26,6 +26,17 @@ internal static class ResourceChecks
         }
         public sealed class FaultResource(bool fail):IDisposable,IAsyncDisposable {public void Dispose(){ResourceTrace.Log+="dispose;";if(fail)throw new ApplicationException("dispose");}public async ValueTask DisposeAsync(){await Task.Yield();Dispose();}}
         public ref struct RefResource<T>(T value):IDisposable {public T Value=>value;public void Dispose(){ResourceTrace.Log+="pattern;";}void IDisposable.Dispose(){ResourceTrace.Log+="interface-pattern;";}}
+        public readonly struct DisposalAwaiter<T>(System.Runtime.CompilerServices.TaskAwaiter<bool> pending):System.Runtime.CompilerServices.INotifyCompletion {
+            public bool IsCompleted=>pending.IsCompleted;public void OnCompleted(Action action)=>pending.OnCompleted(action);public void GetResult(){pending.GetResult();ResourceTrace.Log+="custom-end;";}
+        }
+        public readonly struct DisposalAwaitable<T> {public DisposalAwaiter<T> GetAwaiter()=>new(ResourceTrace.Gate.Task.GetAwaiter());}
+        public sealed class CustomResource<T>(T value){public T Value=>value;public DisposalAwaitable<T> DisposeAsync(){ResourceTrace.Log+="custom-start;";return default;}}
+        public readonly struct ExtensionDisposalAwaitable<T> {}
+        public static class DisposalExtensions {public static DisposalAwaiter<T> GetAwaiter<T>(this ExtensionDisposalAwaitable<T> pending)=>new(ResourceTrace.Gate.Task.GetAwaiter());}
+        public sealed class ExtensionResource<T>(T value){public T Value=>value;public ExtensionDisposalAwaitable<T> DisposeAsync()=>default;}
+        public readonly struct SpecializedDisposalAwaitable<T> {}
+        public static class SpecializedDisposalExtensions {public static DisposalAwaiter<int> GetAwaiter(this SpecializedDisposalAwaitable<int> pending)=>new(ResourceTrace.Gate.Task.GetAwaiter());}
+        public sealed class SpecializedResource<T>(T value){public T Value=>value;public SpecializedDisposalAwaitable<T> DisposeAsync()=>default;}
         public sealed class PatternResource<T>(T value){public T Value=>value;public ValueTask DisposeAsync(){ResourceTrace.Log+="pattern-async;";return default;}}
         """;
 
@@ -48,6 +59,9 @@ internal static class ResourceChecks
             ("ResourceNullableAsyncInterface", "static async Task<int> M(IAsyncDisposable? resource,int value){await using(resource){return value;}}", "global::System.Threading.Tasks.Task<T2> M<T1, T2>(T1? resource, T2 value) where T1 : class, global::System.IAsyncDisposable"),
             ("ResourceAsyncPatternPayload", "static async Task<int> M(PatternResource<int> resource){await using var copy=resource;return copy.Value;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::PatternResource<T1> resource)"),
             ("ResourceAsyncSplit", "static async Task<int> M(SplitResource resource,int value){await using(resource){return value;}}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::SplitResource resource, T1 value)"),
+            ("ResourceCustomDisposalAwaiter", "static async Task<int> M(CustomResource<int> resource){await using var copy=resource;return copy.Value;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::CustomResource<T1> resource)"),
+            ("ResourceExtensionDisposalAwaiter", "static async Task<int> M(ExtensionResource<int> resource){await using var copy=resource;return copy.Value;}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::ExtensionResource<T1> resource)"),
+            ("ResourceSpecializedDisposalAwaiter", "static async Task<int> M(SpecializedResource<int> resource,int value){await using(resource){return value;}}", "global::System.Threading.Tasks.Task<T1> M<T1>(global::SpecializedResource<int> resource, T1 value)"),
             ("ResourceMultiple", "static int M(GenericResource<int> first,GenericResource<int> second){using(var left=first)using(var right=second){return right.Value;}}", "T2 M<T1, T2>(global::GenericResource<T1> first, global::GenericResource<T2> second)")
         ];
         foreach (var test in tests)
@@ -61,7 +75,28 @@ internal static class ResourceChecks
             { throw new InvalidOperationException(test.Name + ": expected " + test.Signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
             Program.Log.Info("PASS " + test.Name);
         }
-        return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false);
+        return tests.Length + ContractlessPattern(cancellationToken) + await Runtime(cancellationToken).ConfigureAwait(false);
+    }
+    private static int ContractlessPattern(CancellationToken cancellationToken)
+    {
+        const string source = """
+            using System;using System.Threading.Tasks;using System.Runtime.CompilerServices;
+            namespace System {public interface IAsyncDisposable {}}
+            public readonly struct LegacyAwaiter:INotifyCompletion {public bool IsCompleted=>true;public void OnCompleted(Action action)=>action();public void GetResult(){}}
+            public readonly struct LegacyAwaitable {public LegacyAwaiter GetAwaiter()=>new();}
+            public sealed class LegacyResource<T>(T value){public T Value=>value;public LegacyAwaitable DisposeAsync()=>default;}
+            public static class LegacyProbe {public static async Task<int> M(LegacyResource<int> resource){await using var copy=resource;return copy.Value;}}
+            """;
+        var compilation = Program.Compile([CSharpSyntaxTree.ParseText(source, cancellationToken: cancellationToken)]);
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+        if (!emitted.Success)
+        { throw new InvalidOperationException("Contractless resource fixture: " + string.Join("\n", emitted.Diagnostics)); }
+        var result = Program.Results(compilation, cancellationToken).Single(r => { ArgumentNullException.ThrowIfNull(r); return r.Method == "M"; });
+        if (result.Status != "Suggestion" || result.Signature != "global::System.Threading.Tasks.Task<T1> M<T1>(global::LegacyResource<T1> resource)")
+        { throw new InvalidOperationException("Contractless disposal pattern: " + result); }
+        Program.Log.Info("PASS ResourcePatternWithoutDisposalContractMember");
+        return 1;
     }
     private static async Task<int> Runtime(CancellationToken cancellationToken)
     {
@@ -74,6 +109,8 @@ internal static class ResourceChecks
                 public static int Struct(StructResource<int> resource){using var copy=resource;return copy.Value;}
                 public static int SplitSync(SplitResource resource,int value){using(resource){return value;}}
                 public static async Task<int> Awaited(GenericResource<int> resource){await using var copy=resource;ResourceTrace.Log+="body;";return copy.Value;}
+                public static async Task<int> Custom(CustomResource<int> resource){await using var copy=resource;return copy.Value;}
+                public static async Task<int> Extension(ExtensionResource<int> resource){await using var copy=resource;return copy.Value;}
                 public static async Task<int> Pattern(PatternResource<int> resource){await using var copy=resource;return copy.Value;}
                 public static async Task<int> SplitAsync(SplitResource resource,int value){await using(resource){return value;}}
             }
@@ -93,6 +130,10 @@ internal static class ResourceChecks
                     if(pending.IsCompleted||ResourceTrace.Log!="body;async-start;")return "bad";
                     ResourceTrace.Gate.SetResult(true);if(await pending!=23)return "bad";
                     if(await ResourceProbe.Pattern(new PatternResource<int>(29))!=29||await ResourceProbe.SplitAsync(new SplitResource(),31)!=31)return "bad";
+                    ResourceTrace.Gate=new();var custom=ResourceProbe.Custom(new CustomResource<int>(37));if(custom.IsCompleted)return "bad";
+                    ResourceTrace.Gate.SetResult(true);if(await custom!=37)return "bad";
+                    ResourceTrace.Gate=new();var extension=ResourceProbe.Extension(new ExtensionResource<int>(41));if(extension.IsCompleted)return "bad";
+                    ResourceTrace.Gate.SetResult(true);if(await extension!=41)return "bad";
                     return ResourceTrace.Log;
                 }
             }
@@ -104,10 +145,10 @@ internal static class ResourceChecks
         var before = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
         var originalTrace = before.GetType("OriginalResourceRunner")!.GetMethod("Run")!.Invoke(null, null);
         var originalAsync = await ((Task<string>)before.GetType("OriginalResourceRunner")!.GetMethod("RunAsync")!.Invoke(null, null)!).ConfigureAwait(false);
-        if (!Equals(originalTrace, "body;plain;body;body;sync;struct;interface-sync;") || originalAsync != "body;async-start;async-end;pattern-async;public-async;")
+        if (!Equals(originalTrace, "body;plain;body;body;sync;struct;interface-sync;") || originalAsync != "body;async-start;async-end;pattern-async;public-async;custom-start;custom-end;custom-end;")
         { throw new InvalidOperationException("Original resource behavior failed: " + originalTrace + " / " + originalAsync); }
         var provider = new HmSignatureCodeFixProvider();
-        for (var round = 0; round < 9; round++)
+        for (var round = 0; round < 11; round++)
         {
             var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
             var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
@@ -131,7 +172,11 @@ internal static class ResourceChecks
                     if(pending.IsCompleted||ResourceTrace.Log!="body;async-start;")return false;
                     ResourceTrace.Gate.SetResult(true);if(!ReferenceEquals(await pending,value))return false;
                     if(!ReferenceEquals(await ResourceProbe.Pattern(new PatternResource<Uri>(value)),value)||!ReferenceEquals(await ResourceProbe.SplitAsync(new SplitResource(),value),value))return false;
-                    return ResourceTrace.Log=="body;async-start;async-end;pattern-async;public-async;";
+                    ResourceTrace.Gate=new();var custom=ResourceProbe.Custom(new CustomResource<Uri>(value));if(custom.IsCompleted)return false;
+                    ResourceTrace.Gate.SetResult(true);if(!ReferenceEquals(await custom,value))return false;
+                    ResourceTrace.Gate=new();var extension=ResourceProbe.Extension(new ExtensionResource<Uri>(value));if(extension.IsCompleted)return false;
+                    ResourceTrace.Gate.SetResult(true);if(!ReferenceEquals(await extension,value))return false;
+                    return ResourceTrace.Log=="body;async-start;async-end;pattern-async;public-async;custom-start;custom-end;custom-end;";
                 }
             }
             """);

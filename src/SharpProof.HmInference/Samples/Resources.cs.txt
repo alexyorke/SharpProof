@@ -18,3 +18,17 @@ public static class ResourceSamples
     public static async Task<int> AsyncResourceContract(IAsyncDisposable resource,int value)
     {await using(resource){return value;}}
 }
+public readonly struct SampleDisposalAwaitable<T>
+{
+    public System.Runtime.CompilerServices.TaskAwaiter GetAwaiter()=>Task.CompletedTask.GetAwaiter();
+}
+public sealed class SamplePatternResource<T>(T value)
+{
+    public T Value=>value;
+    public SampleDisposalAwaitable<T> DisposeAsync()=>default;
+}
+public static class CustomResourceSamples
+{
+    public static async Task<int> CustomResourcePayload(SamplePatternResource<int> resource)
+    {await using var copy=resource;return copy.Value;}
+}

@@ -75,6 +75,7 @@ internal static class CustomBuilderChecks
                     public MoveAwaitable<T> MoveNextAsync()=>new();
                 }
             }
+            public sealed class BuilderResource<T> {public MoveAwaitable<T> DisposeAsync()=>new();}
             public readonly struct MoveAwaitable<T> {public MoveAwaiter<T> GetAwaiter()=>new();}
             public readonly struct MoveAwaiter<T>:INotifyCompletion,IExtra<T> {
                 public bool IsCompleted=>true;public bool GetResult()=>false;public void OnCompleted(Action action)=>action();
@@ -109,6 +110,8 @@ internal static class CustomBuilderChecks
             ("CustomBuilderVoidAwaiterKeepsUnrelated", "static async ProbeTask M(SafeTask<int> task,int x){await task;_=x;}", extraAwaiter, "Suggestion", "global::ProbeTask M<T1>(global::SafeTask<int> task, T1 x)"),
             ("CustomBuilderAwaiterTiedResult", "static async ProbeTask<int> M(SafeTask<int> task,int x) {await task;return x;}", tiedAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<T1> task, T1 x)"),
             ("CustomBuilderUnsafeAwaiterKeepsUnrelated", "static async ProbeTask<int> M(SafeTask<int> task,int x) {await task;return x;}", unsafeAwaiter, "Suggestion", "global::ProbeTask<T1> M<T1>(global::SafeTask<int> task, T1 x)"),
+            ("CustomBuilderResourceAwaiterConstraint", "static async ProbeTask<int> M(BuilderResource<int> resource,int x){await using(resource){}return x;}", extraAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderResource<int> resource, T1 x)"),
+            ("CustomBuilderResourceAwaiterTiedResult", "static async ProbeTask<int> M(BuilderResource<int> resource,int x){await using(resource){}return x;}", tiedAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderResource<T1> resource, T1 x)"),
             ("CustomBuilderImplicitMoveConstraint", "static async ProbeTask<int> M(BuilderStream<int> stream,int x){await foreach(var item in stream){}return x;}", extraAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderStream<int> stream, T1 x)"),
             ("CustomBuilderImplicitMoveTiesResult", "static async ProbeTask<int> M(BuilderStream<int> stream,int x){await foreach(var item in stream){}return x;}", tiedAwaiter + stream, "Suggestion", "global::ProbeTask<T1> M<T1>(global::BuilderStream<T1> stream, T1 x)"),
             ("CustomBuilderLambdaAwaiterConstraint", "static Func<ProbeTask<int>> M(SafeTask<int> task,int x)=>async()=>{await task;return x;};", extraAwaiter, "Suggestion", "global::System.Func<global::ProbeTask<T1>> M<T1>(global::SafeTask<int> task, T1 x)"),

@@ -227,6 +227,10 @@ nullable resources. Explicit storage conversions and distinct disposal patterns 
 fixed; selected disposal members and implicit await bindings are rechecked across
 supplied files, and emission validates lowering. Applied IDE fixes preserve null handling,
 disposal on return and failure, exception precedence, and async suspension/completion.
+Custom instance/extension disposal awaiters retain payload relationships and specialized
+bindings; custom builder awaiter constraints propagate through implicit disposal awaits.
+Pattern disposal remains supported when a source-defined disposal interface lacks its
+expected member; malformed fallback contracts reject safely.
 Lock retains its concrete receiver to preserve Monitor versus System.Threading.Lock lowering.
 Ordinary void
 method calls can appear as expression statements. The standalone HM core remains

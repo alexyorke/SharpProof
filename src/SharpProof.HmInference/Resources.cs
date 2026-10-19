@@ -41,12 +41,19 @@ public static partial class Inference
             if (type is null)
             { throw new ArgumentNullException(nameof(type)); }
             type = ResourceCoreType(type);
-            var contract = semantic.Compilation.GetTypeByMetadataName(asynchronous ? "System.IAsyncDisposable" : "System.IDisposable")
-                ?? throw new InferenceException("Missing disposal interface.");
-            var member = contract.GetMembers(asynchronous ? "DisposeAsync" : "Dispose").OfType<IMethodSymbol>().Single();
+            var contract = semantic.Compilation.GetTypeByMetadataName(asynchronous ? "System.IAsyncDisposable" : "System.IDisposable");
+            var member = contract?.GetMembers(asynchronous ? "DisposeAsync" : "Dispose").OfType<IMethodSymbol>().FirstOrDefault(method =>
+            {
+                if (method is null)
+                { throw new ArgumentNullException(nameof(method)); }
+                return !method.IsStatic && method.Parameters.Length == 0 && method.TypeParameters.Length == 0;
+            });
             var selected = ResourcePattern(semantic, site, type, asynchronous);
             if (selected is not null)
             {
+                // A valid disposal pattern does not require the framework interface.
+                if (member is null)
+                { return (selected, true); }
                 var implementation = (type as INamedTypeSymbol)?.FindImplementationForInterfaceMember(member) as IMethodSymbol;
                 if (!type.IsRefLikeType && SymbolEqualityComparer.Default.Equals(implementation?.OriginalDefinition, selected.OriginalDefinition))
                 { return (member, false); }
@@ -54,7 +61,7 @@ public static partial class Inference
                 { return (member, false); }
                 return (selected, true);
             }
-            if (!((CSharpCompilation)semantic.Compilation).ClassifyConversion(type, contract).IsImplicit)
+            if (contract is null || member is null || !((CSharpCompilation)semantic.Compilation).ClassifyConversion(type, contract).IsImplicit)
             { throw new InferenceException("Unresolved disposal contract."); }
             return (member, false);
         }
