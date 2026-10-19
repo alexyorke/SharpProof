@@ -3674,3 +3674,15 @@ input contract while its consumers are reviewed. Validate baseline/current sched
 manifest and Git-capture scenarios before commit. Status: planned before edits.
 Latest canonical layout passed 2,620 source files, 59 projects, 151 unchanged pinned
 common files and 59 evaluated projects.
+
+IMM-M138 verified: 67 baseline/current controls pass for seed schedule budgets,
+duplicates/order, exact Int32 manifest validation, callback mutation/timing, evidence
+JSON arrays, acceptance single-seed lookup and clean source HEAD/status validation.
+Main and independent review confirm Add return types and publication timing; canonical
+script formatting applied. The typed RetainedSeeds input remains a coupled API review
+item, rather than a blanket native exception.
+IMM-M139: Replace TotalLoweringContext.FreshReceiver's mutable configuration bridge
+with an init-only expression-lowerer option. Compute the existing predicate once per
+LowerCore, pass through ordinary/region initialization, and retain default false for
+pure contract clauses. Verify lowering/write-site behavior with Frontend and Contracts
+ordinary suites. Status: planned before edits.
