@@ -25,11 +25,12 @@ internal sealed record ExactReplayResult(ExactReplayStatus Status, string Detail
 // Opaque heap displays and effect witnesses cannot supply executable inputs.
 internal static class ExactCounterexampleReplay
 {
-    internal static ExactReplayResult Run(string source, string mode, WorkerModelValue[] model)
+    internal static ExactReplayResult Run(string source, string mode, ImmutableArray<WorkerModelValue> model)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(mode);
-        ArgumentNullException.ThrowIfNull(model);
+        if (model.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(model)); }
         if (mode != ContractClaimProgramGenerator.Ensures || model.Length == 0)
         {
             return new(ExactReplayStatus.Unsupported, "No executable postcondition entry model was reported.");

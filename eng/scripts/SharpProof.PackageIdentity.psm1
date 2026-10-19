@@ -32,10 +32,10 @@ function Get-SharpProofNuspecMetadata {
 
     $archive = [IO.Compression.ZipFile]::OpenRead($Path)
     try {
-        $entries = @($archive.Entries | Where-Object {
-                $_.FullName.EndsWith(
-                    '.nuspec', [StringComparison]::OrdinalIgnoreCase)
-            })
+        $entries = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($archive.Entries | Where-Object {
+                    $_.FullName.EndsWith(
+                        '.nuspec', [StringComparison]::OrdinalIgnoreCase)
+                }))
         if ($entries.Count -ne 1) {
             throw "Package '$Path' must contain exactly one nuspec."
         }
@@ -79,8 +79,8 @@ function Get-SharpProofPackageIdentity {
         $metadata.OwnerDocument.NameTable)
     $namespaces.AddNamespace(
         'n', [string]$metadata.OwnerDocument.DocumentElement.NamespaceURI)
-    $ids = @($metadata.SelectNodes('n:id', $namespaces))
-    $versions = @($metadata.SelectNodes('n:version', $namespaces))
+    $ids = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($metadata.SelectNodes('n:id', $namespaces)))
+    $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object](@($metadata.SelectNodes('n:version', $namespaces)))
     if ($RequireSingleIdentity -and
         ($ids.Count -ne 1 -or $versions.Count -ne 1)) {
         throw "Package '$Path' has incomplete identity metadata."
@@ -130,23 +130,23 @@ function Get-SharpProofPackageIdentitySet {
         [switch]$RequireRepository
     )
 
-    $identities = @(
-        $Files | ForEach-Object {
-            [pscustomobject][ordered]@{
-                File     = $_
+    $identityBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($file in $Files) {
+        $identityBuilder.Add([pscustomobject][ordered]@{
+                File     = $file
                 Identity = Get-SharpProofPackageIdentity `
-                    -Path $_.FullName `
+                    -Path $file.FullName `
                     -RequireRepository:$RequireRepository
-            }
-        }
-    )
+            })
+    }
+    $identities = $identityBuilder.ToImmutable()
     foreach ($extension in @('.nupkg', '.snupkg')) {
-        $actualIds = @(
-            $identities |
-                Where-Object { $_.File.Extension -eq $extension } |
-                ForEach-Object { $_.Identity.Id } |
-                Sort-Object
-        )
+        $actualIds = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                $identities |
+                    Where-Object { $_.File.Extension -eq $extension } |
+                    ForEach-Object { $_.Identity.Id } |
+                    Sort-Object
+            ))
         $expectedIds = if ($extension -eq '.snupkg') { $SharpProofSymbolPackageIds } else { $SharpProofPackageIds }
         if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
             throw (
@@ -155,11 +155,11 @@ function Get-SharpProofPackageIdentitySet {
         }
     }
 
-    $versions = @(
-        $identities |
-            ForEach-Object { $_.Identity.Version } |
-            Sort-Object -Unique
-    )
+    $versions = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+            $identities |
+                ForEach-Object { $_.Identity.Version } |
+                Sort-Object -Unique
+        ))
     if ($versions.Count -ne 1) {
         throw (
             'SharpProof package and symbol package versions must match; ' +
@@ -169,12 +169,12 @@ function Get-SharpProofPackageIdentitySet {
     return [pscustomobject][ordered]@{
         Identities        = $identities
         Version           = [string]$versions[0]
-        RepositoryCommits = @(
-            $identities |
-                ForEach-Object { $_.Identity.RepositoryCommit } |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                Sort-Object -Unique
-        )
+        RepositoryCommits = [Collections.Immutable.ImmutableArray]::CreateRange[object](@(
+                $identities |
+                    ForEach-Object { $_.Identity.RepositoryCommit } |
+                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                    Sort-Object -Unique
+            ))
     }
 }
 

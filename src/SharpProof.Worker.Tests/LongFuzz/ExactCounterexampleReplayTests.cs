@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -30,13 +31,14 @@ public sealed class ExactCounterexampleReplayTests
     [Test]
     public async Task ReportedWorkerInputsAreReplayedThroughCompiledCSharp()
     {
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var counts = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         var result = await AnalyzerPipelineLongFuzzTests.RunCase(Source, ContractClaimProgramGenerator.Ensures,
             key => { ArgumentNullException.ThrowIfNull(key); counts[key] = counts.GetValueOrDefault(key) + 1; });
+        var observedCounts = counts.ToImmutable();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted.ToString()), result.Reason);
-            Assert.That(counts.GetValueOrDefault("exact-replay:Reproduced"), Is.EqualTo(1));
+            Assert.That(observedCounts.GetValueOrDefault("exact-replay:Reproduced"), Is.EqualTo(1));
             Assert.That(result.Problems, Is.Empty);
         }
     }
@@ -73,13 +75,13 @@ public sealed class ExactCounterexampleReplayTests
     public void ReconstructsStringsWithoutChangingUtf16CodeUnits(string literal)
     {
         ArgumentNullException.ThrowIfNull(literal);
-        var model = Model();
+        var model = Model().ToBuilder();
         model[3] = model[3] with { Kind = "String" };
         model[3] = model[3] with { Value = literal };
         var source = Source.Replace("Contract.Requires(s == null);", "", StringComparison.Ordinal)
             .Replace(" && s == null", "", StringComparison.Ordinal)
             .Replace("x == 123456789 ? 1 : 0", "s == " + literal + " ? 1 : 0", StringComparison.Ordinal);
-        var result = Replay(source, model);
+        var result = Replay(source, model.ToImmutable());
         Assert.That(result.Status, Is.EqualTo(ExactReplayStatus.Reproduced), result.Detail);
     }
 
@@ -93,18 +95,18 @@ public sealed class ExactCounterexampleReplayTests
     public void MalformedStringDisplaysCannotBecomeReplacementInputs(string encoded)
     {
         ArgumentNullException.ThrowIfNull(encoded);
-        var model = Model();
+        var model = Model().ToBuilder();
         model[3] = model[3] with { Kind = "String" };
         model[3] = model[3] with { Value = encoded };
-        Assert.That(Replay(Source, model).Status, Is.EqualTo(ExactReplayStatus.InvalidModel));
+        Assert.That(Replay(Source, model.ToImmutable()).Status, Is.EqualTo(ExactReplayStatus.InvalidModel));
     }
 
     [Test]
     public void EntryBindingsAreMatchedByOrdinalInsteadOfDisplayOrder()
     {
-        var model = Model();
-        Array.Reverse(model);
-        var result = Replay(Source, model);
+        var model = Model().ToBuilder();
+        model.Reverse();
+        var result = Replay(Source, model.ToImmutable());
         Assert.That(result.Status, Is.EqualTo(ExactReplayStatus.Reproduced), result.Detail);
     }
 
@@ -117,14 +119,14 @@ public sealed class ExactCounterexampleReplayTests
         {
             throw new ArgumentOutOfRangeException(nameof(codeUnit));
         }
-        var model = Model();
+        var model = Model().ToBuilder();
         model[3] = model[3] with { Kind = "String" };
         model[3] = model[3] with { Value = "\"" + (char)codeUnit + "\"" };
         var literal = "\"\\u" + codeUnit.ToString("x4", System.Globalization.CultureInfo.InvariantCulture) + "\"";
         var source = Source.Replace("Contract.Requires(s == null);", "", StringComparison.Ordinal)
             .Replace(" && s == null", "", StringComparison.Ordinal)
             .Replace("x == 123456789 ? 1 : 0", "s == " + literal + " ? 1 : 0", StringComparison.Ordinal);
-        var result = Replay(source, model);
+        var result = Replay(source, model.ToImmutable());
         Assert.That(result.Status, Is.EqualTo(ExactReplayStatus.Reproduced), result.Detail);
     }
 
@@ -134,10 +136,10 @@ public sealed class ExactCounterexampleReplayTests
     {
         ArgumentNullException.ThrowIfNull(kind);
         ArgumentNullException.ThrowIfNull(value);
-        var model = Model();
+        var model = Model().ToBuilder();
         model[2] = model[2] with { Kind = kind };
         model[2] = model[2] with { Value = value };
-        Assert.That(Replay(Source, model).Status, Is.EqualTo(ExactReplayStatus.Unsupported));
+        Assert.That(Replay(Source, model.ToImmutable()).Status, Is.EqualTo(ExactReplayStatus.Unsupported));
     }
 
     [TestCase("missing")]
@@ -150,11 +152,11 @@ public sealed class ExactCounterexampleReplayTests
     public void InvalidModelsCannotPassReplay(string mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
-        var model = Model();
+        var model = Model().ToBuilder();
         switch (mutation)
         {
             case "missing":
-                model = model[..3];
+                model.RemoveAt(3);
                 break;
             case "duplicate":
                 model[1] = model[1] with { Variable = model[0].Variable };
@@ -176,7 +178,7 @@ public sealed class ExactCounterexampleReplayTests
                 model[3] = model[3] with { Value = "unquoted" };
                 break;
         }
-        Assert.That(Replay(Source, model).Status, Is.EqualTo(ExactReplayStatus.InvalidModel));
+        Assert.That(Replay(Source, model.ToImmutable()).Status, Is.EqualTo(ExactReplayStatus.InvalidModel));
     }
 
     [Test]
@@ -196,14 +198,15 @@ public sealed class ExactCounterexampleReplayTests
         Assert.That(Replay("not C#", Model()).Status, Is.EqualTo(ExactReplayStatus.HarnessError));
     }
 
-    private static ExactReplayResult Replay(string source, WorkerModelValue[] model)
+    private static ExactReplayResult Replay(string source, ImmutableArray<WorkerModelValue> model)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(model);
+        if (model.IsDefault)
+        { throw new ArgumentException("Array must be initialized.", nameof(model)); }
         return ExactCounterexampleReplay.Run(source, ContractClaimProgramGenerator.Ensures, model);
     }
 
-    private static WorkerModelValue[] Model(string x = "123456789")
+    private static ImmutableArray<WorkerModelValue> Model(string x = "123456789")
     {
         ArgumentNullException.ThrowIfNull(x);
         return

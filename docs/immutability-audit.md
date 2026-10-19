@@ -2652,3 +2652,26 @@ at JSON tasks/files boundaries and preserve ordered wire records. Validate cover
 receipt negatives and real facade package identity controls, then bounded shard hash/
 file-set controls for manifest publication.
 Status: open before edits.
+
+IMM-M069-M070 verified: all 33 exact replay tests pass, including the real analyzer/
+worker/compiled CLR case. Combined replay, ref-state and runtime coverage fixtures pass
+all 76 tests, zero failures/skips and zero build warnings/errors, including a rerun after
+malformed-model boundary correction. Read-only review found that direct model-root reuse
+moved a default-model failure outside the extraction try. Coordinator reproduced pinned
+baseline default(ImmutableArray<int>).ToArray(): NullReferenceException. Explicit default
+rejection now remains inside that try before outcome publication, preserving accumulated
+WorkerResponseInvalid/WorkerException evidence and preventing replay. The diagnostic
+now names the uninitialized model. Empty/null-element/duplicate model checks remain.
+Metadata domain order, runtime array identities and source text are preserved. All 2,959
+raw/interpolated tokens across 651 changed C# files still match master 7e0e485a.
+
+IMM-M071 verified: real coverage receipt controls and facade identity/archive/provenance
+positive/negative controls pass, including three main and two symbol packages. Additional
+shard probes pass JSON array shape, phase mismatch, changed content hash, extra file and
+missing-file checks. Read-only review identified empty descriptor indexing: retain the
+old null result through an explicit Length guard before later validation. Existing controls
+pass after that correction and after formatting. Final formatter checked 87 PowerShell
+and 19 shell scripts with zero changes; inventory parsed all 84 scripts with zero errors.
+Classified coordinator-reviewed frozen snapshot/builder rows, including earlier canonical
+CreateRange capture wrappers that the syntactic scanner still reports as array literals.
+The repository migration remains open; no unchecked row has been treated as absent.
