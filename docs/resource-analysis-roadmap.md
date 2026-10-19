@@ -1125,3 +1125,28 @@ local links. Layout evaluated 2713 source files, 59 projects and 151 pinned comm
 files. Published b3e0d2db6 coverage failed in the semantic-projects shard on the
 same stale manifest expectation now corrected; it produced no qualified aggregate.
 Fresh exact-head CI and unchanged 100% coverage qualification remain open.
+
+## Logical memory lifetime evaluator
+
+Phase C now has a bounded finite-trace evaluator for fresh source-owned objects,
+root aliases and strong-reference field stores. It computes cumulative storage,
+peak auxiliary storage and retained output separately. The declared logical model
+excludes the final returned object graph from auxiliary storage throughout the
+trace; it does not claim GC collection times or physical heap residency. Shared
+objects and cycles count once. Replacing a root includes the transient overlap
+while the new object is allocated before the old root is overwritten. Removing a
+field reference can release a former child from the logical reachable set.
+
+Allocation sizes remain lower/upper intervals supplied by the separately checked
+layout model. Unsupported escapes, malformed references, resurrection of objects
+that lost every root, invalid output roots and exhausted traversal budgets return
+Unknown without partial metrics. The finite event and traversal limits bound work
+and snapshot storage; cancellation propagates.
+
+This evaluator is an internal foundation. Compiler-owned trace extraction,
+portable ownership binding, static path/repetition composition, native contracts,
+and consumer reporting for peak/retained metrics remain to be connected. It does
+not yet expand public metric support. All 612 IR tests passed, including 19 new
+lifetime cases and replacement traces for 100 sizes.
+All quality and compatibility checks passed. Layout evaluated 2715 source files,
+59 projects and 151 pinned common files. The phase C checklist remains incomplete.

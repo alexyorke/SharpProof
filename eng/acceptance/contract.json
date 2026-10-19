@@ -386,6 +386,7 @@
           "src/SharpProof.Ir/ResourceBoundOrder.cs",
           "src/SharpProof.Ir/ResourceBoundConstraint.cs",
           "src/SharpProof.Ir/ResourceRuntimeLayout.cs",
+          "src/SharpProof.Ir/ResourceMemoryTrace.cs",
           "src/SharpProof.Ir/ResourceProgram.cs",
           "src/SharpProof.Ir/ResourceMetadataReference.cs"
         ]
