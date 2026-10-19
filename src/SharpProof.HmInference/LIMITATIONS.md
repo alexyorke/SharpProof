@@ -24,7 +24,9 @@ The README describes today's supported subset; it is not the completion spec.
 | Custom async builders | Open |
 | Generic instance calls and explicit method type arguments | Implemented: receiver/base/interface substitutions, method constraints and retained explicit arguments |
 | Try/catch/finally, using/await using and lock | Implemented: filtered catches, rethrow, finalizer flow and concrete lifetime receivers; IDE-fix runtime checks preserve disposal pattern selection. Structural disposal constraint generalization remains open |
-| Goto and labels | Open |
+| Goto, labels and C# return completeness | Verified: named/case/default jumps, infinite-loop returns and unreachable typing; Roslyn checks candidate reachability/definite assignment. Applied IDE-fix runtime checks preserve routing and pending finally/disposal |
+| Explicit, constant and uninitialized locals | Verified: declared types and initializer/assignment conversions retained; runtime checks cover widening and boxing identity |
+| Boolean condition conversions | Verified: primitive Boolean inference and retained user-defined conversion/true-operator types, including loops, conditional expressions, guards and filters |
 | Declaration/type/property/list patterns | Open |
 | Custom Deconstruct methods | Open: tuple deconstruction is implemented; nominal and extension Deconstruct remain open |
 | Field/property/indexer stores and object/collection initializers | Verified: conservative receiver/value types, overload/conversion tests and runtime probe; anonymous objects and record with expressions remain open |

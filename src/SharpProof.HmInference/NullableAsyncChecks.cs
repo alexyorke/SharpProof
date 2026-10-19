@@ -62,7 +62,7 @@ internal static class NullableAsyncChecks
             ("AsyncNullableValueLift", "static async ValueTask<int?> M(int x)=>x;", "Suggestion", "global::System.Threading.Tasks.ValueTask<T1?> M<T1>(T1 x) where T1 : struct"),
             ("NullableLambdaResult", "static System.Func<int,string?> M(string x)=>ignored=>x;", "Suggestion", "global::System.Func<int, T1?> M<T1>(T1 x) where T1 : class"),
             ("AsyncCustomAwaiter", "static async Task<int> M(Box task,bool ignored)=>await task; class Box { public System.Runtime.CompilerServices.TaskAwaiter<int> GetAwaiter()=>Task.FromResult(1).GetAwaiter(); }", "Suggestion", "global::System.Threading.Tasks.Task<int> M<T1>(global::Cases.Box task, T1 ignored)"),
-            ("AsyncTypedLocalRejected", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Rejected", null),
+            ("AsyncTypedLocal", "static async Task<int> M(Task<int> task) { int x=await task; return x; }", "Concrete", null),
             ("AsyncGenericRoot", "static async Task<T> M<T>(Task<T> task)=>await task;", "Concrete", null),
             ("AsyncVoidRoot", "static async void M(int x) { await Task.Yield(); }", "Suggestion", "void M<T1>(T1 x)"),
             ("AsyncForeach", "static async Task<int> M(System.Collections.Generic.IAsyncEnumerable<int> xs,int seed) { await foreach(var x in xs) seed=x; return seed; }", "Suggestion", "global::System.Threading.Tasks.Task<T1> M<T1>(global::System.Collections.Generic.IAsyncEnumerable<T1> xs, T1 seed)"),

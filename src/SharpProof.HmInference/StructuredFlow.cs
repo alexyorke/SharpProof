@@ -7,6 +7,19 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private void BooleanCondition(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (model.GetTypeInfo(expression, cancellationToken).Type?.SpecialType == SpecialType.System_Boolean)
+            { HmType.Unify(Expression(expression), new("bool")); }
+            else
+            {
+                // Preserve user-defined bool conversions and true operators at condition boundaries.
+                Anchor(expression);
+            }
+        }
+
         private void DeclareResource(VariableDeclarationSyntax declaration)
         {
             if (declaration is null)
@@ -42,7 +55,7 @@ public static partial class Inference
                         environment.Add(exception, CSharpTypes.Rigid(exception.Type));
                     }
                     if (handler.Filter is not null)
-                    { HmType.Unify(Expression(handler.Filter.FilterExpression), new("bool")); }
+                    { BooleanCondition(handler.Filter.FilterExpression); }
                     return Branch(handler.Block);
                 });
                 returns = MergeReturns(returns, caught.ReturnType);

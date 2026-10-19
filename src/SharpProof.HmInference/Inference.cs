@@ -46,6 +46,8 @@ public static partial class Inference
         public MethodResult Analyze(MethodDeclarationSyntax method)
         {
             var symbol = model.GetDeclaredSymbol(method, cancellationToken) ?? throw new InferenceException("Method has no symbol.");
+            if (symbol.IsVararg)
+            { return new(symbol.Name, "Concrete", "C# vararg methods cannot declare type parameters."); }
             if (symbol.IsExtern || method.Modifiers.Any(SyntaxKind.PartialKeyword))
             {
                 throw new InferenceException("Extern and partial root methods are unsupported.");
@@ -195,7 +197,7 @@ public static partial class Inference
 
             ImportConstructedConstraints(symbol.ReturnType, result);
             var nullableConstraints = NullableConstraints(parameters, result, variables);
-            var candidate = method.WithReturnType(returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
+            var candidate = method.WithReturnType((returnName == "void" ? SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)) : SyntaxFactory.ParseTypeName(returnName)).WithTriviaFrom(method.ReturnType)).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(method.ParameterList.WithParameters(SyntaxFactory.SeparatedList(method.Parameters().Select((p, i) =>
             {
                 if (p is null)
                 {
@@ -207,7 +209,7 @@ public static partial class Inference
                     throw new global::System.ArgumentOutOfRangeException(nameof(i));
                 }
 
-                return p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]));
+                return p.WithType(SyntaxFactory.ParseTypeName(parameterNames[i]).WithTriviaFrom(p.Type!));
             }))));
             candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints));
             // Recheck the original compilation with just this signature changed. This catches
@@ -407,9 +409,9 @@ public static partial class Inference
         private HmType Block(BlockSyntax block)
         {
             var flow = Scoped(() => Statements(block.Statements.ToArray()));
-            if (flow.FallsThrough || flow.Breaks || flow.Continues)
+            if (flow.Breaks || flow.Continues)
             {
-                throw new InferenceException("Body has no structurally complete value return.");
+                throw new InferenceException("Body has an invalid escaping loop exit.");
             }
 
             return flow.ReturnType ?? HmType.Variable();
@@ -445,16 +447,24 @@ public static partial class Inference
             var continues = false;
             for (var index = 0; index < statements.Length; index++)
             {
-                if (!fallsThrough)
-                {
-                    throw new InferenceException("Unreachable statements are unsupported.");
-                }
+                // The candidate compiler checks reachability, return completeness and definite
+                // assignment. Unreachable syntax still contributes C# typing constraints.
 
                 var statement = statements[index];
                 cancellationToken.ThrowIfCancellationRequested();
                 var flow = new Flow(null, true);
                 switch (statement)
                 {
+                    case LabeledStatementSyntax labeled:
+                        flow = Statements([labeled.Statement]);
+                        break;
+                    case GotoStatementSyntax:
+                        // Label/case destinations and constant expressions are compiler checked.
+                        flow = new(null, false);
+                        break;
+                    case LocalDeclarationStatementSyntax local when local.Modifiers.Any(SyntaxKind.ConstKeyword):
+                        Declare(local.Declaration);
+                        break;
                     case LocalDeclarationStatementSyntax local when local.Modifiers.Count == 0 && local.UsingKeyword == default:
                         Declare(local.Declaration);
                         break;
@@ -497,7 +507,7 @@ public static partial class Inference
                         flow = new(Returned(returned.Expression), false);
                         break;
                     case IfStatementSyntax conditional:
-                        HmType.Unify(Expression(conditional.Condition), new("bool"));
+                        BooleanCondition(conditional.Condition);
                         var yes = Branch(conditional.Statement);
                         var no = conditional.Else is not null ? Branch(conditional.Else.Statement) : new Flow(null, true);
                         flow = new(MergeReturns(yes.ReturnType, no.ReturnType), yes.FallsThrough || no.FallsThrough, yes.Breaks || no.Breaks, yes.Continues || no.Continues);
@@ -506,12 +516,12 @@ public static partial class Inference
                         flow = Scoped(() => Statements(nested.Statements.ToArray()));
                         break;
                     case WhileStatementSyntax loop:
-                        HmType.Unify(Expression(loop.Condition), new("bool"));
+                        BooleanCondition(loop.Condition);
                         flow = LoopFlow(Branch(loop.Statement));
                         break;
                     case DoStatementSyntax loop:
                         flow = LoopFlow(Branch(loop.Statement));
-                        HmType.Unify(Expression(loop.Condition), new("bool"));
+                        BooleanCondition(loop.Condition);
                         break;
                     case ForStatementSyntax loop:
                         flow = Scoped(() =>
@@ -528,7 +538,7 @@ public static partial class Inference
 
                             if (loop.Condition is not null)
                             {
-                                HmType.Unify(Expression(loop.Condition), new("bool"));
+                                BooleanCondition(loop.Condition);
                             }
 
                             var body = Branch(loop.Statement);
@@ -615,7 +625,7 @@ public static partial class Inference
                             case CasePatternSwitchLabelSyntax { Pattern: ConstantPatternSyntax or DiscardPatternSyntax } pattern:
                                 if (pattern.WhenClause is not null)
                                 {
-                                    HmType.Unify(Expression(pattern.WhenClause.Condition), new("bool"));
+                                    BooleanCondition(pattern.WhenClause.Condition);
                                 }
 
                                 break;
@@ -660,12 +670,22 @@ public static partial class Inference
 
             foreach (var variable in declaration.Variables)
             {
+                var symbol = model.GetDeclaredSymbol(variable, cancellationToken) as ILocalSymbol
+                    ?? throw new InferenceException("Unresolved local declaration.");
                 if (variable.Initializer is null)
                 {
-                    throw new InferenceException("Uninitialized local.");
+                    environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
                 }
-
-                environment.Add(model.GetDeclaredSymbol(variable, cancellationToken)!, Expression(variable.Initializer.Value));
+                else if (declaration.Type.IsVar)
+                {
+                    environment.Add(symbol, Expression(variable.Initializer.Value));
+                }
+                else
+                {
+                    // Retain the explicit local type and its conversion from the initializer.
+                    Anchor(variable.Initializer.Value);
+                    environment.Add(symbol, CSharpTypes.Rigid(symbol.Type));
+                }
             }
         }
 
@@ -768,7 +788,7 @@ public static partial class Inference
                 case LiteralExpressionSyntax literal when !literal.IsKind(SyntaxKind.NullLiteralExpression) && !literal.IsKind(SyntaxKind.DefaultLiteralExpression):
                     return CSharpTypes.Rigid(model.GetTypeInfo(literal, cancellationToken).Type!);
                 case ConditionalExpressionSyntax conditional:
-                    HmType.Unify(Expression(conditional.Condition), new("bool"));
+                    BooleanCondition(conditional.Condition);
                     var yes = Expression(conditional.WhenTrue);
                     HmType.Unify(yes, Expression(conditional.WhenFalse));
                     return yes;
@@ -926,7 +946,7 @@ public static partial class Inference
 
                         if (arm.WhenClause is not null)
                         {
-                            HmType.Unify(Expression(arm.WhenClause.Condition), new("bool"));
+                            BooleanCondition(arm.WhenClause.Condition);
                         }
 
                         HmType.Unify(switchedResult, Expression(arm.Expression));

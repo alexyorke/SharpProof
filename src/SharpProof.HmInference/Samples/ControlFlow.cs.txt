@@ -1,0 +1,20 @@
+#nullable enable
+
+public static class ControlFlowSamples
+{
+    public static int Forward(int value) { goto Done; Done:return value; }
+    public static int Repeat(int count,int value)
+    {
+        Again:if(count-->0) goto Again;
+        return value;
+    }
+    public static int Route(int tag,int first,int second)
+    {
+        const int Selected=1;
+        switch(tag) { case 0:goto case Selected;case Selected:return first;default:return second; }
+    }
+    public static long Typed(int value,bool ignored) { long local=value;return local; }
+    public static long Assigned(int value,bool ignored) { long local;goto Assign;Assign:local=value;return local; }
+    public static int Loop(int value) { while(true) return value; }
+    public static System.Func<int> Closure(int value) => () => { for(;;) return value; };
+}

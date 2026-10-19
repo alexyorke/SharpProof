@@ -40,7 +40,7 @@ internal static class FlowChecks
             ("BreakLoop", "static int M(int x) { while(true) { break; } return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("ContinueLoop", "static int M(int x) { for(var i=0;i<1;i++) continue; return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("ListEnumeration", "static int M(System.Collections.Generic.List<int> xs,int seed) { foreach(var x in xs) seed=x; return seed; }", "Suggestion", "T1 M<T1>(global::System.Collections.Generic.List<T1> xs, T1 seed)"),
-            ("InfiniteLoopReturn", "static int M(int x) { while(true) return x; }", "Skipped", null),
+            ("InfiniteLoopReturn", "static int M(int x) { while(true) return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("PropertyWrite", "static int M(System.Text.StringBuilder builder,int x) { builder.Length=x; return x; }", "Concrete", null)
         ];
         var failures = new List<string>();

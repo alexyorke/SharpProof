@@ -95,7 +95,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Implicit array construction | Unify initializer elements |
 | Explicit array construction | Preserve declared element types |
 | Synchronous lambdas | Infer inputs/results; retain explicit annotations |
-| Immutable locals and nested blocks | Share types by symbol and respect scope |
+| Locals and nested blocks | Share types by symbol; retain explicit/constant local types, uninitialized declarations and conversions |
 | Mutable locals/parameters, tuple/field/property/array/indexer stores | Keep monotypes; retain receiver types and assignment conversions |
 | Compound assignments and increments | Retain original built-in operand types; skip custom operators |
 | Fallthrough branches, while/do/for, array foreach | Collect return constraints and keep block/loop locals scoped |
@@ -165,9 +165,12 @@ are also unsupported. A nameof member lookup may reject a candidate even though
 its operand is not executed, because the lookup still has to compile.
 
 Loop analysis accumulates constraints over monomorphic bindings; it does not
-generalize at iteration boundaries or prove termination. Loops conservatively
-fall through, so methods whose only return is inside an infinite loop are skipped.
-Goto, ref foreach, generalized extension enumeration and type-parameter enumerator
+generalize at iteration boundaries or prove termination. Roslyn validates return
+completeness, reachability and definite assignment after rewriting. Labels, named
+goto and goto case/default are supported, including pending finally/disposal.
+Unreachable syntax still contributes typing constraints. Boolean conditions retain
+the source type of user-defined conversions and true operators.
+Ref foreach, generalized extension enumeration and type-parameter enumerator
 patterns remain unsupported. Ref delegates,
 attributed/modified lambdas and expression trees remain unsupported.
 Switch statements support constant labels and guards,

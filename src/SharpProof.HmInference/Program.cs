@@ -151,7 +151,7 @@ internal static class Program
             ("Lambda", "static System.Func<int,int> M(int x) => y => x;", "Suggestion", "global::System.Func<int, T1> M<T1>(T1 x)"),
             ("Closure", "static System.Func<int,int> M(int x) => y => x + y;", "Concrete", null),
             ("Local", "static int M(int x) { var y = x; return y; }", "Suggestion", "T1 M<T1>(T1 x)"),
-            ("TypedLocal", "static int M(int x) { int y = x; return y; }", "Rejected", null),
+            ("TypedLocal", "static int M(int x) { int y = x; return y; }", "Concrete", null),
             ("MonomorphicLocal", "static (int,bool) M(int x, bool b) { System.Func<object,object> id = y => y; return ((int)id(x), (bool)id(b)); }", "Concrete", null),
             ("SharedLocalType", "static int M(int x) { System.Func<int,int> id = y => y; var value = id(1); return id(x); }", "Concrete", null),
             ("Member", "static int M(string x) => x.Length;", "Concrete", null),
@@ -202,7 +202,7 @@ internal static class Program
             ("AllocateArray", "static int[] M(int n) => new int[n];", "Concrete", null),
             ("GenericLocal", "static int M(int x) { T Id<T>(T value) => value; return Id(x); }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("CapturedLocal", "static int M(int x) { int Read() => x; return Read(); }", "Rejected", null),
-            ("TypedArrayLocal", "static int M(int[] xs,int i) { int[] copy=xs; return copy[i]; }", "Rejected", null)
+            ("TypedArrayLocal", "static int M(int[] xs,int i) { int[] copy=xs; return copy[i]; }", "Concrete", null)
         ];
         var passed = 0;
         var failures = new List<string>();
@@ -331,6 +331,8 @@ internal static class Program
         passed += await DelegateRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await EnumerationChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await EnumerationRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await ControlFlowChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += await ControlFlowRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += BindingChecks.Run(cancellationToken);
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);

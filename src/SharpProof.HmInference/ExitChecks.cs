@@ -24,7 +24,7 @@ internal static class ExitChecks
             ("SwitchLoopBreak", "static int M(int tag,int x,int y) { switch(tag) { case 0: while(true) { x=y; break; } return x; default: return y; } }", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"),
             ("SwitchSharedScope", "static int M(int tag,int x,int y) { switch(tag) { case 0: var a=x; return a; default: var b=y; return b; } }", "Suggestion", "T1 M<T1>(int tag, T1 x, T1 y)"),
             ("SwitchTypePattern", "static int M(object x) { switch(x) { case int value: return value; default: return 0; } }", "Skipped", null),
-            ("GotoSkipped", "static int M(int x) { goto Done; Done: return x; }", "Skipped", null),
+            ("GotoLabel", "static int M(int x) { goto Done; Done: return x; }", "Suggestion", "T1 M<T1>(T1 x)"),
             ("ForeachDeconstruct", "static int M((int,bool)[] xs,int seed) { foreach(var (value,flag) in xs) seed=value; return seed; }", "Suggestion", "T1 M<T1, T2>((T1, T2)[] xs, T1 seed)"),
             ("ForeachDeconstructNested", "static string M((int,(bool,string))[] xs,string seed) { foreach(var (_,(_,text)) in xs) seed=text; return seed; }", "Suggestion", "T3 M<T1, T2, T3>((T1, (T2, T3))[] xs, T3 seed)"),
             ("ForeachDeconstructTyped", "static int M((int,bool)[] xs,int seed) { foreach((int value,bool flag) in xs) seed=value; return seed; }", "Concrete", null),
