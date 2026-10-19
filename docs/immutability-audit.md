@@ -3404,3 +3404,14 @@ keeps its immutable input contract and receives _blocks.ToImmutable after CFG bl
 registration. Keep traversal queues/stacks, phase scalars and frame lifecycle unchanged.
 Validate full Frontend and source exception/filter, opaque/list and metadata call paths.
 Status: open before edits.
+
+IMM-M117: Main reviewed 30 Contracts and eight Fuzz fixed/projection/helper rows.
+Freeze fixed/nested expected vectors and operation snapshots; make EntryValues/Values
+return immutable maps and remove redundant recapture. Use the existing internal
+ImmutableDictionaryCapture.Create (builder + explicit duplicate guard) for all twelve
+strict ToDictionary projections, retaining selector order/comparers; grant only the two
+test assemblies the same existing Ir friend access used by other test projects. Preserve
+substitution indexer overwrite semantics with scoped builders. No new public helper API.
+Retain native reflection/byte buffers and mutable test subjects. Run Contracts/Fuzz
+ordinary suites plus layout after project metadata changes and literal text verification.
+Status: open before edits.
