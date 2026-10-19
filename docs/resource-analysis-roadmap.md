@@ -516,3 +516,37 @@ partial numeric or undefined-outcome evidence. Every mutation is rejected and th
 restored response validates. No coverage percentage is inferred until the next
 complete measurement; the 100% baseline and remaining roadmap requirements stay
 unchanged.
+
+## Next ranking increment: composed counter phases
+
+Admit a top-tested loop with two distinct Int32/Int64 locals, initialized from
+supported sizes, and this fixed phase selection:
+
+```csharp
+while (left > 0 || right > 0)
+{
+    if (left > 0) { /* phase prefix */ left -= positiveConstant; }
+    else { /* phase prefix */ right -= positiveConstant; }
+}
+```
+
+Each continuing phase must reach its own checked progress rule. The decrement
+family uses ceiling division of the initial nonnegative size; division by a
+constant greater than one uses the existing digit bound. Both counters remain
+protected from all other writes, aliases and jumps. Earlier mutation, missing
+steps, mismatched phase selection and coupled updates produce Unknown.
+
+Compose the two existing typed rank certificates as a sequence of resource
+repeats. The native checker derives each phase count and its prefix costs, then
+adds the results. This preserves separate phase allocation/nested-loop costs
+without treating a mathematical sum as a physical counter domain.
+
+Roslyn can split the logical-or guard into separate branches. Extend source-entry
+markers only where a true edge enters this source while body; ordinary body
+conditionals must not add entries. Check left-only, right-only, both-positive and
+both-inactive executions independently before using numeric violation evidence.
+
+Verification must include independent small executions, constant and same-input
+linear contracts, all three resource metrics, exact violating prefixes, and
+explicit Unknown controls. Keep the broader ranking checkbox open until the
+source, native and relevant broader gates pass for this admitted family.
